@@ -40,5 +40,8 @@ Thumbs.db
 .env
 .env.local
 
+# Raw policy documents (copyrighted marketplace text); only policies/manifest.yaml is committed
+policies/raw/
+
 # Claude Code local state
 .claude/
