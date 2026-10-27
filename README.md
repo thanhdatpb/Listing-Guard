@@ -4,9 +4,10 @@ Pre-publish checker for marketplace listings (Etsy first, Amazon later). Listing
 listing and suggests fixes before you publish. It does not edit or publish anything, and it does not
 do SEO.
 
-- **Rule Engine**: deterministic rules (title length, tag count, length and characters, duplicate
-  tags, required fields, banned words). Thresholds, word lists and severities are configured per
-  marketplace in versioned YAML, never hard-coded.
+- **Rule Engine**: deterministic rules (title length, characters and repeated special characters; tag
+  count, length, characters and duplicates; required fields; positive price and quantity; banned
+  words). Thresholds, word lists and severities are configured per marketplace in versioned YAML,
+  never hard-coded.
 - **RAG Analyzer** (not built yet): an LLM grounded in public marketplace policies (pgvector). Every
   citation will be verified by code.
 
@@ -44,7 +45,7 @@ Modules:
 | Module | Role |
 |---|---|
 | `core/` | Plain Java domain types shared by all modules: `Listing`, `Money`, `Finding`, `Severity`. No Spring. |
-| `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, the Etsy rules and `rulesets/etsy-2026-10.yaml`. No Spring. |
+| `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, the Etsy rules and `rulesets/etsy-2026-11.yaml`. No Spring. |
 | `rag-analyzer/` | RAG + LLM analysis library (empty) |
 | `api/` | Spring Boot REST app, Flyway migrations, normalizers, ruleset registration |
 | `eval/` | Evaluation harness (README only) |
@@ -88,20 +89,24 @@ The response lists one finding per problem, each with `ruleId`, `severity`, `fie
 
 ## Rulesets
 
-`rule-engine/src/main/resources/rulesets/etsy-2026-10.yaml` holds every threshold, word list and
+`rule-engine/src/main/resources/rulesets/etsy-2026-11.yaml` holds every threshold, word list and
 severity. Each rule records where its values come from:
 
 | Rule | Severity | Source status |
 |---|---|---|
 | `title_length` (max 140) | ERROR | verified |
+| `title_characters` | ERROR | verified: Etsy Open API `createDraftListing` |
+| `title_repeated_special_chars` (`%` `:` `&`, once each) | WARNING | secondary: the same API text also lists `+`, not checked here |
 | `tag_count` (max 13), `tag_length` (max 20) | ERROR | secondary: help.etsy.com blocks automated access |
 | `tag_characters` | ERROR | verified: Etsy Open API `createDraftListing` |
 | `required_fields` | ERROR | verified: Etsy Open API `createDraftListing` |
+| `price_quantity_positive` | ERROR | verified: Etsy Open API `createDraftListing` |
 | `duplicate_tags` | WARNING | unverified |
 | `banned_words` | WARNING | unverified: sample list only |
 
-To change a threshold or a severity, edit the YAML and **bump its `version`**: the API refuses to
+To change a threshold or a severity, create a new ruleset file with a new `version`: the API refuses to
 start if a registered version has different content (see [ADR-002](docs/adr/ADR-002-ruleset-versioning.md)).
+`etsy-2026-10.yaml` is kept unchanged as history (a test pins its hash) and is no longer loaded.
 Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `application.yml`.
 
 ## Roadmap
