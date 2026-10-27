@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -17,5 +18,17 @@ public class TestcontainersConfig {
     @ServiceConnection
     PostgreSQLContainer<?> postgres() {
         return new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
+    }
+
+    /**
+     * Test-wide properties, set here so every test importing this configuration keeps the same context:
+     * the deterministic fake embedding provider (no Ollama needed) and the debug search endpoint.
+     */
+    @Bean
+    DynamicPropertyRegistrar testProperties() {
+        return registry -> {
+            registry.add("listing-guard.embedding.provider", () -> "hashing");
+            registry.add("listing-guard.policies.search-endpoint.enabled", () -> "true");
+        };
     }
 }
