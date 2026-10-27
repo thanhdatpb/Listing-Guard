@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 class RulesetLoaderTest {
 
-    private static final String ETSY = "rulesets/etsy-2026-10.yaml";
+    private static final String ETSY = "rulesets/etsy-2026-11.yaml";
 
     private static final String MINIMAL = """
             marketplace: etsy
@@ -37,11 +37,12 @@ class RulesetLoaderTest {
         RulesetConfig config = RulesetLoader.loadClasspath(ETSY);
 
         assertThat(config.marketplace()).isEqualTo("ETSY");
-        assertThat(config.version()).isEqualTo("etsy-2026-10");
+        assertThat(config.version()).isEqualTo("etsy-2026-11");
         assertThat(config.checkedAt()).isEqualTo(LocalDate.of(2026, 10, 27));
         assertThat(config.contentHash()).matches("[0-9a-f]{64}");
-        assertThat(config.rules()).containsOnlyKeys("title_length", "tag_count", "tag_length", "tag_characters",
-                "duplicate_tags", "required_fields", "banned_words");
+        assertThat(config.rules()).containsOnlyKeys("title_length", "title_characters", "title_repeated_special_chars",
+                "tag_count", "tag_length", "tag_characters", "duplicate_tags", "required_fields",
+                "price_quantity_positive", "banned_words");
     }
 
     @Test
@@ -51,6 +52,14 @@ class RulesetLoaderTest {
         assertThat(config.rule("title_length").severity()).isEqualTo(Severity.ERROR);
         assertThat(config.rule("duplicate_tags").severity()).isEqualTo(Severity.WARNING);
         assertThat(config.rule("banned_words").severity()).isEqualTo(Severity.WARNING);
+
+        assertThat(config.rule("title_characters").severity()).isEqualTo(Severity.ERROR);
+        assertThat(config.rule("title_repeated_special_chars").severity()).isEqualTo(Severity.WARNING);
+        assertThat(config.rule("price_quantity_positive").severity()).isEqualTo(Severity.ERROR);
+        assertThat(config.rule("title_characters").source().status()).isEqualTo(SourceStatus.VERIFIED);
+        assertThat(config.rule("title_repeated_special_chars").source().status()).isEqualTo(SourceStatus.SECONDARY);
+        assertThat(config.rule("price_quantity_positive").source().status()).isEqualTo(SourceStatus.VERIFIED);
+        assertThat(config.rule("title_repeated_special_chars").stringListParam("chars")).containsExactly("%", ":", "&");
 
         assertThat(config.rule("title_length").source().status()).isEqualTo(SourceStatus.VERIFIED);
         assertThat(config.rule("tag_count").source().status()).isEqualTo(SourceStatus.SECONDARY);

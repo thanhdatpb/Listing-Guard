@@ -43,7 +43,7 @@ rules:
       urls:
         - https://www.etsy.com/openapi/generated/oas/3.0.0.json
         - https://developers.etsy.com/documentation/reference#operation/createDraftListing
-      note: The same createDraftListing text also lists "+" among the characters usable once each. The maintainers chose to check only % : & here and to rate the source secondary. Adding "+" needs a new ruleset version.
+      note: 'The same createDraftListing text also lists "+" among the characters usable once each. The maintainers chose to check only % : & here and to rate the source secondary. Adding "+" needs a new ruleset version.'
 
   tag_count:
     severity: ERROR

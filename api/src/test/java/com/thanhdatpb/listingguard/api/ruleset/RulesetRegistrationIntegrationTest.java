@@ -19,7 +19,7 @@ import org.springframework.core.io.ClassPathResource;
 @Import(TestcontainersConfig.class)
 class RulesetRegistrationIntegrationTest {
 
-    private static final String LOCATION = "rulesets/etsy-2026-10.yaml";
+    private static final String LOCATION = "rulesets/etsy-2026-11.yaml";
 
     @Autowired
     ActiveRulesets rulesets;
@@ -35,7 +35,7 @@ class RulesetRegistrationIntegrationTest {
     void startupRegistersTheEtsyRulesetWithItsMetadata() {
         RulesetConfig config = rulesets.get("ETSY").config();
 
-        RulesetVersion row = versions.findByMarketplaceCodeAndVersion("ETSY", "etsy-2026-10").orElseThrow();
+        RulesetVersion row = versions.findByMarketplaceCodeAndVersion("ETSY", "etsy-2026-11").orElseThrow();
 
         assertThat(rulesets.get("ETSY").rulesetVersionId()).isEqualTo(row.getId());
         assertThat(row.getContentHash()).isEqualTo(config.contentHash()).matches("[0-9a-f]{64}");
@@ -63,13 +63,13 @@ class RulesetRegistrationIntegrationTest {
 
         assertThatThrownBy(() -> rulesets.register(edited))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("etsy-2026-10")
+                .hasMessageContaining("etsy-2026-11")
                 .hasMessageContaining("bump its version");
     }
 
     @Test
     void aNewVersionIsRegisteredAsANewRow() throws IOException {
-        RulesetConfig next = RulesetLoader.parse(yaml().replace("version: etsy-2026-10", "version: etsy-2099-01"));
+        RulesetConfig next = RulesetLoader.parse(yaml().replace("version: etsy-2026-11", "version: etsy-2099-01"));
 
         ActiveRulesets.Active active = rulesets.register(next);
 

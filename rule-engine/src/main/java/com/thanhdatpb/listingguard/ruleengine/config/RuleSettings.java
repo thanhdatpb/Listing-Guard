@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.ruleengine.config;
 
 import com.thanhdatpb.listingguard.core.finding.Severity;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +18,14 @@ public record RuleSettings(String ruleId, Severity severity, Source source, Map<
             return number.intValue();
         }
         throw invalid(name, "an integer", value);
+    }
+
+    public BigDecimal decimalParam(String name) {
+        Object value = require(name);
+        if (value instanceof Number number) {
+            return new BigDecimal(number.toString());
+        }
+        throw invalid(name, "a number", value);
     }
 
     public String stringParam(String name) {
