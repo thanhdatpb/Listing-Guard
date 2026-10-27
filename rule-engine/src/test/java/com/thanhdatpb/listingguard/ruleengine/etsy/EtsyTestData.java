@@ -10,7 +10,7 @@ import java.util.List;
 /** Shared fixtures. Limits are read from the real ruleset so tests never hard-code them. */
 final class EtsyTestData {
 
-    static final RulesetConfig CONFIG = RulesetLoader.loadClasspath("rulesets/etsy-2026-10.yaml");
+    static final RulesetConfig CONFIG = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
 
     private EtsyTestData() {
     }

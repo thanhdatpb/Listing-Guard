@@ -40,7 +40,7 @@ class TitleLengthRuleTest {
         assertThat(finding.field()).isEqualTo("title");
         assertThat(finding.message()).isEqualTo("Tiêu đề dài " + (max + 1) + " ký tự, tối đa " + max + ".");
         assertThat(finding.suggestion()).contains("1 ký tự");
-        assertThat(finding.rulesetVersion()).isEqualTo("etsy-2026-10");
+        assertThat(finding.rulesetVersion()).isEqualTo(CONFIG.version());
     }
 
     @Test

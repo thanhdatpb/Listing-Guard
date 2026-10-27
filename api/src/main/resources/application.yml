@@ -1,7 +1,7 @@
 listing-guard:
   rulesets:
     locations:
-      - classpath:rulesets/etsy-2026-10.yaml
+      - classpath:rulesets/etsy-2026-11.yaml
 
 spring:
   application:

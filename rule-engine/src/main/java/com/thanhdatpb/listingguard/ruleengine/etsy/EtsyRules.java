@@ -14,7 +14,10 @@ public final class EtsyRules {
     public static List<Rule> all() {
         return List.of(
                 new RequiredFieldsRule(),
+                new PriceQuantityPositiveRule(),
                 new TitleLengthRule(),
+                new TitleCharactersRule(),
+                new TitleRepeatedSpecialCharsRule(),
                 new TagCountRule(),
                 new TagLengthRule(),
                 new TagCharactersRule(),

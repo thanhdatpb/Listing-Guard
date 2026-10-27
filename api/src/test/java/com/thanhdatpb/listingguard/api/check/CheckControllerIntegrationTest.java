@@ -108,7 +108,7 @@ class CheckControllerIntegrationTest {
         List<String> ruleIds = new ArrayList<>();
         json.get("findings").forEach(finding -> {
             ruleIds.add(finding.get("ruleId").asText());
-            assertThat(finding.get("rulesetVersion").asText()).isEqualTo("etsy-2026-10");
+            assertThat(finding.get("rulesetVersion").asText()).isEqualTo("etsy-2026-11");
             assertThat(finding.get("message").asText()).isNotBlank();
             assertThat(finding.get("suggestion").asText()).isNotBlank();
         });

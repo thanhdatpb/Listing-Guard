@@ -3,7 +3,7 @@ package com.thanhdatpb.listingguard.api.ruleset;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/** Ruleset YAML files to load at startup, e.g. {@code classpath:rulesets/etsy-2026-10.yaml}. */
+/** Ruleset YAML files to load at startup, e.g. {@code classpath:rulesets/etsy-2026-11.yaml}. */
 @ConfigurationProperties(prefix = "listing-guard.rulesets")
 public record RulesetProperties(List<String> locations) {
 

@@ -9,11 +9,13 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.finding.Severity;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.core.listing.Money;
 import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
 import com.thanhdatpb.listingguard.ruleengine.RuleRegistry;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetLoader;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,19 +45,21 @@ class EtsyRulesTest {
         tags.add("TAG0");
         tags.add(CONFIG.rule("banned_words").stringListParam("words").get(0));
         Listing base = valid();
-        Listing bad = new Listing("x".repeat(limit("title_length", "max_length") + 1), null, tags, base.price(),
+        String badTitle = "x".repeat(limit("title_length", "max_length") + 1) + " 😀 100% 50%";
+        Listing bad = new Listing(badTitle, null, tags, new Money(BigDecimal.ZERO, "USD"),
                 base.category(), base.materials(), base.images(), base.quantity(), base.whoMade(), base.whenMade());
 
         List<Finding> findings = engine.run(bad, CONFIG);
 
         assertThat(findings).extracting(Finding::ruleId).containsExactlyInAnyOrder(
-                "required_fields", "title_length", "tag_count", "tag_length", "tag_characters", "duplicate_tags",
+                "required_fields", "price_quantity_positive", "title_length", "title_characters",
+                "title_repeated_special_chars", "tag_count", "tag_length", "tag_characters", "duplicate_tags",
                 "banned_words");
     }
 
     @Test
     void severityCanBeChangedInYamlWithoutTouchingCode() throws IOException {
-        String yaml = new String(getClass().getResourceAsStream("/rulesets/etsy-2026-10.yaml").readAllBytes(),
+        String yaml = new String(getClass().getResourceAsStream("/rulesets/etsy-2026-11.yaml").readAllBytes(),
                 StandardCharsets.UTF_8);
         String relaxed = yaml.replace("  tag_count:\n    severity: ERROR", "  tag_count:\n    severity: INFO");
         assertThat(relaxed).isNotEqualTo(yaml);
