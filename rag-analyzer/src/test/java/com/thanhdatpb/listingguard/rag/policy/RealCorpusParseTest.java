@@ -30,6 +30,7 @@ class RealCorpusParseTest {
         PolicyChunker chunker = new PolicyChunker(new PolicyChunker.Config(1500, 200));
 
         List<String> dump = new ArrayList<>();
+        List<String> full = new ArrayList<>();
         int checked = 0;
         for (PolicyManifest.Entry entry : manifest.documents()) {
             Path file = POLICIES.resolve("raw").resolve(entry.marketplace().toLowerCase(Locale.ROOT)).resolve(entry.file());
@@ -48,13 +49,17 @@ class RealCorpusParseTest {
             dump.add("=== " + entry.file() + " | " + entry.title() + " | lastUpdated=" + parsed.lastUpdated()
                     + " | sections=" + parsed.sections().size() + " | chunks=" + chunks.size());
             for (PolicyChunk chunk : chunks) {
+                full.add("##### " + entry.file() + " #" + chunk.ordinal() + " | " + chunk.sectionPath());
+                full.add(chunk.content());
+                full.add("");
                 dump.add(String.format("%3d | %4d chars | %s | #%s%n      %s", chunk.ordinal(), chunk.content().length(),
                         chunk.sectionPath(), chunk.anchor(), chunk.content().replace("\n", " ").substring(0,
-                                Math.min(110, chunk.content().replace("\n", " ").length()))));
+                                Math.min(280, chunk.content().replace("\n", " ").length()))));
             }
         }
         assumeTrue(checked > 0, "no raw policy files saved locally");
         Files.createDirectories(Path.of("target"));
         Files.write(Path.of("target", "corpus-chunks.txt"), dump, StandardCharsets.UTF_8);
+        Files.write(Path.of("target", "corpus-chunks-full.txt"), full, StandardCharsets.UTF_8);
     }
 }
