@@ -1,7 +1,8 @@
 # Retrieval evaluation set for the Etsy policy corpus (policies/manifest.yaml).
 #
-# STATUS: labels written by the assistant after reading the parsed corpus. PENDING MAINTAINER REVIEW:
-# do not run the evaluation until the labels are approved.
+# STATUS: labels were written after reading the parsed corpus and APPROVED by the maintainer (with their
+# corrections) before the first evaluation run. Do not change labels or questions after seeing results; if
+# a change is unavoidable, record the reason in results.md.
 #
 # Every query has an English and a Vietnamese question (same meaning), so recall and MRR can be reported
 # per language. `expected` lists the sections that answer the question; a retrieved chunk is relevant if it
