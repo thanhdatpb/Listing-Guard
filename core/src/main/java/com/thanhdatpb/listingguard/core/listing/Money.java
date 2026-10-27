@@ -1,4 +1,4 @@
-package com.thanhdatpb.listingguard.api.listing;
+package com.thanhdatpb.listingguard.core.listing;
 
 import java.math.BigDecimal;
 import java.util.Objects;

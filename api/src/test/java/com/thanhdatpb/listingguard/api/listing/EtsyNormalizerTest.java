@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.listing;
 
+import com.thanhdatpb.listingguard.core.listing.Listing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

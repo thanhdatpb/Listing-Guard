@@ -4,6 +4,7 @@ FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
+COPY core core
 COPY rule-engine rule-engine
 COPY rag-analyzer rag-analyzer
 COPY api api

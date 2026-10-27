@@ -17,6 +17,10 @@
     <dependencies>
         <dependency>
             <groupId>com.thanhdatpb.listingguard</groupId>
+            <artifactId>core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.thanhdatpb.listingguard</groupId>
             <artifactId>rule-engine</artifactId>
         </dependency>
         <dependency>

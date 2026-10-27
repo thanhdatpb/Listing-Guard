@@ -1,4 +1,4 @@
-package com.thanhdatpb.listingguard.api.check;
+package com.thanhdatpb.listingguard.core.finding;
 
 public enum Severity {
     ERROR,

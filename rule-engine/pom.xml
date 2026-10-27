@@ -12,5 +12,12 @@
 
     <artifactId>rule-engine</artifactId>
     <name>Listing Guard :: Rule Engine</name>
-    <description>Deterministic, marketplace-configurable listing rules. Placeholder in week 1.</description>
+    <description>Deterministic, marketplace-configurable listing rules.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.thanhdatpb.listingguard</groupId>
+            <artifactId>core</artifactId>
+        </dependency>
+    </dependencies>
 </project>

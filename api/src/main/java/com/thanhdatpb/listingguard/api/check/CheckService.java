@@ -1,6 +1,6 @@
 package com.thanhdatpb.listingguard.api.check;
 
-import com.thanhdatpb.listingguard.api.listing.Listing;
+import com.thanhdatpb.listingguard.core.listing.Listing;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.stereotype.Service;

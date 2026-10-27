@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.check;
 
+import com.thanhdatpb.listingguard.core.finding.Finding;
 import java.util.List;
 import java.util.UUID;
 
