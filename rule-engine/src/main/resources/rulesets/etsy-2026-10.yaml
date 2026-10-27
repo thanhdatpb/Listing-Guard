@@ -1,0 +1,89 @@
+# Etsy ruleset. Thresholds, word lists and severities live here; rule logic lives in Java (ADR-001).
+#
+# Any change to this file changes its content hash. Bump `version` for every change: the API refuses to
+# start when a registered version has a different hash (ADR-002).
+#
+# source.status:
+#   verified   - confirmed against an official Etsy document
+#   secondary  - official page not readable by automation; consistent across secondary sources
+#   unverified - no usable source found
+marketplace: ETSY
+version: etsy-2026-10
+checked_at: 2026-10-27
+
+rules:
+  title_length:
+    severity: ERROR
+    max_length: 140
+    source:
+      status: verified
+      urls:
+        - https://www.etsy.com/ca/seller-handbook/article/28834504207
+      note: Etsy Seller Handbook, title guidance.
+
+  tag_count:
+    severity: ERROR
+    max_count: 13
+    source:
+      status: secondary
+      urls:
+        - https://help.etsy.com/hc/en-us/articles/360000336307-How-to-Use-Tags-to-Get-Found-in-Search
+      note: help.etsy.com blocks automated access (HTTP 403); value is consistent across secondary sources.
+
+  tag_length:
+    severity: ERROR
+    max_length: 20
+    source:
+      status: secondary
+      urls:
+        - https://help.etsy.com/hc/en-us/articles/360000336307-How-to-Use-Tags-to-Get-Found-in-Search
+      note: help.etsy.com blocks automated access (HTTP 403); value is consistent across secondary sources.
+
+  tag_characters:
+    severity: ERROR
+    # One character class: a tag may only contain characters matching it.
+    allowed_char_class: "[\\p{L}\\p{Nd}\\p{Zs}\\-'™©®]"
+    source:
+      status: verified
+      urls:
+        - https://www.etsy.com/openapi/generated/oas/3.0.0.json
+        - https://developers.etsy.com/documentation/reference#operation/createDraftListing
+      note: Etsy Open API v3 createDraftListing, "tags" - letters, numbers, whitespace, hyphen, apostrophe, TM, copyright, registered.
+
+  duplicate_tags:
+    severity: WARNING
+    case_insensitive: true
+    source:
+      status: unverified
+      note: No official source found for how Etsy treats duplicate tags.
+
+  required_fields:
+    severity: ERROR
+    # Listing fields. "category" corresponds to Etsy taxonomy_id. "images" is deliberately not listed:
+    # createDraftListing does not require it.
+    fields:
+      - title
+      - description
+      - price
+      - quantity
+      - who_made
+      - when_made
+      - category
+    source:
+      status: verified
+      urls:
+        - https://www.etsy.com/openapi/generated/oas/3.0.0.json
+        - https://developers.etsy.com/documentation/reference#operation/createDraftListing
+      note: Etsy Open API v3 createDraftListing required body fields.
+
+  banned_words:
+    severity: WARNING
+    sample: true
+    # SAMPLE LIST for development. Not derived from any Etsy policy.
+    words:
+      - counterfeit
+      - replica
+      - knockoff
+    source:
+      status: unverified
+      note: Sample words only; replace with a list backed by Etsy policy.
