@@ -40,8 +40,21 @@ public final class HtmlPolicyParser implements PolicyParser {
     private static final Set<String> BLOCK_TAGS = Set.of(
             "p", "div", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6", "table", "section", "article",
             "blockquote", "dl", "pre");
-    private static final int STRONG_HEADING_LEVEL = 7;
+    /**
+     * Levels of headings that are not real h1-h6 tags (which keep their number, 1-6, so a real heading always
+     * closes all of these). A numbered "a." or "1." item is a letter-level heading, "i." a roman-level one,
+     * and a heading with no number belongs to the nearest numbered heading above it, one step deeper.
+     */
+    private static final int LETTER_LEVEL = 70;
+    private static final int ROMAN_LEVEL = 80;
+    private static final int CHILD_STEP = 5;
     private static final int MAX_STRONG_HEADING_CHARS = 150;
+    private static final String ROMAN = "i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|xii";
+    private static final Pattern DIGIT_MARKER = Pattern.compile("^\\d+\\.\\s+\\S.*");
+    private static final Pattern LETTER_MARKER = Pattern.compile("^[a-z]\\.\\s+\\S.*");
+    private static final Pattern ROMAN_MARKER = Pattern.compile("^(" + ROMAN + ")\\.\\s+\\S.*");
+    /** A paragraph that is only a short roman-numbered label ("i. Messages"), not a sentence. */
+    private static final Pattern ROMAN_LABEL = Pattern.compile("^(" + ROMAN + ")\\.\\s+[^.:;!?]{1,80}$");
     private static final Pattern LAST_UPDATED = Pattern.compile("^Last updated on\\s+(.+?)\\.?$", Pattern.CASE_INSENSITIVE);
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
             dateFormat("MMM d, yyyy"),
@@ -139,12 +152,52 @@ public final class HtmlPolicyParser implements PolicyParser {
                 // "<strong>Note</strong>: ..." is an emphasized label, not a heading, with or without the colon inside
                 boolean label = heading.endsWith(":") || restText.startsWith(":");
                 if (!heading.isEmpty() && heading.length() <= MAX_STRONG_HEADING_CHARS && !label) {
-                    sections.heading(STRONG_HEADING_LEVEL, heading, null);
+                    sections.heading(strongLevel(heading), heading, null);
                     sections.unit(restText);
                     return;
                 }
             }
+            if (p.children().isEmpty() && ROMAN_LABEL.matcher(text).matches()) {
+                sections.heading(strongLevel(text), text, null);
+                return;
+            }
             sections.unit(textWithBreaks(p));
+        }
+
+        /** Level for a heading that is not a real h-tag; see the level constants. */
+        private int strongLevel(String heading) {
+            int marked = markerLevel(heading);
+            if (marked > 0) {
+                return marked;
+            }
+            int parent = sections.deepestOpenLevel(LETTER_LEVEL, Walker::isNumbered);
+            return parent < 0 ? LETTER_LEVEL : parent + CHILD_STEP;
+        }
+
+        /** Level given by a leading "1.", "a." or "i." marker, or -1 when the heading has none. */
+        private int markerLevel(String heading) {
+            if (DIGIT_MARKER.matcher(heading).matches()) {
+                return LETTER_LEVEL;
+            }
+            Matcher roman = ROMAN_MARKER.matcher(heading);
+            if (roman.matches()) {
+                String token = roman.group(1);
+                // "i.", "v." and "x." are also letters: they are the next letter after "h.", "u." and "w."
+                boolean asLetter = token.length() == 1 && isNextLetter(token.charAt(0), sections.openHeadingAt(LETTER_LEVEL));
+                return asLetter ? LETTER_LEVEL : ROMAN_LEVEL;
+            }
+            return LETTER_MARKER.matcher(heading).matches() ? LETTER_LEVEL : -1;
+        }
+
+        private static boolean isNextLetter(char letter, String openLetterHeading) {
+            return openLetterHeading != null && !openLetterHeading.isEmpty()
+                    && openLetterHeading.charAt(0) == (char) (letter - 1) && openLetterHeading.length() > 1
+                    && openLetterHeading.charAt(1) == '.';
+        }
+
+        private static boolean isNumbered(String heading) {
+            return DIGIT_MARKER.matcher(heading).matches() || ROMAN_MARKER.matcher(heading).matches()
+                    || LETTER_MARKER.matcher(heading).matches();
         }
 
         private void list(Element list) {

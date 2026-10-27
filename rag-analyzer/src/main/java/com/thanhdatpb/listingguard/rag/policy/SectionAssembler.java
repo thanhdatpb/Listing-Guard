@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.rag.policy;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * Builds sections from a stream of headings and text units. A heading of level L closes every open
@@ -43,6 +44,27 @@ final class SectionAssembler {
             currentUnits = new ArrayList<>();
         }
         currentUnits.add(text);
+    }
+
+    /** Level of the deepest open heading at {@code minLevel} or deeper whose text passes the test, or -1. */
+    int deepestOpenLevel(int minLevel, Predicate<String> textTest) {
+        for (int i = open.size() - 1; i >= 0; i--) {
+            Heading heading = open.get(i);
+            if (heading.level() >= minLevel && textTest.test(heading.text())) {
+                return heading.level();
+            }
+        }
+        return -1;
+    }
+
+    /** Text of the deepest open heading with exactly this level, or null. */
+    String openHeadingAt(int level) {
+        for (int i = open.size() - 1; i >= 0; i--) {
+            if (open.get(i).level() == level) {
+                return open.get(i).text();
+            }
+        }
+        return null;
     }
 
     ParsedPolicy build(LocalDate lastUpdated) {

@@ -72,7 +72,12 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   citation checks compare against it); only the embedding input has the section path prepended.
 - Embeddings: tests use `HashingEmbeddingProvider` (set through `TestcontainersConfig`), never Ollama.
   Evaluation numbers are only ever produced by a real run; never write or estimate them by hand. The
-  evaluation labels in `eval/retrieval/queries.yaml` are reviewed by the maintainer before a run.
+  evaluation labels in `eval/retrieval/queries.yaml` are reviewed by the maintainer before a run. Labels
+  always name a specific section (never a whole document); recall@5 is a hit when the top 5 contain at
+  least one label of the query.
+- Strong-led headings (`<p><strong>`) and plain roman labels ("i. Messages") are nested by their marker:
+  `1.`/`a.` level 70, `i.` level 80 (`i.` is a letter right after `h.`), an unnumbered strong heading is a
+  child of the nearest numbered heading above. Real `h1`-`h6` always close them.
 - Tests read boundary values from the ruleset instead of hard-coding limits.
 
 ## Git

@@ -177,6 +177,93 @@ class HtmlPolicyParserTest {
         assertThat(paths(policy)).containsExactly("Title");
     }
 
+    // ---- heading hierarchy of strong-led and plain numbered labels --------------------------------------
+
+    @Test
+    void theSellerPolicyCommunicationStandardsStructureNestsUnnumberedHeadingsUnderTheNumberedOneAbove() {
+        ParsedPolicy policy = parseArticle("""
+                <h2 id="community">2. Being a Member of the Etsy Community</h2>
+                <p>Intro to community.</p>
+                <p><strong>b. Privacy and Protecting Personal Information</strong></p>
+                <p>Privacy text.</p>
+                <p><strong>c. Communication Standards</strong></p>
+                <p>i. Messages</p>
+                <p>With Messages you can talk to buyers.</p>
+                <ol><li>Sending unsolicited advertisements</li></ol>
+                <p><strong>Interference</strong></p>
+                <p>Interference occurs when a member interferes with another shop.</p>
+                <p><strong>Harassment and Discrimination</strong></p>
+                <p>Harassment of other members is prohibited.</p>
+                <p>ii. Forums and Teams</p>
+                <p>Forums are public spaces.</p>
+                <p>iii. Communicating Cancellations</p>
+                <p>Notify the buyer via Messages.</p>
+                <h2 id="success">3. Feedback, Cases and Your Success</h2>
+                <p><strong>a. Reviews</strong></p>
+                <p>Reviews are great.</p>
+                """);
+
+        String community = "2. Being a Member of the Etsy Community";
+        String communication = community + " > c. Communication Standards";
+        assertThat(paths(policy)).containsExactly(
+                community,
+                community + " > b. Privacy and Protecting Personal Information",
+                communication + " > i. Messages",
+                communication + " > i. Messages > Interference",
+                communication + " > i. Messages > Harassment and Discrimination",
+                communication + " > ii. Forums and Teams",
+                communication + " > iii. Communicating Cancellations",
+                "3. Feedback, Cases and Your Success > a. Reviews");
+        assertThat(policy.sections().get(2).units())
+                .containsExactly("With Messages you can talk to buyers.", "- Sending unsolicited advertisements");
+        assertThat(policy.sections()).allSatisfy(section -> assertThat(section.anchor()).isIn("community", "success"));
+    }
+
+    @Test
+    void iIsALetterAfterHAndARomanNumeralOtherwise() {
+        ParsedPolicy letters = parseArticle("""
+                <h2>1. X</h2>
+                <p><strong>h. Eighth</strong></p><p>Text h.</p>
+                <p><strong>i. Ninth</strong></p><p>Text i.</p>
+                <p><strong>j. Tenth</strong></p><p>Text j.</p>
+                """);
+        ParsedPolicy roman = parseArticle("""
+                <h2>1. X</h2>
+                <p><strong>c. Third</strong></p>
+                <p><strong>i. First part</strong></p><p>Text one.</p>
+                <p><strong>ii. Second part</strong></p><p>Text two.</p>
+                <p><strong>d. Fourth</strong></p><p>Text four.</p>
+                """);
+
+        assertThat(paths(letters)).containsExactly("1. X > h. Eighth", "1. X > i. Ninth", "1. X > j. Tenth");
+        assertThat(paths(roman)).containsExactly(
+                "1. X > c. Third > i. First part", "1. X > c. Third > ii. Second part", "1. X > d. Fourth");
+    }
+
+    @Test
+    void anUnnumberedStrongHeadingUnderARealHeadingIsItsChildAndANewRealHeadingClosesIt() {
+        ParsedPolicy policy = parseArticle("""
+                <h2>1. Rules</h2>
+                <p><strong>Interference</strong></p><p>Interference text.</p>
+                <h3>Details</h3><p>Detail text.</p>
+                """);
+
+        assertThat(paths(policy)).containsExactly("1. Rules > Interference", "1. Rules > Details");
+    }
+
+    @Test
+    void aRomanLabelMustBeAShortPlainParagraphNotASentence() {
+        ParsedPolicy policy = parseArticle("""
+                <h2>Rules</h2>
+                <p>i. Messages are sent every day by members of the shop.</p>
+                <p>i.e. the item must be new</p>
+                <p><a href="https://example.com/x">i. Linked label</a></p>
+                """);
+
+        assertThat(paths(policy)).containsExactly("Rules");
+        assertThat(policy.sections().get(0).units()).hasSize(3);
+    }
+
     // ---- navigation is not content --------------------------------------------------------------------
 
     @Test

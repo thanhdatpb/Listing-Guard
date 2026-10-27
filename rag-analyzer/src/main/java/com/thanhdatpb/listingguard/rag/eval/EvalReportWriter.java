@@ -31,8 +31,9 @@ public final class EvalReportWriter {
         md.append("- Each question is retrieved with k=").append(RetrievalEvaluator.RETRIEVE_K)
                 .append("; recall is measured at ").append(RetrievalEvaluator.RECALL_K)
                 .append(", MRR over the top ").append(RetrievalEvaluator.RETRIEVE_K).append('\n');
-        md.append("- A result counts as relevant when it comes from an expected document and, if the expected entry names a section, "
-                + "its heading path starts with that section\n\n");
+        md.append("- A result is relevant when it comes from the expected document and its heading path starts with the expected "
+                + "section (an empty section means only the text before the first heading)\n");
+        md.append("- A query counts as a hit at 5 when the top 5 results contain at least one of its labels\n\n");
 
         md.append("## Summary\n\n");
         md.append("| Language | Queries | Hits in top ").append(RetrievalEvaluator.RECALL_K).append(" | Recall@")
@@ -66,11 +67,8 @@ public final class EvalReportWriter {
             md.append("### ").append(miss.queryId()).append(" (").append(miss.language()).append(")\n\n");
             md.append("Question: ").append(miss.question()).append("\n\nExpected:\n");
             for (EvalSet.Expected expected : miss.query().expected()) {
-                md.append("- ").append(expected.file());
-                if (expected.section() != null) {
-                    md.append(" > ").append(expected.section().isEmpty() ? "(text before the first heading)" : expected.section());
-                }
-                md.append('\n');
+                md.append("- ").append(expected.file()).append(" > ")
+                        .append(expected.section().isEmpty() ? "(text before the first heading)" : expected.section()).append('\n');
             }
             md.append("\nTop results returned:\n");
             for (RetrievedChunk chunk : miss.top()) {

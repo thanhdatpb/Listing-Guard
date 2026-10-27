@@ -23,6 +23,7 @@ class RetrievalEvaluatorTest {
                 vi: "vietnamese ip"
                 expected:
                   - file: ip.html
+                    section: "1. Role"
               - id: q-fees
                 en: "english fees"
                 vi: "vietnamese fees"

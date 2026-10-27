@@ -17,6 +17,7 @@ class EvalSetTest {
                 vi: "Tôi có được bán hàng giả không?"
                 expected:
                   - file: ip.html
+                    section: "1. Etsy's Role"
                   - file: seller.html
                     section: "1. Selling Basics > b. What Can't be Sold on Etsy"
             """;
@@ -36,15 +37,26 @@ class EvalSetTest {
         assertThat(query.questions()).containsEntry("en", "Can I sell counterfeit items?")
                 .containsEntry("vi", "Tôi có được bán hàng giả không?");
         assertThat(query.expected()).extracting(EvalSet.Expected::file).containsExactly("ip.html", "seller.html");
-        assertThat(query.expected().get(0).section()).isNull();
+        assertThat(query.expected().get(0).section()).isEqualTo("1. Etsy's Role");
     }
 
     @Test
-    void aDocumentLevelExpectationMatchesAnyChunkOfThatDocument() {
-        EvalSet.Expected expected = new EvalSet.Expected("ip.html", null);
+    void aLabelWithoutASectionIsRejectedBecauseLabelsNeverPointAtAWholeDocument() {
+        String withoutSection = VALID.replace("        section: \"1. Etsy's Role\"\n", "");
+        assertThat(withoutSection).isNotEqualTo(VALID);
 
-        assertThat(expected.matches(chunk("ip.html", "IP Policy", "IP Policy"))).isTrue();
+        assertThatThrownBy(() -> EvalSet.parse(withoutSection))
+                .isInstanceOf(PolicyParseException.class)
+                .hasMessageContaining("missing 'section'");
+    }
+
+    @Test
+    void aSectionLabelMatchesOnlyThatSectionOfThatDocument() {
+        EvalSet.Expected expected = new EvalSet.Expected("ip.html", "3. Counter Notice");
+
         assertThat(expected.matches(chunk("ip.html", "IP Policy", "IP Policy > 3. Counter Notice"))).isTrue();
+        assertThat(expected.matches(chunk("ip.html", "IP Policy", "IP Policy > 4. Repeat Infringement"))).isFalse();
+        assertThat(expected.matches(chunk("ip.html", "IP Policy", "IP Policy"))).isFalse();
         assertThat(expected.matches(chunk("other.html", "Other", "Other > 3. Counter Notice"))).isFalse();
     }
 
@@ -60,18 +72,27 @@ class EvalSetTest {
     }
 
     @Test
-    void anEmptySectionMeansTextBeforeTheFirstHeadingOrAnything() {
+    void anEmptySectionMeansOnlyTheTextBeforeTheFirstHeading() {
         EvalSet.Expected root = new EvalSet.Expected("mature.html", "");
 
         assertThat(root.matches(chunk("mature.html", "Mature", "Mature"))).isTrue();
-        assertThat(root.matches(chunk("mature.html", "Mature", "Mature > 1. Nudity"))).isTrue();
+        assertThat(root.matches(chunk("mature.html", "Mature", "Mature > 1. Nudity"))).isFalse();
+        assertThat(root.matches(chunk("other.html", "Other", "Other"))).isFalse();
+    }
+
+    @Test
+    void anEmptySectionCanBeWrittenInYaml() {
+        EvalSet set = EvalSet.parse(VALID.replace("section: \"1. Etsy's Role\"", "section: \"\""));
+
+        assertThat(set.queries().get(0).expected().get(0).section()).isEmpty();
     }
 
     @Test
     void relevanceIsAnyOfTheExpectedEntries() {
         EvalSet.Query query = EvalSet.parse(VALID).queries().get(0);
 
-        assertThat(query.isRelevant(chunk("ip.html", "IP", "IP > x"))).isTrue();
+        assertThat(query.isRelevant(chunk("ip.html", "IP", "IP > 1. Etsy's Role"))).isTrue();
+        assertThat(query.isRelevant(chunk("ip.html", "IP", "IP > 2. Reports"))).isFalse();
         assertThat(query.isRelevant(chunk("seller.html", "Seller", "Seller > 1. Selling Basics > b. What Can't be Sold on Etsy"))).isTrue();
         assertThat(query.isRelevant(chunk("seller.html", "Seller", "Seller > 2. Community"))).isFalse();
     }

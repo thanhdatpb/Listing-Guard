@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -53,16 +54,25 @@ public record EvalSet(String marketplace, List<Query> queries) {
     }
 
     /**
-     * A section that answers a question.
+     * A section that answers a question. Labels always point at a specific section, never at a whole document.
      *
      * @param file    manifest file name of the document
-     * @param section start of the heading path inside the document (without the document title), or null for
-     *                "anywhere in the document". An empty heading path (text before the first heading) is "".
+     * @param section start of the heading path inside the document (without the document title). The empty
+     *                string means exactly the text before the first heading, not the whole document.
      */
     public record Expected(String file, String section) {
 
+        public Expected {
+            Objects.requireNonNull(file, "file");
+            Objects.requireNonNull(section, "section");
+        }
+
         public boolean matches(RetrievedChunk chunk) {
-            return file.equals(chunk.sourceFile()) && (section == null || headingPath(chunk).startsWith(section));
+            if (!file.equals(chunk.sourceFile())) {
+                return false;
+            }
+            String path = headingPath(chunk);
+            return section.isEmpty() ? path.isEmpty() : path.startsWith(section);
         }
 
         static String headingPath(RetrievedChunk chunk) {
@@ -133,8 +143,11 @@ public record EvalSet(String marketplace, List<Query> queries) {
             }
             rejectUnknownKeys(e, EXPECTED_KEYS, where + " (" + id + ") expected");
             JsonNode section = e.get("section");
-            expected.add(new Expected(text(e, "file", where + " (" + id + ") expected"),
-                    section == null || section.isNull() ? null : section.asText()));
+            if (section == null || !section.isValueNode() || section.isNull()) {
+                throw new PolicyParseException(where + " (" + id + ") expected entry is missing 'section': labels must point "
+                        + "at a specific section (use \"\" for the text before the first heading)");
+            }
+            expected.add(new Expected(text(e, "file", where + " (" + id + ") expected"), section.asText().trim()));
         }
         return new Query(id, questions, expected);
     }

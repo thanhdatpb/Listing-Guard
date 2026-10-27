@@ -102,23 +102,40 @@ except the embedding backend.
    is git-ignored and each contributor saves their own copy. Only `policies/manifest.yaml` is
    committed: for each file its `marketplace`, `title`, canonical `url`, `fetched_at` and `version`, the
    page's own "Last updated" date. Ingest checks that date against the page and refuses a mismatch.
-2. **Start Ollama and pull the model once** (about a few hundred MB; the Ollama image itself is large):
+2. **Get Ollama with the model `nomic-embed-text`.** Two ways; pick one.
+
+   **A. Ollama in Docker** (the compose `ollama` service; its image is several GB because it bundles GPU
+   libraries, so make sure the Docker disk has room):
    ```bash
    docker compose up -d ollama
    docker compose run --rm ollama-pull        # ollama pull nomic-embed-text
    ```
-   Or run Ollama on the host and point `OLLAMA_URL` at it.
-3. **Ingest.** It is a one-shot job, not an HTTP endpoint (there is no authentication yet, and ingest is
-   batch work on local files):
+
+   **B. Ollama on the host** (for example the Windows installer from ollama.com). The application reads
+   `OLLAMA_URL`, default `http://localhost:11434`, so nothing needs configuring:
    ```bash
-   docker compose run --rm ingest
-   # or on the host: ./mvnw -pl api -am spring-boot:run -Dspring-boot.run.profiles=ingest
+   ollama pull nomic-embed-text
+   ```
+   Do not run a plain `docker compose up` in this case (it would also start the large `ollama` image); start
+   only what you need: `docker compose up -d postgres`.
+
+3. **Ingest.** It is a one-shot job, not an HTTP endpoint (there is no authentication yet, and ingest is
+   batch work on local files). With A, run it in Docker; with B, run it on the host from the repository root
+   (defaults: database `localhost:5432`, `policies/` and `eval/retrieval/` relative to the working directory;
+   set `DB_URL` if you changed `POSTGRES_PORT`):
+   ```bash
+   # A: docker compose run --rm ingest
+   # B:
+   ./mvnw -B -DskipTests package
+   java -jar api/target/listing-guard-api.jar --spring.profiles.active=ingest
    ```
    Ingest is idempotent. A document whose file, manifest entry, chunking settings and embedding model
    are unchanged is skipped; a changed document gets its chunks replaced; a document removed from the
    manifest is deleted (only for marketplaces that appear in the manifest). Every file is checked before
    anything is written.
-4. **Search** (debug view, off by default; the compose file turns it on):
+4. **Search** (debug view, off by default; the compose file turns it on). The compose `api` service reaches
+   Ollama at `http://ollama:11434`, so with way B run the application on the host instead
+   (`java -jar api/target/listing-guard-api.jar --listing-guard.policies.search-endpoint.enabled=true`):
    ```bash
    curl 'http://localhost:8080/policies/search?marketplace=ETSY&q=can+I+sell+counterfeit+items&k=5'
    ```
@@ -131,11 +148,13 @@ except the embedding backend.
 should answer them. After the corpus is ingested:
 
 ```bash
-docker compose run --rm eval-retrieval      # writes eval/retrieval/results.md
+# A: docker compose run --rm eval-retrieval
+# B: java -jar api/target/listing-guard-api.jar --spring.profiles.active=eval-retrieval
 ```
 
-`results.md` reports recall@5 and MRR separately for each language, the embedding model and the hash of
-every ingested file. Nothing in it is estimated: it only exists after a real run.
+Either way it writes `eval/retrieval/results.md`: recall@5 (a query is a hit when the top 5 contain at
+least one of its section labels) and MRR@10 separately for each language, the embedding model and the
+hash of every ingested file. Nothing in it is estimated: it only exists after a real run.
 
 ## Rulesets
 

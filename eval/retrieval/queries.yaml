@@ -4,12 +4,14 @@
 # do not run the evaluation until the labels are approved.
 #
 # Every query has an English and a Vietnamese question (same meaning), so recall and MRR can be reported
-# per language. `expected` lists the places that answer the question; a retrieved chunk is relevant if it
-# matches ANY entry:
+# per language. `expected` lists the sections that answer the question; a retrieved chunk is relevant if it
+# matches ANY entry, so a query is a hit at 5 when its top 5 results contain at least one label:
 #   file    - file name from policies/manifest.yaml
-#   section - optional; the start of the heading path inside the document (the document title is not part
-#             of it). Without `section`, any chunk of that document counts.
-# Section names are the headings of the saved pages, e.g. "1. Selling Basics > b. What Can't be Sold on Etsy".
+#   section - required. The start of the heading path inside the document (the document title is not part
+#             of it), e.g. "1. Selling Basics > b. What Can't be Sold on Etsy". There are no whole-document
+#             labels. "" means only the text before the first heading.
+# Where a question has a main answer and a supporting one, the main label is listed first and marked
+# "primary" in a comment; this is documentation only, every label counts the same.
 marketplace: ETSY
 
 queries:
@@ -17,7 +19,9 @@ queries:
     en: "Am I allowed to sell counterfeit or knock-off branded products in my shop?"
     vi: "Tôi có được bán hàng giả nhãn hiệu (hàng nhái) trong shop của mình không?"
     expected:
-      - file: intellectual-property-policy.html
+      # primary: lists unauthorized or counterfeit goods among the illegal items
+      - file: prohibited-items-policy.html
+        section: "5. Illegal Items"
       - file: seller-policy.html
         section: "1. Selling Basics > b. What Can't be Sold on Etsy"
 
@@ -25,8 +29,10 @@ queries:
     en: "Can I dropship or resell items that I bought from a wholesaler?"
     vi: "Tôi có được dropship hoặc bán lại hàng mua từ nhà bán sỉ không?"
     expected:
+      # primary: says outright that dropshipping and reselling are not allowed
       - file: seller-policy.html
         section: "1. Selling Basics > b. What Can't be Sold on Etsy"
+      # supporting: resold generic items do not qualify as "sourced by a seller"
       - file: creativity-standards.html
         section: "Sourced by a seller"
 
@@ -71,7 +77,9 @@ queries:
     en: "How do I list sexual wellness products, and what tag do mature listings need?"
     vi: "Tôi đăng bán sản phẩm chăm sóc sức khoẻ tình dục thì phải làm gì và gắn thẻ nào?"
     expected:
+      # only the opening text of the policy, where the "mature" tag requirement is stated
       - file: listing-mature-content.html
+        section: ""
 
   - id: unedited-photo-required
     en: "Do I have to include at least one unedited photo of the real item in my listing?"
@@ -154,7 +162,7 @@ queries:
     vi: "Tôi có được nhắn tin cho khách của một shop khác để khuyên họ đừng mua ở đó không?"
     expected:
       - file: seller-policy.html
-        section: "2. Being a Member of the Etsy Community > Interference"
+        section: "2. Being a Member of the Etsy Community > c. Communication Standards > i. Messages > Interference"
 
   - id: misleading-images-consequences
     en: "What happens if my listing images look different from the item I actually ship?"
