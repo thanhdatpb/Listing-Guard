@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-listingguard}
+      POSTGRES_USER: ${POSTGRES_USER:-listingguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
+      DB_USER: ${POSTGRES_USER:-listingguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+      REDIS_HOST: redis
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+volumes:
+  pgdata:

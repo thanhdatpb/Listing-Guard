@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: listing-guard-api
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/listingguard}
+    username: ${DB_USER:listingguard}
+    password: ${DB_PASSWORD:listingguard}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
