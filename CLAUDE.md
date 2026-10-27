@@ -8,12 +8,14 @@ It never edits a listing, never publishes, and does no SEO.
 - **Rule Engine** (`rule-engine/`): deterministic rules (title length/characters/repeated special
   characters, tag count/length/characters/duplicates, required fields, positive price and quantity,
   banned words), configured per marketplace in versioned YAML. Current ruleset: `etsy-2026-11`.
-- **RAG Analyzer** (`rag-analyzer/`): LLM plus public marketplace policies (pgvector); citations are
-  verified by code. Not built yet.
+- **RAG Analyzer** (`rag-analyzer/`): public marketplace policies in pgvector, plus an LLM step with
+  code-verified citations. Built so far: policy manifest, HTML/PDF parsers, structural chunker,
+  `EmbeddingProvider`, `PolicyRetriever`, retrieval metrics. No LLM yet.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns the findings.
-- Current scope: Etsy rule engine. No RAG, no LLM, no auth, no Amazon.
+- Current scope: Etsy rule engine, and policy ingest + retrieval (no LLM call, no structured output, no
+  citation verification yet). No auth, no Amazon.
 
 ## Stack
 
@@ -24,8 +26,16 @@ JUnit 5 + Testcontainers. Root package `com.thanhdatpb.listingguard`.
 
 ```bash
 ./mvnw -B verify                 # build + all tests (needs Docker for Testcontainers)
-./mvnw -B -pl core,rule-engine verify   # fast: no Docker needed
+./mvnw -B -pl core,rule-engine,rag-analyzer verify   # fast: no Docker needed
 docker compose up --build        # postgres + redis + api (override ports: POSTGRES_PORT, REDIS_PORT, API_PORT)
+```
+
+Policy corpus (see README "Policy corpus and retrieval"):
+
+```bash
+docker compose up -d ollama && docker compose run --rm ollama-pull   # once: pull nomic-embed-text
+docker compose run --rm ingest                                       # policies/ -> pgvector (profile `ingest`)
+docker compose run --rm eval-retrieval                               # writes eval/retrieval/results.md
 ```
 
 On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
@@ -48,6 +58,21 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   an applied one. Hibernate runs with `ddl-auto=validate`.
 - Enums stored as strings with `CHECK` constraints in SQL; keep the Java enum and the constraint in sync.
 - A failing rule is logged and skipped by `RuleEngine`; it must not break the other rules.
+- **Policy text is copyrighted**: `policies/raw/` is git-ignored, only `policies/manifest.yaml` is
+  committed. Tests and CI use small self-written HTML, never the real corpus. Never fetch policy pages
+  around a 403, CAPTCHA or block (no curl tricks, proxies or mirrors): list the URLs and let the maintainer
+  save the files.
+- Ingest only reads local files and is idempotent; a document is redone when its file, manifest entry,
+  `PolicyChunker.VERSION`/limits or `EmbeddingProvider.modelId()` changes. Bump `PolicyChunker.VERSION` when
+  the chunking rules change. The manifest `version` must equal the page's "Last updated" date.
+- Ingest and eval are one-shot jobs (profiles `ingest`, `eval-retrieval`), not HTTP endpoints: there is no
+  authentication yet. `GET /policies/search` is a debug view that answers 404 unless
+  `listing-guard.policies.search-endpoint.enabled=true`.
+- Retrieval filters by marketplace before ranking. Chunk text is stored exactly as on the page (later
+  citation checks compare against it); only the embedding input has the section path prepended.
+- Embeddings: tests use `HashingEmbeddingProvider` (set through `TestcontainersConfig`), never Ollama.
+  Evaluation numbers are only ever produced by a real run; never write or estimate them by hand. The
+  evaluation labels in `eval/retrieval/queries.yaml` are reviewed by the maintainer before a run.
 - Tests read boundary values from the ruleset instead of hard-coding limits.
 
 ## Git
