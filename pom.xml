@@ -11,6 +11,12 @@
     <name>Listing Guard</name>
     <description>Pre-publish listing checker: deterministic rule engine plus RAG analyzer.</description>
 
+    <modules>
+        <module>rule-engine</module>
+        <module>rag-analyzer</module>
+        <module>api</module>
+    </modules>
+
     <properties>
         <java.version>21</java.version>
         <maven.compiler.release>21</maven.compiler.release>
