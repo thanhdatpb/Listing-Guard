@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.ruleengine;
 
+import com.thanhdatpb.listingguard.ruleengine.etsy.EtsyRules;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,6 +11,13 @@ import java.util.Map;
 public final class RuleRegistry {
 
     private final Map<String, List<Rule>> byMarketplace = new LinkedHashMap<>();
+
+    /** A registry holding the built-in rules of every supported marketplace. */
+    public static RuleRegistry withDefaults() {
+        RuleRegistry registry = new RuleRegistry();
+        EtsyRules.all().forEach(rule -> registry.register(EtsyRules.MARKETPLACE, rule));
+        return registry;
+    }
 
     public RuleRegistry register(String marketplace, Rule rule) {
         List<Rule> rules = byMarketplace.computeIfAbsent(key(marketplace), k -> new ArrayList<>());
