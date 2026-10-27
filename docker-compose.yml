@@ -25,7 +25,20 @@ services:
       timeout: 3s
       retries: 10
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   api:
+    image: listing-guard-api:dev
     build: .
     depends_on:
       postgres:
@@ -37,8 +50,65 @@ services:
       DB_USER: ${POSTGRES_USER:-listingguard}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
       REDIS_HOST: redis
+      OLLAMA_URL: http://ollama:11434
+      # Debug endpoint GET /policies/search; off by default in the application, on here for development.
+      LISTING_GUARD_POLICIES_SEARCHENDPOINT_ENABLED: ${POLICY_SEARCH_ENABLED:-true}
     ports:
       - "${API_PORT:-8080}:8080"
 
+  # ---- one-shot jobs (docker compose --profile tools ...) ----
+
+  # Downloads the embedding model into the ollama volume. Run once: docker compose run --rm ollama-pull
+  ollama-pull:
+    image: ollama/ollama:latest
+    profiles: ["tools"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${EMBEDDING_MODEL:-nomic-embed-text}"]
+
+  # Ingests policies/manifest.yaml and policies/raw/** into the database: docker compose run --rm ingest
+  ingest:
+    image: listing-guard-api:dev
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ingest
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
+      DB_USER: ${POSTGRES_USER:-listingguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+      OLLAMA_URL: http://ollama:11434
+      POLICIES_DIR: /policies
+    volumes:
+      - ./policies:/policies:ro
+
+  # Runs eval/retrieval/queries.yaml against the ingested corpus and writes eval/retrieval/results.md.
+  eval-retrieval:
+    image: listing-guard-api:dev
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: eval-retrieval
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
+      DB_USER: ${POSTGRES_USER:-listingguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+      OLLAMA_URL: http://ollama:11434
+      POLICIES_DIR: /policies
+      LISTING_GUARD_EVAL_DIR: /eval/retrieval
+    volumes:
+      - ./policies:/policies:ro
+      - ./eval:/eval
+
 volumes:
   pgdata:
+  ollama:
