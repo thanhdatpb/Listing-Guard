@@ -1,0 +1,164 @@
+# Retrieval evaluation set for the Etsy policy corpus (policies/manifest.yaml).
+#
+# STATUS: labels written by the assistant after reading the parsed corpus. PENDING MAINTAINER REVIEW:
+# do not run the evaluation until the labels are approved.
+#
+# Every query has an English and a Vietnamese question (same meaning), so recall and MRR can be reported
+# per language. `expected` lists the places that answer the question; a retrieved chunk is relevant if it
+# matches ANY entry:
+#   file    - file name from policies/manifest.yaml
+#   section - optional; the start of the heading path inside the document (the document title is not part
+#             of it). Without `section`, any chunk of that document counts.
+# Section names are the headings of the saved pages, e.g. "1. Selling Basics > b. What Can't be Sold on Etsy".
+marketplace: ETSY
+
+queries:
+  - id: counterfeit-branded-items
+    en: "Am I allowed to sell counterfeit or knock-off branded products in my shop?"
+    vi: "Tôi có được bán hàng giả nhãn hiệu (hàng nhái) trong shop của mình không?"
+    expected:
+      - file: intellectual-property-policy.html
+      - file: seller-policy.html
+        section: "1. Selling Basics > b. What Can't be Sold on Etsy"
+
+  - id: dropshipping-resale
+    en: "Can I dropship or resell items that I bought from a wholesaler?"
+    vi: "Tôi có được dropship hoặc bán lại hàng mua từ nhà bán sỉ không?"
+    expected:
+      - file: seller-policy.html
+        section: "1. Selling Basics > b. What Can't be Sold on Etsy"
+      - file: creativity-standards.html
+        section: "Sourced by a seller"
+
+  - id: alcohol-tobacco-vape
+    en: "Can I list alcohol, cigarettes or e-cigarette liquid for sale?"
+    vi: "Tôi có được đăng bán rượu, thuốc lá hoặc dung dịch thuốc lá điện tử không?"
+    expected:
+      - file: prohibited-items-policy.html
+        section: "1. Alcohol"
+
+  - id: ivory-endangered-animals
+    en: "Can I sell jewelry made from ivory or parts of endangered animals?"
+    vi: "Tôi có được bán trang sức làm từ ngà voi hoặc bộ phận của động vật nguy cấp không?"
+    expected:
+      - file: prohibited-items-policy.html
+        section: "2. Animal Products"
+
+  - id: weapons-recalled-items
+    en: "Are weapons and recalled products such as drop-side cribs allowed on Etsy?"
+    vi: "Vũ khí và sản phẩm bị thu hồi như cũi có thành hạ xuống có được bán trên Etsy không?"
+    expected:
+      - file: prohibited-items-policy.html
+        section: "3. Dangerous Items"
+
+  - id: hateful-slogans
+    en: "Can I sell items with slogans that degrade people because of their race or religion?"
+    vi: "Tôi có được bán sản phẩm có khẩu hiệu miệt thị người khác vì chủng tộc hoặc tôn giáo không?"
+    expected:
+      - file: prohibited-items-policy.html
+        section: "4. Hate Items"
+
+  - id: nudity-first-image
+    en: "My product photos show nudity. What must the first image of the listing look like?"
+    vi: "Ảnh sản phẩm của tôi có hình khoả thân thì ảnh đầu tiên của listing phải như thế nào?"
+    expected:
+      - file: listing-mature-content.html
+        section: "1. Nudity"
+      - file: prohibited-items-policy.html
+        section: "7. Nudity and Sexual Content"
+
+  - id: sexual-wellness-mature-tag
+    en: "How do I list sexual wellness products, and what tag do mature listings need?"
+    vi: "Tôi đăng bán sản phẩm chăm sóc sức khoẻ tình dục thì phải làm gì và gắn thẻ nào?"
+    expected:
+      - file: listing-mature-content.html
+
+  - id: unedited-photo-required
+    en: "Do I have to include at least one unedited photo of the real item in my listing?"
+    vi: "Listing của tôi có bắt buộc phải có ít nhất một ảnh thật của sản phẩm chưa qua chỉnh sửa không?"
+    expected:
+      - file: listing-image-requirements.html
+        section: "Photo Editing & AI Guidelines"
+      - file: listing-image-requirements.html
+        section: "General Rules"
+
+  - id: ai-generated-images
+    en: "Can I use AI-generated or AI-edited images as my listing photos?"
+    vi: "Tôi có được dùng ảnh do AI tạo ra hoặc AI chỉnh sửa làm ảnh sản phẩm không?"
+    expected:
+      - file: listing-image-requirements.html
+        section: "Photo Editing & AI Guidelines"
+      - file: listing-image-requirements.html
+        section: "Examples"
+
+  - id: print-on-demand-mockup
+    en: "Can I use a stock photo mockup for a mug that is printed with my design by a print-on-demand partner?"
+    vi: "Tôi có được dùng ảnh mockup có sẵn cho chiếc cốc in theo thiết kế của tôi qua đối tác in theo yêu cầu không?"
+    expected:
+      - file: listing-image-requirements.html
+        section: "Rules by Product Type"
+
+  - id: made-by-seller-definition
+    en: "What counts as an item that is made by the seller?"
+    vi: "Thế nào được coi là sản phẩm do chính người bán tự làm?"
+    expected:
+      - file: creativity-standards.html
+        section: "Made by a seller"
+
+  - id: vintage-age
+    en: "How old does an item have to be to be sold as vintage?"
+    vi: "Một món đồ phải bao nhiêu năm tuổi thì mới được bán là đồ vintage?"
+    expected:
+      - file: creativity-standards.html
+        section: "Handpicked by a seller"
+
+  - id: counter-notice
+    en: "My listing was removed after an infringement report. Can I send a counter notice?"
+    vi: "Listing của tôi bị gỡ sau một báo cáo vi phạm. Tôi có thể gửi phản hồi (counter notice) không?"
+    expected:
+      - file: intellectual-property-policy.html
+        section: "3. Counter Notice"
+      - file: intellectual-property-policy.html
+        section: "2. Reports of Intellectual Property Infringement"
+
+  - id: repeat-infringement
+    en: "What happens to my shop if I receive repeated intellectual property infringement notices?"
+    vi: "Shop của tôi sẽ bị xử lý thế nào nếu bị báo cáo vi phạm sở hữu trí tuệ nhiều lần?"
+    expected:
+      - file: intellectual-property-policy.html
+        section: "4. Repeat Infringement"
+
+  - id: shipping-processing-times
+    en: "What are my obligations about processing and shipping times?"
+    vi: "Tôi có nghĩa vụ gì về thời gian xử lý đơn và giao hàng?"
+    expected:
+      - file: seller-policy.html
+        section: "1. Selling Basics > d. Seller Standards"
+
+  - id: selling-fees
+    en: "What fees does Etsy charge sellers?"
+    vi: "Etsy thu những loại phí nào từ người bán?"
+    expected:
+      - file: seller-policy.html
+        section: "1. Selling Basics > e. Selling Fees"
+
+  - id: review-window
+    en: "How long do buyers have to leave a review after receiving an order?"
+    vi: "Người mua có bao lâu để để lại đánh giá sau khi nhận được đơn hàng?"
+    expected:
+      - file: seller-policy.html
+        section: "3. Feedback, Cases and Your Success > a. Reviews"
+
+  - id: interference-other-shops
+    en: "Can I message another shop's customers to warn them away from that shop?"
+    vi: "Tôi có được nhắn tin cho khách của một shop khác để khuyên họ đừng mua ở đó không?"
+    expected:
+      - file: seller-policy.html
+        section: "2. Being a Member of the Etsy Community > Interference"
+
+  - id: misleading-images-consequences
+    en: "What happens if my listing images look different from the item I actually ship?"
+    vi: "Điều gì xảy ra nếu ảnh trong listing khác với sản phẩm tôi thực sự gửi đi?"
+    expected:
+      - file: listing-image-requirements.html
+        section: "General Rules"
