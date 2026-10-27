@@ -1,15 +1,13 @@
 package com.thanhdatpb.listingguard.api.listing;
 
-import com.thanhdatpb.listingguard.core.listing.Money;
-import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.core.listing.Money;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
@@ -34,10 +32,10 @@ public class EtsyNormalizer implements Normalizer {
         return new Listing(
                 text(raw.get("title")),
                 text(raw.get("description")),
-                strings(raw.get("tags"), true),
+                strings(raw.get("tags")),
                 price(raw.get("price")),
                 category(raw),
-                strings(raw.get("materials"), false),
+                strings(raw.get("materials")),
                 images(raw.get("images")),
                 raw.hasNonNull("quantity") && raw.get("quantity").canConvertToInt() ? raw.get("quantity").intValue() : null,
                 text(raw.get("who_made")),
@@ -52,21 +50,17 @@ public class EtsyNormalizer implements Normalizer {
         return value.isEmpty() ? null : value;
     }
 
-    private static List<String> strings(JsonNode node, boolean dedupeIgnoreCase) {
+    /** Trims each entry and drops blanks. Duplicates are kept on purpose: the rule engine reports them. */
+    private static List<String> strings(JsonNode node) {
         List<String> out = new ArrayList<>();
         if (node == null || !node.isArray()) {
             return out;
         }
-        Set<String> seen = new HashSet<>();
         for (JsonNode item : node) {
             String value = text(item);
-            if (value == null) {
-                continue;
+            if (value != null) {
+                out.add(value);
             }
-            if (dedupeIgnoreCase && !seen.add(value.toLowerCase(Locale.ROOT))) {
-                continue;
-            }
-            out.add(value);
         }
         return out;
     }
@@ -90,7 +84,7 @@ public class EtsyNormalizer implements Normalizer {
         if (category != null) {
             return category;
         }
-        List<String> path = strings(raw.get("taxonomy_path"), false);
+        List<String> path = strings(raw.get("taxonomy_path"));
         return path.isEmpty() ? null : String.join(" > ", path);
     }
 
