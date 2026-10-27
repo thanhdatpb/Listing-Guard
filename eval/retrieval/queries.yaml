@@ -52,7 +52,7 @@ queries:
 
   - id: weapons-recalled-items
     en: "Are weapons and recalled products such as drop-side cribs allowed on Etsy?"
-    vi: "Vũ khí và sản phẩm bị thu hồi như cũi có thành hạ xuống có được bán trên Etsy không?"
+    vi: "Vũ khí và sản phẩm bị thu hồi như cũi trẻ em có thành hạ được (drop-side crib) có được bán trên Etsy không?"
     expected:
       - file: prohibited-items-policy.html
         section: "3. Dangerous Items"
@@ -75,7 +75,7 @@ queries:
 
   - id: sexual-wellness-mature-tag
     en: "How do I list sexual wellness products, and what tag do mature listings need?"
-    vi: "Tôi đăng bán sản phẩm chăm sóc sức khoẻ tình dục thì phải làm gì và gắn thẻ nào?"
+    vi: "Listing bán sản phẩm sức khoẻ tình dục cần gắn thẻ gì?"
     expected:
       # only the opening text of the policy, where the "mature" tag requirement is stated
       - file: listing-mature-content.html
@@ -152,7 +152,7 @@ queries:
 
   - id: review-window
     en: "How long do buyers have to leave a review after receiving an order?"
-    vi: "Người mua có bao lâu để để lại đánh giá sau khi nhận được đơn hàng?"
+    vi: "Người mua có bao lâu để đánh giá sau khi nhận hàng?"
     expected:
       - file: seller-policy.html
         section: "3. Feedback, Cases and Your Success > a. Reviews"
@@ -170,3 +170,21 @@ queries:
     expected:
       - file: listing-image-requirements.html
         section: "General Rules"
+
+  - id: production-partner-disclosure
+    en: "I use a print-on-demand partner to produce my designs. Do I need to disclose that in my listing?"
+    vi: "Tôi dùng đối tác in theo yêu cầu để sản xuất thiết kế của mình. Tôi có phải ghi rõ điều này trong listing không?"
+    expected:
+      - file: seller-policy.html
+        section: "1. Selling Basics > a. What can be sold on Etsy"
+      - file: creativity-standards.html
+        section: "Designed by a seller"
+
+  - id: ai-disclosure
+    en: "My product design was created with AI. Do I need to disclose that?"
+    vi: "Thiết kế sản phẩm của tôi được tạo bằng AI. Tôi có phải công khai điều đó không?"
+    expected:
+      - file: seller-policy.html
+        section: "1. Selling Basics > a. What can be sold on Etsy"
+      - file: creativity-standards.html
+        section: "Designed by a seller"

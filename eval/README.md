@@ -7,7 +7,7 @@ change to rules, prompts or retrieval.
 
 Does retrieval find the policy section that answers a question?
 
-- `queries.yaml`: 20 questions about Etsy policy, each in English and Vietnamese, with the section(s)
+- `queries.yaml`: 22 questions about Etsy policy, each in English and Vietnamese, with the section(s)
   that should answer it. The labels are reviewed by the maintainer before they are used.
 - `results.md`: written by the `eval-retrieval` job (`docker compose run --rm eval-retrieval`) after the
   corpus is ingested. It reports recall@5 and MRR@10 separately for English and Vietnamese, the embedding

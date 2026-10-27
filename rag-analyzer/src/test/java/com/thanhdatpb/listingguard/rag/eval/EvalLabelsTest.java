@@ -29,7 +29,7 @@ class EvalLabelsTest {
         EvalSet set = EvalSet.load(EVAL_SET);
 
         assertThat(set.marketplace()).isEqualTo("ETSY");
-        assertThat(set.queries()).hasSizeBetween(15, 20);
+        assertThat(set.queries()).hasSize(22);
         assertThat(set.queries()).allSatisfy(query -> assertThat(query.questions().keySet()).containsExactlyInAnyOrder("en", "vi"));
     }
 
