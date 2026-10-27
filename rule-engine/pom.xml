@@ -12,5 +12,35 @@
 
     <artifactId>rule-engine</artifactId>
     <name>Listing Guard :: Rule Engine</name>
-    <description>Deterministic, marketplace-configurable listing rules. Placeholder in week 1.</description>
+    <description>Deterministic, marketplace-configurable listing rules.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.thanhdatpb.listingguard</groupId>
+            <artifactId>core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>

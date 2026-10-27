@@ -12,6 +12,7 @@
     <description>Pre-publish listing checker: deterministic rule engine plus RAG analyzer.</description>
 
     <modules>
+        <module>core</module>
         <module>rule-engine</module>
         <module>rag-analyzer</module>
         <module>api</module>
@@ -32,6 +33,11 @@
                 <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.thanhdatpb.listingguard</groupId>
+                <artifactId>core</artifactId>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.thanhdatpb.listingguard</groupId>

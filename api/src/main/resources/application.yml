@@ -1,3 +1,8 @@
+listing-guard:
+  rulesets:
+    locations:
+      - classpath:rulesets/etsy-2026-10.yaml
+
 spring:
   application:
     name: listing-guard-api

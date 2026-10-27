@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thanhdatpb.listingguard.core.listing.Listing;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
@@ -65,12 +66,12 @@ class EtsyNormalizerTest {
     }
 
     @Test
-    void dedupesTagsIgnoringCaseKeepingFirstSpelling() throws Exception {
+    void keepsDuplicateTagsSoTheRuleEngineCanReportThem() throws Exception {
         Listing listing = normalizer.normalize(json("""
                 {"tags": ["Mug", "mug", "MUG", "cup"]}
                 """));
 
-        assertThat(listing.tags()).containsExactly("Mug", "cup");
+        assertThat(listing.tags()).containsExactly("Mug", "mug", "MUG", "cup");
     }
 
     @Test
