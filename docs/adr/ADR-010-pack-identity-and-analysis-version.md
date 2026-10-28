@@ -60,13 +60,18 @@ cache reuse across different analyses.
 logical constraint only through new Flyway migrations in two separately deployable releases.
 
 **PR 0a — expand, backfill and compatibility code.** Add nullable `pack_id` to `ruleset_version` and
-`listing_check`, with default `listing-rules`, and nullable `analysis_version` to `listing_check`.
-The nullable columns and default let old instances continue inserting text ruleset/check rows while
-PR 0a is rolling out. Backfill every existing ruleset/check row; derive historical analysis versions
-from their associated ruleset version and preserve the exact externally visible value. New
-compatibility code writes explicit `listing-rules`, reads legacy null `analysis_version` as the
-existing ruleset version, and keeps the existing unique constraints and cache lookup behavior.
-Deploy PR 0a across the fleet while old instances may still be running.
+`listing_check` with `DEFAULT 'listing-rules'` applied when each column is added; retain that
+database default through PR 0b. This is the chosen compatibility mechanism for old instances that
+omit the new columns when inserting text ruleset/check rows during rollout. It avoids requiring an
+old binary to know about `pack_id`. The tradeoff is that a writer explicitly inserting `NULL`
+bypasses the default, so PR 0b must defensively backfill any remaining null `pack_id` values before
+verification. Add nullable `analysis_version` to `listing_check`; do not assign it a generic
+database default because historical values must derive from the associated ruleset version. Backfill
+every existing ruleset/check row; derive historical analysis versions from their associated
+ruleset version and preserve the exact externally visible value. New compatibility code writes
+explicit `listing-rules`, reads legacy null `analysis_version` as the existing ruleset version, and
+keeps the existing unique constraints and cache lookup behavior. Deploy PR 0a across the fleet while
+old instances may still be running.
 
 The PR 0a integration test upgrades representative data from the V1 schema through V6, then through
 the new expansion/backfill migrations. The fixture includes ruleset metadata, checks, findings and
@@ -76,11 +81,18 @@ existing API/cache behavior. Verify no pre-existing rows are lost and report any
 association cannot safely determine its analysis version.
 
 **PR 0b — contract in a later release.** Deploy only after every instance is running PR 0a-compatible
-code and no old instance can restart or write. Validate no null `pack_id` remains, no duplicate
-`(pack_id, marketplace_code, version)` identity exists, and all historical result versions are
-correct. Set `pack_id` NOT NULL, establish the new unique identity, and remove the old
-`(marketplace_code, version)` unique constraint. Replace the completed-result cache index with one
-covering client, marketplace, pack, input hash, ruleset version ID and analysis version.
+code and no old instance can restart or write. Before verification, rerun a null-only backfill for
+`pack_id` as a defensive check for writers that may have explicitly inserted NULL despite the
+expand-phase default. Rerun the historical `analysis_version` backfill for rows created by old
+instances after PR 0a's initial backfill; derive each value from its associated ruleset version and
+preserve the established external value. Then verify no null `pack_id` or `analysis_version`
+remains, no duplicate `(pack_id, marketplace_code, version)` identity exists, and all historical
+result versions are correct. Set both columns NOT NULL, establish the new unique identity, and
+remove the old `(marketplace_code, version)` unique constraint. Replace the completed-result cache
+index with one covering client, marketplace, pack, input hash, ruleset version ID and analysis
+version. The expand-phase default prevents null `pack_id` for normal legacy inserts that omit the
+column; the 0b backfill is a safeguard, while rerunning `analysis_version` backfill is required
+because old instances could not populate that new column.
 
 **Do not register or activate a ruleset for any new pack before PR 0b is complete.** The old unique
 constraint cannot represent multiple pack identities for a marketplace/version during PR 0a, and
@@ -146,8 +158,10 @@ implementing PR A or PR B, tests must demonstrate:
    values.
 4. `FrozenRulesetsTest` continues to pass with the pinned historical hash.
 5. PR 0a's migration test upgrades representative V1 data through V6 and the expand/backfill
-   migration while old-version inserts remain compatible; PR 0b's test contracts that schema only
-   after compatible code is active, with no row loss or unintended identity changes.
+   migration while old-version inserts remain compatible; PR 0b's test inserts legacy rows after
+   the initial backfill, reruns the null-only `pack_id` and historical `analysis_version` backfills,
+   verifies there are no nulls, and contracts the schema only after compatible code is active, with
+   no row loss or unintended identity changes.
 6. PR 0b's index tests verify concurrent index creation/validation, uniqueness, and that the old
    unique/cache indexes are removed only after replacements are valid.
 7. Cache tests prove that changing pack, ruleset content/version, algorithm version, data fingerprint
@@ -181,10 +195,12 @@ tested.
 
 ## Planned pull requests
 
-1. **PR 0a — Expand:** nullable pack and analysis-version columns, defaults/backfill, compatibility
-   code and V1-to-V6 migration/regression tests. It must deploy while old instances may still run.
-2. **PR 0b — Contract:** after all instances are 0a-compatible, enforce NOT NULL, create and validate
-   new unique identities, and remove old unique/cache indexes. No new pack rulesets may be registered
+1. **PR 0a — Expand:** nullable pack and analysis-version columns, `listing-rules` database defaults
+   for pack IDs, initial backfill, compatibility code and V1-to-V6 migration/regression tests. It
+   must deploy while old instances may still run.
+2. **PR 0b — Contract:** after all instances are 0a-compatible, rerun defensive pack-ID and
+   historical analysis-version backfills, verify no nulls, enforce NOT NULL, create and validate new
+   unique identities, and remove old unique/cache indexes. No new pack rulesets may be registered
    before 0b completes. For single-instance deployment, use the coordinated maintenance sequence
    described above.
 3. **PR A — Image:** implement ADR-008 after PR 0b is approved and complete. Add the separate endpoint,
