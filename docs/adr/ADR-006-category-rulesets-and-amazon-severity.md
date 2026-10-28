@@ -44,12 +44,14 @@ A listing's category is its `product_type`, the Amazon concept that the Listings
 product type schemas are keyed by. It is matched ignoring case and blanks. Browse nodes were rejected: they are
 numeric, per store, very numerous, and nothing official ties a limit to one.
 
-A product type with no override anywhere in the ruleset gets the defaults and one `INFO` finding,
-`category_not_covered`, saying so. It is a statement about the ruleset, not a problem in the listing, and it tells
-the caller that category-specific limits are not being checked. A listing without a product type gets the
-`required_fields` ERROR instead (the product type is the one field with an official source) and no INFO. No
-product type is overridden in `amazon-2026-11`: the numbers are not available yet. The mechanism is tested with a
-separate test ruleset in `src/test`, not with invented categories in the real one.
+A product type with no override gets the defaults. When the ruleset overrides at least one product type, such a
+listing also gets one `INFO` finding, `category_not_covered`, saying so. It is a statement about the ruleset, not a
+problem in the listing, and it tells the caller that category-specific limits are not being checked. A ruleset
+with no override at all never reports it: every product type would be "not covered", so the message would carry
+no information and only add noise to every check. A listing without a product type gets the `required_fields`
+ERROR instead (the product type is the one field with an official source) and no INFO. No product type is
+overridden in `amazon-2026-11`: the numbers are not available yet, so today no check reports it. The mechanism is
+tested with a separate test ruleset in `src/test`, not with invented categories in the real one.
 
 ## Severity: stricter for Amazon than for Etsy
 

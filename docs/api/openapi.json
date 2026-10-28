@@ -270,21 +270,13 @@
                         "source" : "RULE",
                         "suggestion" : "Xoá url khỏi nội dung listing; không đưa liên kết ngoài hay thông tin liên hệ vào tiêu đề, bullet point hoặc mô tả.",
                         "value" : "www.roadster.example"
-                      }, {
-                        "field" : "product_type",
-                        "message" : "Chưa có luật riêng cho product type 'LUGGAGE'; đang áp dụng luật chung.",
-                        "ruleId" : "category_not_covered",
-                        "severity" : "INFO",
-                        "source" : "RULE",
-                        "suggestion" : "Không cần sửa listing. Luật chung vẫn được kiểm tra; giới hạn riêng của product type này sẽ được thêm vào ruleset khi có nguồn.",
-                        "value" : "LUGGAGE"
                       } ],
                       "marketplace" : "AMAZON",
                       "rulesetVersion" : "amazon-2026-11",
                       "status" : "COMPLETED",
                       "summary" : {
                         "errors" : 0,
-                        "infos" : 1,
+                        "infos" : 0,
                         "warnings" : 4
                       }
                     }

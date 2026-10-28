@@ -121,7 +121,7 @@ public final class ApiExamples {
               "contentHash": "9c1e5f0a62b7d34e8a1f0c5d7b2e4a6893d1c0f5e7a2b4d6c8e0f1a3b5d7c9e1",
               "cached": false,
               "createdAt": "2026-10-28T09:20:11.482913Z",
-              "summary": {"errors": 0, "warnings": 4, "infos": 1},
+              "summary": {"errors": 0, "warnings": 4, "infos": 0},
               "findings": [
                 {
                   "ruleId": "title_repeated_words",
@@ -158,15 +158,6 @@ public final class ApiExamples {
                   "value": "www.roadster.example",
                   "message": "Phát hiện url trong bullet_points[5]: 'www.roadster.example'.",
                   "suggestion": "Xoá url khỏi nội dung listing; không đưa liên kết ngoài hay thông tin liên hệ vào tiêu đề, bullet point hoặc mô tả."
-                },
-                {
-                  "ruleId": "category_not_covered",
-                  "source": "RULE",
-                  "severity": "INFO",
-                  "field": "product_type",
-                  "value": "LUGGAGE",
-                  "message": "Chưa có luật riêng cho product type 'LUGGAGE'; đang áp dụng luật chung.",
-                  "suggestion": "Không cần sửa listing. Luật chung vẫn được kiểm tra; giới hạn riêng của product type này sẽ được thêm vào ruleset khi có nguồn."
                 }
               ]
             }

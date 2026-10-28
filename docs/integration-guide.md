@@ -169,17 +169,18 @@ bullet at zero-based position `i` in the cleaned list; blank bullets are dropped
 | `bullet_count` | `bullet_points` | the count, as text | WARNING | unverified |
 | `search_terms_length` | `search_terms` | the search terms (limit in UTF-8 **bytes**, not characters) | WARNING | secondary |
 | `prohibited_content` | `title`, `description`, `bullet_points[i]` | the matched web address or email | WARNING | secondary |
-| `category_not_covered` | `product_type` | the product type as sent | INFO | not an Amazon rule |
+| `category_not_covered` | `product_type` | the product type as sent | INFO | not an Amazon rule; only reported once the ruleset overrides at least one product type |
 
 `bullet_length` is in the ruleset but switched off: the sources disagree on the limit. Amazon uses ERROR only
 for verified values; everything else is WARNING (see ADR-006). The limits are in `amazon-2026-11.yaml`, each with
 its source and status. Numbers in the messages are the real limits and the real counts.
 
 **Product types.** Some Amazon limits depend on the product type. The ruleset can override a rule per product
-type, but it overrides none yet, so every listing is checked with the same limits. A listing whose product type
-has no override gets one `INFO` finding, `category_not_covered`, to say that category-specific limits were not
-checked; it needs no change in the listing. A listing without `product_type` gets the `required_fields` ERROR
-instead. The rules are written for the US store (English).
+type, but `amazon-2026-11` overrides none, so every listing is checked with the same limits and nothing is
+reported about product types. Once a ruleset overrides some product types, a listing whose product type has no
+override gets one `INFO` finding, `category_not_covered`, to say that category-specific limits were not checked;
+it needs no change in the listing. A listing without `product_type` gets the `required_fields` ERROR instead. The
+rules are written for the US store (English).
 
 ## Caching and versions
 

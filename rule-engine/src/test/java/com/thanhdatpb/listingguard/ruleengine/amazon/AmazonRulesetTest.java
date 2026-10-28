@@ -104,12 +104,10 @@ class AmazonRulesetTest {
     }
 
     @Test
-    void aValidListingOnlyGetsTheCategoryNotCoveredInfo() {
-        List<Finding> findings = engine.run(valid(), CONFIG);
-
-        assertThat(findings).hasSize(1);
-        assertThat(findings.get(0).ruleId()).isEqualTo("category_not_covered");
-        assertThat(findings.get(0).severity()).isEqualTo(Severity.INFO);
+    void aValidListingHasNoFindingsNotEvenTheCategoryInfo() {
+        // the ruleset overrides no product type, so "not covered" would be true of every listing and says nothing
+        assertThat(engine.run(valid(), CONFIG)).isEmpty();
+        assertThat(engine.run(AmazonTestData.withProductType("SOMETHING_ELSE"), CONFIG)).isEmpty();
     }
 
     @Test
@@ -135,7 +133,7 @@ class AmazonRulesetTest {
         assertThat(findings).extracting(Finding::ruleId).containsExactly(
                 "title_length", "title_repeated_words", "title_forbidden_chars", "bullet_count",
                 "search_terms_length", "prohibited_content", "prohibited_content", "prohibited_content", "prohibited_content",
-                "prohibited_content", "prohibited_content", "prohibited_content", "category_not_covered");
+                "prohibited_content", "prohibited_content", "prohibited_content");
         assertThat(findings).extracting(Finding::rulesetVersion).containsOnly(CONFIG.version());
         assertThat(findings).extracting(Finding::severity).doesNotContain(Severity.ERROR);
         assertThat(findings).allSatisfy(finding -> {

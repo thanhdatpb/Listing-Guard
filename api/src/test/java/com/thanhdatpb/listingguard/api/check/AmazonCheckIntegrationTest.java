@@ -85,7 +85,7 @@ class AmazonCheckIntegrationTest {
     }
 
     @Test
-    void aCleanListingOnlyGetsTheInfoThatItsProductTypeHasNoOwnRules() throws Exception {
+    void aCleanListingHasNoFindings() throws Exception {
         JsonNode result = postOk(cleanListing(UUID.randomUUID().toString()));
 
         assertThat(result.get("status").asText()).isEqualTo("COMPLETED");
@@ -95,13 +95,9 @@ class AmazonCheckIntegrationTest {
         assertThat(result.get("cached").asBoolean()).isFalse();
         assertThat(result.get("summary").get("errors").asInt()).isZero();
         assertThat(result.get("summary").get("warnings").asInt()).isZero();
-        assertThat(result.get("summary").get("infos").asInt()).isEqualTo(1);
-        assertThat(ruleIds(result)).containsExactly("category_not_covered");
-        JsonNode info = finding(result, "category_not_covered");
-        assertThat(info.get("severity").asText()).isEqualTo("INFO");
-        assertThat(info.get("source").asText()).isEqualTo("RULE");
-        assertThat(info.get("field").asText()).isEqualTo("product_type");
-        assertThat(info.get("value").asText()).isEqualTo("LUGGAGE");
+        assertThat(result.get("summary").get("infos").asInt()).isZero();
+        // the ruleset overrides no product type, so there is no "not covered" info either
+        assertThat(result.get("findings")).isEmpty();
     }
 
     @Test
@@ -119,7 +115,7 @@ class AmazonCheckIntegrationTest {
                 """.formatted(id, "t".repeat(400)));
 
         assertThat(ruleIds(result)).containsExactly("title_repeated_words", "title_forbidden_chars", "bullet_count",
-                "search_terms_length", "prohibited_content", "prohibited_content", "category_not_covered");
+                "search_terms_length", "prohibited_content", "prohibited_content");
 
         JsonNode repeated = finding(result, "title_repeated_words");
         assertThat(repeated.get("severity").asText()).isEqualTo("WARNING");
@@ -148,7 +144,7 @@ class AmazonCheckIntegrationTest {
 
         assertThat(result.get("summary").get("errors").asInt()).isZero();
         assertThat(result.get("summary").get("warnings").asInt()).isEqualTo(6);
-        assertThat(result.get("summary").get("infos").asInt()).isEqualTo(1);
+        assertThat(result.get("summary").get("infos").asInt()).isZero();
     }
 
     @Test

@@ -168,4 +168,4 @@ rules:
     severity: INFO
     source:
       status: unverified
-      note: Behavior of Listing Guard, not an Amazon rule. Tells the caller that the product type has no overrides in this ruleset, so only the default settings were applied.
+      note: Behavior of Listing Guard, not an Amazon rule. When the ruleset has at least one category override, tells the caller that the listing's product type has none, so only the default settings were applied. A ruleset without any override never reports it.
