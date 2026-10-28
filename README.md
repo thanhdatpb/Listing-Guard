@@ -4,47 +4,52 @@ Pre-publish checker for marketplace listings (Etsy and Amazon). Listing Guard ch
 listing and suggests fixes before you publish. It does not edit or publish anything, and it does not
 do SEO.
 
-- **Rule Engine**: deterministic rules (title length, characters and repeated special characters; tag
-  count, length, characters and duplicates; required fields; positive price and quantity; banned
-  words). Thresholds, word lists and severities are configured per marketplace in versioned YAML,
-  never hard-coded.
-- **RAG Analyzer** (in progress): an LLM grounded in public marketplace policies (pgvector). Every
-  citation will be verified by code. So far the policy corpus can be ingested and searched; the LLM
-  step is not built yet.
+- **Rule Engine**: Etsy and Amazon deterministic rules. Thresholds, word lists and severities are
+  configured in versioned YAML per marketplace; Amazon rulesets support product-type overrides.
+- **RAG Analyzer**: policy documents can be ingested and retrieved from pgvector. Retrieval evaluation
+  has not been run, and the LLM analyzer and citation verification are not implemented.
 
-> Status: the Etsy and Amazon rule engines work end to end. `POST /api/v1/checks` normalizes the listing, runs
-> the rules of its marketplace, stores the check and its findings, and returns them; an identical listing gets the stored
-> result. The API is ready for a backend to call (client API keys, rate limit, OpenAPI, standard errors): see
-> [docs/integration-guide.md](docs/integration-guide.md). Policy documents can be ingested into pgvector
-> and retrieved (no LLM involved yet).
+## Status
+
+The Etsy and Amazon rule engines work end to end. `POST /api/v1/checks` normalizes a listing, runs the
+rules for its marketplace, stores the check and findings in the caller's client scope, and returns them.
+Repeated checks reuse stored results within that client. The API supports client API keys, per-client
+rate limits, and per-client check isolation; see the [integration guide](docs/integration-guide.md).
+
+Policy ingestion and retrieval are implemented, but retrieval has not been evaluated yet. The policy-grounded
+LLM analyzer and citation verification are not implemented.
 
 ## Architecture
 
 ```text
-              POST /api/v1/checks (raw listing JSON)
-                              |
-                              v
-        +---------------------------------------------+
-        | api  (Spring Boot)                          |
-        |                                             |
-        |  Normalizer (EtsyNormalizer)                |
-        |        |  Listing (core)                    |
-        |        v                                    |
-        |  RuleEngine (rule-engine) <-- ruleset YAML  |
-        |        |  Finding (core)    (versioned)     |
-        |        v                                    |
-        |  listing_check + finding  ------------------+--> PostgreSQL 16 + pgvector
-        |  ruleset_version (id + content hash)        |     marketplace, ruleset_version,
-        |                                             |     listing_check, finding,
-        |  PolicyRetriever (rag-analyzer API)  -------+-->  finding_feedback,
-        |        ^                                    |     policy_document, policy_chunk
-        |        |  GET /policies/search (debug)      |
-        |  X-API-Key, rate limit, request id, RFC7807 |
-        +---------------------------------------------+--> Redis (declared, unused yet)
-                 ^
-                 | ingest job (profile `ingest`)
-   policies/manifest.yaml + policies/raw/<marketplace>/*.html|pdf
-        parse -> chunk by structure -> embed (Ollama, nomic-embed-text) -> policy_chunk
+Client backend -- POST /api/v1/checks + X-API-Key --> Listing Guard API (Spring Boot)
+                                                      |
+                         API key --> authenticated client
+                         rate limit per client
+                                                      |
+                              NormalizerRegistry
+                               /             \
+                    EtsyNormalizer       AmazonNormalizer
+                               \             /
+                                Listing (core)
+                                      |
+                RuleEngine (rule-engine) <-- versioned ruleset YAML
+                  Etsy ruleset            Amazon ruleset
+                                           + product-type overrides
+                                      |
+                                Findings (core)
+                                      |
+                   client-scoped listing_check + finding
+                   cache key includes client_id
+                                      |
+                         PostgreSQL 16 + pgvector
+
+  Policy ingest job (profile `ingest`)
+  policies/manifest.yaml + policies/raw/<marketplace>/*.html|pdf
+       -> parse -> structural chunks -> embeddings -> pgvector
+  PolicyRetriever / GET /policies/search (debug; feature-gated)
+
+  Redis: declared in compose; not used by the current API.
 ```
 
 Modules:
@@ -52,9 +57,9 @@ Modules:
 | Module | Role |
 |---|---|
 | `core/` | Plain Java domain types shared by all modules: `Listing`, `Money`, `Finding`, `Severity`. No Spring. |
-| `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, the Etsy rules and `rulesets/etsy-2026-11.yaml`. No Spring. |
+| `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (Ollama, fake), `PolicyRetriever`, retrieval metrics. No Spring. |
-| `api/` | Spring Boot REST app, Flyway migrations, normalizers, ruleset registration, policy ingest and pgvector retrieval |
+| `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, policy ingest and pgvector retrieval |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `policies/` | `manifest.yaml` (committed) and `raw/` (local files, git-ignored) |
 | `docs/adr/` | Architecture decision records |
@@ -81,10 +86,10 @@ results and the rate limit belong to the client. Clients and keys live in the da
 admin job, which logs every change (client, key id, time; never a secret):
 
 ```bash
-docker compose run --rm admin client create acme
-docker compose run --rm admin key create acme --label="first key"   # prints the key once
+docker compose run --rm admin client create demo-client
+docker compose run --rm admin key create demo-client --label="first key"   # prints the key once
 docker compose run --rm admin client list          # also: client deactivate|activate <name>
-docker compose run --rm admin key list acme        # also: key revoke <keyId>
+docker compose run --rm admin key list demo-client # also: key revoke <keyId>
 ```
 
 The application starts without any key (it logs a warning and answers `401` until one exists). For local
@@ -227,26 +232,22 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 
 ## Roadmap
 
-1. **Skeleton + Rule Engine for Etsy**: multi-module build, listing schema and normalizer, Flyway
-   schema, Docker, CI, versioned Etsy ruleset and rules, findings stored and returned by `/checks`.
-2. **RAG Analyzer**: policy ingest and retrieval (done: corpus, chunking, embeddings, pgvector search,
-   retrieval evaluation); next: LLM findings with code-verified citations.
-3. **Client integration, feedback and evaluation set**: integrate with client systems, collect
-   accepted/rejected/ignored feedback, build the golden set in `eval/`.
-4. **Ablation, tuning and demo**: measure what each layer contributes, tune, and prepare the demo.
+1. Run and review the retrieval evaluation against the maintained labels; record measured results.
+2. Add Amazon product-type overrides only when their limits and sources have been verified.
+3. Implement policy-grounded LLM findings, structured output, and code-verified citations.
+4. Build feedback and broader evaluation workflows to measure and tune the analyzer.
 
-Amazon rules are in (WARNING-level until their sources are verified); the next Amazon step is a
-`amazon-2026-12` ruleset with verified limits and product type overrides, once the help pages and product type
-schemas are saved.
+## Documentation
 
-Design decisions: [ADR-001](docs/adr/ADR-001-rule-config.md) (rule configuration),
-[ADR-002](docs/adr/ADR-002-ruleset-versioning.md) (ruleset versioning),
-[ADR-003](docs/adr/ADR-003-chunking-strategy.md) (chunking),
-[ADR-004](docs/adr/ADR-004-embedding-provider.md) (embedding provider),
-[ADR-005](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md) (API keys, rate limit, result cache),
-[ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md) (category rulesets, Amazon severity),
-[ADR-007](docs/adr/ADR-007-multi-client-model.md) (clients, keys in the database, per-client data).
-The input a client sends is a public contract: [docs/input-schema.md](docs/input-schema.md).
+- [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, and client isolation.
+- [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields.
+- [ADR-001: Rule configuration](docs/adr/ADR-001-rule-config.md)
+- [ADR-002: Ruleset versioning](docs/adr/ADR-002-ruleset-versioning.md)
+- [ADR-003: Chunking strategy](docs/adr/ADR-003-chunking-strategy.md)
+- [ADR-004: Embedding provider](docs/adr/ADR-004-embedding-provider.md)
+- [ADR-005: API auth, rate limit, and result cache](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md)
+- [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
+- [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
 
 ## License
-MIT © 2026 Tran Thanh Dat
+MIT © 2026 Thanh Dat Tran. See [LICENSE](LICENSE).

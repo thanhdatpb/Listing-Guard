@@ -246,6 +246,6 @@ the operator creates one.
 ## Not covered yet
 
 Mapping a client's own listing format to the standard input format (that is done on the client's side),
-rules that differ per client, per-client rate limits, an admin UI, billing, policy-grounded LLM findings,
-feedback on findings, image checks, product-type-specific Amazon limits (waiting for sources) and stores other
-than the US one.
+rules that differ per client, an admin UI, billing, policy-grounded LLM findings, feedback on findings,
+image checks, configured product-type-specific Amazon limits (no overrides are configured until sources are
+verified), and stores other than the US one.
