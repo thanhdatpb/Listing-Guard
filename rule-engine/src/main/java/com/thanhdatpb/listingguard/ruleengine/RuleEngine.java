@@ -24,12 +24,16 @@ public final class RuleEngine {
 
     /**
      * Never stops on a failing rule: a rule that throws is logged and skipped, the others still run.
+     * A rule switched off with {@code enabled: false} (for the listing's product type) does not run.
      * Findings keep rule registration order.
      */
     public List<Finding> run(Listing listing, RulesetConfig config) {
         List<Finding> findings = new ArrayList<>();
         for (Rule rule : registry.rulesFor(config.marketplace())) {
             try {
+                if (!config.rule(rule.id(), listing.productType()).enabled()) {
+                    continue;
+                }
                 findings.addAll(rule.evaluate(listing, config));
             } catch (RuntimeException e) {
                 log.error("Rule '{}' failed on ruleset {}; skipping it", rule.id(), config.version(), e);
