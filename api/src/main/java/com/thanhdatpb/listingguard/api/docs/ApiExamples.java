@@ -87,6 +87,91 @@ public final class ApiExamples {
             }
             """;
 
+    public static final String AMAZON_REQUEST = """
+            {
+              "marketplace": "AMAZON",
+              "listing": {
+                "title": "Hardside Carry-On Luggage Luggage Spinner Luggage! 20 Inch",
+                "brand": "Roadster",
+                "bullet_points": [
+                  "Lightweight polycarbonate shell",
+                  "Four 360-degree spinner wheels",
+                  "TSA-approved lock",
+                  "Expandable main compartment",
+                  "Interior packing straps",
+                  "Contact us at www.roadster.example"
+                ],
+                "description": "A durable hardside suitcase for short trips.",
+                "search_terms": "carry on suitcase cabin bag spinner",
+                "product_type": "LUGGAGE",
+                "price": {"amount": 89.99, "currency_code": "USD"},
+                "quantity": 12,
+                "images": ["https://example.com/luggage-1.jpg"]
+              }
+            }
+            """;
+
+    public static final String AMAZON_RESULT = """
+            {
+              "checkId": "0d7f2c1d-9a11-4a58-9c6e-7f0c2f3e6a52",
+              "status": "COMPLETED",
+              "marketplace": "AMAZON",
+              "rulesetVersion": "amazon-2026-11",
+              "analysisVersion": "amazon-2026-11",
+              "contentHash": "9c1e5f0a62b7d34e8a1f0c5d7b2e4a6893d1c0f5e7a2b4d6c8e0f1a3b5d7c9e1",
+              "cached": false,
+              "createdAt": "2026-10-28T09:20:11.482913Z",
+              "summary": {"errors": 0, "warnings": 4, "infos": 1},
+              "findings": [
+                {
+                  "ruleId": "title_repeated_words",
+                  "source": "RULE",
+                  "severity": "WARNING",
+                  "field": "title",
+                  "value": "Luggage",
+                  "message": "Từ 'Luggage' xuất hiện 3 lần trong tiêu đề, tối đa 2 lần.",
+                  "suggestion": "Bỏ bớt 1 lần xuất hiện của từ 'Luggage' trong tiêu đề."
+                },
+                {
+                  "ruleId": "title_forbidden_chars",
+                  "source": "RULE",
+                  "severity": "WARNING",
+                  "field": "title",
+                  "value": "!",
+                  "message": "Tiêu đề chứa ký tự không được phép: '!'.",
+                  "suggestion": "Xoá ký tự '!' khỏi tiêu đề (chỉ được giữ khi nó là một phần của tên brand)."
+                },
+                {
+                  "ruleId": "bullet_count",
+                  "source": "RULE",
+                  "severity": "WARNING",
+                  "field": "bullet_points",
+                  "value": "6",
+                  "message": "Listing có 6 bullet point, tối đa 5.",
+                  "suggestion": "Bỏ bớt 1 bullet point, giữ lại các ý quan trọng nhất."
+                },
+                {
+                  "ruleId": "prohibited_content",
+                  "source": "RULE",
+                  "severity": "WARNING",
+                  "field": "bullet_points[5]",
+                  "value": "www.roadster.example",
+                  "message": "Phát hiện url trong bullet_points[5]: 'www.roadster.example'.",
+                  "suggestion": "Xoá url khỏi nội dung listing; không đưa liên kết ngoài hay thông tin liên hệ vào tiêu đề, bullet point hoặc mô tả."
+                },
+                {
+                  "ruleId": "category_not_covered",
+                  "source": "RULE",
+                  "severity": "INFO",
+                  "field": "product_type",
+                  "value": "LUGGAGE",
+                  "message": "Chưa có luật riêng cho product type 'LUGGAGE'; đang áp dụng luật chung.",
+                  "suggestion": "Không cần sửa listing. Luật chung vẫn được kiểm tra; giới hạn riêng của product type này sẽ được thêm vào ruleset khi có nguồn."
+                }
+              ]
+            }
+            """;
+
     public static final String ETSY_RESULT_CACHED = """
             {
               "checkId": "5331208a-583a-4ff3-a990-99a7440ae59f",
@@ -120,7 +205,7 @@ public final class ApiExamples {
               "type": "urn:listing-guard:problem:unknown-marketplace",
               "title": "Bad Request",
               "status": 400,
-              "detail": "Unknown marketplace: NOPE. Supported: ETSY.",
+              "detail": "Unknown marketplace: NOPE. Supported: AMAZON, ETSY.",
               "instance": "/api/v1/checks",
               "code": "unknown-marketplace",
               "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
@@ -132,7 +217,7 @@ public final class ApiExamples {
               "type": "urn:listing-guard:problem:marketplace-not-yet-supported",
               "title": "Unprocessable Entity",
               "status": 422,
-              "detail": "Marketplace AMAZON is planned but not supported yet. Supported: ETSY.",
+              "detail": "Marketplace WALMART is planned but not supported yet. Supported: AMAZON, ETSY.",
               "instance": "/api/v1/checks",
               "code": "marketplace-not-yet-supported",
               "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"

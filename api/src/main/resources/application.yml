@@ -13,11 +13,12 @@ listing-guard:
     burst: 20
   marketplaces:
     # On the roadmap, not supported yet: a check request for one of these gets 422, not the 400 for unknown codes.
-    planned:
-      - AMAZON
+    # None today: Amazon is supported.
+    planned: []
   rulesets:
     locations:
       - classpath:rulesets/etsy-2026-11.yaml
+      - classpath:rulesets/amazon-2026-11.yaml
   policies:
     dir: ${POLICIES_DIR:policies}
     chunking:

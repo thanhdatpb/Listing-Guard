@@ -31,6 +31,8 @@ public class TestcontainersConfig {
             registry.add("listing-guard.embedding.provider", () -> "hashing");
             registry.add("listing-guard.policies.search-endpoint.enabled", () -> "true");
             registry.add("listing-guard.security.api-keys", () -> ApiTestKeys.CONFIGURED);
+            // no marketplace is planned in production; the tests need one to exercise the 422 "not yet supported" answer
+            registry.add("listing-guard.marketplaces.planned", () -> "WALMART");
             // generous by default so tests never trip the limit; a test that exercises it sets test.custom-rate-limit=true
             // and its own listing-guard.rate-limit.* values
             if (!environment.getProperty("test.custom-rate-limit", Boolean.class, false)) {
