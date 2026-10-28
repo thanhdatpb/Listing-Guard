@@ -21,7 +21,8 @@ It never edits a listing, never publishes, and does no SEO.
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
-  product type with no override gets the defaults plus an INFO `category_not_covered`.
+  product type with no override gets the defaults, plus an INFO `category_not_covered` only when the ruleset has
+  at least one override (none yet in `amazon-2026-11`, so it reports nothing today).
 
 ## Stack
 

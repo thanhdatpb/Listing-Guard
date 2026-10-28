@@ -18,8 +18,23 @@ class CategoryNotCoveredRuleTest {
     private final CategoryNotCoveredRule rule = new CategoryNotCoveredRule();
 
     @Test
-    void aProductTypeWithoutOverridesGetsOneInfoFinding() {
-        List<Finding> findings = rule.evaluate(withProductType("LUGGAGE"), CONFIG);
+    void aRulesetWithoutAnyOverrideNeverReportsIt() {
+        assertThat(CONFIG.categories()).isEmpty();
+
+        assertThat(rule.evaluate(withProductType("LUGGAGE"), CONFIG)).isEmpty();
+        assertThat(rule.evaluate(withProductType("anything"), CONFIG)).isEmpty();
+        assertThat(rule.evaluate(withProductType(null), CONFIG)).isEmpty();
+    }
+
+    @Test
+    void theRealRulesetCoversNoProductTypeYet() {
+        assertThat(CONFIG.categories()).isEmpty();
+        assertThat(CONFIG.coversCategory("LUGGAGE")).isFalse();
+    }
+
+    @Test
+    void aProductTypeWithoutOverridesGetsOneInfoFindingWhenTheRulesetHasOverrides() {
+        List<Finding> findings = rule.evaluate(withProductType("LUGGAGE"), WITH_CATEGORIES);
 
         assertThat(findings).hasSize(1);
         Finding finding = findings.get(0);
@@ -29,23 +44,17 @@ class CategoryNotCoveredRuleTest {
         assertThat(finding.value()).isEqualTo("LUGGAGE");
         assertThat(finding.message()).isEqualTo("Chưa có luật riêng cho product type 'LUGGAGE'; đang áp dụng luật chung.");
         assertThat(finding.suggestion()).startsWith("Không cần sửa listing.");
-        assertThat(finding.rulesetVersion()).isEqualTo(CONFIG.version());
+        assertThat(finding.rulesetVersion()).isEqualTo(WITH_CATEGORIES.version());
     }
 
     @Test
     void theValueIsTheProductTypeAsWritten() {
-        assertThat(rule.evaluate(withProductType("luggage"), CONFIG)).extracting(Finding::value).containsExactly("luggage");
+        assertThat(rule.evaluate(withProductType("luggage"), WITH_CATEGORIES)).extracting(Finding::value).containsExactly("luggage");
     }
 
     @Test
     void noProductTypeIsLeftToRequiredFields() {
-        assertThat(rule.evaluate(withProductType(null), CONFIG)).isEmpty();
-    }
-
-    @Test
-    void theRealRulesetCoversNoProductTypeYet() {
-        assertThat(CONFIG.categories()).isEmpty();
-        assertThat(CONFIG.coversCategory("LUGGAGE")).isFalse();
+        assertThat(rule.evaluate(withProductType(null), WITH_CATEGORIES)).isEmpty();
     }
 
     @Test

@@ -208,7 +208,7 @@ overridden yet. See [ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-seve
 | `bullet_length` | WARNING, **switched off** | unverified: sources disagree |
 | `search_terms_length` (max 249 bytes) | WARNING | secondary: Amazon staff, Seller Forums |
 | `prohibited_content` (web addresses, emails) | WARNING | secondary |
-| `category_not_covered` | INFO | not an Amazon rule: the product type has no overrides |
+| `category_not_covered` | INFO | not an Amazon rule: the product type has no overrides (only reported when the ruleset has some) |
 
 To change a threshold or a severity, create a new ruleset file with a new `version`: the API refuses to
 start if a registered version has different content (see [ADR-002](docs/adr/ADR-002-ruleset-versioning.md)).

@@ -9,7 +9,8 @@ import java.util.List;
 /**
  * Tells the caller that the listing's product type has no overrides in the ruleset, so only the default
  * (category-wide) settings were applied. It is about the ruleset's coverage, not about a problem in the listing.
- * A listing without a product type is RequiredFields' job.
+ * A ruleset with no override at all says nothing: every product type would be "not covered", so the message would
+ * carry no information. A listing without a product type is RequiredFields' job.
  */
 public final class CategoryNotCoveredRule extends AmazonRule {
 
@@ -28,7 +29,7 @@ public final class CategoryNotCoveredRule extends AmazonRule {
     @Override
     List<Finding> check(Listing listing, RulesetConfig config, RuleSettings settings) {
         String productType = listing.productType();
-        if (productType == null || config.coversCategory(productType)) {
+        if (productType == null || config.categories().isEmpty() || config.coversCategory(productType)) {
             return List.of();
         }
         return List.of(finding(config, settings, "product_type", productType,
