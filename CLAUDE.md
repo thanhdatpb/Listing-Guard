@@ -15,9 +15,12 @@ It never edits a listing, never publishes, and does no SEO.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Contract: `docs/api/openapi.json`,
-  `docs/integration-guide.md`, ADR-005.
-- Current scope: Etsy rule engine, the Preview-facing API, and policy ingest + retrieval (no LLM call, no
-  structured output, no citation verification yet). No Preview format mapper yet.
+  `docs/integration-guide.md`, `docs/input-schema.md`, ADR-005, ADR-007.
+- Listing Guard is an independent product that many clients call over the API (ADR-007). There is no code or data
+  for any single company in this repo; a client's own listing format is mapped to the standard input
+  (`docs/input-schema.md`) on the client's side.
+- Current scope: Etsy and Amazon rule engines, the multi-client API, and policy ingest + retrieval (no LLM call,
+  no structured output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
@@ -75,17 +78,21 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 - Ingest only reads local files and is idempotent; a document is redone when its file, manifest entry,
   `PolicyChunker.VERSION`/limits or `EmbeddingProvider.modelId()` changes. Bump `PolicyChunker.VERSION` when
   the chunking rules change. The manifest `version` must equal the page's "Last updated" date.
-- Ingest and eval are one-shot jobs (profiles `ingest`, `eval-retrieval`), not HTTP endpoints, and need no
-  API keys. `GET /policies/search` is a debug view (API key needed) that answers 404 unless
+- Ingest, eval and admin are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`), not HTTP endpoints,
+  and need no API keys. `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
-- **API contract** (ADR-005): everything but `/health` needs `X-API-Key` (keys from `LISTING_GUARD_API_KEYS`,
-  `name:key`, key 32+ characters, the web app refuses to start otherwise). Errors are RFC 7807 problems with a
+- **Clients** (ADR-007): everything but `/health` needs `X-API-Key`, and every key belongs to one client. Clients
+  and keys are rows (`client`, `api_key`, only the SHA-256 of a key is stored), managed by the `admin` job
+  (`docker compose run --rm admin ...`) which audit-logs client, key id and time and never a secret. Everything a
+  client creates carries its `client_id`; any query for client data must filter by it, and another client's check is
+  a 404, never a 403. Rate limit is per client. The web app starts with no key (WARN).
+- **API contract** (ADR-005, ADR-007): Errors are RFC 7807 problems with a
   stable `code` and `requestId`; never return a bare error body or a stack trace. Cache identity is
-  `(marketplace, contentHash, analysisVersion)`; a change to anything that decides findings must change
+  `(client, marketplace, contentHash, analysisVersion)`; a change to anything that decides findings must change
   `analysisVersion`. After an intended API change refresh `docs/api/openapi.json` with
   `./mvnw -B verify -Dopenapi.update=true` and commit it (a test fails on drift); update
   `docs/integration-guide.md` when behavior a client sees changes. Dev-only settings are fenced by
-  `StartupSafetyCheck`: a key starting with `insecure-` needs profile `dev` (never `prod`), and
+  `StartupSafetyCheck`: `LISTING_GUARD_DEV_API_KEY` needs profile `dev` (never `prod`), and
   `LISTING_GUARD_SWAGGER_UI=true` warns and is refused under `prod`; compose sets `SPRING_PROFILES_ACTIVE=dev`.
 - Retrieval filters by marketplace before ranking. Chunk text is stored exactly as on the page (later
   citation checks compare against it); only the embedding input has the section path prepended.

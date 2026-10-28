@@ -14,7 +14,7 @@ do SEO.
 
 > Status: the Etsy and Amazon rule engines work end to end. `POST /api/v1/checks` normalizes the listing, runs
 > the rules of its marketplace, stores the check and its findings, and returns them; an identical listing gets the stored
-> result. The API is ready for a backend to call (API key, rate limit, OpenAPI, standard errors): see
+> result. The API is ready for a backend to call (client API keys, rate limit, OpenAPI, standard errors): see
 > [docs/integration-guide.md](docs/integration-guide.md). Policy documents can be ingested into pgvector
 > and retrieved (no LLM involved yet).
 
@@ -76,12 +76,22 @@ The compose file has dev defaults, overridable with environment variables or a l
 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and host ports `POSTGRES_PORT` (5432),
 `REDIS_PORT` (6379), `OLLAMA_PORT` (11434), `API_PORT` (8080).
 
-The API needs keys. `LISTING_GUARD_API_KEYS` is a comma separated list of `name:key` pairs, each key at
-least 32 characters; the application does not start without a valid value. Compose supplies a public
-development key (`dev:insecure-dev-key-change-me-0123456789abcdef`) together with `SPRING_PROFILES_ACTIVE=dev`.
-Any key that starts with `insecure-` is refused unless the `dev` profile is active, and never with `prod`, so
-that key cannot reach a real deployment by accident; set your own keys (and `API_PROFILES`) anywhere others
-can reach the service. When running the jar yourself, export the variable first. `LISTING_GUARD_SWAGGER_UI=true`
+Listing Guard is one service for many clients (ADR-007). Every API key belongs to a client; checks, cached
+results and the rate limit belong to the client. Clients and keys live in the database and are managed with the
+admin job, which logs every change (client, key id, time; never a secret):
+
+```bash
+docker compose run --rm admin client create acme
+docker compose run --rm admin key create acme --label="first key"   # prints the key once
+docker compose run --rm admin client list          # also: client deactivate|activate <name>
+docker compose run --rm admin key list acme        # also: key revoke <keyId>
+```
+
+The application starts without any key (it logs a warning and answers `401` until one exists). For local
+development compose registers a public key as client `dev` from `LISTING_GUARD_DEV_API_KEY`
+(`insecure-dev-key-change-me-0123456789abcdef`) together with `SPRING_PROFILES_ACTIVE=dev`. That key is refused
+unless the `dev` profile is active, and never with `prod`, so it cannot reach a real deployment by accident; clear
+it (and set `API_PROFILES`) anywhere others can reach the service. `LISTING_GUARD_SWAGGER_UI=true`
 turns on Swagger UI at `/swagger-ui.html` for development: it logs a WARN at start-up, opens the UI and
 `/v3/api-docs` without a key, and the application refuses to start with it under the `prod` profile. Off by
 default; then the spec at `/v3/api-docs` needs a key.
@@ -221,7 +231,7 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
    schema, Docker, CI, versioned Etsy ruleset and rules, findings stored and returned by `/checks`.
 2. **RAG Analyzer**: policy ingest and retrieval (done: corpus, chunking, embeddings, pgvector search,
    retrieval evaluation); next: LLM findings with code-verified citations.
-3. **Preview integration, feedback and evaluation set**: integrate with the Preview flow, collect
+3. **Client integration, feedback and evaluation set**: integrate with client systems, collect
    accepted/rejected/ignored feedback, build the golden set in `eval/`.
 4. **Ablation, tuning and demo**: measure what each layer contributes, tune, and prepare the demo.
 
@@ -234,4 +244,6 @@ Design decisions: [ADR-001](docs/adr/ADR-001-rule-config.md) (rule configuration
 [ADR-003](docs/adr/ADR-003-chunking-strategy.md) (chunking),
 [ADR-004](docs/adr/ADR-004-embedding-provider.md) (embedding provider),
 [ADR-005](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md) (API keys, rate limit, result cache),
-[ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md) (category rulesets, Amazon severity).
+[ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md) (category rulesets, Amazon severity),
+[ADR-007](docs/adr/ADR-007-multi-client-model.md) (clients, keys in the database, per-client data).
+The input a client sends is a public contract: [docs/input-schema.md](docs/input-schema.md).
