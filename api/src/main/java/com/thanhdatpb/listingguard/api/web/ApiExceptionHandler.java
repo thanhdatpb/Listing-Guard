@@ -71,6 +71,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex, HttpHeaders headers,
                                                                   HttpStatusCode status, WebRequest request) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof PayloadTooLargeException) {
+                ProblemDetail tooLarge = Problems.of(HttpStatus.PAYLOAD_TOO_LARGE, "payload-too-large", cause.getMessage() + ".");
+                return handleExceptionInternal(ex, tooLarge, headers, HttpStatus.PAYLOAD_TOO_LARGE, request);
+            }
+        }
         ProblemDetail problem = Problems.of(status, "invalid-request", "The request body is missing or is not valid JSON.");
         return handleExceptionInternal(ex, problem, headers, status, request);
     }

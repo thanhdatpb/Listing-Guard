@@ -1,4 +1,16 @@
 listing-guard:
+  security:
+    # name:key pairs, comma separated; several keys at once allow rotation. Each key needs 32+ characters.
+    # The application does not start without valid keys (web mode only).
+    api-keys: ${LISTING_GUARD_API_KEYS:}
+  api:
+    max-body-bytes: 262144
+    # Development only: serves Swagger UI and opens it and /v3/api-docs without an API key.
+    swagger-ui-enabled: ${LISTING_GUARD_SWAGGER_UI:false}
+  rate-limit:
+    enabled: true
+    requests-per-minute: 60
+    burst: 20
   marketplaces:
     # On the roadmap, not supported yet: a check request for one of these gets 422, not the 400 for unknown codes.
     planned:
@@ -45,5 +57,9 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
-    # Swagger UI is for development only; see the integration guide
-    enabled: false
+    # Swagger UI is for development only; it follows listing-guard.api.swagger-ui-enabled (off by default)
+    enabled: ${listing-guard.api.swagger-ui-enabled:false}
+
+logging:
+  pattern:
+    level: "%5p [%X{requestId:-}] [%X{apiKey:-}]"

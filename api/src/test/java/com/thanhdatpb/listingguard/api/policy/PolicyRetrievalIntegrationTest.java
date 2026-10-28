@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.thanhdatpb.listingguard.api.ApiTestKeys;
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.rag.retrieval.PolicyRetriever;
 import com.thanhdatpb.listingguard.rag.retrieval.PolicyRetriever.RetrievedChunk;
@@ -146,7 +147,7 @@ class PolicyRetrievalIntegrationTest {
 
     @Test
     void searchEndpointReturnsChunksWithScoreUrlAndSectionPath() throws Exception {
-        mvc.perform(get("/policies/search").param("marketplace", "ETSY").param("q", "counterfeit branded items").param("k", "2"))
+        mvc.perform(get("/policies/search").header(ApiTestKeys.HEADER, ApiTestKeys.KEY_1).param("marketplace", "ETSY").param("q", "counterfeit branded items").param("k", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].sectionPath").value("IP Policy > Counterfeit items"))
@@ -158,18 +159,18 @@ class PolicyRetrievalIntegrationTest {
 
     @Test
     void searchEndpointDefaultsKToFive() throws Exception {
-        mvc.perform(get("/policies/search").param("marketplace", "OTHER").param("q", "counterfeit"))
+        mvc.perform(get("/policies/search").header(ApiTestKeys.HEADER, ApiTestKeys.KEY_1).param("marketplace", "OTHER").param("q", "counterfeit"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(5));
     }
 
     @Test
     void searchEndpointRejectsBadRequests() throws Exception {
-        mvc.perform(get("/policies/search").param("marketplace", "ETSY")).andExpect(status().isBadRequest());
-        mvc.perform(get("/policies/search").param("q", "x")).andExpect(status().isBadRequest());
-        mvc.perform(get("/policies/search").param("marketplace", "ETSY").param("q", "x").param("k", "0"))
+        mvc.perform(get("/policies/search").header(ApiTestKeys.HEADER, ApiTestKeys.KEY_1).param("marketplace", "ETSY")).andExpect(status().isBadRequest());
+        mvc.perform(get("/policies/search").header(ApiTestKeys.HEADER, ApiTestKeys.KEY_1).param("q", "x")).andExpect(status().isBadRequest());
+        mvc.perform(get("/policies/search").header(ApiTestKeys.HEADER, ApiTestKeys.KEY_1).param("marketplace", "ETSY").param("q", "x").param("k", "0"))
                 .andExpect(status().isBadRequest());
-        mvc.perform(get("/policies/search").param("marketplace", "ETSY").param("q", "x").param("k", "many"))
+        mvc.perform(get("/policies/search").header(ApiTestKeys.HEADER, ApiTestKeys.KEY_1).param("marketplace", "ETSY").param("q", "x").param("k", "many"))
                 .andExpect(status().isBadRequest());
     }
 }

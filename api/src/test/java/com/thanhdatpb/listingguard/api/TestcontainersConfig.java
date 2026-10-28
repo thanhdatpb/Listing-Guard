@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -25,10 +26,17 @@ public class TestcontainersConfig {
      * the deterministic fake embedding provider (no Ollama needed) and the debug search endpoint.
      */
     @Bean
-    DynamicPropertyRegistrar testProperties() {
+    DynamicPropertyRegistrar testProperties(Environment environment) {
         return registry -> {
             registry.add("listing-guard.embedding.provider", () -> "hashing");
             registry.add("listing-guard.policies.search-endpoint.enabled", () -> "true");
+            registry.add("listing-guard.security.api-keys", () -> ApiTestKeys.CONFIGURED);
+            // generous by default so tests never trip the limit; a test that exercises it sets test.custom-rate-limit=true
+            // and its own listing-guard.rate-limit.* values
+            if (!environment.getProperty("test.custom-rate-limit", Boolean.class, false)) {
+                registry.add("listing-guard.rate-limit.burst", () -> "100000");
+                registry.add("listing-guard.rate-limit.requests-per-minute", () -> "6000000");
+            }
         };
     }
 }
