@@ -1,6 +1,6 @@
 # Listing Guard
 
-Pre-publish checker for marketplace listings (Etsy first, Amazon later). Listing Guard checks a
+Pre-publish checker for marketplace listings (Etsy and Amazon). Listing Guard checks a
 listing and suggests fixes before you publish. It does not edit or publish anything, and it does not
 do SEO.
 
@@ -12,8 +12,8 @@ do SEO.
   citation will be verified by code. So far the policy corpus can be ingested and searched; the LLM
   step is not built yet.
 
-> Status: the Etsy rule engine works end to end. `POST /api/v1/checks` normalizes the listing, runs the
-> Etsy rules, stores the check and its findings, and returns them; an identical listing gets the stored
+> Status: the Etsy and Amazon rule engines work end to end. `POST /api/v1/checks` normalizes the listing, runs
+> the rules of its marketplace, stores the check and its findings, and returns them; an identical listing gets the stored
 > result. The API is ready for a backend to call (API key, rate limit, OpenAPI, standard errors): see
 > [docs/integration-guide.md](docs/integration-guide.md). Policy documents can be ingested into pgvector
 > and retrieved (no LLM involved yet).
@@ -193,6 +193,23 @@ severity. Each rule records where its values come from:
 | `duplicate_tags` | WARNING | unverified |
 | `banned_words` | WARNING | unverified: sample list only |
 
+`amazon-2026-11.yaml` is the Amazon ruleset. Amazon uses ERROR only for verified values, so most of its rules
+are WARNING (the sources are an Amazon announcement and forum replies; Seller Central help needs a login). A
+rule can be overridden per product type (`categories`) and switched off (`enabled: false`); no product type is
+overridden yet. See [ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md).
+
+| Rule | Severity | Source status |
+|---|---|---|
+| `required_fields` (`product_type`) | ERROR | verified: Listings Items API model |
+| `title_length` (max 200) | WARNING | secondary: Amazon announcement, Jan 2025 |
+| `title_repeated_words` (max 2, articles, prepositions, conjunctions exempt) | WARNING | secondary; the exempt list is ours |
+| `title_forbidden_chars` (`! $ ? _ { } ^ ¬ ¦`, unless in the brand) | WARNING | secondary |
+| `bullet_count` (max 5) | WARNING | unverified |
+| `bullet_length` | WARNING, **switched off** | unverified: sources disagree |
+| `search_terms_length` (max 249 bytes) | WARNING | secondary: Amazon staff, Seller Forums |
+| `prohibited_content` (web addresses, emails) | WARNING | secondary |
+| `category_not_covered` | INFO | not an Amazon rule: the product type has no overrides |
+
 To change a threshold or a severity, create a new ruleset file with a new `version`: the API refuses to
 start if a registered version has different content (see [ADR-002](docs/adr/ADR-002-ruleset-versioning.md)).
 `etsy-2026-10.yaml` is kept unchanged as history (a test pins its hash) and is no longer loaded.
@@ -208,10 +225,13 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
    accepted/rejected/ignored feedback, build the golden set in `eval/`.
 4. **Ablation, tuning and demo**: measure what each layer contributes, tune, and prepare the demo.
 
-Amazon is only started after Etsy is done and measured.
+Amazon rules are in (WARNING-level until their sources are verified); the next Amazon step is a
+`amazon-2026-12` ruleset with verified limits and product type overrides, once the help pages and product type
+schemas are saved.
 
 Design decisions: [ADR-001](docs/adr/ADR-001-rule-config.md) (rule configuration),
 [ADR-002](docs/adr/ADR-002-ruleset-versioning.md) (ruleset versioning),
 [ADR-003](docs/adr/ADR-003-chunking-strategy.md) (chunking),
 [ADR-004](docs/adr/ADR-004-embedding-provider.md) (embedding provider),
-[ADR-005](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md) (API keys, rate limit, result cache).
+[ADR-005](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md) (API keys, rate limit, result cache),
+[ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md) (category rulesets, Amazon severity).

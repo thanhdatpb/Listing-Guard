@@ -1,6 +1,6 @@
 # Listing Guard
 
-Pre-publish checker for marketplace listings (Etsy first, Amazon later). It checks and suggests.
+Pre-publish checker for marketplace listings (Etsy and Amazon). It checks and suggests.
 It never edits a listing, never publishes, and does no SEO.
 
 ## Context
@@ -17,7 +17,11 @@ It never edits a listing, never publishes, and does no SEO.
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Contract: `docs/api/openapi.json`,
   `docs/integration-guide.md`, ADR-005.
 - Current scope: Etsy rule engine, the Preview-facing API, and policy ingest + retrieval (no LLM call, no
-  structured output, no citation verification yet). No Amazon rules, no Preview format mapper yet.
+  structured output, no citation verification yet). No Preview format mapper yet.
+- **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
+  `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
+  be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
+  product type with no override gets the defaults plus an INFO `category_not_covered`.
 
 ## Stack
 
@@ -52,7 +56,10 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   read in that rule's `validate()` so mistakes fail at startup.
 - Every rule has a `source` with `status`: `verified` (official doc), `secondary` (official page not
   readable, consistent secondary sources) or `unverified`. Never mark a value `verified` without a URL, and
-  never guess a limit: say it is unverified.
+  never guess a limit: say it is unverified. Amazon rules are ERROR only when `verified`, else WARNING
+  (ADR-006); a category override needs its own `source`; raising a status or severity is a new ruleset version.
+  `ContentHasher` leaves the Amazon-only `Listing` components out while empty so Etsy hashes never change (a
+  test pins one): keep it that way when adding components.
 - Rule messages and suggestions are Vietnamese and cite the actual numbers.
 - Normalizers map and clean data only (trim, drop blanks); they never dedupe, truncate or correct, because
   rules must see what the user wrote.
@@ -104,4 +111,4 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 ## Out of scope
 
 Auto-fixing listings, publishing or any write to a marketplace, SEO or keyword optimization, price
-advice, Amazon support before the Etsy path is done and measured.
+advice.

@@ -49,13 +49,29 @@ wait that long and retry. `GET /health` is not limited.
 
 | Field | Type | Notes |
 |---|---|---|
-| `marketplace` | string | `ETSY` (case-insensitive). `AMAZON` is planned: `422`. Anything else: `400`. |
-| `listing` | object | The listing in the marketplace's own JSON format. For Etsy: Open API v3 style, snake_case. |
+| `marketplace` | string | `ETSY` or `AMAZON` (case-insensitive). A code that is planned but not supported yet gets `422` (none is planned today). Anything else: `400`. |
+| `listing` | object | The listing in the marketplace's own JSON format: Open API v3 style for Etsy, the simple format below for Amazon. |
 
 Etsy listing fields that are read: `title`, `description`, `tags` (array of strings), `price`
 (`{amount, divisor, currency_code}` or a plain number), `taxonomy_path` or `category`, `materials`, `images`,
 `quantity`, `who_made`, `when_made`. Unknown fields are ignored. Strings are trimmed and blank list entries
 are dropped; nothing else is changed, because the rules must see what the seller wrote.
+
+Amazon listing fields that are read: `title`, `brand`, `bullet_points` (array of strings), `description`,
+`search_terms` (a string, or an array that is joined by single spaces), `product_type` (for example `LUGGAGE`),
+`price` (`{amount, currency_code}` or a plain number), `quantity` and `images` (array of URLs). Unknown fields,
+including Etsy's, are ignored. Cleaning is the same as for Etsy. The Amazon SP-API attribute format
+(`item_name`, `bullet_point` with `value` and `language_tag`) is not accepted yet; the Preview mapper will convert
+to this format.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/checks \
+  -H 'X-API-Key: <key>' -H 'Content-Type: application/json' \
+  -d '{"marketplace":"AMAZON","listing":{
+        "title":"Hardside Carry-On Luggage Luggage Spinner Luggage! 20 Inch","brand":"Roadster",
+        "bullet_points":["Lightweight polycarbonate shell","Contact us at www.roadster.example"],
+        "search_terms":"carry on suitcase cabin bag spinner","product_type":"LUGGAGE"}}'
+```
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/checks \
@@ -134,9 +150,36 @@ your list contains blank or whitespace-only tags, the index can differ from your
 `value`** (the tag text) and use `tags[i]` only as a hint. Findings about a repeated tag report the later
 occurrences and name the first position in `message`.
 
-Finding rules and what they report: `required_fields`, `title_length`, `title_characters`,
+Etsy finding rules and what they report: `required_fields`, `title_length`, `title_characters`,
 `title_repeated_special_chars`, `tag_count`, `tag_length`, `tag_characters`, `duplicate_tags`,
 `price_quantity_positive`, `banned_words` (`title`, `description` or `tags[i]`).
+
+### Amazon
+
+Amazon field paths use the same snake_case names as the request: `title`, `brand`, `description`, `search_terms`,
+`product_type`, `bullet_points` (the list as a whole, for example too many bullets) and `bullet_points[i]` (the
+bullet at zero-based position `i` in the cleaned list; blank bullets are dropped, so match by `value`).
+
+| `ruleId` | `field` | `value` | Severity | Source status |
+|---|---|---|---|---|
+| `required_fields` | `product_type` | `null` | ERROR | verified |
+| `title_length` | `title` | the title | WARNING | secondary |
+| `title_repeated_words` | `title` | the word (one finding per word) | WARNING | secondary |
+| `title_forbidden_chars` | `title` | the character (one finding per character; allowed when the `brand` contains it) | WARNING | secondary |
+| `bullet_count` | `bullet_points` | the count, as text | WARNING | unverified |
+| `search_terms_length` | `search_terms` | the search terms (limit in UTF-8 **bytes**, not characters) | WARNING | secondary |
+| `prohibited_content` | `title`, `description`, `bullet_points[i]` | the matched web address or email | WARNING | secondary |
+| `category_not_covered` | `product_type` | the product type as sent | INFO | not an Amazon rule |
+
+`bullet_length` is in the ruleset but switched off: the sources disagree on the limit. Amazon uses ERROR only
+for verified values; everything else is WARNING (see ADR-006). The limits are in `amazon-2026-11.yaml`, each with
+its source and status. Numbers in the messages are the real limits and the real counts.
+
+**Product types.** Some Amazon limits depend on the product type. The ruleset can override a rule per product
+type, but it overrides none yet, so every listing is checked with the same limits. A listing whose product type
+has no override gets one `INFO` finding, `category_not_covered`, to say that category-specific limits were not
+checked; it needs no change in the listing. A listing without `product_type` gets the `required_fields` ERROR
+instead. The rules are written for the US store (English).
 
 ## Caching and versions
 
@@ -167,7 +210,7 @@ validation. Branch on `code`, not on `detail`.
 | 405 | `method-not-allowed` | Wrong HTTP method. | |
 | 413 | `payload-too-large` | Body over 256 KB. | Send less. |
 | 415 | `unsupported-media-type` | Not `application/json`. | |
-| 422 | `marketplace-not-yet-supported` | Planned marketplace (for example `AMAZON`). | Skip the check for it. |
+| 422 | `marketplace-not-yet-supported` | A marketplace that is planned but not supported yet. None is planned today, so you will not see it now. | Skip the check for it. |
 | 429 | `rate-limited` | Over the per-key limit. | Wait `Retry-After` seconds, then retry. |
 | 500 | `internal-error` | Unexpected failure. No details are exposed. | Retry later with backoff; report the `requestId`. |
 | 503 | `embedding-unavailable` | Only on routes that need the embedding backend. Not `POST /api/v1/checks`. | |
@@ -195,5 +238,6 @@ profile; with any other profile, and always with `prod`, the service refuses to 
 
 ## Not covered yet
 
-Mapping Preview's own listing format to the marketplace format (the caller sends the Etsy-style JSON for now),
-policy-grounded LLM findings, feedback on findings, image checks and Amazon rules.
+Mapping Preview's own listing format to the marketplace format (the caller sends the Etsy-style or the simple
+Amazon JSON for now), policy-grounded LLM findings, feedback on findings, image checks, product-type-specific Amazon
+limits (waiting for sources) and stores other than the US one.
