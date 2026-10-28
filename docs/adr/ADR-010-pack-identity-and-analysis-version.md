@@ -3,6 +3,8 @@
 - Status: Proposed
 - Date: 2026-10-28
 - Applies to: existing listing checks and future independent analysis packs
+- Acceptance convention: Keep Proposed until the PR implementing this ADR is approved and merged.
+  Then set Status to Accepted and Date to the actual acceptance/merge date.
 
 ## Context
 
@@ -98,8 +100,15 @@ contraction behavior, not merely assert the final schema.
   result/evidence, not full title/tags/description/brand text; evidence snippets are minimized and
   retained with the result. Proposed retention is 30 days.
 - The 30-day periods are proposals for new pack data only; they do not change `/checks` retention.
-  Cleanup must delete child findings/items before or with parent checks and must not cross client
-  boundaries.
+  Run one scheduled cleanup task in the API profile. Each API instance may trigger it, but a
+  PostgreSQL advisory lock ensures only one instance performs cleanup at a time. Delete expired
+  check parents in bounded batches; cascade or explicitly delete child findings/items in the same
+  transaction. Every delete and GET is scoped to the owning check/client.
+- GET for an expired image or trademark check returns 404 even if the scheduled cleanup has not run.
+  Expired results are excluded from cache lookup. On a repeated request, atomically remove a matching
+  expired row and its children before recalculating and inserting a new result; the unique constraint
+  resolves concurrent requests onto the newly computed result. Expired IDs never become readable
+  again. This cache-miss/recompute behavior applies only to the new pack tables.
 - New API responses are pack-specific DTOs. Image returns completeness, per-image evidence and a
   ruleset-configured summary; trademark returns completeness, risk level and evidence. Neither
   requires changing core `Finding` or the existing `/checks` response.
@@ -138,6 +147,9 @@ tested.
   implementation/data update; that is preferable to serving stale results.
 - Dedicated result tables and endpoints isolate image/trademark input and response contracts, at the
   cost of additional migrations, retention cleanup and API documentation.
+- A scheduled cleanup job and PostgreSQL advisory lock avoid duplicate retention work across API
+  instances; application behavior remains correct if cleanup is delayed because expiry is also
+  enforced by GET and cache lookup.
 - A failed new-pack rule must produce an explicit incomplete result; the legacy text rule engine's
   log-and-skip behavior is unchanged.
 

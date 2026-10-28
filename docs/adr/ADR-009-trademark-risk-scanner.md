@@ -3,6 +3,8 @@
 - Status: Proposed
 - Date: 2026-10-28
 - Depends on: [ADR-010](ADR-010-pack-identity-and-analysis-version.md)
+- Acceptance convention: Keep Proposed until the implementation PR is approved and merged. Then set
+  Status to Accepted and Date to the actual acceptance/merge date.
 
 ## Context
 
@@ -61,8 +63,16 @@ reuse, but it does not need the full listing text after analysis.
   and delete them at the same retention boundary as the result.
 - Provide `GET /api/v1/trademark-checks/{id}` only while the result is retained; after expiry it
   behaves as not found. The proposed retention is 30 days for check metadata, hash and result, with
-  cleanup by a scheduled job. The duration is an operational proposal, not a legal or marketplace
-  guarantee.
+  cleanup by a scheduled API-profile task. The duration is an operational proposal, not a legal or
+  marketplace guarantee. In a multi-instance deployment, the task uses the PostgreSQL advisory lock
+  described in ADR-010 so only one instance cleans up at a time. GET checks the retention cutoff
+  independently of cleanup timing and returns 404 after expiry.
+
+Expired rows are not cache-eligible. If cleanup has not removed a matching expired row when a new
+request arrives, remove that row and its findings atomically before recalculating and storing the
+new result. The unique cache constraint settles concurrent requests on the new result. An expired
+check ID must not become readable again; a repeated input after retention is a cache miss and a new
+analysis.
 
 Proposed schema, created through new Flyway migrations:
 
