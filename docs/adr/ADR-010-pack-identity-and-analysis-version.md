@@ -60,8 +60,8 @@ cache reuse across different analyses.
 logical constraint only through new Flyway migrations in two separately deployable releases.
 
 **PR 0a — expand, backfill and compatibility code.** Add nullable `pack_id` to `ruleset_version` and
-`listing_check` with `DEFAULT 'listing-rules'` applied when each column is added; retain that
-database default through PR 0b. This is the chosen compatibility mechanism for old instances that
+`listing_check` with `DEFAULT 'listing-rules'` applied when each column is added. This is the chosen
+compatibility mechanism for old instances that
 omit the new columns when inserting text ruleset/check rows during rollout. It avoids requiring an
 old binary to know about `pack_id`. The tradeoff is that a writer explicitly inserting `NULL`
 bypasses the default, so PR 0b must defensively backfill any remaining null `pack_id` values before
@@ -87,12 +87,14 @@ expand-phase default. Rerun the historical `analysis_version` backfill for rows 
 instances after PR 0a's initial backfill; derive each value from its associated ruleset version and
 preserve the established external value. Then verify no null `pack_id` or `analysis_version`
 remains, no duplicate `(pack_id, marketplace_code, version)` identity exists, and all historical
-result versions are correct. Set both columns NOT NULL, establish the new unique identity, and
+result versions are correct. Set both columns NOT NULL, then drop the `pack_id` database default so
+every writer must provide the pack identity explicitly. Establish the new unique identity and
 remove the old `(marketplace_code, version)` unique constraint. Replace the completed-result cache
 index with one covering client, marketplace, pack, input hash, ruleset version ID and analysis
 version. The expand-phase default prevents null `pack_id` for normal legacy inserts that omit the
-column; the 0b backfill is a safeguard, while rerunning `analysis_version` backfill is required
-because old instances could not populate that new column.
+column during rollout; dropping it after the 0b NOT NULL transition prevents future writers from
+silently inheriting `listing-rules`. Rerunning `analysis_version` backfill is required because old
+instances could not populate that new column.
 
 **Do not register or activate a ruleset for any new pack before PR 0b is complete.** The old unique
 constraint cannot represent multiple pack identities for a marketplace/version during PR 0a, and
@@ -161,7 +163,8 @@ implementing PR A or PR B, tests must demonstrate:
    migration while old-version inserts remain compatible; PR 0b's test inserts legacy rows after
    the initial backfill, reruns the null-only `pack_id` and historical `analysis_version` backfills,
    verifies there are no nulls, and contracts the schema only after compatible code is active, with
-   no row loss or unintended identity changes.
+   no row loss or unintended identity changes. After PR 0b, an `INSERT` that omits `pack_id` must
+   fail, proving writers must supply the pack identity explicitly.
 6. PR 0b's index tests verify concurrent index creation/validation, uniqueness, and that the old
    unique/cache indexes are removed only after replacements are valid.
 7. Cache tests prove that changing pack, ruleset content/version, algorithm version, data fingerprint
