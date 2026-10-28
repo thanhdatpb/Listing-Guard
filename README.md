@@ -247,3 +247,6 @@ Design decisions: [ADR-001](docs/adr/ADR-001-rule-config.md) (rule configuration
 [ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md) (category rulesets, Amazon severity),
 [ADR-007](docs/adr/ADR-007-multi-client-model.md) (clients, keys in the database, per-client data).
 The input a client sends is a public contract: [docs/input-schema.md](docs/input-schema.md).
+
+## License
+MIT © 2026 Thanh Dat Tran
