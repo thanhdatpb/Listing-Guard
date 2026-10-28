@@ -8,4 +8,7 @@
 - **Validation:** run `mvnw -B verify` before opening or updating a PR. On Windows, use
   `mvnw.cmd -B verify`.
 
+Major Maven dependency upgrades are intentionally handled as dedicated migrations, not automatic
+Dependabot PRs.
+
 Do not merge your own change into `main`, force-push shared branches, or commit secrets.
