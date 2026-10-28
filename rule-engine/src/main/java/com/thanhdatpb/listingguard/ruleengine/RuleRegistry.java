@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.ruleengine;
 
+import com.thanhdatpb.listingguard.ruleengine.amazon.AmazonRules;
 import com.thanhdatpb.listingguard.ruleengine.etsy.EtsyRules;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -16,6 +17,7 @@ public final class RuleRegistry {
     public static RuleRegistry withDefaults() {
         RuleRegistry registry = new RuleRegistry();
         EtsyRules.all().forEach(rule -> registry.register(EtsyRules.MARKETPLACE, rule));
+        AmazonRules.all().forEach(rule -> registry.register(AmazonRules.MARKETPLACE, rule));
         return registry;
     }
 

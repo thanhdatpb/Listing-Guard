@@ -1,0 +1,106 @@
+# TEST ruleset: exercises category overrides (ADR-006) with made-up product types TESTBAG and TESTMUG.
+# It is never loaded by the application; the real amazon ruleset has no category overrides yet.
+marketplace: AMAZON
+version: test-categories-1
+checked_at: 2026-10-28
+
+rules:
+  required_fields:
+    severity: ERROR
+    fields:
+      - product_type
+    source:
+      status: verified
+      urls:
+        - https://example.com/default
+    categories:
+      TESTBAG:
+        fields:
+          - product_type
+          - brand
+          - title
+        source:
+          status: verified
+          urls:
+            - https://example.com/testbag-schema
+
+  title_length:
+    severity: WARNING
+    max_length: 100
+    source:
+      status: secondary
+      urls:
+        - https://example.com/default
+    categories:
+      TESTBAG:
+        severity: ERROR
+        max_length: 60
+        source:
+          status: verified
+          urls:
+            - https://example.com/testbag-schema
+      testmug:
+        max_length: 80
+        source:
+          status: secondary
+          urls:
+            - https://example.com/testmug-style-guide
+
+  title_repeated_words:
+    severity: WARNING
+    max_occurrences: 2
+    exempt_words: [the]
+    source:
+      status: unverified
+
+  title_forbidden_chars:
+    severity: WARNING
+    chars: ["!"]
+    source:
+      status: unverified
+
+  bullet_count:
+    severity: WARNING
+    max_count: 5
+    source:
+      status: unverified
+    categories:
+      TESTMUG:
+        enabled: false
+        source:
+          status: unverified
+          note: This product type has no bullet points.
+
+  bullet_length:
+    severity: WARNING
+    enabled: false
+    max_length: 50
+    source:
+      status: unverified
+    categories:
+      TESTMUG:
+        enabled: true
+        max_length: 10
+        source:
+          status: secondary
+          urls:
+            - https://example.com/testmug-style-guide
+
+  search_terms_length:
+    severity: WARNING
+    max_bytes: 20
+    source:
+      status: unverified
+
+  prohibited_content:
+    severity: WARNING
+    fields: [title]
+    patterns:
+      url: '(?i)\bwww\.\S+'
+    source:
+      status: unverified
+
+  category_not_covered:
+    severity: INFO
+    source:
+      status: unverified

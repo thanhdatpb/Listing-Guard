@@ -1,0 +1,171 @@
+# Amazon ruleset. Thresholds, word lists and severities live here; rule logic lives in Java (ADR-001).
+# Settings can be overridden per product type under `categories` (ADR-006). None are overridden yet: the
+# product type limits are published only in Amazon's per-product-type schemas and in Seller Central help
+# pages, which need a seller login; a later version will add them.
+#
+# Any change to this file changes its content hash. Bump `version` for every change: the API refuses to
+# start when a registered version has a different hash (ADR-002).
+#
+# Severity policy for Amazon (differs from Etsy, see ADR-006): ERROR only when the value is verified;
+# secondary and unverified values are WARNING.
+#
+# source.status:
+#   verified   - confirmed against an official Amazon document that could be read
+#   secondary  - official page not readable by automation (Seller Central help needs a login), value taken
+#                from an Amazon announcement or from Amazon staff in the Seller Forums
+#   unverified - no usable source found, or sources disagree
+#
+# The rules target the US store (en_US): the word rules (repeated words, exempt words) are English.
+marketplace: AMAZON
+version: amazon-2026-11
+checked_at: 2026-10-28
+
+rules:
+  required_fields:
+    severity: ERROR
+    # Listing fields. Only product_type is listed because it is the only field with an official source:
+    # the other required attributes depend on the product type and appear only in its schema.
+    fields:
+      - product_type
+    source:
+      status: verified
+      urls:
+        - https://github.com/amzn/selling-partner-api-models/blob/main/models/listings-items-api-model/listingsItems_2021-08-01.json
+      note: Listings Items API v2021-08-01, ListingsItemPutRequest - required fields are productType and attributes. Which attributes are required depends on the product type (Product Type Definitions API).
+
+  title_length:
+    severity: WARNING
+    max_length: 200
+    source:
+      status: secondary
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/b2b15728-0d43-453e-974f-59eb63f73059
+      note: 'Amazon announcement "New product title requirements effective January 21, 2025" - for most product categories a title may not exceed 200 characters, including spaces. Some categories have a lower limit (category overrides, none yet). The official help page needs a seller login.'
+
+  title_repeated_words:
+    severity: WARNING
+    # A word (ignoring case) may appear at most this many times in the title.
+    max_occurrences: 2
+    # Prepositions, articles and conjunctions do not count. Amazon publishes no list: this one is ours.
+    exempt_words:
+      - a
+      - an
+      - the
+      - and
+      - or
+      - but
+      - nor
+      - for
+      - so
+      - yet
+      - about
+      - above
+      - across
+      - after
+      - against
+      - along
+      - among
+      - around
+      - at
+      - before
+      - behind
+      - below
+      - beside
+      - between
+      - by
+      - down
+      - during
+      - from
+      - in
+      - inside
+      - into
+      - near
+      - of
+      - "off"
+      - "on"
+      - onto
+      - out
+      - outside
+      - over
+      - past
+      - through
+      - to
+      - toward
+      - under
+      - until
+      - up
+      - upon
+      - with
+      - within
+      - without
+    source:
+      status: secondary
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/b2b15728-0d43-453e-974f-59eb63f73059
+      note: 'Same announcement - "Titles may not contain the same word more than twice", with prepositions, articles and conjunctions excepted. The exempt word list is not published by Amazon and is unverified.'
+
+  title_forbidden_chars:
+    severity: WARNING
+    # Not allowed in a title unless they are part of the brand name (the brand field is checked).
+    chars: ["!", "$", "?", "_", "{", "}", "^", "¬", "¦"]
+    source:
+      status: secondary
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/b2b15728-0d43-453e-974f-59eb63f73059
+      note: 'Same announcement - the special characters !, $, ?, _, {, }, ^, ¬ and ¦ are not allowed, unless they are part of the brand name.'
+
+  bullet_count:
+    severity: WARNING
+    max_count: 5
+    source:
+      status: unverified
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/5de5712a-24e0-4071-8cae-7302864a6d04
+      note: 'Old Seller Central help text ("up to five Feature Bullets") as quoted by a seller in the Seller Forums; the current help page needs a login. Not confirmed by an Amazon document.'
+
+  bullet_length:
+    severity: WARNING
+    # Switched off: sources disagree (256, 100, 500 characters per bullet, or 1000 in total) and the limit
+    # depends on the product type. Enable it, with a verified value, when the product type schemas are available.
+    enabled: false
+    max_length: 256
+    source:
+      status: unverified
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/5de5712a-24e0-4071-8cae-7302864a6d04
+      note: 'Quoted old help text says 256 characters per bullet, "can vary by product category"; other Seller Forums posts report 100, 500, or 1000 characters for all bullets together. The unit (characters or bytes) is not confirmed either.'
+
+  search_terms_length:
+    severity: WARNING
+    # UTF-8 bytes, not characters.
+    max_bytes: 249
+    source:
+      status: secondary
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/d73f6ef2-6a10-4ae5-b2bf-140066b8b299
+      note: 'Amazon staff in the Seller Forums - "the length limit for generic keywords is 249 Bytes, as shown in the Keyword attributes explained page" (a help page that needs a login). Other posts report 250 or 500; the product type schema measures strings in UTF-8 bytes (maxUtf8ByteLength).'
+
+  prohibited_content:
+    severity: WARNING
+    # Fields scanned: title, description, bullet_points (each bullet).
+    fields:
+      - title
+      - description
+      - bullet_points
+    # Name -> regex. The first match in a field is reported. Phone numbers and addresses are not checked: they
+    # cannot be told apart reliably with a regex.
+    patterns:
+      url: '(?i)\b(?:https?://|www\.)\S+'
+      email: '[\p{L}\p{Nd}._%+-]+@[\p{L}\p{Nd}-]+(?:\.[\p{L}\p{Nd}-]+)+'
+    source:
+      status: secondary
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/476c3ca7-35c7-4ca5-912a-e854487579c2
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/2f1eb3e8-bc07-45b1-a74a-0820342fde5e
+      note: 'Seller Forums posts quote the Product detail page rules - phone numbers, addresses, email addresses and website URLs are not allowed in listing content. Read through search result summaries; the official help page needs a seller login.'
+
+  category_not_covered:
+    severity: INFO
+    source:
+      status: unverified
+      note: Behavior of Listing Guard, not an Amazon rule. Tells the caller that the product type has no overrides in this ruleset, so only the default settings were applied.
