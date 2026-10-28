@@ -138,11 +138,23 @@ client-scoped.
 - Set explicit multipart request-size, per-file byte-size, image-count, total-pixel and caller-wait
   deadlines in application configuration. Reject oversized requests before decoding. A caller-wait
   deadline does not terminate an ImageIO read; see the bounded in-process design below.
+- Configure `spring.servlet.multipart.file-size-threshold` explicitly as `0` and
+  `spring.servlet.multipart.location` as a dedicated, private, ephemeral upload directory. Spring
+  therefore stages multipart files on that directory's filesystem rather than relying on its
+  default temporary location. The directory must be owned by the API service account, accessible
+  only to that account (mode `0700` on POSIX systems), mounted with a size quota, and excluded from
+  backups and shared volumes. Let the multipart lifecycle remove staged files when the request
+  completes; also remove orphaned files older than the maximum request lifetime during startup,
+  without deleting files belonging to active requests. Tests must assert the configured threshold,
+  location, permissions/quota contract, and cleanup after successful and failed requests. This
+  avoids retaining uploads in heap but introduces ephemeral-disk capacity and cleanup requirements.
 - Allowlist formats (initially JPEG and PNG); determine format from the decoded stream/magic, never
   trust extension or `Content-Type`.
 - Use `ImageReader` to inspect format and dimensions before full raster decode. Reject dimensions or
   aggregate pixels beyond configured limits before allocating full images.
-- Do not write uploaded bytes or decoded images to persistent or shared temporary files.
+- Do not write uploaded bytes or decoded images to persistent storage or any shared temporary
+  location. The private ephemeral multipart staging directory above is the only permitted upload
+  staging location.
 - Treat unsupported, corrupt, CMYK or otherwise undecodable files as per-image incomplete results,
   not server errors. Do not fetch user-provided URLs, follow redirects, or access server paths.
 - Bound evidence and diagnostic output; never return parser exceptions, stack traces or local paths.
@@ -152,10 +164,16 @@ client-scoped.
 - Apply a process-wide bounded semaphore to image decode work, in addition to the existing per-client
   request rate limit. Use a weighted memory budget based on inspected dimensions and a conservative
   decoded-pixel/working-buffer estimate; acquire permits before full decode and release them in
-  `finally`. Do not queue unbounded work. If the global decode or memory budget is exhausted, fail
-  admission promptly with a retryable service-capacity response. Configure concurrency and memory
-  budgets per API instance; deployment replica limits must keep their aggregate within the host's
-  resource budget.
+  `finally`. The estimate must include the complete analysis phase, including color-conversion
+  buffers, grayscale buffers, white-background scanning and Laplacian blur-analysis working data,
+  not only the decoded raster. Derive the available budget from configured fractions of the JVM
+  maximum heap and detected container memory limit, reserving configured headroom for the rest of the
+  application; do not use a fixed byte budget that ignores runtime limits. Track the encoded byte
+  size of both active and queued requests and include their aggregate against a configured admission
+  budget before accepting work. Do not queue unbounded work. If the global decode, memory or encoded
+  byte budget is exhausted, reject admission promptly with HTTP 503 and a configured `Retry-After`
+  value. Configure ratios, concurrency and budgets per API instance; deployment replica limits must
+  keep their aggregate within the host's resource budget.
 - An ImageIO read cannot be reliably stopped with `Thread.interrupt()` or `Future.cancel()`, so a
   thread-level timeout is not a hard decode deadline. V1 chooses the simpler bounded in-process
   design: inspect dimensions before decode, enforce strict encoded-byte and pixel ceilings, acquire
@@ -164,6 +182,12 @@ client-scoped.
   stop waiting, but the worker retains its thread, semaphore permit and memory reservation until
   ImageIO returns; it must not be reported as a successfully cancelled decode. This bounds concurrent
   work and queued memory but cannot guarantee recovery from a decoder that hangs indefinitely.
+- Measure active and stuck decode tasks in the bounded executor; classify a task as stuck after a
+  configured age. Expose the stuck-task count and configured threshold through health checks. If the
+  count reaches the configured threshold, mark both readiness and liveness unhealthy so the
+  orchestrator stops routing requests and restarts the instance. The age and count threshold are
+  application configuration, not marketplace ruleset values. Since ImageIO cannot be interrupted,
+  restarting the process is the recovery mechanism for tasks that remain stuck.
 - A supervised worker process with an enforceable wall-clock deadline and OS-level memory limits is
   deferred until load/soak measurements or a demonstrated decoder hang justify its extra process
   supervision, IPC, container-image and operational complexity. It can isolate a stuck decoder, but
@@ -198,5 +222,12 @@ These are operational safety controls and are separate from marketplace threshol
   behavior, and cleanup at the retention boundary.
 - Tests verify bounded-executor/semaphore admission and release on success and failure, plus behavior
   when caller deadlines expire while ImageIO work is still running.
+- Tests verify explicit multipart threshold and private staging location configuration, cleanup of
+  staged files after successful and failed requests, and orphan cleanup without removing active
+  uploads.
+- Tests verify that queued encoded bytes and all decode/analysis working buffers count toward
+  admission budgets, and that budget exhaustion returns HTTP 503 with the configured `Retry-After`.
+- Tests verify stuck-task metrics and that reaching the configured threshold marks readiness and
+  liveness unhealthy.
 - A new ruleset version and source metadata are used; prior rulesets and frozen hashes remain
   unchanged. Update OpenAPI and integration documentation with any endpoint contract.
