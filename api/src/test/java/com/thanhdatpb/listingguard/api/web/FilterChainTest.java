@@ -10,12 +10,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thanhdatpb.listingguard.api.security.ApiKeyFilter;
-import com.thanhdatpb.listingguard.api.security.ApiKeys;
+import com.thanhdatpb.listingguard.api.client.AuthenticatedClient;
+import com.thanhdatpb.listingguard.api.security.ClientAuthenticator;
 import com.thanhdatpb.listingguard.api.security.RateLimitFilter;
 import com.thanhdatpb.listingguard.api.security.RateLimitProperties;
 import com.thanhdatpb.listingguard.api.security.RateLimiter;
 import java.io.ByteArrayInputStream;
-import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
@@ -35,6 +37,10 @@ class FilterChainTest {
 
     private static final String KEY_A = "a".repeat(40);
     private static final String KEY_B = "b".repeat(40);
+    /** A second key of the same client as KEY_A. */
+    private static final String KEY_A2 = "c".repeat(40);
+    private static final AuthenticatedClient CLIENT_A = new AuthenticatedClient(UUID.randomUUID(), "client-a", "keya0001");
+    private static final AuthenticatedClient CLIENT_B = new AuthenticatedClient(UUID.randomUUID(), "client-b", "keyb0001");
     private static final int MAX_BODY = 100;
 
     @RestController
@@ -63,13 +69,21 @@ class FilterChainTest {
 
     private final long[] nanos = {0};
     private final ObjectMapper mapper = Jackson2ObjectMapperBuilder.json().build();
-    private final ApiKeys keys = ApiKeys.parse(List.of("key-a:" + KEY_A, "key-b:" + KEY_B));
+    private final ClientAuthenticator authenticator = key -> {
+        if (key.equals(KEY_A)) {
+            return Optional.of(CLIENT_A);
+        }
+        if (key.equals(KEY_A2)) {
+            return Optional.of(new AuthenticatedClient(CLIENT_A.id(), CLIENT_A.name(), "keya0002"));
+        }
+        return key.equals(KEY_B) ? Optional.of(CLIENT_B) : Optional.empty();
+    };
 
     private MockMvc mvc(boolean docsPublic, int burst) {
         RateLimiter limiter = new RateLimiter(new RateLimitProperties(true, 60, burst), () -> nanos[0]);
         return MockMvcBuilders.standaloneSetup(new StubController())
                 .setControllerAdvice(new ApiExceptionHandler())
-                .addFilters(new RequestIdFilter(), new BodyLimitFilter(MAX_BODY, mapper), new ApiKeyFilter(keys, docsPublic, mapper),
+                .addFilters(new RequestIdFilter(), new BodyLimitFilter(MAX_BODY, mapper), new ApiKeyFilter(authenticator, docsPublic, mapper),
                         new RateLimitFilter(limiter, mapper))
                 .build();
     }
@@ -90,10 +104,10 @@ class FilterChainTest {
 
     @Test
     void keepsAClientRequestIdAndRepeatsItInProblemResponses() throws Exception {
-        mvc().perform(get("/api/v1/ping").header("X-Request-Id", "preview-123.abc"))
+        mvc().perform(get("/api/v1/ping").header("X-Request-Id", "client-123.abc"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().string("X-Request-Id", "preview-123.abc"))
-                .andExpect(jsonPath("$.requestId").value("preview-123.abc"));
+                .andExpect(header().string("X-Request-Id", "client-123.abc"))
+                .andExpect(jsonPath("$.requestId").value("client-123.abc"));
     }
 
     @Test
@@ -134,7 +148,7 @@ class FilterChainTest {
     }
 
     @Test
-    void anyConfiguredKeyIsAccepted() throws Exception {
+    void anyKnownKeyIsAccepted() throws Exception {
         mvc().perform(get("/api/v1/ping").header("X-API-Key", KEY_A)).andExpect(status().isOk());
         mvc().perform(get("/api/v1/ping").header("X-API-Key", KEY_B)).andExpect(status().isOk());
     }
@@ -158,7 +172,7 @@ class FilterChainTest {
     // ---- rate limit ---------------------------------------------------------------------------------
 
     @Test
-    void tooManyRequestsFromOneKeyGet429WithRetryAfterAndOtherKeysAreUnaffected() throws Exception {
+    void tooManyRequestsFromOneClientGet429WithRetryAfterAndOtherClientsAreUnaffected() throws Exception {
         MockMvc mvc = mvc(false, 2);
         mvc.perform(get("/api/v1/ping").header("X-API-Key", KEY_A)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/ping").header("X-API-Key", KEY_A)).andExpect(status().isOk());
@@ -174,6 +188,17 @@ class FilterChainTest {
 
         nanos[0] += TimeUnit.SECONDS.toNanos(1) + 1;
         mvc.perform(get("/api/v1/ping").header("X-API-Key", KEY_A)).andExpect(status().isOk());
+    }
+
+    @Test
+    void allKeysOfOneClientShareOneBucket() throws Exception {
+        MockMvc mvc = mvc(false, 2);
+        mvc.perform(get("/api/v1/ping").header("X-API-Key", KEY_A)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/ping").header("X-API-Key", KEY_A2)).andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/ping").header("X-API-Key", KEY_A)).andExpect(status().isTooManyRequests());
+        mvc.perform(get("/api/v1/ping").header("X-API-Key", KEY_A2)).andExpect(status().isTooManyRequests());
+        mvc.perform(get("/api/v1/ping").header("X-API-Key", KEY_B)).andExpect(status().isOk());
     }
 
     @Test

@@ -15,11 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.mock.env.MockEnvironment;
 
+/** Development-only settings are refused outside the dev profile and never printed. */
 class StartupSafetyCheckTest {
-
-    private static final String DEV_KEY = "insecure-dev-key-change-me-0123456789abcdef";
-    private static final ApiKeys INSECURE = ApiKeys.parse(List.of("dev:" + DEV_KEY));
-    private static final ApiKeys REAL = ApiKeys.parse(List.of("preview:" + "k".repeat(40)));
 
     private final Logger logger = (Logger) LoggerFactory.getLogger(StartupSafetyCheck.class);
     private ListAppender<ILoggingEvent> appender;
@@ -46,60 +43,43 @@ class StartupSafetyCheckTest {
         return appender.list.stream().filter(event -> event.getLevel() == Level.WARN).toList();
     }
 
-    // ---- development keys ---------------------------------------------------------------------------------
+    // ---- development key ----------------------------------------------------------------------------------
 
     @Test
-    void anInsecureKeyIsRefusedWithoutAnyProfile() {
-        assertThatThrownBy(() -> new StartupSafetyCheck(INSECURE, false, profiles()))
+    void aDevKeyIsRefusedWithoutAnyProfile() {
+        assertThatThrownBy(() -> new StartupSafetyCheck(true, false, profiles()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("insecure-").hasMessageContaining("'dev' profile")
-                .hasMessageNotContaining(DEV_KEY);
+                .hasMessageContaining("LISTING_GUARD_DEV_API_KEY").hasMessageContaining("'dev' profile");
     }
 
     @Test
-    void anInsecureKeyIsRefusedWithAnotherProfile() {
-        assertThatThrownBy(() -> new StartupSafetyCheck(INSECURE, false, profiles("staging")))
+    void aDevKeyIsRefusedWithAnotherProfile() {
+        assertThatThrownBy(() -> new StartupSafetyCheck(true, false, profiles("staging")))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("[staging]");
     }
 
     @Test
-    void anInsecureKeyIsRefusedWhenProdIsActiveEvenWithDev() {
-        assertThatThrownBy(() -> new StartupSafetyCheck(INSECURE, false, profiles("dev", "prod")))
+    void aDevKeyIsRefusedWhenProdIsActiveEvenWithDev() {
+        assertThatThrownBy(() -> new StartupSafetyCheck(true, false, profiles("dev", "prod")))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("never with 'prod'");
     }
 
     @Test
-    void anInsecureKeyIsAllowedWithTheDevProfile() {
-        assertThatCode(() -> new StartupSafetyCheck(INSECURE, false, profiles("dev"))).doesNotThrowAnyException();
+    void aDevKeyIsAllowedWithTheDevProfile() {
+        assertThatCode(() -> new StartupSafetyCheck(true, false, profiles("dev"))).doesNotThrowAnyException();
     }
 
     @Test
-    void aKeyThatDoesNotStartWithInsecureNeedsNoProfile() {
-        assertThat(REAL.hasInsecureDevKey()).isFalse();
-        assertThatCode(() -> new StartupSafetyCheck(REAL, false, profiles())).doesNotThrowAnyException();
-        assertThatCode(() -> new StartupSafetyCheck(REAL, false, profiles("prod"))).doesNotThrowAnyException();
-    }
-
-    @Test
-    void oneInsecureKeyAmongSeveralIsEnoughToRefuse() {
-        ApiKeys mixed = ApiKeys.parse(List.of("preview:" + "k".repeat(40), "dev:" + DEV_KEY));
-
-        assertThat(mixed.hasInsecureDevKey()).isTrue();
-        assertThatThrownBy(() -> new StartupSafetyCheck(mixed, false, profiles("prod"))).isInstanceOf(IllegalStateException.class);
-    }
-
-    @Test
-    void onlyTheKeyCountsNotTheName() {
-        ApiKeys namedInsecure = ApiKeys.parse(List.of("insecure-name:" + "k".repeat(40)));
-
-        assertThat(namedInsecure.hasInsecureDevKey()).isFalse();
+    void withoutADevKeyNoProfileIsNeeded() {
+        assertThatCode(() -> new StartupSafetyCheck(false, false, profiles())).doesNotThrowAnyException();
+        assertThatCode(() -> new StartupSafetyCheck(false, false, profiles("prod"))).doesNotThrowAnyException();
     }
 
     // ---- swagger flag -------------------------------------------------------------------------------------
 
     @Test
     void theSwaggerFlagLogsAWarningAndStarts() {
-        new StartupSafetyCheck(REAL, true, profiles("dev"));
+        new StartupSafetyCheck(false, true, profiles("dev"));
 
         assertThat(warnings()).hasSize(1);
         assertThat(warnings().get(0).getFormattedMessage()).contains("Swagger UI is enabled").contains("without an API key");
@@ -107,21 +87,21 @@ class StartupSafetyCheckTest {
 
     @Test
     void theSwaggerFlagWithoutProfilesAlsoJustWarns() {
-        new StartupSafetyCheck(REAL, true, profiles());
+        new StartupSafetyCheck(false, true, profiles());
 
         assertThat(warnings()).hasSize(1);
     }
 
     @Test
     void theSwaggerFlagIsRefusedUnderProd() {
-        assertThatThrownBy(() -> new StartupSafetyCheck(REAL, true, profiles("prod")))
+        assertThatThrownBy(() -> new StartupSafetyCheck(false, true, profiles("prod")))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("LISTING_GUARD_SWAGGER_UI").hasMessageContaining("'prod'");
         assertThat(warnings()).isEmpty();
     }
 
     @Test
     void noWarningWhenTheFlagIsOff() {
-        new StartupSafetyCheck(REAL, false, profiles("prod"));
+        new StartupSafetyCheck(false, false, profiles("prod"));
 
         assertThat(warnings()).isEmpty();
     }

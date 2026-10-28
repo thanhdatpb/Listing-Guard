@@ -67,7 +67,7 @@ class ApiContractIntegrationTest {
     }
 
     @Test
-    void bothKeysWorkSoAKeyCanBeRotated() throws Exception {
+    void keysOfTwoClientsBothWork() throws Exception {
         assertProblem(mvc.perform(get(CHECKS + "/" + UUID.randomUUID()).header(HEADER, KEY_1)), 404, "check-not-found");
         assertProblem(mvc.perform(get(CHECKS + "/" + UUID.randomUUID()).header(HEADER, KEY_2)), 404, "check-not-found");
     }
@@ -86,10 +86,10 @@ class ApiContractIntegrationTest {
 
     @Test
     void aClientRequestIdIsKeptInTheHeaderAndInProblemResponses() throws Exception {
-        ResultActions result = mvc.perform(get(CHECKS + "/" + UUID.randomUUID()).header(HEADER, KEY_1).header("X-Request-Id", "preview-req-42"));
+        ResultActions result = mvc.perform(get(CHECKS + "/" + UUID.randomUUID()).header(HEADER, KEY_1).header("X-Request-Id", "client-req-42"));
 
         assertProblem(result, 404, "check-not-found");
-        result.andExpect(header().string("X-Request-Id", "preview-req-42")).andExpect(jsonPath("$.requestId").value("preview-req-42"));
+        result.andExpect(header().string("X-Request-Id", "client-req-42")).andExpect(jsonPath("$.requestId").value("client-req-42"));
     }
 
     @Test

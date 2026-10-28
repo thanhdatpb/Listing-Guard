@@ -23,9 +23,9 @@ class RateLimiterTest {
         RateLimiter limiter = limiter(60, 20);
 
         for (int i = 0; i < 20; i++) {
-            assertThat(limiter.acquire("preview")).as("request %d", i + 1).isZero();
+            assertThat(limiter.acquire("client-a")).as("request %d", i + 1).isZero();
         }
-        assertThat(limiter.acquire("preview")).isPositive();
+        assertThat(limiter.acquire("client-a")).isPositive();
     }
 
     @Test

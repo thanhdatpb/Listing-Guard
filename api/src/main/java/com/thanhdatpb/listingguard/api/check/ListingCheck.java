@@ -19,6 +19,10 @@ public class ListingCheck {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /** The client that asked for this check; only that client can read it or be answered from it. */
+    @Column(name = "client_id", nullable = false)
+    private UUID clientId;
+
     @Column(name = "content_hash", nullable = false)
     private String contentHash;
 
@@ -39,7 +43,8 @@ public class ListingCheck {
     protected ListingCheck() {
     }
 
-    public ListingCheck(String contentHash, String marketplaceCode, CheckStatus status, Long rulesetVersionId) {
+    public ListingCheck(UUID clientId, String contentHash, String marketplaceCode, CheckStatus status, Long rulesetVersionId) {
+        this.clientId = clientId;
         this.contentHash = contentHash;
         this.marketplaceCode = marketplaceCode;
         this.status = status;
@@ -48,6 +53,10 @@ public class ListingCheck {
 
     public UUID getId() {
         return id;
+    }
+
+    public UUID getClientId() {
+        return clientId;
     }
 
     public String getContentHash() {

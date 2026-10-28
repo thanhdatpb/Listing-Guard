@@ -13,6 +13,8 @@ import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_TOO_LARGE
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_UNAUTHORIZED;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_UNKNOWN_MARKETPLACE;
 
+import com.thanhdatpb.listingguard.api.client.AuthenticatedClient;
+import com.thanhdatpb.listingguard.api.security.ApiKeyFilter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -26,6 +28,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,8 +51,8 @@ public class CheckController {
             summary = "Check a listing",
             description = """
                     Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content \
-                    was already checked with the same analysisVersion, the stored result is returned instead and `cached` \
-                    is true (no new check is created). The listing is the marketplace's own format; for Etsy it is the \
+                    was already checked by the calling client with the same analysisVersion, the stored result is returned \
+                    instead and `cached` is true (no new check is created); results are never shared between clients. The listing is the marketplace's own format; for Etsy it is the \
                     Open API v3 style JSON with snake_case fields, for Amazon the simple format with title, brand, \
                     bullet_points, description, search_terms, product_type, price, quantity and images.""",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -82,17 +85,18 @@ public class CheckController {
                     @ApiResponse(responseCode = "422", description = "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`). No marketplace is planned today.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_NOT_YET_SUPPORTED))),
-                    @ApiResponse(responseCode = "429", description = "Rate limit exceeded for this API key; see the Retry-After header.",
+                    @ApiResponse(responseCode = "429", description = "Rate limit exceeded for the calling client; see the Retry-After header.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_RATE_LIMITED)))})
-    public CheckResult check(@Valid @RequestBody CheckRequest request) {
-        return service.check(request);
+    public CheckResult check(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
+                             @Valid @RequestBody CheckRequest request) {
+        return service.check(client.id(), request);
     }
 
     @GetMapping("/{id}")
     @Operation(
             summary = "Read a stored check",
-            description = "Returns the stored result of an earlier check, in the same shape as the POST response (`cached` is false).",
+            description = "Returns the stored result of an earlier check of the calling client, in the same shape as the POST response (`cached` is false).",
             responses = {
                     @ApiResponse(responseCode = "200", description = "The stored check result.",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = CheckResult.class),
@@ -102,13 +106,14 @@ public class CheckController {
                     @ApiResponse(responseCode = "401", description = "Missing or invalid API key.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_UNAUTHORIZED))),
-                    @ApiResponse(responseCode = "404", description = "No check with this id (code `check-not-found`).",
+                    @ApiResponse(responseCode = "404", description = "No check with this id for the calling client (code `check-not-found`). A check of another client gives the same answer.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_NOT_FOUND))),
-                    @ApiResponse(responseCode = "429", description = "Rate limit exceeded for this API key.",
+                    @ApiResponse(responseCode = "429", description = "Rate limit exceeded for the calling client.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_RATE_LIMITED)))})
-    public CheckResult get(@Parameter(description = "checkId returned by POST /api/v1/checks") @PathVariable UUID id) {
-        return service.get(id);
+    public CheckResult get(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
+                           @Parameter(description = "checkId returned by POST /api/v1/checks") @PathVariable UUID id) {
+        return service.get(client.id(), id);
     }
 }

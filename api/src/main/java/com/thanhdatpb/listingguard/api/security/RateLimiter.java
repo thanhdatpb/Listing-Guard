@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
-/** One token bucket per API key name. The clock is injected so tests do not have to wait. */
+/** One token bucket per caller (the client id). The clock is injected so tests do not have to wait. */
 public final class RateLimiter {
 
     private static final double NANOS_PER_SECOND = 1_000_000_000.0;

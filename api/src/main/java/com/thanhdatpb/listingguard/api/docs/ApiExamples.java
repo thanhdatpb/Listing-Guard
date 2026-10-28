@@ -244,7 +244,7 @@ public final class ApiExamples {
               "type": "urn:listing-guard:problem:rate-limited",
               "title": "Too Many Requests",
               "status": 429,
-              "detail": "Too many requests for this API key. Retry after 2 second(s).",
+              "detail": "Too many requests for this client. Retry after 2 second(s).",
               "instance": "/api/v1/checks",
               "code": "rate-limited",
               "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
