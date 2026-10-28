@@ -78,6 +78,22 @@ services:
       OLLAMA_HOST: http://ollama:11434
     entrypoint: ["ollama", "pull", "${EMBEDDING_MODEL:-nomic-embed-text}"]
 
+  # Manages clients and their API keys (ADR-007); every change is written to the log with client, key id and time.
+  #   docker compose run --rm admin client create <name>
+  #   docker compose run --rm admin key create <client> --label="first key"   (prints the key once)
+  #   docker compose run --rm admin client list | client deactivate <name> | key list <client> | key revoke <keyId>
+  admin:
+    image: listing-guard-api:dev
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: admin
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
+      DB_USER: ${POSTGRES_USER:-listingguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+
   # Ingests policies/manifest.yaml and policies/raw/** into the database: docker compose run --rm ingest
   ingest:
     image: listing-guard-api:dev

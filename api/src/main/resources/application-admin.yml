@@ -1,0 +1,9 @@
+# Profile for the one-shot admin job (clients and API keys): no web server, the process ends when the job ends.
+spring:
+  main:
+    web-application-type: none
+
+listing-guard:
+  embedding:
+    # The admin job never embeds anything; this keeps it from needing an Ollama server.
+    provider: hashing
