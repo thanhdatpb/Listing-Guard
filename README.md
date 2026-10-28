@@ -12,14 +12,16 @@ do SEO.
   citation will be verified by code. So far the policy corpus can be ingested and searched; the LLM
   step is not built yet.
 
-> Status: the Etsy rule engine works end to end. `POST /checks` normalizes the listing, runs the Etsy
-> rules, stores the check and its findings, and returns them. Policy documents can be ingested into
-> pgvector and retrieved (no LLM involved yet).
+> Status: the Etsy rule engine works end to end. `POST /api/v1/checks` normalizes the listing, runs the
+> Etsy rules, stores the check and its findings, and returns them; an identical listing gets the stored
+> result. The API is ready for a backend to call (API key, rate limit, OpenAPI, standard errors): see
+> [docs/integration-guide.md](docs/integration-guide.md). Policy documents can be ingested into pgvector
+> and retrieved (no LLM involved yet).
 
 ## Architecture
 
 ```text
-                 POST /checks (raw listing JSON)
+              POST /api/v1/checks (raw listing JSON)
                               |
                               v
         +---------------------------------------------+
@@ -37,6 +39,7 @@ do SEO.
         |  PolicyRetriever (rag-analyzer API)  -------+-->  finding_feedback,
         |        ^                                    |     policy_document, policy_chunk
         |        |  GET /policies/search (debug)      |
+        |  X-API-Key, rate limit, request id, RFC7807 |
         +---------------------------------------------+--> Redis (declared, unused yet)
                  ^
                  | ingest job (profile `ingest`)
@@ -55,6 +58,8 @@ Modules:
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `policies/` | `manifest.yaml` (committed) and `raw/` (local files, git-ignored) |
 | `docs/adr/` | Architecture decision records |
+| `docs/api/` | `openapi.json`, the committed API contract (a test fails when it drifts from the code) |
+| `docs/integration-guide.md` | How a backend calls the API: auth, flow, field paths, errors |
 
 ## Run
 
@@ -71,11 +76,18 @@ The compose file has dev defaults, overridable with environment variables or a l
 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and host ports `POSTGRES_PORT` (5432),
 `REDIS_PORT` (6379), `OLLAMA_PORT` (11434), `API_PORT` (8080).
 
+The API needs keys. `LISTING_GUARD_API_KEYS` is a comma separated list of `name:key` pairs, each key at
+least 32 characters; the application does not start without a valid value. Compose supplies a public
+development key (`dev:insecure-dev-key-change-me-0123456789abcdef`): set your own anywhere others can reach
+the service. When running the jar yourself, export the variable first. `LISTING_GUARD_SWAGGER_UI=true` turns
+on Swagger UI at `/swagger-ui.html` for development (off by default; the spec at `/v3/api-docs` needs a key).
+
 ```bash
 curl http://localhost:8080/health
-# {"status":"UP"}
+# {"status":"UP"}   (503 when the database is unreachable; no key needed)
 
-curl -X POST http://localhost:8080/checks -H 'Content-Type: application/json' -d '{
+curl -X POST http://localhost:8080/api/v1/checks -H 'Content-Type: application/json' \
+  -H 'X-API-Key: insecure-dev-key-change-me-0123456789abcdef' -d '{
   "marketplace": "ETSY",
   "listing": {
     "title": "Handmade Mug",
@@ -87,10 +99,14 @@ curl -X POST http://localhost:8080/checks -H 'Content-Type: application/json' -d
 }'
 ```
 
-The response lists one finding per problem, each with `ruleId`, `severity`, `field`, `message`,
-`suggestion` and the `rulesetVersion` that produced it. This example reports the duplicate tag
-(`WARNING`), the `_` in `gift_idea` (`ERROR`) and the missing `quantity`, `who_made` and `when_made`
-(`ERROR`). Messages are in Vietnamese.
+The response has the check's `checkId`, `rulesetVersion`, `analysisVersion`, `cached`, a `summary` and one
+finding per problem, each with `ruleId`, `source`, `severity`, `field`, `value`, `message` and `suggestion`.
+This example reports the duplicate tag (`WARNING`), the `_` in `gift_idea` (`ERROR`) and the missing
+`quantity`, `who_made` and `when_made` (`ERROR`). Messages are in Vietnamese. Sending the same listing again
+returns the stored result with `cached: true`; `GET /api/v1/checks/{checkId}` reads it later. Errors are
+RFC 7807 problems. Everything about calling the API is in [docs/integration-guide.md](docs/integration-guide.md),
+the contract in [docs/api/openapi.json](docs/api/openapi.json) (after an intended API change refresh it with
+`./mvnw -B verify -Dopenapi.update=true`, then commit it).
 
 ## Policy corpus and retrieval
 
@@ -119,8 +135,8 @@ except the embedding backend.
    Do not run a plain `docker compose up` in this case (it would also start the large `ollama` image); start
    only what you need: `docker compose up -d postgres`.
 
-3. **Ingest.** It is a one-shot job, not an HTTP endpoint (there is no authentication yet, and ingest is
-   batch work on local files). With A, run it in Docker; with B, run it on the host from the repository root
+3. **Ingest.** It is a one-shot job, not an HTTP endpoint (it is batch work on local files and needs no API
+   key). With A, run it in Docker; with B, run it on the host from the repository root
    (defaults: database `localhost:5432`, `policies/` and `eval/retrieval/` relative to the working directory;
    set `DB_URL` if you changed `POSTGRES_PORT`):
    ```bash
@@ -137,7 +153,7 @@ except the embedding backend.
    Ollama at `http://ollama:11434`, so with way B run the application on the host instead
    (`java -jar api/target/listing-guard-api.jar --listing-guard.policies.search-endpoint.enabled=true`):
    ```bash
-   curl 'http://localhost:8080/policies/search?marketplace=ETSY&q=can+I+sell+counterfeit+items&k=5'
+   curl -H 'X-API-Key: <key>' 'http://localhost:8080/policies/search?marketplace=ETSY&q=can+I+sell+counterfeit+items&k=5'
    ```
    Returns the chunks with `score`, `url` (with the section anchor) and `sectionPath`. The marketplace
    filter is applied before the vector ranking, so another marketplace can never appear.
@@ -193,4 +209,5 @@ Amazon is only started after Etsy is done and measured.
 Design decisions: [ADR-001](docs/adr/ADR-001-rule-config.md) (rule configuration),
 [ADR-002](docs/adr/ADR-002-ruleset-versioning.md) (ruleset versioning),
 [ADR-003](docs/adr/ADR-003-chunking-strategy.md) (chunking),
-[ADR-004](docs/adr/ADR-004-embedding-provider.md) (embedding provider).
+[ADR-004](docs/adr/ADR-004-embedding-provider.md) (embedding provider),
+[ADR-005](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md) (API keys, rate limit, result cache).
