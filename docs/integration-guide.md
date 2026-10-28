@@ -65,12 +65,93 @@ The fields that are read, their accepted forms and how values are cleaned are th
 list entries are dropped; nothing else is changed, because the rules must see what the seller wrote. If your own
 listing format differs, map it to this one on your side.
 
+### Java client (Spring `RestClient`)
+
+Keep the API key in server-side configuration or a secret manager. Send a request ID for support
+correlation. Do not retry a `401` without fixing the key, or a `422` without handling the unsupported
+marketplace. On `429`, read `Retry-After` in seconds and schedule a retry after that delay rather than
+retrying immediately.
+
+```java
+import java.time.Duration;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+
+final class ListingGuardExample {
+    private final String apiKey;
+    private final RestClient listingGuard = RestClient.builder()
+        .baseUrl("https://listing-guard.example")
+        .build();
+
+    ListingGuardExample(String apiKey) {
+        this.apiKey = apiKey;
+    }
+
+    String checkListing() {
+        String requestId = UUID.randomUUID().toString();
+        try {
+            return listingGuard.post()
+                .uri("/api/v1/checks")
+                .header("X-API-Key", apiKey)
+                .header("X-Request-Id", requestId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(
+                    "marketplace", "ETSY",
+                    "listing", Map.of(
+                        "title", "Handmade Ceramic Mug",
+                        "description", "Hand-thrown stoneware mug.",
+                        "tags", java.util.List.of("mug", "ceramic"),
+                        "price", Map.of("amount", 19.99, "currency", "USD"),
+                        "quantity", 5,
+                        "who_made", "i_did",
+                        "when_made", "made_to_order")))
+                .retrieve()
+                .body(String.class);
+        } catch (RestClientResponseException ex) {
+            switch (ex.getStatusCode().value()) {
+                case 401 -> throw new IllegalStateException("Check the API key; requestId=" + requestId, ex);
+                case 422 -> throw new IllegalArgumentException(
+                    "Handle the unsupported marketplace; requestId=" + requestId, ex);
+                case 429 -> {
+                    HttpHeaders headers = ex.getResponseHeaders();
+                    String retryAfter = headers == null ? null : headers.getFirst(HttpHeaders.RETRY_AFTER);
+                    Duration delay = retryAfter == null ? null : Duration.ofSeconds(Long.parseLong(retryAfter));
+                    throw new RateLimitedException(delay, ex);
+                }
+                default -> throw ex;
+            }
+        }
+    }
+}
+
+final class RateLimitedException extends RuntimeException {
+    private final Duration retryAfter;
+
+    RateLimitedException(Duration retryAfter, Throwable cause) {
+        super("Rate limited; wait for Retry-After before retrying.", cause);
+        this.retryAfter = retryAfter;
+    }
+
+    Duration retryAfter() {
+        return retryAfter;
+    }
+}
+```
+
+The caller can use `RateLimitedException.retryAfter()` to schedule its next attempt; if the header is absent,
+use a bounded backoff. Never include `apiKey` in logs or exception messages.
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/checks \
   -H 'X-API-Key: <key>' -H 'Content-Type: application/json' \
   -d '{"marketplace":"AMAZON","listing":{
-        "title":"Hardside Carry-On Luggage Luggage Spinner Luggage! 20 Inch","brand":"Roadster",
-        "bullet_points":["Lightweight polycarbonate shell","Contact us at www.roadster.example"],
+        "title":"Hardside Carry-On Luggage Luggage Spinner Luggage! 20 Inch","brand":"Example Brand",
+        "bullet_points":["Lightweight polycarbonate shell","Contact us at www.example.invalid"],
         "search_terms":"carry on suitcase cabin bag spinner","product_type":"LUGGAGE"}}'
 ```
 
