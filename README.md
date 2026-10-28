@@ -249,4 +249,4 @@ Design decisions: [ADR-001](docs/adr/ADR-001-rule-config.md) (rule configuration
 The input a client sends is a public contract: [docs/input-schema.md](docs/input-schema.md).
 
 ## License
-MIT © 2026 Thanh Dat Tran
+MIT © 2026 Tran Thanh Dat
