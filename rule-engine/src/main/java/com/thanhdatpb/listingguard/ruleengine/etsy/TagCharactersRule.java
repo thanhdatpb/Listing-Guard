@@ -32,7 +32,7 @@ public final class TagCharactersRule implements Rule {
         for (int i = 0; i < tags.size(); i++) {
             Set<String> invalid = Characters.invalid(tags.get(i), allowed);
             if (!invalid.isEmpty()) {
-                findings.add(finding(config, "tags[" + i + "]",
+                findings.add(finding(config, "tags[" + i + "]", tags.get(i),
                         "Tag " + Texts.quote(tags.get(i)) + " chứa ký tự không hợp lệ: " + String.join(" ", invalid) + ".",
                         "Xoá hoặc thay các ký tự không hợp lệ trong tag này."));
             }

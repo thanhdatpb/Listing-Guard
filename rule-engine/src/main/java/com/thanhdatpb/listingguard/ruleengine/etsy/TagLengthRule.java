@@ -31,7 +31,7 @@ public final class TagLengthRule implements Rule {
             String tag = tags.get(i);
             int length = Texts.length(tag);
             if (length > max) {
-                findings.add(finding(config, "tags[" + i + "]",
+                findings.add(finding(config, "tags[" + i + "]", tag,
                         "Tag " + Texts.quote(tag) + " dài " + length + " ký tự, tối đa " + max + ".",
                         "Rút ngắn tag này ít nhất " + (length - max) + " ký tự."));
             }

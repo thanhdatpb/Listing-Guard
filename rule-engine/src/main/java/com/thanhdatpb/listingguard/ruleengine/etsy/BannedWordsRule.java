@@ -6,6 +6,7 @@ import com.thanhdatpb.listingguard.ruleengine.Rule;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -42,8 +43,9 @@ public final class BannedWordsRule implements Rule {
     }
 
     private void check(RulesetConfig config, List<Finding> findings, Pattern pattern, String word, String field, String text) {
-        if (text != null && pattern.matcher(text).find()) {
-            findings.add(finding(config, field,
+        Matcher matcher = text == null ? null : pattern.matcher(text);
+        if (matcher != null && matcher.find()) {
+            findings.add(finding(config, field, matcher.group(),
                     "Từ '" + word + "' nằm trong danh sách từ cần xem lại và xuất hiện ở " + field + ".",
                     "Xem lại chính sách của sàn và cân nhắc bỏ hoặc thay từ '" + word + "'."));
         }

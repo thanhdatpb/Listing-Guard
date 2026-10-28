@@ -31,7 +31,7 @@ public final class TitleCharactersRule implements Rule {
         if (invalid.isEmpty()) {
             return List.of();
         }
-        return List.of(finding(config, "title",
+        return List.of(finding(config, "title", listing.title(),
                 "Tiêu đề chứa ký tự không hợp lệ: " + String.join(" ", invalid) + ".",
                 "Xoá hoặc thay các ký tự không hợp lệ trong tiêu đề."));
     }

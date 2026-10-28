@@ -36,7 +36,7 @@ public final class DuplicateTagsRule implements Rule {
             String key = ignoreCase ? tag.toLowerCase(Locale.ROOT) : tag;
             Integer first = firstSeenAt.putIfAbsent(key, i);
             if (first != null) {
-                findings.add(finding(config, "tags[" + i + "]",
+                findings.add(finding(config, "tags[" + i + "]", tag,
                         "Tag " + Texts.quote(tag) + " trùng với tag ở vị trí " + (first + 1) + ".",
                         "Xoá tag trùng hoặc thay bằng một tag khác để tận dụng đủ chỗ."));
             }
