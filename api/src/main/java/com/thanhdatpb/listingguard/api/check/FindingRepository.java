@@ -7,4 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface FindingRepository extends JpaRepository<FindingEntity, Long> {
 
     List<FindingEntity> findByCheckId(UUID checkId);
+
+    /** In the order the rules reported them. */
+    List<FindingEntity> findByCheckIdOrderByIdAsc(UUID checkId);
 }

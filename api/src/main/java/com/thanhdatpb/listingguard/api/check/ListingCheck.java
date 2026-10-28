@@ -29,16 +29,21 @@ public class ListingCheck {
     @Column(nullable = false)
     private CheckStatus status;
 
+    /** The ruleset this check was produced with; null for checks stored before versions were recorded. */
+    @Column(name = "ruleset_version_id")
+    private Long rulesetVersionId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
     protected ListingCheck() {
     }
 
-    public ListingCheck(String contentHash, String marketplaceCode, CheckStatus status) {
+    public ListingCheck(String contentHash, String marketplaceCode, CheckStatus status, Long rulesetVersionId) {
         this.contentHash = contentHash;
         this.marketplaceCode = marketplaceCode;
         this.status = status;
+        this.rulesetVersionId = rulesetVersionId;
     }
 
     public UUID getId() {
@@ -55,6 +60,10 @@ public class ListingCheck {
 
     public CheckStatus getStatus() {
         return status;
+    }
+
+    public Long getRulesetVersionId() {
+        return rulesetVersionId;
     }
 
     public Instant getCreatedAt() {

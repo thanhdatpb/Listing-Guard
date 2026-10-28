@@ -31,7 +31,7 @@ public final class TitleLengthRule implements Rule {
         if (length <= max) {
             return List.of();
         }
-        return List.of(finding(config, "title",
+        return List.of(finding(config, "title", listing.title(),
                 "Tiêu đề dài " + length + " ký tự, tối đa " + max + ".",
                 "Rút ngắn tiêu đề ít nhất " + (length - max) + " ký tự."));
     }

@@ -36,14 +36,14 @@ public final class PriceQuantityPositiveRule implements Rule {
 
         BigDecimal minPrice = settings.decimalParam("price_min_exclusive");
         if (listing.price() != null && listing.price().amount().compareTo(minPrice) <= 0) {
-            findings.add(finding(config, "price",
+            findings.add(finding(config, "price", listing.price().amount().toPlainString(),
                     "Giá là " + listing.price().amount().toPlainString() + ", phải lớn hơn " + minPrice.toPlainString() + ".",
                     "Nhập giá lớn hơn " + minPrice.toPlainString() + "."));
         }
 
         BigDecimal minQuantity = settings.decimalParam("quantity_min_exclusive");
         if (listing.quantity() != null && BigDecimal.valueOf(listing.quantity()).compareTo(minQuantity) <= 0) {
-            findings.add(finding(config, "quantity",
+            findings.add(finding(config, "quantity", String.valueOf(listing.quantity()),
                     "Số lượng là " + listing.quantity() + ", phải lớn hơn " + minQuantity.toPlainString() + ".",
                     "Nhập số lượng lớn hơn " + minQuantity.toPlainString() + "."));
         }

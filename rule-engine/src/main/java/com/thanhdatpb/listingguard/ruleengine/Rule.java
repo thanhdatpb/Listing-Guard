@@ -30,7 +30,13 @@ public interface Rule {
         config.rule(id());
     }
 
+    /** A finding with no single offending value (for example a missing field). */
     default Finding finding(RulesetConfig config, String field, String message, String suggestion) {
-        return new Finding(id(), severity(config), field, message, suggestion, config.version());
+        return finding(config, field, null, message, suggestion);
+    }
+
+    /** @param value the exact value that caused the finding, so clients can match by value, not position */
+    default Finding finding(RulesetConfig config, String field, String value, String message, String suggestion) {
+        return new Finding(id(), severity(config), field, value, message, suggestion, config.version());
     }
 }

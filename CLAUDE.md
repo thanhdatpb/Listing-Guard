@@ -12,10 +12,12 @@ It never edits a listing, never publishes, and does no SEO.
   code-verified citations. Built so far: policy manifest, HTML/PDF parsers, structural chunker,
   `EmbeddingProvider`, `PolicyRetriever`, retrieval metrics. No LLM yet.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
-- **API** (`api/`): Spring Boot REST. `POST /checks` normalizes, runs the rule engine, stores a
-  `listing_check` and its findings, returns the findings.
-- Current scope: Etsy rule engine, and policy ingest + retrieval (no LLM call, no structured output, no
-  citation verification yet). No auth, no Amazon.
+- **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
+  `listing_check` and its findings, returns them (an identical listing returns the stored result,
+  `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Contract: `docs/api/openapi.json`,
+  `docs/integration-guide.md`, ADR-005.
+- Current scope: Etsy rule engine, the Preview-facing API, and policy ingest + retrieval (no LLM call, no
+  structured output, no citation verification yet). No Amazon rules, no Preview format mapper yet.
 
 ## Stack
 
@@ -65,9 +67,16 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 - Ingest only reads local files and is idempotent; a document is redone when its file, manifest entry,
   `PolicyChunker.VERSION`/limits or `EmbeddingProvider.modelId()` changes. Bump `PolicyChunker.VERSION` when
   the chunking rules change. The manifest `version` must equal the page's "Last updated" date.
-- Ingest and eval are one-shot jobs (profiles `ingest`, `eval-retrieval`), not HTTP endpoints: there is no
-  authentication yet. `GET /policies/search` is a debug view that answers 404 unless
+- Ingest and eval are one-shot jobs (profiles `ingest`, `eval-retrieval`), not HTTP endpoints, and need no
+  API keys. `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
+- **API contract** (ADR-005): everything but `/health` needs `X-API-Key` (keys from `LISTING_GUARD_API_KEYS`,
+  `name:key`, key 32+ characters, the web app refuses to start otherwise). Errors are RFC 7807 problems with a
+  stable `code` and `requestId`; never return a bare error body or a stack trace. Cache identity is
+  `(marketplace, contentHash, analysisVersion)`; a change to anything that decides findings must change
+  `analysisVersion`. After an intended API change refresh `docs/api/openapi.json` with
+  `./mvnw -B verify -Dopenapi.update=true` and commit it (a test fails on drift); update
+  `docs/integration-guide.md` when behavior a client sees changes.
 - Retrieval filters by marketplace before ranking. Chunk text is stored exactly as on the page (later
   citation checks compare against it); only the embedding input has the section path prepended.
 - Embeddings: tests use `HashingEmbeddingProvider` (set through `TestcontainersConfig`), never Ollama.

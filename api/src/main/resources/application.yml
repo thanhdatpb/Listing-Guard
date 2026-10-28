@@ -1,4 +1,20 @@
 listing-guard:
+  security:
+    # name:key pairs, comma separated; several keys at once allow rotation. Each key needs 32+ characters.
+    # The application does not start without valid keys (web mode only).
+    api-keys: ${LISTING_GUARD_API_KEYS:}
+  api:
+    max-body-bytes: 262144
+    # Development only: serves Swagger UI and opens it and /v3/api-docs without an API key.
+    swagger-ui-enabled: ${LISTING_GUARD_SWAGGER_UI:false}
+  rate-limit:
+    enabled: true
+    requests-per-minute: 60
+    burst: 20
+  marketplaces:
+    # On the roadmap, not supported yet: a check request for one of these gets 422, not the 400 for unknown codes.
+    planned:
+      - AMAZON
   rulesets:
     locations:
       - classpath:rulesets/etsy-2026-11.yaml
@@ -24,6 +40,9 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/listingguard}
     username: ${DB_USER:listingguard}
     password: ${DB_PASSWORD:listingguard}
+    hikari:
+      # fail fast when the database is down (a health check or request waits at most this long for a connection)
+      connection-timeout: 3000
   jpa:
     open-in-view: false
     hibernate:
@@ -33,3 +52,14 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    # Swagger UI is for development only; it follows listing-guard.api.swagger-ui-enabled (off by default)
+    enabled: ${listing-guard.api.swagger-ui-enabled:false}
+
+logging:
+  pattern:
+    level: "%5p [%X{requestId:-}] [%X{apiKey:-}]"

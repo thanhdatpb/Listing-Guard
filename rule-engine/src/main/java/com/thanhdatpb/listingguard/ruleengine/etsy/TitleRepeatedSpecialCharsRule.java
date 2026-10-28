@@ -39,7 +39,7 @@ public final class TitleRepeatedSpecialCharsRule implements Rule {
             int codePoint = character.codePointAt(0);
             long count = listing.title().codePoints().filter(c -> c == codePoint).count();
             if (count > max) {
-                findings.add(finding(config, "title",
+                findings.add(finding(config, "title", character,
                         "Ký tự '" + character + "' xuất hiện " + count + " lần trong tiêu đề, tối đa " + max + " lần.",
                         "Chỉ giữ " + max + " ký tự '" + character + "' trong tiêu đề, bỏ " + (count - max) + " ký tự còn lại."));
             }
