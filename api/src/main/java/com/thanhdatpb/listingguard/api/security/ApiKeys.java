@@ -30,10 +30,15 @@ public final class ApiKeys {
     private record Entry(String name, byte[] digest) {
     }
 
-    private final List<Entry> entries;
+    /** Keys that start with this are public development keys (the compose default is one); see StartupSafetyCheck. */
+    public static final String INSECURE_PREFIX = "insecure-";
 
-    private ApiKeys(List<Entry> entries) {
+    private final List<Entry> entries;
+    private final boolean insecureDevKey;
+
+    private ApiKeys(List<Entry> entries, boolean insecureDevKey) {
         this.entries = entries;
+        this.insecureDevKey = insecureDevKey;
     }
 
     /** @throws IllegalStateException if there is no key, or any entry is malformed or duplicated */
@@ -41,6 +46,7 @@ public final class ApiKeys {
         List<Entry> entries = new ArrayList<>();
         Set<String> names = new HashSet<>();
         Set<String> digests = new HashSet<>();
+        boolean insecureDevKey = false;
         int position = 0;
         for (String raw : configured) {
             if (raw == null || raw.isBlank()) {
@@ -61,13 +67,19 @@ public final class ApiKeys {
             if (!digests.add(HexFormat.of().formatHex(digest))) {
                 throw new IllegalStateException("API key of '" + name + "' is the same as another configured key");
             }
+            insecureDevKey |= matcher.group(2).startsWith(INSECURE_PREFIX);
             entries.add(new Entry(name, digest));
         }
         if (entries.isEmpty()) {
             throw new IllegalStateException("No API keys configured. Set LISTING_GUARD_API_KEYS to name:key pairs, comma "
                     + "separated; each key needs at least " + MIN_KEY_LENGTH + " characters.");
         }
-        return new ApiKeys(List.copyOf(entries));
+        return new ApiKeys(List.copyOf(entries), insecureDevKey);
+    }
+
+    /** True when any configured key starts with {@value #INSECURE_PREFIX}, the marker of a public development key. */
+    public boolean hasInsecureDevKey() {
+        return insecureDevKey;
     }
 
     /**

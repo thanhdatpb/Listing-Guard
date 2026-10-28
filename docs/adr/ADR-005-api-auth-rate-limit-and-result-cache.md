@@ -20,6 +20,13 @@ itself and the spec. The cost: keys are secrets in environment variables, there 
 and no audit beyond the key name in logs. Revisit when a second kind of caller (a browser, a third party)
 appears.
 
+Two development conveniences are fenced so they cannot reach a real deployment by accident. A key starting
+with `insecure-` (the public key in `docker-compose.yml`) is accepted only when the `dev` profile is active and
+never together with `prod`; otherwise the application does not start. The Swagger flag logs a WARN at start-up
+and the application does not start with it under `prod`. The compose file sets `SPRING_PROFILES_ACTIVE=dev` for
+the same reason. The fence relies on the operator naming profiles honestly; it catches the likely mistake
+(copying the dev setup), not a deliberate bypass.
+
 ## Rate limit: token bucket per key, in memory
 
 Each key name has a bucket of 20 tokens refilled at 60 per minute (both configurable). Over the limit the

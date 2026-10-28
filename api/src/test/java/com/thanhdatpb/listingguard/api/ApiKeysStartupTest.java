@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -14,6 +17,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /** The web application refuses to start without valid API keys; the one-shot jobs do not need any. */
 @Testcontainers
+@ExtendWith(OutputCaptureExtension.class)
 class ApiKeysStartupTest {
 
     @Container
@@ -59,6 +63,61 @@ class ApiKeysStartupTest {
                 "--listing-guard.security.api-keys=" + ApiTestKeys.CONFIGURED, "--listing-guard.embedding.provider=hashing")) {
             assertThat(context.isRunning()).isTrue();
         }
+    }
+
+    // ---- development-only settings --------------------------------------------------------------------------
+
+    private static final String DEV_KEY = "insecure-dev-key-change-me-0123456789abcdef";
+    private static final String DEV_KEYS_ARG = "--listing-guard.security.api-keys=dev:" + DEV_KEY;
+
+    @Test
+    void aPublicDevKeyWithoutTheDevProfileDoesNotStartAndIsNeverPrinted() {
+        assertThatThrownBy(() -> start(WebApplicationType.SERVLET, DEV_KEYS_ARG, "--listing-guard.embedding.provider=hashing"))
+                .satisfies(e -> assertThat(allMessages(e)).contains("insecure-").contains("'dev' profile").doesNotContain(DEV_KEY));
+    }
+
+    @Test
+    void aPublicDevKeyWithTheDevProfileStarts() {
+        try (ConfigurableApplicationContext context = start(WebApplicationType.SERVLET, DEV_KEYS_ARG,
+                "--spring.profiles.active=dev", "--listing-guard.embedding.provider=hashing")) {
+            assertThat(context.isRunning()).isTrue();
+        }
+    }
+
+    @Test
+    void aPublicDevKeyWithTheProdProfileDoesNotStartEvenIfDevIsActiveToo() {
+        assertThatThrownBy(() -> start(WebApplicationType.SERVLET, DEV_KEYS_ARG, "--spring.profiles.active=dev,prod",
+                "--listing-guard.embedding.provider=hashing"))
+                .satisfies(e -> assertThat(allMessages(e)).contains("never with 'prod'"));
+    }
+
+    @Test
+    void theSwaggerFlagWithTheProdProfileDoesNotStart() {
+        assertThatThrownBy(() -> start(WebApplicationType.SERVLET, "--listing-guard.security.api-keys=" + ApiTestKeys.CONFIGURED,
+                "--spring.profiles.active=prod", "--listing-guard.api.swagger-ui-enabled=true", "--listing-guard.embedding.provider=hashing"))
+                .satisfies(e -> assertThat(allMessages(e)).contains("LISTING_GUARD_SWAGGER_UI").contains("'prod'"));
+    }
+
+    @Test
+    void theSwaggerFlagStartsWithAWarningOutsideProd(CapturedOutput output) {
+        try (ConfigurableApplicationContext context = start(WebApplicationType.SERVLET,
+                "--listing-guard.security.api-keys=" + ApiTestKeys.CONFIGURED, "--listing-guard.api.swagger-ui-enabled=true",
+                "--listing-guard.embedding.provider=hashing")) {
+            assertThat(context.isRunning()).isTrue();
+        }
+
+        assertThat(output.getAll()).contains("WARN").contains("Swagger UI is enabled");
+    }
+
+    @Test
+    void withoutTheSwaggerFlagThereIsNoSuchWarning(CapturedOutput output) {
+        try (ConfigurableApplicationContext context = start(WebApplicationType.SERVLET,
+                "--listing-guard.security.api-keys=" + ApiTestKeys.CONFIGURED, "--spring.profiles.active=prod",
+                "--listing-guard.embedding.provider=hashing")) {
+            assertThat(context.isRunning()).isTrue();
+        }
+
+        assertThat(output.getAll()).doesNotContain("Swagger UI is enabled");
     }
 
     @Test
