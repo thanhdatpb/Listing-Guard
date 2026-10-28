@@ -1,6 +1,8 @@
 package com.thanhdatpb.listingguard.api.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thanhdatpb.listingguard.api.client.ApiKeyRepository;
+import com.thanhdatpb.listingguard.api.client.ClientProvisioning;
 import com.thanhdatpb.listingguard.api.web.BodyLimitFilter;
 import com.thanhdatpb.listingguard.api.web.RequestIdFilter;
 import jakarta.servlet.Filter;
@@ -14,8 +16,8 @@ import org.springframework.core.env.Environment;
 
 /**
  * Wires the request filters in a fixed order: request id, body size limit, API key, rate limit. Only for web
- * applications, so the one-shot jobs (ingest, evaluation) need no API keys. If the keys are missing or malformed
- * the application does not start.
+ * applications, so the one-shot jobs (ingest, evaluation, admin) need none of it. Clients and keys are read from
+ * the database; when none exists the application still starts and logs a warning (ADR-007).
  */
 @Configuration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
@@ -23,14 +25,22 @@ import org.springframework.core.env.Environment;
 public class ApiSecurityConfig {
 
     @Bean
-    public ApiKeys apiKeys(SecurityProperties properties) {
-        return ApiKeys.parse(properties.apiKeys());
+    public ClientAuthenticator clientAuthenticator(ApiKeyRepository keys, SecurityProperties properties) {
+        return new DatabaseClientAuthenticator(keys, properties.authCacheTtl(), properties.lastUsedInterval());
     }
 
     /** Fails the start-up when development-only settings are combined with a profile that must not have them. */
     @Bean
-    public StartupSafetyCheck startupSafetyCheck(ApiKeys keys, ApiProperties properties, Environment environment) {
-        return new StartupSafetyCheck(keys, properties.swaggerUiEnabled(), environment);
+    public StartupSafetyCheck startupSafetyCheck(SecurityProperties security, ApiProperties properties, Environment environment) {
+        boolean devKeyConfigured = security.devApiKey() != null && !security.devApiKey().isBlank();
+        return new StartupSafetyCheck(devKeyConfigured, properties.swaggerUiEnabled(), environment);
+    }
+
+    /** Registers the development key (when configured) and warns when no key can authenticate. */
+    @Bean
+    public ClientBootstrap clientBootstrap(ClientProvisioning provisioning, ApiKeyRepository keys, SecurityProperties properties,
+                                           StartupSafetyCheck safetyCheck) {
+        return new ClientBootstrap(provisioning, keys, properties.devApiKey());
     }
 
     @Bean
@@ -49,8 +59,9 @@ public class ApiSecurityConfig {
     }
 
     @Bean
-    public FilterRegistrationBean<ApiKeyFilter> apiKeyFilter(ApiKeys keys, ApiProperties properties, ObjectMapper mapper) {
-        return register(new ApiKeyFilter(keys, properties.swaggerUiEnabled(), mapper), Ordered.HIGHEST_PRECEDENCE + 20);
+    public FilterRegistrationBean<ApiKeyFilter> apiKeyFilter(ClientAuthenticator authenticator, ApiProperties properties,
+                                                             ObjectMapper mapper) {
+        return register(new ApiKeyFilter(authenticator, properties.swaggerUiEnabled(), mapper), Ordered.HIGHEST_PRECEDENCE + 20);
     }
 
     @Bean

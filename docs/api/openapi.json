@@ -152,7 +152,7 @@
     },
     "securitySchemes" : {
       "ApiKeyAuth" : {
-        "description" : "Service-to-service API key. Several keys can be valid at once to allow rotation.",
+        "description" : "Service-to-service API key issued to a client. A client can hold several keys at once to allow rotation; checks, cached results and the rate limit belong to the client, not to the key.",
         "in" : "header",
         "name" : "X-API-Key",
         "type" : "apiKey"
@@ -168,7 +168,7 @@
   "paths" : {
     "/api/v1/checks" : {
       "post" : {
-        "description" : "Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content was already checked with the same analysisVersion, the stored result is returned instead and `cached` is true (no new check is created). The listing is the marketplace's own format; for Etsy it is the Open API v3 style JSON with snake_case fields, for Amazon the simple format with title, brand, bullet_points, description, search_terms, product_type, price, quantity and images.",
+        "description" : "Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content was already checked by the calling client with the same analysisVersion, the stored result is returned instead and `cached` is true (no new check is created); results are never shared between clients. The listing is the marketplace's own format; for Etsy it is the Open API v3 style JSON with snake_case fields, for Amazon the simple format with title, brand, bullet_points, description, search_terms, product_type, price, quantity and images.",
         "operationId" : "check",
         "requestBody" : {
           "content" : {
@@ -481,7 +481,7 @@
               "application/problem+json" : {
                 "example" : {
                   "code" : "rate-limited",
-                  "detail" : "Too many requests for this API key. Retry after 2 second(s).",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
                   "instance" : "/api/v1/checks",
                   "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
                   "status" : 429,
@@ -493,7 +493,7 @@
                 }
               }
             },
-            "description" : "Rate limit exceeded for this API key; see the Retry-After header."
+            "description" : "Rate limit exceeded for the calling client; see the Retry-After header."
           }
         },
         "summary" : "Check a listing",
@@ -502,7 +502,7 @@
     },
     "/api/v1/checks/{id}" : {
       "get" : {
-        "description" : "Returns the stored result of an earlier check, in the same shape as the POST response (`cached` is false).",
+        "description" : "Returns the stored result of an earlier check of the calling client, in the same shape as the POST response (`cached` is false).",
         "operationId" : "get",
         "parameters" : [ {
           "description" : "checkId returned by POST /api/v1/checks",
@@ -627,14 +627,14 @@
                 }
               }
             },
-            "description" : "No check with this id (code `check-not-found`)."
+            "description" : "No check with this id for the calling client (code `check-not-found`). A check of another client gives the same answer."
           },
           "429" : {
             "content" : {
               "application/problem+json" : {
                 "example" : {
                   "code" : "rate-limited",
-                  "detail" : "Too many requests for this API key. Retry after 2 second(s).",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
                   "instance" : "/api/v1/checks",
                   "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
                   "status" : 429,
@@ -646,7 +646,7 @@
                 }
               }
             },
-            "description" : "Rate limit exceeded for this API key."
+            "description" : "Rate limit exceeded for the calling client."
           }
         },
         "summary" : "Read a stored check",

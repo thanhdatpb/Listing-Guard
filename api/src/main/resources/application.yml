@@ -1,8 +1,13 @@
 listing-guard:
   security:
-    # name:key pairs, comma separated; several keys at once allow rotation. Each key needs 32+ characters.
-    # The application does not start without valid keys (web mode only).
-    api-keys: ${LISTING_GUARD_API_KEYS:}
+    # Clients and API keys live in the database and are managed with the admin job (ADR-007). The application
+    # starts without any key (it logs a warning and answers 401 until one exists).
+    # Development only, needs the `dev` profile: a key registered at start-up as client `dev`, 32+ characters.
+    dev-api-key: ${LISTING_GUARD_DEV_API_KEY:}
+    # Revoking a key or deactivating a client takes up to this long to take effect (0s turns the cache off).
+    auth-cache-ttl: 30s
+    # api_key.last_used_at is written at most once per key in this time.
+    last-used-interval: 1m
   api:
     max-body-bytes: 262144
     # Development only: serves Swagger UI and opens it and /v3/api-docs without an API key.
@@ -63,4 +68,4 @@ springdoc:
 
 logging:
   pattern:
-    level: "%5p [%X{requestId:-}] [%X{apiKey:-}]"
+    level: "%5p [%X{requestId:-}] [%X{client:-}/%X{keyId:-}]"

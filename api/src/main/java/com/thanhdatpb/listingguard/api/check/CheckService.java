@@ -22,9 +22,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>The analysis version identifies everything that decides the result. Today that is the ruleset version;
  * when other analyzers are added it grows to include their versions, and the stored result stays valid only
- * for an identical analysis version. A listing that was already checked with the current analysis version gets
- * the stored result back (cached). Two identical requests at the same time are settled by a unique index: the
- * request that loses the race reads the winner's row and answers from it as well.
+ * for an identical analysis version. A listing that the same client already checked with the current analysis
+ * version gets the stored result back (cached); another client's checks are never read or reused (ADR-007). Two
+ * identical requests of one client at the same time are settled by a unique index: the request that loses the
+ * race reads the winner's row and answers from it as well.
  */
 @Service
 public class CheckService {
@@ -53,7 +54,7 @@ public class CheckService {
         this.transactions = transactions;
     }
 
-    public CheckResult check(CheckRequest request) {
+    public CheckResult check(UUID clientId, CheckRequest request) {
         Normalizer normalizer = normalizers.get(request.marketplace());
         Listing listing = normalizer.normalize(request.listing());
         String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
@@ -61,33 +62,37 @@ public class CheckService {
         ActiveRulesets.Active ruleset = rulesets.get(marketplace);
         long rulesetVersionId = ruleset.rulesetVersionId();
 
-        Optional<CheckResult> cached = findCached(marketplace, contentHash, rulesetVersionId);
+        Optional<CheckResult> cached = findCached(clientId, marketplace, contentHash, rulesetVersionId);
         if (cached.isPresent()) {
             return cached.get();
         }
 
         List<Finding> found = ruleEngine.run(listing, ruleset.config());
         try {
-            UUID id = transactions.execute(status -> persist(marketplace, contentHash, rulesetVersionId, found));
+            UUID id = transactions.execute(status -> persist(clientId, marketplace, contentHash, rulesetVersionId, found));
             return toResult(checks.findById(id).orElseThrow(), false);
         } catch (DataIntegrityViolationException e) {
-            // another request stored the same listing between our lookup and our insert: answer from its row
+            // another request of this client stored the same listing between our lookup and our insert: answer from its row
             log.debug("Concurrent identical check for {} {}; answering from the stored result", marketplace, contentHash);
-            return findCached(marketplace, contentHash, rulesetVersionId).orElseThrow(() -> e);
+            return findCached(clientId, marketplace, contentHash, rulesetVersionId).orElseThrow(() -> e);
         }
     }
 
-    public CheckResult get(UUID id) {
-        return toResult(checks.findById(id).orElseThrow(() -> new CheckNotFoundException(id)), false);
+    /**
+     * A check of this client. One that belongs to another client is reported exactly like one that does not exist,
+     * so the answer does not reveal which ids are in use.
+     */
+    public CheckResult get(UUID clientId, UUID id) {
+        return toResult(checks.findByIdAndClientId(id, clientId).orElseThrow(() -> new CheckNotFoundException(id)), false);
     }
 
-    private Optional<CheckResult> findCached(String marketplace, String contentHash, long rulesetVersionId) {
-        return checks.findFirstByMarketplaceCodeAndContentHashAndRulesetVersionIdAndStatus(
-                marketplace, contentHash, rulesetVersionId, CheckStatus.COMPLETED).map(check -> toResult(check, true));
+    private Optional<CheckResult> findCached(UUID clientId, String marketplace, String contentHash, long rulesetVersionId) {
+        return checks.findFirstByClientIdAndMarketplaceCodeAndContentHashAndRulesetVersionIdAndStatus(
+                clientId, marketplace, contentHash, rulesetVersionId, CheckStatus.COMPLETED).map(check -> toResult(check, true));
     }
 
-    private UUID persist(String marketplace, String contentHash, long rulesetVersionId, List<Finding> found) {
-        ListingCheck saved = checks.saveAndFlush(new ListingCheck(contentHash, marketplace, CheckStatus.COMPLETED, rulesetVersionId));
+    private UUID persist(UUID clientId, String marketplace, String contentHash, long rulesetVersionId, List<Finding> found) {
+        ListingCheck saved = checks.saveAndFlush(new ListingCheck(clientId, contentHash, marketplace, CheckStatus.COMPLETED, rulesetVersionId));
         findings.saveAll(found.stream().map(finding -> FindingEntity.fromRule(saved.getId(), finding, rulesetVersionId)).toList());
         return saved.getId();
     }

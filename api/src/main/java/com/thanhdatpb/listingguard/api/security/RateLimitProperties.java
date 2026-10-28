@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * Per API key rate limit: a token bucket holding up to {@code burst} requests that refills at
+ * Per client rate limit (all keys of a client share it): a token bucket holding up to {@code burst} requests that refills at
  * {@code requestsPerMinute} per minute. In memory, so it limits one application instance (ADR-005).
  */
 @ConfigurationProperties(prefix = "listing-guard.rate-limit")

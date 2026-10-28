@@ -1,8 +1,9 @@
 # Integration guide
 
-For the system that calls Listing Guard from its backend (Preview). Listing Guard checks a listing before
-it is published and returns findings with suggestions. It never edits a listing, never publishes and does no
-SEO: what to do with a finding is the caller's decision.
+For any system that calls Listing Guard from its backend. Listing Guard is an independent service that many
+clients call; each client has its own API keys, checks, cached results and rate limit. It checks a listing
+before it is published and returns findings with suggestions. It never edits a listing, never publishes and does
+no SEO: what to do with a finding is the caller's decision.
 
 The machine-readable contract is [`docs/api/openapi.json`](api/openapi.json) (also served at
 `GET /v3/api-docs`, with a key). A test fails when the committed file no longer matches the code.
@@ -10,7 +11,7 @@ The machine-readable contract is [`docs/api/openapi.json`](api/openapi.json) (al
 ## Calling flow
 
 ```text
-Preview backend                          Listing Guard
+Client backend                           Listing Guard
       |  POST /api/v1/checks  + X-API-Key       |
       |  {"marketplace":"ETSY","listing":{...}} |
       |---------------------------------------->|  normalize -> rules -> store
@@ -26,10 +27,17 @@ deterministic rules run today. Calls are server to server: do not put the key in
 ## Authentication
 
 Send `X-API-Key: <key>` on every request except `GET /health`. A missing or wrong key gets `401`
-(`unauthorized`) with a `WWW-Authenticate: ApiKey` header. The server accepts several keys at once, so a key
-can be rotated without downtime: the operator adds the new key, you switch over, the old key is removed.
-Keys are configured as `LISTING_GUARD_API_KEYS=name:key,name2:key2` (each key at least 32 characters); the
-name identifies your client in logs and in the rate limit. Never log or echo the key.
+(`unauthorized`) with a `WWW-Authenticate: ApiKey` header. A key that was revoked, or whose client was
+deactivated, gets the same `401` as a wrong one.
+
+Every key belongs to one client. The operator creates the client and its keys with the admin job
+(`docker compose run --rm admin client create <name>`, then `key create <name>`); the key is printed once and
+cannot be read again, because only its hash is stored. A client can hold several keys at once, so a key can be
+rotated without downtime: the operator creates a new key, you switch over, the old key is revoked. A revoked key
+or a deactivated client stops working within about 30 seconds. Never log or echo the key.
+
+What belongs to the client, not to the key: the checks you create, the cached results you get back, and the rate
+limit. Another client can neither read your checks nor be answered from them.
 
 ## Request id
 
@@ -39,9 +47,9 @@ not valid the server generates one. The id comes back in the `X-Request-Id` resp
 
 ## Rate limit
 
-Each API key gets 60 requests per minute with a burst of 20 (configurable per deployment). The limit is
-counted in memory per instance. Over the limit you get `429` (`rate-limited`) with `Retry-After: <seconds>`;
-wait that long and retry. `GET /health` is not limited.
+Each client gets 60 requests per minute with a burst of 20 (configurable per deployment), shared by all of its
+keys. The limit is counted in memory per instance. Over the limit you get `429` (`rate-limited`) with
+`Retry-After: <seconds>`; wait that long and retry. `GET /health` is not limited.
 
 ## Create a check
 
@@ -50,19 +58,12 @@ wait that long and retry. `GET /health` is not limited.
 | Field | Type | Notes |
 |---|---|---|
 | `marketplace` | string | `ETSY` or `AMAZON` (case-insensitive). A code that is planned but not supported yet gets `422` (none is planned today). Anything else: `400`. |
-| `listing` | object | The listing in the marketplace's own JSON format: Open API v3 style for Etsy, the simple format below for Amazon. |
+| `listing` | object | The listing in the standard input format of its marketplace: Open API v3 style for Etsy, the simple format for Amazon. |
 
-Etsy listing fields that are read: `title`, `description`, `tags` (array of strings), `price`
-(`{amount, divisor, currency_code}` or a plain number), `taxonomy_path` or `category`, `materials`, `images`,
-`quantity`, `who_made`, `when_made`. Unknown fields are ignored. Strings are trimmed and blank list entries
-are dropped; nothing else is changed, because the rules must see what the seller wrote.
-
-Amazon listing fields that are read: `title`, `brand`, `bullet_points` (array of strings), `description`,
-`search_terms` (a string, or an array that is joined by single spaces), `product_type` (for example `LUGGAGE`),
-`price` (`{amount, currency_code}` or a plain number), `quantity` and `images` (array of URLs). Unknown fields,
-including Etsy's, are ignored. Cleaning is the same as for Etsy. The Amazon SP-API attribute format
-(`item_name`, `bullet_point` with `value` and `language_tag`) is not accepted yet; the Preview mapper will convert
-to this format.
+The fields that are read, their accepted forms and how values are cleaned are the public contract in
+[`docs/input-schema.md`](input-schema.md). In short: unknown fields are ignored; strings are trimmed and blank
+list entries are dropped; nothing else is changed, because the rules must see what the seller wrote. If your own
+listing format differs, map it to this one on your side.
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/checks \
@@ -75,7 +76,7 @@ curl -X POST http://localhost:8080/api/v1/checks \
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/checks \
-  -H 'X-API-Key: <key>' -H 'Content-Type: application/json' -H 'X-Request-Id: preview-123' \
+  -H 'X-API-Key: <key>' -H 'Content-Type: application/json' -H 'X-Request-Id: client-123' \
   -d '{"marketplace":"ETSY","listing":{
         "title":"Handmade Ceramic Mug",
         "description":"Hand-thrown stoneware mug, 350 ml.",
@@ -184,10 +185,12 @@ rules are written for the US store (English).
 
 ## Caching and versions
 
-Checks are deterministic, so an identical listing is not checked twice. The key is
-`(marketplace, contentHash, analysisVersion)`: if a completed check exists for the same key, the stored result
-is returned with `cached: true` and the original `checkId` and `createdAt`. Two identical requests at the same
-moment produce one stored check; both get the same `checkId`.
+Checks are deterministic, so an identical listing is not checked twice by the same client. The key is
+`(client, marketplace, contentHash, analysisVersion)`: if a completed check of your client exists for the same
+key, the stored result is returned with `cached: true` and the original `checkId` and `createdAt`. Two identical
+requests of one client at the same moment produce one stored check; both get the same `checkId`. The same
+content sent by another client is a separate check with its own `checkId`: results are never shared between
+clients.
 
 `analysisVersion` identifies everything that decides the result. When the rules change (a new ruleset
 version) or another analyzer is added, it changes, old results are no longer reused, and a new check is
@@ -206,15 +209,16 @@ validation. Branch on `code`, not on `detail`.
 | 400 | `invalid-request` | Body missing, not JSON, or `marketplace` / `listing` missing; `listing` not an object. | Fix the request. Do not retry unchanged. |
 | 400 | `unknown-marketplace` | The marketplace code is not known. | Fix the code. `detail` lists the supported ones. |
 | 401 | `unauthorized` | Missing or invalid `X-API-Key`. | Check the key. Do not retry in a loop. |
-| 404 | `check-not-found` | No check with that id. | The id is wrong. |
+| 404 | `check-not-found` | No check with that id for your client. A check of another client gives this same answer. | The id is wrong, or it is not yours. |
 | 404 | `not-found` | Unknown route. | Check the URL. |
 | 405 | `method-not-allowed` | Wrong HTTP method. | |
 | 413 | `payload-too-large` | Body over 256 KB. | Send less. |
 | 415 | `unsupported-media-type` | Not `application/json`. | |
 | 422 | `marketplace-not-yet-supported` | A marketplace that is planned but not supported yet. None is planned today, so you will not see it now. | Skip the check for it. |
-| 429 | `rate-limited` | Over the per-key limit. | Wait `Retry-After` seconds, then retry. |
+| 429 | `rate-limited` | Over the per-client limit. | Wait `Retry-After` seconds, then retry. |
 | 500 | `internal-error` | Unexpected failure. No details are exposed. | Retry later with backoff; report the `requestId`. |
 | 503 | `embedding-unavailable` | Only on routes that need the embedding backend. Not `POST /api/v1/checks`. | |
+| 503 | `service-unavailable` | The API key could not be checked because the database did not answer. | Retry later with backoff. |
 
 Retrying `POST /api/v1/checks` is always safe: it has no side effect other than storing the result, and an
 identical listing returns the stored one. Suggested client behavior: timeout of a few seconds, retry `429`
@@ -234,11 +238,14 @@ made from the UI still need one, entered with the Authorize button). The service
 the flag is on and refuses to start with it under the `prod` profile. Never turn this on where others can reach
 the service.
 
-Likewise any key starting with `insecure-` (the public key in the compose file) is only accepted with the `dev`
-profile; with any other profile, and always with `prod`, the service refuses to start.
+Likewise `LISTING_GUARD_DEV_API_KEY` (the public development key in the compose file, registered as client
+`dev`) is only accepted with the `dev` profile; with any other profile, and always with `prod`, the service
+refuses to start. Without any key the service starts, logs a warning and answers every request with `401` until
+the operator creates one.
 
 ## Not covered yet
 
-Mapping Preview's own listing format to the marketplace format (the caller sends the Etsy-style or the simple
-Amazon JSON for now), policy-grounded LLM findings, feedback on findings, image checks, product-type-specific Amazon
-limits (waiting for sources) and stores other than the US one.
+Mapping a client's own listing format to the standard input format (that is done on the client's side),
+rules that differ per client, per-client rate limits, an admin UI, billing, policy-grounded LLM findings,
+feedback on findings, image checks, product-type-specific Amazon limits (waiting for sources) and stores other
+than the US one.

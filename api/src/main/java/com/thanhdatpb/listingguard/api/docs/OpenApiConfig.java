@@ -30,7 +30,8 @@ public class OpenApiConfig {
                         .type(SecurityScheme.Type.APIKEY)
                         .in(SecurityScheme.In.HEADER)
                         .name("X-API-Key")
-                        .description("Service-to-service API key. Several keys can be valid at once to allow rotation.")))
+                        .description("Service-to-service API key issued to a client. A client can hold several keys at once to allow rotation; "
+                                + "checks, cached results and the rate limit belong to the client, not to the key.")))
                 .addSecurityItem(new SecurityRequirement().addList(API_KEY_SCHEME));
     }
 }

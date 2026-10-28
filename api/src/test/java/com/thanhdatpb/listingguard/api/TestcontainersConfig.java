@@ -1,5 +1,7 @@
 package com.thanhdatpb.listingguard.api;
 
+import com.thanhdatpb.listingguard.api.client.ClientProvisioning;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
@@ -30,7 +32,8 @@ public class TestcontainersConfig {
         return registry -> {
             registry.add("listing-guard.embedding.provider", () -> "hashing");
             registry.add("listing-guard.policies.search-endpoint.enabled", () -> "true");
-            registry.add("listing-guard.security.api-keys", () -> ApiTestKeys.CONFIGURED);
+            // no cache, so a test that revokes a key or deactivates a client sees it at once
+            registry.add("listing-guard.security.auth-cache-ttl", () -> "0s");
             // no marketplace is planned in production; the tests need one to exercise the 422 "not yet supported" answer
             registry.add("listing-guard.marketplaces.planned", () -> "WALMART");
             // generous by default so tests never trip the limit; a test that exercises it sets test.custom-rate-limit=true
@@ -39,6 +42,16 @@ public class TestcontainersConfig {
                 registry.add("listing-guard.rate-limit.burst", () -> "100000");
                 registry.add("listing-guard.rate-limit.requests-per-minute", () -> "6000000");
             }
+        };
+    }
+
+    /** The clients and keys of {@link ApiTestKeys}, registered once the schema exists. */
+    @Bean
+    ApplicationRunner testClients(ClientProvisioning provisioning) {
+        return args -> {
+            provisioning.ensureKnownKey(ApiTestKeys.CLIENT_1, ApiTestKeys.KEY_1, "test key 1");
+            provisioning.ensureKnownKey(ApiTestKeys.CLIENT_1, ApiTestKeys.KEY_1_SECOND, "test key 1, second");
+            provisioning.ensureKnownKey(ApiTestKeys.CLIENT_2, ApiTestKeys.KEY_2, "test key 2");
         };
     }
 }
