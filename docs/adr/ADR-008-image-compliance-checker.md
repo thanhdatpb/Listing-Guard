@@ -3,6 +3,8 @@
 - Status: Proposed
 - Date: 2026-10-28
 - Depends on: [ADR-010](ADR-010-pack-identity-and-analysis-version.md)
+- Acceptance convention: Keep Proposed until the implementation PR is approved and merged. Then set
+  Status to Accepted and Date to the actual acceptance/merge date.
 
 ## Context
 
@@ -33,6 +35,21 @@ its measured result recorded; it does not postpone the approved Amazon image pro
   and cache identity as specified in ADR-010. Do not use the text-listing hash as a proxy for image
   identity.
 - Do not persist original image bytes. Persist result metadata and bounded evidence only.
+- PNG alpha handling: composite each pixel onto opaque white before testing whether edge pixels are
+  near white. Fully transparent pixels therefore count as white; record that the input had alpha in
+  image metadata/evidence. This matches the chosen white-canvas interpretation and is deterministic,
+  but can make a transparent background pass even when another renderer would show a different
+  canvas. Do not infer a marketplace rule that forbids transparency unless a verified source and a
+  new ruleset version support it.
+- Color handling: convert pixels with an embedded, valid ICC profile to sRGB before color-based
+  rules; treat images without a profile as sRGB. A malformed or unsupported profile makes that
+  image incomplete rather than silently comparing unconverted channel values. Color conversion
+  improves comparisons across camera profiles but adds conversion work and may vary with the color
+  management implementation, which must be included in the image algorithm/runtime fingerprint.
+- EXIF orientation: apply the standard orientation transform before evaluating width, height, aspect
+  ratio, edge pixels or product occupancy. Missing orientation means orientation 1. An invalid or
+  unsupported orientation makes the image incomplete. The submitted bytes remain unchanged and
+  their original byte sequence is used in the input hash.
 - If an image cannot be completely checked, return that image with `completeness: INCOMPLETE`, retain
   all findings established by successful checks, and identify failed rules/checks. A request-level
   multipart validation error remains a client error; a corrupt, CMYK, unsupported or otherwise
@@ -85,6 +102,20 @@ Text, logo and watermark detection are **deferred**. They are not part of v1, ev
 | Result endpoint | Recomputing for GET is expensive and can disagree after a ruleset change. | Persist a client-scoped check and provide GET by check ID. |
 | Retention | Indefinite storage simplifies retrieval but retains client-derived data unnecessarily. | Proposed 30-day retention for image-check metadata, hashes and evidence, then deletion by a scheduled cleanup job. Do not change retention of existing `/checks` records. The duration is an operational proposal, not a marketplace rule. |
 
+### Expiry and cleanup
+
+Run cleanup from a scheduled task in the API profile. In a multi-instance deployment, each instance
+may trigger the schedule, but a PostgreSQL advisory lock permits only one cleanup runner at a time.
+The runner deletes expired parent checks in bounded batches; foreign-key cascades remove per-image
+items and findings. If the scheduled cleanup has not yet run, GET still treats a row older than the
+retention cutoff as expired and returns 404.
+
+An expired row is not cache-eligible. When a repeated request encounters an expired row before the
+cleanup job has removed it, atomically delete that row and its children and recalculate/store a new
+result. The existing unique cache constraint arbitrates concurrent requests: one fresh result wins
+and other callers read it. Thus an expired check ID does not become readable again, and the post-
+retention request is a cache miss followed by a new analysis.
+
 Image and per-image result schema proposal:
 
 - `image_check`: check ID, `client_id`, marketplace, profile/product type, canonical input hash,
@@ -107,11 +138,27 @@ client-scoped.
   trust extension or `Content-Type`.
 - Use `ImageReader` to inspect format and dimensions before full raster decode. Reject dimensions or
   aggregate pixels beyond configured limits before allocating full images.
-- Disable ImageIO's disk cache (`ImageIO.setUseCache(false)`) at application initialization; do not
-  write uploaded bytes or decoded images to persistent or shared temporary files.
+- Do not write uploaded bytes or decoded images to persistent or shared temporary files.
 - Treat unsupported, corrupt, CMYK or otherwise undecodable files as per-image incomplete results,
   not server errors. Do not fetch user-provided URLs, follow redirects, or access server paths.
 - Bound evidence and diagnostic output; never return parser exceptions, stack traces or local paths.
+- Use one application-initialization point to call `ImageIO.setUseCache(false)` before any image
+  reader is created. Do not toggle this global setting per request. A startup/unit test must verify
+  the initializer disables ImageIO cache and that initialization occurs before decoder use.
+- Apply a process-wide bounded semaphore to image decode work, in addition to the existing per-client
+  request rate limit. Use a weighted memory budget based on inspected dimensions and a conservative
+  decoded-pixel/working-buffer estimate; acquire permits before full decode and release them in
+  `finally`. Do not queue unbounded work. If the global decode or memory budget is exhausted, fail
+  admission promptly with a retryable service-capacity response. Configure concurrency and memory
+  budgets per API instance; deployment replica limits must keep their aggregate within the host's
+  resource budget.
+- An ImageIO read cannot be reliably stopped with `Thread.interrupt()` or `Future.cancel()`. Therefore
+  do not claim an in-process timeout is a hard decode timeout. V1 runs decoding in a bounded,
+  supervised worker process; the API enforces a wall-clock deadline and terminates/replaces the
+  worker when it expires. Send bounded bytes over process streams rather than shared temporary files.
+  If worker isolation or its resource limits are unavailable, image checking must fail closed rather
+  than fall back to an interrupt-based in-process timeout. Cooperative checks between processing
+  stages are an additional safeguard, not a substitute for terminating a stuck decoder.
 
 These are operational safety controls and are separate from marketplace thresholds in ruleset YAML.
 
@@ -123,6 +170,9 @@ These are operational safety controls and are separate from marketplace threshol
   profile change intentionally creates a new cache identity.
 - Image results and their evidence are retained for a bounded period; callers must not depend on
   retrieval after the retention window.
+- A scheduled API cleanup job uses a PostgreSQL advisory lock to avoid concurrent cleanup across
+  instances; expired GET requests return 404, and expired cache entries are deleted before a new
+  analysis is stored.
 - Unverified marketplace guidance can produce only advisory findings. Product-specific and store
   variations remain a known limitation until sources and profiles are reviewed.
 
