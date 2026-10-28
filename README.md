@@ -1,5 +1,10 @@
 # Listing Guard
 
+[![CI](https://github.com/thanhdatpb/Listing-Guard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/thanhdatpb/Listing-Guard/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/thanhdatpb/Listing-Guard?label=release)](https://github.com/thanhdatpb/Listing-Guard/releases/latest)
+[![License](https://img.shields.io/github/license/thanhdatpb/Listing-Guard)](LICENSE)
+[![GHCR image](https://img.shields.io/badge/GHCR-listing--guard-2496ED?logo=docker&logoColor=white)](https://github.com/thanhdatpb/Listing-Guard/pkgs/container/listing-guard)
+
 Pre-publish checker for marketplace listings (Etsy and Amazon). Listing Guard checks a
 listing and suggests fixes before you publish. It does not edit or publish anything, and it does not
 do SEO.
