@@ -1,4 +1,8 @@
 listing-guard:
+  marketplaces:
+    # On the roadmap, not supported yet: a check request for one of these gets 422, not the 400 for unknown codes.
+    planned:
+      - AMAZON
   rulesets:
     locations:
       - classpath:rulesets/etsy-2026-11.yaml
@@ -24,6 +28,9 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/listingguard}
     username: ${DB_USER:listingguard}
     password: ${DB_PASSWORD:listingguard}
+    hikari:
+      # fail fast when the database is down (a health check or request waits at most this long for a connection)
+      connection-timeout: 3000
   jpa:
     open-in-view: false
     hibernate:
@@ -33,3 +40,10 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    # Swagger UI is for development only; see the integration guide
+    enabled: false

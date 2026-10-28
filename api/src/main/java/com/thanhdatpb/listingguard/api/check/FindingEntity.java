@@ -34,6 +34,10 @@ public class FindingEntity {
 
     private String field;
 
+    /** The exact value that caused the finding, or null when no single value applies. */
+    @Column(name = "value")
+    private String value;
+
     @Column(nullable = false)
     private String message;
 
@@ -59,6 +63,7 @@ public class FindingEntity {
         entity.source = FindingSource.RULE;
         entity.severity = finding.severity();
         entity.field = finding.field();
+        entity.value = finding.value();
         entity.message = finding.message();
         entity.suggestion = finding.suggestion();
         entity.rulesetVersionId = rulesetVersionId;
@@ -84,6 +89,10 @@ public class FindingEntity {
 
     public String getField() {
         return field;
+    }
+
+    public String getValue() {
+        return value;
     }
 
     public String getMessage() {
