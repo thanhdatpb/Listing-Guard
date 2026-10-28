@@ -78,9 +78,13 @@ The compose file has dev defaults, overridable with environment variables or a l
 
 The API needs keys. `LISTING_GUARD_API_KEYS` is a comma separated list of `name:key` pairs, each key at
 least 32 characters; the application does not start without a valid value. Compose supplies a public
-development key (`dev:insecure-dev-key-change-me-0123456789abcdef`): set your own anywhere others can reach
-the service. When running the jar yourself, export the variable first. `LISTING_GUARD_SWAGGER_UI=true` turns
-on Swagger UI at `/swagger-ui.html` for development (off by default; the spec at `/v3/api-docs` needs a key).
+development key (`dev:insecure-dev-key-change-me-0123456789abcdef`) together with `SPRING_PROFILES_ACTIVE=dev`.
+Any key that starts with `insecure-` is refused unless the `dev` profile is active, and never with `prod`, so
+that key cannot reach a real deployment by accident; set your own keys (and `API_PROFILES`) anywhere others
+can reach the service. When running the jar yourself, export the variable first. `LISTING_GUARD_SWAGGER_UI=true`
+turns on Swagger UI at `/swagger-ui.html` for development: it logs a WARN at start-up, opens the UI and
+`/v3/api-docs` without a key, and the application refuses to start with it under the `prod` profile. Off by
+default; then the spec at `/v3/api-docs` needs a key.
 
 ```bash
 curl http://localhost:8080/health

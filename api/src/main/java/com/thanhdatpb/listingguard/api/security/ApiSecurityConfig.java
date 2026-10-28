@@ -10,6 +10,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.core.env.Environment;
 
 /**
  * Wires the request filters in a fixed order: request id, body size limit, API key, rate limit. Only for web
@@ -24,6 +25,12 @@ public class ApiSecurityConfig {
     @Bean
     public ApiKeys apiKeys(SecurityProperties properties) {
         return ApiKeys.parse(properties.apiKeys());
+    }
+
+    /** Fails the start-up when development-only settings are combined with a profile that must not have them. */
+    @Bean
+    public StartupSafetyCheck startupSafetyCheck(ApiKeys keys, ApiProperties properties, Environment environment) {
+        return new StartupSafetyCheck(keys, properties.swaggerUiEnabled(), environment);
     }
 
     @Bean

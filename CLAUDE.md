@@ -76,7 +76,9 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `(marketplace, contentHash, analysisVersion)`; a change to anything that decides findings must change
   `analysisVersion`. After an intended API change refresh `docs/api/openapi.json` with
   `./mvnw -B verify -Dopenapi.update=true` and commit it (a test fails on drift); update
-  `docs/integration-guide.md` when behavior a client sees changes.
+  `docs/integration-guide.md` when behavior a client sees changes. Dev-only settings are fenced by
+  `StartupSafetyCheck`: a key starting with `insecure-` needs profile `dev` (never `prod`), and
+  `LISTING_GUARD_SWAGGER_UI=true` warns and is refused under `prod`; compose sets `SPRING_PROFILES_ACTIVE=dev`.
 - Retrieval filters by marketplace before ranking. Chunk text is stored exactly as on the page (later
   citation checks compare against it); only the embedding input has the section path prepended.
 - Embeddings: tests use `HashingEmbeddingProvider` (set through `TestcontainersConfig`), never Ollama.

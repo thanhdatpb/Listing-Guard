@@ -186,8 +186,12 @@ the listing should still be publishable: a check is advice, not a gate.
 
 The spec is served at `GET /v3/api-docs` and needs the key. Swagger UI is off. For development set
 `LISTING_GUARD_SWAGGER_UI=true`: the UI at `/swagger-ui.html` and the spec then open without a key (calls
-made from the UI still need one, entered with the Authorize button). Never turn this on where others can reach
+made from the UI still need one, entered with the Authorize button). The service logs a WARN at start-up when
+the flag is on and refuses to start with it under the `prod` profile. Never turn this on where others can reach
 the service.
+
+Likewise any key starting with `insecure-` (the public key in the compose file) is only accepted with the `dev`
+profile; with any other profile, and always with `prod`, the service refuses to start.
 
 ## Not covered yet
 
