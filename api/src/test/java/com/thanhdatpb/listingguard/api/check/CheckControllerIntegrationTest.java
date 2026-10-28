@@ -246,17 +246,26 @@ class CheckControllerIntegrationTest {
     }
 
     @Test
-    void unknownMarketplaceIs400AndAmazonIs422() throws Exception {
+    void unknownMarketplaceIs400AndAPlannedOneIs422() throws Exception {
+        // WALMART is the planned marketplace configured for the tests (TestcontainersConfig); none is planned in production
         mvc.perform(post(CHECKS).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"marketplace\":\"NOPE\",\"listing\":{}}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("unknown-marketplace"))
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Supported: ETSY")));
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Supported: AMAZON, ETSY")));
         mvc.perform(post(CHECKS).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"marketplace\":\"amazon\",\"listing\":{}}"))
+                        .content("{\"marketplace\":\"walmart\",\"listing\":{}}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("marketplace-not-yet-supported"))
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("AMAZON")));
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("WALMART")));
+    }
+
+    @Test
+    void amazonIsNoLongerAPlannedMarketplace() throws Exception {
+        mvc.perform(post(CHECKS).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"marketplace\":\"amazon\",\"listing\":{}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.marketplace").value("AMAZON"));
     }
 
     @Test

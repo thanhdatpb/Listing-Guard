@@ -96,6 +96,31 @@ class OpenApiIntegrationTest {
         assertThat(fieldNames(actual)).isEqualTo(fieldNames(example));
     }
 
+    @Test
+    void theAmazonExampleIsWhatTheEndpointReallyAnswers() throws Exception {
+        JsonNode actual = mapper.readTree(mvc.perform(post("/api/v1/checks").header(HEADER, KEY_1)
+                        .contentType(MediaType.APPLICATION_JSON).content(ApiExamples.AMAZON_REQUEST))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8));
+        JsonNode example = mapper.readTree(ApiExamples.AMAZON_RESULT);
+
+        assertThat(actual.get("findings")).isEqualTo(example.get("findings"));
+        assertThat(actual.get("summary")).isEqualTo(example.get("summary"));
+        assertThat(actual.get("marketplace")).isEqualTo(example.get("marketplace"));
+        assertThat(actual.get("rulesetVersion")).isEqualTo(example.get("rulesetVersion"));
+        assertThat(actual.get("analysisVersion")).isEqualTo(example.get("analysisVersion"));
+        assertThat(fieldNames(actual)).isEqualTo(fieldNames(example));
+    }
+
+    @Test
+    void theSpecCarriesTheAmazonExamples() throws Exception {
+        JsonNode spec = mapper.readTree(generatedSpec());
+
+        assertThat(spec.at("/paths/~1api~1v1~1checks/post/requestBody/content/application~1json/examples/amazon-listing").isMissingNode())
+                .isFalse();
+        assertThat(spec.at("/paths/~1api~1v1~1checks/post/responses/200/content/application~1json/examples/amazon-findings").isMissingNode())
+                .isFalse();
+    }
+
     /** The spec as stable, pretty JSON: keys sorted, and without the server URL, which depends on where it was read. */
     private String generatedSpec() throws Exception {
         String body = mvc.perform(get("/v3/api-docs").header(HEADER, KEY_1)).andExpect(status().isOk())

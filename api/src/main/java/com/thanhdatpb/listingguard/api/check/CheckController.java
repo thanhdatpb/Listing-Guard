@@ -1,5 +1,7 @@
 package com.thanhdatpb.listingguard.api.check;
 
+import static com.thanhdatpb.listingguard.api.docs.ApiExamples.AMAZON_REQUEST;
+import static com.thanhdatpb.listingguard.api.docs.ApiExamples.AMAZON_RESULT;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.ETSY_REQUEST;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.ETSY_RESULT;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.ETSY_RESULT_CACHED;
@@ -48,17 +50,22 @@ public class CheckController {
                     Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content \
                     was already checked with the same analysisVersion, the stored result is returned instead and `cached` \
                     is true (no new check is created). The listing is the marketplace's own format; for Etsy it is the \
-                    Open API v3 style JSON with snake_case fields.""",
+                    Open API v3 style JSON with snake_case fields, for Amazon the simple format with title, brand, \
+                    bullet_points, description, search_terms, product_type, price, quantity and images.""",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = CheckRequest.class),
-                            examples = @ExampleObject(name = "etsy-listing", summary = "An Etsy listing with problems",
-                                    value = ETSY_REQUEST))),
+                            examples = {
+                                    @ExampleObject(name = "etsy-listing", summary = "An Etsy listing with problems",
+                                            value = ETSY_REQUEST),
+                                    @ExampleObject(name = "amazon-listing", summary = "An Amazon listing with problems",
+                                            value = AMAZON_REQUEST)})),
             responses = {
                     @ApiResponse(responseCode = "200", description = "The check result.",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = CheckResult.class),
                                     examples = {
-                                            @ExampleObject(name = "findings", summary = "A fresh check with findings", value = ETSY_RESULT),
+                                            @ExampleObject(name = "findings", summary = "A fresh Etsy check with findings", value = ETSY_RESULT),
+                                            @ExampleObject(name = "amazon-findings", summary = "A fresh Amazon check with findings", value = AMAZON_RESULT),
                                             @ExampleObject(name = "cached", summary = "The same listing again: stored result", value = ETSY_RESULT_CACHED)})),
                     @ApiResponse(responseCode = "400", description = "Invalid request (code `invalid-request`) or unknown marketplace (`unknown-marketplace`).",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class), examples = {
@@ -72,7 +79,7 @@ public class CheckController {
                                     examples = @ExampleObject(value = PROBLEM_TOO_LARGE))),
                     @ApiResponse(responseCode = "415", description = "The body is not application/json (code `unsupported-media-type`).",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class))),
-                    @ApiResponse(responseCode = "422", description = "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`).",
+                    @ApiResponse(responseCode = "422", description = "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`). No marketplace is planned today.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_NOT_YET_SUPPORTED))),
                     @ApiResponse(responseCode = "429", description = "Rate limit exceeded for this API key; see the Retry-After header.",

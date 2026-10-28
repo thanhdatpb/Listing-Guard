@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 /** SHA-256 over a canonical JSON form of a normalized listing: same content, same hash. */
@@ -22,8 +23,17 @@ public class ContentHasher {
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
             .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true);
 
+    /** Components added for Amazon. They are left out while empty so the hash of an Etsy listing never changed. */
+    private static final List<String> OPTIONAL_KEYS = List.of("brand", "bulletPoints", "searchTerms", "productType");
+
     public String hash(Listing listing) {
         JsonNode tree = canonicalMapper.valueToTree(listing);
+        for (String key : OPTIONAL_KEYS) {
+            JsonNode value = tree.get(key);
+            if (value != null && (value.isNull() || value.isArray() && value.isEmpty())) {
+                ((ObjectNode) tree).remove(key);
+            }
+        }
         if (listing.price() != null) {
             BigDecimal amount = listing.price().amount().stripTrailingZeros();
             ((ObjectNode) tree.get("price")).set("amount", TextNode.valueOf(amount.toPlainString()));

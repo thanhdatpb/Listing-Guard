@@ -1,13 +1,15 @@
 package com.thanhdatpb.listingguard.api.listing;
 
+import static com.thanhdatpb.listingguard.api.listing.JsonFields.firstNonNull;
+import static com.thanhdatpb.listingguard.api.listing.JsonFields.integer;
+import static com.thanhdatpb.listingguard.api.listing.JsonFields.price;
+import static com.thanhdatpb.listingguard.api.listing.JsonFields.strings;
+import static com.thanhdatpb.listingguard.api.listing.JsonFields.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.thanhdatpb.listingguard.core.listing.Listing;
-import com.thanhdatpb.listingguard.core.listing.Money;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,32 +39,9 @@ public class EtsyNormalizer implements Normalizer {
                 category(raw),
                 strings(raw.get("materials")),
                 images(raw.get("images")),
-                raw.hasNonNull("quantity") && raw.get("quantity").canConvertToInt() ? raw.get("quantity").intValue() : null,
+                integer(raw.get("quantity")),
                 text(raw.get("who_made")),
                 text(raw.get("when_made")));
-    }
-
-    private static String text(JsonNode node) {
-        if (node == null || node.isNull() || !node.isValueNode()) {
-            return null;
-        }
-        String value = node.asText().trim();
-        return value.isEmpty() ? null : value;
-    }
-
-    /** Trims each entry and drops blanks. Duplicates are kept on purpose: the rule engine reports them. */
-    private static List<String> strings(JsonNode node) {
-        List<String> out = new ArrayList<>();
-        if (node == null || !node.isArray()) {
-            return out;
-        }
-        for (JsonNode item : node) {
-            String value = text(item);
-            if (value != null) {
-                out.add(value);
-            }
-        }
-        return out;
     }
 
     private static List<String> images(JsonNode node) {
@@ -86,44 +65,5 @@ public class EtsyNormalizer implements Normalizer {
         }
         List<String> path = strings(raw.get("taxonomy_path"));
         return path.isEmpty() ? null : String.join(" > ", path);
-    }
-
-    private static Money price(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
-        if (node.isObject()) {
-            JsonNode amount = node.get("amount");
-            if (amount == null || !amount.isNumber() && !amount.isTextual()) {
-                return null;
-            }
-            BigDecimal value = decimal(amount);
-            if (value == null) {
-                return null;
-            }
-            JsonNode divisor = node.get("divisor");
-            if (divisor != null && divisor.isNumber() && divisor.intValue() != 0) {
-                value = value.divide(BigDecimal.valueOf(divisor.intValue()), 6, RoundingMode.HALF_UP).stripTrailingZeros();
-                if (value.scale() < 2) {
-                    value = value.setScale(2);
-                }
-            }
-            String currency = firstNonNull(text(node.get("currency_code")), text(node.get("currency")));
-            return new Money(value, currency == null ? null : currency.toUpperCase(Locale.ROOT));
-        }
-        BigDecimal value = decimal(node);
-        return value == null ? null : new Money(value, null);
-    }
-
-    private static BigDecimal decimal(JsonNode node) {
-        try {
-            return node.isNumber() ? node.decimalValue() : new BigDecimal(node.asText().trim());
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private static String firstNonNull(String a, String b) {
-        return a != null ? a : b;
     }
 }
