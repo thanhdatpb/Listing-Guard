@@ -105,10 +105,13 @@ Text, logo and watermark detection are **deferred**. They are not part of v1, ev
 ### Expiry and cleanup
 
 Run cleanup from a scheduled task in the API profile. In a multi-instance deployment, each instance
-may trigger the schedule, but a PostgreSQL advisory lock permits only one cleanup runner at a time.
-The runner deletes expired parent checks in bounded batches; foreign-key cascades remove per-image
-items and findings. If the scheduled cleanup has not yet run, GET still treats a row older than the
-retention cutoff as expired and returns 404.
+may trigger the schedule, but only one cleanup runner may process a batch at a time. In the batch
+transaction acquire `pg_try_advisory_xact_lock(1279746628, 1380271182)`, the fixed key pair reserved
+for Listing Guard retention cleanup in ADR-010. If the lock is unavailable, skip this run. The
+transaction-level lock is released automatically at commit/rollback. The runner deletes expired
+parent checks in bounded batches; foreign-key cascades remove per-image items and findings. If the
+scheduled cleanup has not yet run, GET still treats a row older than the retention cutoff as expired
+and returns 404.
 
 An expired row is not cache-eligible. When a repeated request encounters an expired row before the
 cleanup job has removed it, atomically delete that row and its children and recalculate/store a new
@@ -132,8 +135,9 @@ client-scoped.
 
 ## Image input security
 
-- Set explicit multipart request-size, per-file byte-size, image-count, total-pixel and processing
-  time limits in application configuration. Reject oversized requests before decoding.
+- Set explicit multipart request-size, per-file byte-size, image-count, total-pixel and caller-wait
+  deadlines in application configuration. Reject oversized requests before decoding. A caller-wait
+  deadline does not terminate an ImageIO read; see the bounded in-process design below.
 - Allowlist formats (initially JPEG and PNG); determine format from the decoded stream/magic, never
   trust extension or `Content-Type`.
 - Use `ImageReader` to inspect format and dimensions before full raster decode. Reject dimensions or
@@ -152,13 +156,20 @@ client-scoped.
   admission promptly with a retryable service-capacity response. Configure concurrency and memory
   budgets per API instance; deployment replica limits must keep their aggregate within the host's
   resource budget.
-- An ImageIO read cannot be reliably stopped with `Thread.interrupt()` or `Future.cancel()`. Therefore
-  do not claim an in-process timeout is a hard decode timeout. V1 runs decoding in a bounded,
-  supervised worker process; the API enforces a wall-clock deadline and terminates/replaces the
-  worker when it expires. Send bounded bytes over process streams rather than shared temporary files.
-  If worker isolation or its resource limits are unavailable, image checking must fail closed rather
-  than fall back to an interrupt-based in-process timeout. Cooperative checks between processing
-  stages are an additional safeguard, not a substitute for terminating a stuck decoder.
+- An ImageIO read cannot be reliably stopped with `Thread.interrupt()` or `Future.cancel()`, so a
+  thread-level timeout is not a hard decode deadline. V1 chooses the simpler bounded in-process
+  design: inspect dimensions before decode, enforce strict encoded-byte and pixel ceilings, acquire
+  a process-wide semaphore and weighted memory budget, and submit decode work to a fixed-size
+  executor with a bounded queue. Reject promptly when capacity is exhausted. A caller deadline may
+  stop waiting, but the worker retains its thread, semaphore permit and memory reservation until
+  ImageIO returns; it must not be reported as a successfully cancelled decode. This bounds concurrent
+  work and queued memory but cannot guarantee recovery from a decoder that hangs indefinitely.
+- A supervised worker process with an enforceable wall-clock deadline and OS-level memory limits is
+  deferred until load/soak measurements or a demonstrated decoder hang justify its extra process
+  supervision, IPC, container-image and operational complexity. It can isolate a stuck decoder, but
+  adds baseline memory per worker and increases deployment size. Record decode duration, in-flight
+  work, queue depth, rejected admissions and stuck-task observations so this decision can be revisited
+  with evidence. Do not claim a hard timeout in v1.
 
 These are operational safety controls and are separate from marketplace thresholds in ruleset YAML.
 
@@ -170,9 +181,9 @@ These are operational safety controls and are separate from marketplace threshol
   profile change intentionally creates a new cache identity.
 - Image results and their evidence are retained for a bounded period; callers must not depend on
   retrieval after the retention window.
-- A scheduled API cleanup job uses a PostgreSQL advisory lock to avoid concurrent cleanup across
-  instances; expired GET requests return 404, and expired cache entries are deleted before a new
-  analysis is stored.
+- A scheduled API cleanup job uses the reserved transaction-level PostgreSQL advisory lock to avoid
+  concurrent cleanup across instances; expired GET requests return 404, and expired cache entries
+  are deleted before a new analysis is stored.
 - Unverified marketplace guidance can produce only advisory findings. Product-specific and store
   variations remain a known limitation until sources and profiles are reviewed.
 
@@ -185,5 +196,7 @@ These are operational safety controls and are separate from marketplace threshol
   clean-pass summary.
 - Tests prove client isolation, cache identity changes for every included input component, GET
   behavior, and cleanup at the retention boundary.
+- Tests verify bounded-executor/semaphore admission and release on success and failure, plus behavior
+  when caller deadlines expire while ImageIO work is still running.
 - A new ruleset version and source metadata are used; prior rulesets and frozen hashes remain
   unchanged. Update OpenAPI and integration documentation with any endpoint contract.

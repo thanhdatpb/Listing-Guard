@@ -53,39 +53,56 @@ cache reuse across different analyses.
 - Keep cache scope per client. No result or cache hit may be shared across clients, including
   checks from different packs.
 
-### Database migration: expand, backfill, verify, contract
+### Database migration: PR 0a expand/backfill, then PR 0b contract
 
 `V1__init_schema.sql` currently creates `uq_ruleset_version` on
 `(marketplace_code, version)`. It is an applied migration and must **not** be edited. Change that
-logical constraint only through new Flyway migrations using an expand-then-contract deployment:
+logical constraint only through new Flyway migrations in two separately deployable releases.
 
-1. **Expand:** a new migration adds nullable `pack_id` to `ruleset_version`, and nullable
-   `analysis_version` where needed on result tables. Existing application versions continue to run
-   while `pack_id` is nullable.
-2. Deploy compatibility code that writes and reads the explicit `listing-rules` pack identity while
-   tolerating pre-backfill nulls during the transition. Do not deploy pack-specific checks before
-   this version is active.
-3. **Backfill:** set `pack_id='listing-rules'` for every existing `ruleset_version` row. Backfill
-   `analysis_version` on historical `/checks` rows from their associated ruleset version, preserving
-   the exact existing externally visible version value. Record or derive it only where the
-   association is valid; fail the migration/verification rather than inventing a version for
-   unresolvable rows.
-4. **Verify:** assert no null pack identities remain; check for duplicate
-   `(pack_id, marketplace_code, version)` identities; verify every result's ruleset and stored
-   analysis version agree with the historical behavior. Test the actual Flyway upgrade path from
-   the V1 schema through V6 using representative data inserted at the V1 stage, then continue
-   through the new migrations. Include checks, findings, clients, ruleset metadata and the legacy
-   client assignment in the fixture.
-5. After all application instances write `pack_id`, **contract:** create and validate the new unique
-   constraint on `(pack_id, marketplace_code, version)`, then drop the old
-   `(marketplace_code, version)` constraint and set `pack_id` NOT NULL. Add/replace result-cache
-   uniqueness to use the explicit pack and `analysis_version` identity. Preserve client scope and
-   the completed-result predicate. Ensure rollback/deployment sequencing does not leave old code
-   writing null pack IDs after contraction.
+**PR 0a — expand, backfill and compatibility code.** Add nullable `pack_id` to `ruleset_version` and
+`listing_check`, with default `listing-rules`, and nullable `analysis_version` to `listing_check`.
+The nullable columns and default let old instances continue inserting text ruleset/check rows while
+PR 0a is rolling out. Backfill every existing ruleset/check row; derive historical analysis versions
+from their associated ruleset version and preserve the exact externally visible value. New
+compatibility code writes explicit `listing-rules`, reads legacy null `analysis_version` as the
+existing ruleset version, and keeps the existing unique constraints and cache lookup behavior.
+Deploy PR 0a across the fleet while old instances may still be running.
 
-The staged migration must not edit any applied migration, discard historical checks, or change the
-current `/checks` cache result. A test must exercise the expansion, backfill, verification and
-contraction behavior, not merely assert the final schema.
+The PR 0a integration test upgrades representative data from the V1 schema through V6, then through
+the new expansion/backfill migrations. The fixture includes ruleset metadata, checks, findings and
+the V6 legacy-client assignment. Verify that old-version inserts receive the `listing-rules` default,
+that backfill preserves the old Etsy `analysisVersion`, and that compatibility code serves the
+existing API/cache behavior. Verify no pre-existing rows are lost and report any row whose ruleset
+association cannot safely determine its analysis version.
+
+**PR 0b — contract in a later release.** Deploy only after every instance is running PR 0a-compatible
+code and no old instance can restart or write. Validate no null `pack_id` remains, no duplicate
+`(pack_id, marketplace_code, version)` identity exists, and all historical result versions are
+correct. Set `pack_id` NOT NULL, establish the new unique identity, and remove the old
+`(marketplace_code, version)` unique constraint. Replace the completed-result cache index with one
+covering client, marketplace, pack, input hash, ruleset version ID and analysis version.
+
+**Do not register or activate a ruleset for any new pack before PR 0b is complete.** The old unique
+constraint cannot represent multiple pack identities for a marketplace/version during PR 0a, and
+old application instances do not understand new packs. PR A and PR B depend on completed PR 0b.
+For a single-instance deployment, this plan assumes an operator-coordinated maintenance window:
+deploy 0a, stop the old process, deploy the compatible release, then run 0b before enabling any new
+pack. Do not perform the contract step while an old process is running.
+
+**Large-table indexes.** Build replacement unique indexes on large result tables with
+`CREATE UNIQUE INDEX CONCURRENTLY`, in a dedicated Flyway migration configured with
+`executeInTransaction=false`; do not combine it with transactional DDL or data backfill. For the
+ruleset registry, build the new unique index concurrently and attach it as a constraint with
+`ALTER TABLE ... ADD CONSTRAINT ... UNIQUE USING INDEX` before dropping the old constraint. For
+completed-result cache uniqueness, create a new partial unique index concurrently with the complete
+client/pack/input/ruleset/analysis identity and `WHERE status = 'COMPLETED'`, validate that it is
+valid and duplicate-free, then drop the old index concurrently in a separate non-transactional
+migration. If concurrent index creation fails, inspect and remove only its invalid index before
+retrying; never silently accept an invalid or missing cache index.
+
+The migration test must cover both the 0a expansion while old inserts remain compatible and the 0b
+contract after compatibility code is in place. Never edit an applied migration, discard historical
+checks or change the current `/checks` cache result.
 
 ### Result storage and endpoint scope
 
@@ -100,10 +117,14 @@ contraction behavior, not merely assert the final schema.
   result/evidence, not full title/tags/description/brand text; evidence snippets are minimized and
   retained with the result. Proposed retention is 30 days.
 - The 30-day periods are proposals for new pack data only; they do not change `/checks` retention.
-  Run one scheduled cleanup task in the API profile. Each API instance may trigger it, but a
-  PostgreSQL advisory lock ensures only one instance performs cleanup at a time. Delete expired
-  check parents in bounded batches; cascade or explicitly delete child findings/items in the same
-  transaction. Every delete and GET is scoped to the owning check/client.
+  Run one scheduled cleanup task in the API profile. Each API instance may trigger it, but only one
+  instance may perform a cleanup batch. In the batch transaction acquire
+  `pg_try_advisory_xact_lock(1279746628, 1380271182)`; these fixed two-key values are reserved for
+  Listing Guard retention cleanup and must be documented as such to prevent reuse for another job.
+  If the lock is unavailable, skip this run. The transaction-level lock is released automatically
+  at commit/rollback. Delete expired check parents in bounded batches; cascade or explicitly delete
+  child findings/items in the same transaction. Every delete and GET is scoped to the owning
+  check/client.
 - GET for an expired image or trademark check returns 404 even if the scheduled cleanup has not run.
   Expired results are excluded from cache lookup. On a repeated request, atomically remove a matching
   expired row and its children before recalculating and inserting a new result; the unique constraint
@@ -115,8 +136,8 @@ contraction behavior, not merely assert the final schema.
 
 ## Compatibility and acceptance criteria
 
-PR 0 is a code-only refactor/migration prerequisite and must not change behavior. Before implementing
-PR A or PR B, tests must demonstrate:
+PR 0a and PR 0b are code/migration prerequisites and must not change `/checks` behavior. Before
+implementing PR A or PR B, tests must demonstrate:
 
 1. Existing Etsy canonical content hashes are unchanged for the frozen fixtures.
 2. Repeating an identical Etsy `/checks` request still returns a cache hit with the same `checkId`
@@ -124,12 +145,17 @@ PR A or PR B, tests must demonstrate:
 3. The Etsy `/checks` JSON contract is unchanged, including `analysisVersion` and `rulesetVersion`
    values.
 4. `FrozenRulesetsTest` continues to pass with the pinned historical hash.
-5. The migration test upgrades representative V1 data through V6 and the new expand/backfill/
-   contract migrations without loss or unintended identity changes.
-6. Cache tests prove that changing pack, ruleset content/version, algorithm version, data fingerprint
+5. PR 0a's migration test upgrades representative V1 data through V6 and the expand/backfill
+   migration while old-version inserts remain compatible; PR 0b's test contracts that schema only
+   after compatible code is active, with no row loss or unintended identity changes.
+6. PR 0b's index tests verify concurrent index creation/validation, uniqueness, and that the old
+   unique/cache indexes are removed only after replacements are valid.
+7. Cache tests prove that changing pack, ruleset content/version, algorithm version, data fingerprint
    or image input changes the relevant identity; the same input from another client never hits the
    cache.
-7. New endpoint results, GET lookups and cleanup obey their pack-specific schema, client scope and
+8. No new pack ruleset is registered or active before PR 0b completes. For single-instance
+   deployment, test/document the coordinated stop-and-contract sequence.
+9. New endpoint results, GET lookups and cleanup obey their pack-specific schema, client scope and
    retention.
 
 `analysisVersion` values are opaque to clients. Any change to a component that can affect findings
@@ -147,20 +173,23 @@ tested.
   implementation/data update; that is preferable to serving stale results.
 - Dedicated result tables and endpoints isolate image/trademark input and response contracts, at the
   cost of additional migrations, retention cleanup and API documentation.
-- A scheduled cleanup job and PostgreSQL advisory lock avoid duplicate retention work across API
-  instances; application behavior remains correct if cleanup is delayed because expiry is also
-  enforced by GET and cache lookup.
+- A scheduled cleanup job uses a fixed `pg_try_advisory_xact_lock` key pair to avoid duplicate
+  retention work across API instances; application behavior remains correct if cleanup is delayed
+  because expiry is also enforced by GET and cache lookup.
 - A failed new-pack rule must produce an explicit incomplete result; the legacy text rule engine's
   log-and-skip behavior is unchanged.
 
 ## Planned pull requests
 
-1. **PR 0 — ADR-010 implementation:** pack-aware registry, independent analysis-version persistence,
-   expand/backfill/verify/contract migrations and regression tests only. No image or trademark
-   analysis behavior changes.
-2. **PR A — Image:** implement ADR-008 after PR 0 is approved and complete. Add the separate endpoint,
+1. **PR 0a — Expand:** nullable pack and analysis-version columns, defaults/backfill, compatibility
+   code and V1-to-V6 migration/regression tests. It must deploy while old instances may still run.
+2. **PR 0b — Contract:** after all instances are 0a-compatible, enforce NOT NULL, create and validate
+   new unique identities, and remove old unique/cache indexes. No new pack rulesets may be registered
+   before 0b completes. For single-instance deployment, use the coordinated maintenance sequence
+   described above.
+3. **PR A — Image:** implement ADR-008 after PR 0b is approved and complete. Add the separate endpoint,
    storage, safety limits, versioned profiles and generated-image tests.
-3. **PR B — Trademark:** implement ADR-009 after PR A. Add the separate endpoint, offline importer,
+4. **PR B — Trademark:** implement ADR-009 after PR A. Add the separate endpoint, offline importer,
    versioned catalog, explicit-threshold matcher and synthetic held-out evaluation.
 
 Each implementation PR remains separate, is not merged automatically, preserves existing `/checks`

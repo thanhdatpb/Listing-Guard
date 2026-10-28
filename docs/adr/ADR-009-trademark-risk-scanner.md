@@ -33,7 +33,8 @@ offline during a check. It reports possible risk, not a legal conclusion.
   ruleset. Do not hardcode a marketplace or legal threshold in Java.
 - Support exact, word-boundary phrase and fuzzy candidate matching. Record the matched mark, input
   field and span, match type, similarity score where applicable, catalog version and rule provenance
-  as evidence.
+  as evidence. Fuzzy comparison is between a bounded input token/n-gram and a catalog mark, never the
+  entire title/description and a mark.
 - Context rules distinguish descriptive/compatibility use from a mark presented as the product's own
   brand. Such rules are configurable and advisory; they must not assert that a use is legally allowed.
 - The initial catalog is global and versioned, not client-specific. No real trademark corpus or
@@ -54,8 +55,16 @@ the new isolated contract.
 The trademark endpoint must store enough to return a stable client-scoped result and support cache
 reuse, but it does not need the full listing text after analysis.
 
-- Persist canonical input hash, client ID, marketplace/context, pack ID, ruleset and catalog versions,
-  analysis version, completeness, risk level, findings/evidence and timestamps.
+- Persist a canonical input hash, client ID, marketplace/context, pack ID, ruleset and catalog
+  versions, analysis version, completeness, risk level, findings/evidence and timestamps. Compute
+  the hash from input fields in a fixed canonical field order, applying Unicode NFC and trimming
+  surrounding whitespace, but before homoglyph, leet, diacritic or punctuation normalization. This
+  distinguishes different submitted text that happens to normalize to the same match form, at the
+  cost of fewer cache hits than hashing the fully normalized form.
+- Evidence positions refer to that same canonical raw-text representation (field plus offsets after
+  NFC and trim); evidence may additionally include the normalized token used for matching. Preserve
+  offsets through normalization while the request is in memory. Do not persist the complete canonical
+  input.
 - Do **not** persist the submitted title, tags, description, shop name, brand or category as a full
   input document. Compute the hash from canonical normalized input before matching.
 - Evidence may contain the minimum matched token/phrase and field/span needed to explain the finding;
@@ -70,7 +79,11 @@ reuse, but it does not need the full listing text after analysis.
 
 Expired rows are not cache-eligible. If cleanup has not removed a matching expired row when a new
 request arrives, remove that row and its findings atomically before recalculating and storing the
-new result. The unique cache constraint settles concurrent requests on the new result. An expired
+new result. If two requests race to replace the same expired cache identity, the expected unique
+constraint violation is handled as a cache race: roll back the losing insert transaction, then read
+and return the winning unexpired result. Do not convert an unrelated integrity failure into a cache
+hit; if no matching winner exists, surface the original error. This prevents a concurrent expiry
+race from becoming HTTP 500 while preserving visibility of real persistence errors. An expired
 check ID must not become readable again; a repeated input after retention is a cache miss and a new
 analysis.
 
@@ -100,9 +113,10 @@ unnecessary privacy and breach impact; it is rejected for v1.
 
 | Decision | Alternatives and tradeoff | Choice |
 |---|---|---|
-| Fuzzy matching | Jaro-Winkler is simple but favors prefix similarity; pure Java Levenshtein scans can be expensive for a large catalog; PostgreSQL trigram matching requires an extension. | Use `pg_trgm` to find candidates and a deterministic Java similarity calculation for final scoring. |
-| Similarity threshold | The `%` operator depends on session GUC `pg_trgm.similarity_threshold`, which can vary by connection/session. | Pass the ruleset threshold explicitly as a SQL parameter and compare with `similarity(normalized_input, normalized_mark) >= :similarityThreshold`; do not rely on the GUC. |
-| Index/performance | An explicit function comparison may not use the trigram index as efficiently as `%`; avoiding a hidden GUC makes the configured decision reproducible. | Keep indexes for exact normalized lookup and benchmark explicit-threshold candidate search. Optimize candidate narrowing without changing the configured similarity decision. |
+| Fuzzy matching | Comparing whole listing fields to a short mark produces poor similarity semantics. Jaro-Winkler favors prefixes; a full Java scan may be expensive for a large catalog. | Generate bounded tokens/n-grams from each canonical field and compare each candidate to marks using PostgreSQL `pg_trgm`; Java scores only returned candidate pairs. |
+| Candidate threshold | A SQL filter limits candidate volume. Relying on the session-wide trigram GUC makes behavior connection-dependent. | Put the candidate similarity threshold in the versioned ruleset. In the same transaction, set it transaction-locally with `set_config('pg_trgm.similarity_threshold', :candidateThreshold, true)`, then use the `%` operator on each bounded token/n-gram against indexed marks. The `true` local setting resets at transaction end and allows the trigram index to be used. |
+| Final threshold | Letting SQL alone decide risk couples final scoring to candidate retrieval and can exclude borderline candidates. | Put a separate final similarity threshold in the ruleset; calculate the deterministic final score in Java for returned candidates and apply this threshold there. Both thresholds and the scoring algorithm version participate in ruleset/analysis fingerprints. |
+| Similarity strategy | `word_similarity`/`strict_word_similarity` compare a query against parts/word boundaries of a string and may reduce explicit n-gram generation; results differ from token-to-mark matching and need their own tuning. | V1 explicitly generates bounded tokens/n-grams and compares them with catalog marks. Treat word-similarity functions as a future alternative requiring measured evaluation and a new algorithm version. |
 | Catalog ownership | Per-client catalogs complicate consistency, import and privacy boundaries; a global catalog cannot encode client-owned data. | Global versioned public/open-data catalog only in v1. A client-specific overlay requires a separate ADR and scoped fingerprint. |
 
 The initial supported database is PostgreSQL 16. The analysis fingerprint includes the PostgreSQL
@@ -154,6 +168,11 @@ reported results. Metrics may be published only after running the evaluation, wi
 dataset hash, ruleset version, catalog fingerprint and run date; do not estimate or hand-write
 results.
 
+Before calculating any metric, the evaluation must compare the held-out file's SHA-256 with the
+expected hash committed in its manifest. A test supplies a different held-out file and asserts that
+evaluation fails before producing a report. A changed held-out dataset requires an explicit reviewed
+hash update; it must not be silently accepted.
+
 ## Consequences
 
 - Existing `/checks`, its hash, response, cache and `banned_words` behavior are unchanged.
@@ -170,12 +189,21 @@ results.
   results. Include explicit cases where incomplete analysis preserves known risk and where
   indeterminate risk is `UNKNOWN`.
 - Tests demonstrate deterministic explicit similarity thresholds independent of session GUC and
-  verify the PostgreSQL-major/`pg_trgm`-`extversion` fingerprint.
+  verify the PostgreSQL-major/`pg_trgm`-`extversion` fingerprint. Candidate retrieval tests verify
+  the transaction-local SQL threshold and that fuzzy comparisons use input tokens/n-grams rather
+  than whole title/description fields.
 - Import tests cover local-only operation, invalid source data, idempotency, version immutability and
   catalog isolation by version.
 - API tests cover disclaimer, evidence, client isolation, cache identity, GET, retention, and no
   persistence of full submitted text.
-- Tuning and held-out datasets are separate; held-out hash is frozen before threshold tuning.
-  Generate evaluation results only from a real run.
+- Tests verify input hashes use fixed field order, NFC and trim before match-normalization, and
+  evidence spans refer to that canonical representation. Tuning and held-out datasets are separate;
+  held-out hash is frozen before threshold tuning and a changed file fails the hash test.
+- Race tests expire one result, run two identical replacement requests concurrently, and verify both
+  receive the winner's result rather than HTTP 500. Generate evaluation results only from a real run.
 - Do not alter rulesets already published or current `/checks` behavior. Update OpenAPI and
   integration documentation for the new endpoint.
+
+Known limitation: if a shop owner's own brand matches an entry in the shared catalog, v1 can report a
+false positive. The checker has no reliable ownership/authorization proof to distinguish that case;
+the finding remains an advisory warning, not a legal conclusion.
