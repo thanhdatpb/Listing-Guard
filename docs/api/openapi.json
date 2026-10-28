@@ -1,0 +1,614 @@
+{
+  "components" : {
+    "schemas" : {
+      "CheckRequest" : {
+        "properties" : {
+          "listing" : {
+            "$ref" : "#/components/schemas/JsonNode",
+            "description" : "The listing in the marketplace's own JSON format (for Etsy, Open API v3 style snake_case fields). Must be a JSON object.",
+            "type" : "object"
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, case-insensitive. Supported: ETSY.",
+            "example" : "ETSY",
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "listing", "marketplace" ],
+        "type" : "object"
+      },
+      "CheckResult" : {
+        "properties" : {
+          "analysisVersion" : {
+            "description" : "Version of the whole analysis that produced the result. Currently equal to rulesetVersion; it will also change when other analyzers (for example an LLM step) are added. Two checks with the same marketplace, contentHash and analysisVersion have the same result.",
+            "example" : "etsy-2026-11",
+            "type" : [ "string", "null" ]
+          },
+          "cached" : {
+            "description" : "True when an identical listing had already been checked with the same analysisVersion and the stored result is returned instead of a new check.",
+            "type" : "boolean"
+          },
+          "checkId" : {
+            "description" : "Identifier of the stored check; use it with GET /api/v1/checks/{id}.",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "contentHash" : {
+            "description" : "SHA-256 of the normalized listing content.",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "description" : "When the check was first stored.",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "findings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FindingView"
+            },
+            "type" : "array"
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, upper case.",
+            "example" : "ETSY",
+            "type" : "string"
+          },
+          "rulesetVersion" : {
+            "description" : "Version of the ruleset that produced the findings. Null for checks stored before versions were recorded.",
+            "example" : "etsy-2026-11",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "PENDING", "COMPLETED", "FAILED" ],
+            "type" : "string"
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/Summary"
+          }
+        },
+        "type" : "object"
+      },
+      "FindingView" : {
+        "properties" : {
+          "field" : {
+            "description" : "Field path, see the integration guide.",
+            "example" : "tags[1]",
+            "type" : "string"
+          },
+          "message" : {
+            "example" : "Tag 'a tag that is far too long...' dài 38 ký tự, tối đa 20.",
+            "type" : "string"
+          },
+          "ruleId" : {
+            "example" : "tag_length",
+            "type" : "string"
+          },
+          "severity" : {
+            "enum" : [ "ERROR", "WARNING", "INFO" ],
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "RULE", "LLM" ],
+            "type" : "string"
+          },
+          "suggestion" : {
+            "example" : "Rút ngắn tag này ít nhất 18 ký tự.",
+            "type" : "string"
+          },
+          "value" : {
+            "description" : "The value that caused the finding; null when no single value applies (a missing field).",
+            "example" : "a tag that is far too long for the limit",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "JsonNode" : { },
+      "ProblemDetail" : {
+        "properties" : {
+          "detail" : {
+            "type" : [ "string", "null" ]
+          },
+          "instance" : {
+            "format" : "uri",
+            "type" : [ "string", "null" ]
+          },
+          "properties" : {
+            "additionalProperties" : { },
+            "type" : [ "object", "null" ]
+          },
+          "status" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : [ "string", "null" ]
+          },
+          "type" : {
+            "format" : "uri",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Summary" : {
+        "properties" : {
+          "errors" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "infos" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "warnings" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    "securitySchemes" : {
+      "ApiKeyAuth" : {
+        "description" : "Service-to-service API key. Several keys can be valid at once to allow rotation.",
+        "in" : "header",
+        "name" : "X-API-Key",
+        "type" : "apiKey"
+      }
+    }
+  },
+  "info" : {
+    "description" : "Checks a marketplace listing before it is published and returns findings with suggestions. It only checks and suggests: it never edits a listing and never publishes anything.\n\nEvery endpoint except GET /health needs the X-API-Key header. Errors are RFC 7807 problem responses (application/problem+json) with a stable `code`; quote the `requestId` when reporting one. See docs/integration-guide.md for the calling flow, error table and field path conventions.",
+    "title" : "Listing Guard API",
+    "version" : "v1"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/api/v1/checks" : {
+      "post" : {
+        "description" : "Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content was already checked with the same analysisVersion, the stored result is returned instead and `cached` is true (no new check is created). The listing is the marketplace's own format; for Etsy it is the Open API v3 style JSON with snake_case fields.",
+        "operationId" : "check",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "examples" : {
+                "etsy-listing" : {
+                  "description" : "etsy-listing",
+                  "summary" : "An Etsy listing with problems",
+                  "value" : {
+                    "listing" : {
+                      "description" : "Hand-thrown stoneware mug, 350 ml.",
+                      "images" : [ "https://example.com/mug-1.jpg" ],
+                      "materials" : [ "stoneware" ],
+                      "price" : {
+                        "amount" : 1999,
+                        "currency_code" : "USD",
+                        "divisor" : 100
+                      },
+                      "quantity" : 0,
+                      "tags" : [ "mug", "Mug", "gift_idea" ],
+                      "taxonomy_path" : [ "Home & Living", "Kitchen & Dining", "Mugs" ],
+                      "title" : "Handmade Ceramic Mug"
+                    },
+                    "marketplace" : "ETSY"
+                  }
+                }
+              },
+              "schema" : {
+                "$ref" : "#/components/schemas/CheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "cached" : {
+                    "description" : "cached",
+                    "summary" : "The same listing again: stored result",
+                    "value" : {
+                      "analysisVersion" : "etsy-2026-11",
+                      "cached" : true,
+                      "checkId" : "5331208a-583a-4ff3-a990-99a7440ae59f",
+                      "contentHash" : "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
+                      "createdAt" : "2026-10-28T09:15:30.123456Z",
+                      "findings" : [ ],
+                      "marketplace" : "ETSY",
+                      "rulesetVersion" : "etsy-2026-11",
+                      "status" : "COMPLETED",
+                      "summary" : {
+                        "errors" : 0,
+                        "infos" : 0,
+                        "warnings" : 0
+                      }
+                    }
+                  },
+                  "findings" : {
+                    "description" : "findings",
+                    "summary" : "A fresh check with findings",
+                    "value" : {
+                      "analysisVersion" : "etsy-2026-11",
+                      "cached" : false,
+                      "checkId" : "5331208a-583a-4ff3-a990-99a7440ae59f",
+                      "contentHash" : "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
+                      "createdAt" : "2026-10-28T09:15:30.123456Z",
+                      "findings" : [ {
+                        "field" : "who_made",
+                        "message" : "Thiếu trường bắt buộc 'who_made'.",
+                        "ruleId" : "required_fields",
+                        "severity" : "ERROR",
+                        "source" : "RULE",
+                        "suggestion" : "Bổ sung giá trị cho trường 'who_made' trước khi publish.",
+                        "value" : null
+                      }, {
+                        "field" : "when_made",
+                        "message" : "Thiếu trường bắt buộc 'when_made'.",
+                        "ruleId" : "required_fields",
+                        "severity" : "ERROR",
+                        "source" : "RULE",
+                        "suggestion" : "Bổ sung giá trị cho trường 'when_made' trước khi publish.",
+                        "value" : null
+                      }, {
+                        "field" : "quantity",
+                        "message" : "Số lượng là 0, phải lớn hơn 0.",
+                        "ruleId" : "price_quantity_positive",
+                        "severity" : "ERROR",
+                        "source" : "RULE",
+                        "suggestion" : "Nhập số lượng lớn hơn 0.",
+                        "value" : "0"
+                      }, {
+                        "field" : "tags[2]",
+                        "message" : "Tag 'gift_idea' chứa ký tự không hợp lệ: '_'.",
+                        "ruleId" : "tag_characters",
+                        "severity" : "ERROR",
+                        "source" : "RULE",
+                        "suggestion" : "Xoá hoặc thay các ký tự không hợp lệ trong tag này.",
+                        "value" : "gift_idea"
+                      }, {
+                        "field" : "tags[1]",
+                        "message" : "Tag 'Mug' trùng với tag ở vị trí 1.",
+                        "ruleId" : "duplicate_tags",
+                        "severity" : "WARNING",
+                        "source" : "RULE",
+                        "suggestion" : "Xoá tag trùng hoặc thay bằng một tag khác để tận dụng đủ chỗ.",
+                        "value" : "Mug"
+                      } ],
+                      "marketplace" : "ETSY",
+                      "rulesetVersion" : "etsy-2026-11",
+                      "status" : "COMPLETED",
+                      "summary" : {
+                        "errors" : 4,
+                        "infos" : 0,
+                        "warnings" : 1
+                      }
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/CheckResult"
+                }
+              }
+            },
+            "description" : "The check result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-request" : {
+                    "description" : "invalid-request",
+                    "value" : {
+                      "code" : "invalid-request",
+                      "detail" : "The request is not valid; see errors.",
+                      "errors" : [ {
+                        "field" : "listing",
+                        "message" : "must not be null"
+                      } ],
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-request"
+                    }
+                  },
+                  "unknown-marketplace" : {
+                    "description" : "unknown-marketplace",
+                    "value" : {
+                      "code" : "unknown-marketplace",
+                      "detail" : "Unknown marketplace: NOPE. Supported: ETSY.",
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:unknown-marketplace"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request (code `invalid-request`) or unknown marketplace (`unknown-marketplace`)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "payload-too-large",
+                  "detail" : "The request body is larger than the limit of 262144 bytes.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 413,
+                  "title" : "Payload Too Large",
+                  "type" : "urn:listing-guard:problem:payload-too-large"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request body is over the size limit (256 KB)."
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not application/json (code `unsupported-media-type`)."
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "marketplace-not-yet-supported",
+                  "detail" : "Marketplace AMAZON is planned but not supported yet. Supported: ETSY.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 422,
+                  "title" : "Unprocessable Entity",
+                  "type" : "urn:listing-guard:problem:marketplace-not-yet-supported"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`)."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this API key. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for this API key; see the Retry-After header."
+          }
+        },
+        "summary" : "Check a listing",
+        "tags" : [ "Checks" ]
+      }
+    },
+    "/api/v1/checks/{id}" : {
+      "get" : {
+        "description" : "Returns the stored result of an earlier check, in the same shape as the POST response (`cached` is false).",
+        "operationId" : "get",
+        "parameters" : [ {
+          "description" : "checkId returned by POST /api/v1/checks",
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "analysisVersion" : "etsy-2026-11",
+                  "cached" : false,
+                  "checkId" : "5331208a-583a-4ff3-a990-99a7440ae59f",
+                  "contentHash" : "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
+                  "createdAt" : "2026-10-28T09:15:30.123456Z",
+                  "findings" : [ {
+                    "field" : "who_made",
+                    "message" : "Thiếu trường bắt buộc 'who_made'.",
+                    "ruleId" : "required_fields",
+                    "severity" : "ERROR",
+                    "source" : "RULE",
+                    "suggestion" : "Bổ sung giá trị cho trường 'who_made' trước khi publish.",
+                    "value" : null
+                  }, {
+                    "field" : "when_made",
+                    "message" : "Thiếu trường bắt buộc 'when_made'.",
+                    "ruleId" : "required_fields",
+                    "severity" : "ERROR",
+                    "source" : "RULE",
+                    "suggestion" : "Bổ sung giá trị cho trường 'when_made' trước khi publish.",
+                    "value" : null
+                  }, {
+                    "field" : "quantity",
+                    "message" : "Số lượng là 0, phải lớn hơn 0.",
+                    "ruleId" : "price_quantity_positive",
+                    "severity" : "ERROR",
+                    "source" : "RULE",
+                    "suggestion" : "Nhập số lượng lớn hơn 0.",
+                    "value" : "0"
+                  }, {
+                    "field" : "tags[2]",
+                    "message" : "Tag 'gift_idea' chứa ký tự không hợp lệ: '_'.",
+                    "ruleId" : "tag_characters",
+                    "severity" : "ERROR",
+                    "source" : "RULE",
+                    "suggestion" : "Xoá hoặc thay các ký tự không hợp lệ trong tag này.",
+                    "value" : "gift_idea"
+                  }, {
+                    "field" : "tags[1]",
+                    "message" : "Tag 'Mug' trùng với tag ở vị trí 1.",
+                    "ruleId" : "duplicate_tags",
+                    "severity" : "WARNING",
+                    "source" : "RULE",
+                    "suggestion" : "Xoá tag trùng hoặc thay bằng một tag khác để tận dụng đủ chỗ.",
+                    "value" : "Mug"
+                  } ],
+                  "marketplace" : "ETSY",
+                  "rulesetVersion" : "etsy-2026-11",
+                  "status" : "COMPLETED",
+                  "summary" : {
+                    "errors" : 4,
+                    "infos" : 0,
+                    "warnings" : 1
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/CheckResult"
+                }
+              }
+            },
+            "description" : "The stored check result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The id is not a UUID."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "check-not-found",
+                  "detail" : "No check with id 5331208a-583a-4ff3-a990-99a7440ae59f",
+                  "instance" : "/api/v1/checks/5331208a-583a-4ff3-a990-99a7440ae59f",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 404,
+                  "title" : "Not Found",
+                  "type" : "urn:listing-guard:problem:check-not-found"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No check with this id (code `check-not-found`)."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this API key. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for this API key."
+          }
+        },
+        "summary" : "Read a stored check",
+        "tags" : [ "Checks" ]
+      }
+    },
+    "/health" : {
+      "get" : {
+        "description" : "200 when PostgreSQL can be queried, 503 otherwise. No API key needed.",
+        "operationId" : "health",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Health",
+        "tags" : [ "health-controller" ]
+      }
+    }
+  },
+  "security" : [ {
+    "ApiKeyAuth" : [ ]
+  } ],
+  "tags" : [ {
+    "description" : "Check a listing and read stored results.",
+    "name" : "Checks"
+  } ]
+}

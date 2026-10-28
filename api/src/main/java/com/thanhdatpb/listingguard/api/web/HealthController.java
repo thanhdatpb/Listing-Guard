@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.web;
 
+import io.swagger.v3.oas.annotations.Operation;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,8 @@ public class HealthController {
     }
 
     @GetMapping("/health")
+    @Operation(summary = "Health", description = "200 when PostgreSQL can be queried, 503 otherwise. No API key needed.",
+            security = {})
     public ResponseEntity<Map<String, String>> health() {
         if (probe.isUp()) {
             return ResponseEntity.ok(Map.of("status", "UP"));

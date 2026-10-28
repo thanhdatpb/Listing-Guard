@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.api.policy;
 
 import com.thanhdatpb.listingguard.rag.retrieval.PolicyRetriever;
+import io.swagger.v3.oas.annotations.Hidden;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
  * Debug view of retrieval: what the retriever returns for a question. Read-only, but there is no
  * authentication yet, so it answers 404 unless {@code listing-guard.policies.search-endpoint.enabled=true}.
  */
+@Hidden
 @RestController
 public class PolicySearchController {
 
