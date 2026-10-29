@@ -12,14 +12,23 @@ import java.util.TreeSet;
  * {@code contentHash} is the SHA-256 of the normalized YAML text it was parsed from.
  */
 public record RulesetConfig(
+        String packId,
         String marketplace,
         String version,
         LocalDate checkedAt,
         String contentHash,
         Map<String, RuleSettings> rules) {
 
+    public static final String DEFAULT_PACK_ID = "listing-rules";
+
     public RulesetConfig {
+        packId = packId == null ? DEFAULT_PACK_ID : packId;
         rules = Map.copyOf(rules);
+    }
+
+    public RulesetConfig(String marketplace, String version, LocalDate checkedAt, String contentHash,
+                         Map<String, RuleSettings> rules) {
+        this(DEFAULT_PACK_ID, marketplace, version, checkedAt, contentHash, rules);
     }
 
     /** The default settings of a rule. */

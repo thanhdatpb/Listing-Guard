@@ -4,6 +4,7 @@ import com.thanhdatpb.listingguard.api.listing.Normalizer;
 import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetVersion;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetVersionRepository;
+import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
@@ -59,8 +60,10 @@ public class CheckService {
         Listing listing = normalizer.normalize(request.listing());
         String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
         String contentHash = hasher.hash(listing);
-        ActiveRulesets.Active ruleset = rulesets.get(marketplace);
+        ActiveRulesets.Active ruleset = rulesets.get(RulesetConfig.DEFAULT_PACK_ID, marketplace);
         long rulesetVersionId = ruleset.rulesetVersionId();
+        String packId = ruleset.config().packId();
+        String analysisVersion = ruleset.config().version();
 
         Optional<CheckResult> cached = findCached(clientId, marketplace, contentHash, rulesetVersionId);
         if (cached.isPresent()) {
@@ -69,7 +72,8 @@ public class CheckService {
 
         List<Finding> found = ruleEngine.run(listing, ruleset.config());
         try {
-            UUID id = transactions.execute(status -> persist(clientId, marketplace, contentHash, rulesetVersionId, found));
+            UUID id = transactions.execute(status -> persist(clientId, packId, marketplace, contentHash,
+                    rulesetVersionId, analysisVersion, found));
             return toResult(checks.findById(id).orElseThrow(), false);
         } catch (DataIntegrityViolationException e) {
             // another request of this client stored the same listing between our lookup and our insert: answer from its row
@@ -91,8 +95,10 @@ public class CheckService {
                 clientId, marketplace, contentHash, rulesetVersionId, CheckStatus.COMPLETED).map(check -> toResult(check, true));
     }
 
-    private UUID persist(UUID clientId, String marketplace, String contentHash, long rulesetVersionId, List<Finding> found) {
-        ListingCheck saved = checks.saveAndFlush(new ListingCheck(clientId, contentHash, marketplace, CheckStatus.COMPLETED, rulesetVersionId));
+    private UUID persist(UUID clientId, String packId, String marketplace, String contentHash, long rulesetVersionId,
+                         String analysisVersion, List<Finding> found) {
+        ListingCheck saved = checks.saveAndFlush(new ListingCheck(clientId, packId, contentHash, marketplace,
+                CheckStatus.COMPLETED, rulesetVersionId, analysisVersion));
         findings.saveAll(found.stream().map(finding -> FindingEntity.fromRule(saved.getId(), finding, rulesetVersionId)).toList());
         return saved.getId();
     }
@@ -104,8 +110,7 @@ public class CheckService {
                 .toList();
         String rulesetVersion = check.getRulesetVersionId() == null ? null
                 : rulesetVersions.findById(check.getRulesetVersionId()).map(RulesetVersion::getVersion).orElse(null);
-        // today the analysis is the rule engine alone, so both versions are the same value
-        String analysisVersion = rulesetVersion;
+        String analysisVersion = check.getAnalysisVersion() == null ? rulesetVersion : check.getAnalysisVersion();
         return new CheckResult(check.getId(), check.getStatus(), check.getMarketplaceCode(), rulesetVersion, analysisVersion,
                 check.getContentHash(), cached, check.getCreatedAt(), CheckResult.Summary.of(views), views);
     }

@@ -109,7 +109,9 @@ class CheckControllerIntegrationTest {
         ListingCheck saved = checks.findById(checkId).orElseThrow();
         assertThat(saved.getMarketplaceCode()).isEqualTo("ETSY");
         assertThat(saved.getStatus()).isEqualTo(CheckStatus.COMPLETED);
+        assertThat(saved.getPackId()).isEqualTo("listing-rules");
         assertThat(saved.getRulesetVersionId()).isEqualTo(rulesets.get("ETSY").rulesetVersionId());
+        assertThat(saved.getAnalysisVersion()).isEqualTo("etsy-2026-11");
         assertThat(findings.findByCheckId(checkId)).isEmpty();
     }
 
@@ -162,6 +164,7 @@ class CheckControllerIntegrationTest {
         assertThat(second.get("checkId").asText()).isEqualTo(first.get("checkId").asText());
         assertThat(second.get("createdAt").asText()).isEqualTo(first.get("createdAt").asText());
         assertThat(second.get("contentHash").asText()).isEqualTo(first.get("contentHash").asText());
+        assertThat(second.get("findings")).isEqualTo(first.get("findings"));
         assertThat(countChecks(first.get("contentHash").asText())).isEqualTo(1);
     }
 
@@ -222,13 +225,16 @@ class CheckControllerIntegrationTest {
     @Test
     void aStoredCheckCanBeReadBackById() throws Exception {
         JsonNode created = postOk(violatingBody());
+        UUID checkId = UUID.fromString(created.get("checkId").asText());
+        jdbc.update("UPDATE listing_check SET analysis_version = NULL WHERE id = ?", checkId);
 
-        String response = mvc.perform(get(CHECKS + "/" + created.get("checkId").asText()).header(HEADER, KEY_1))
+        String response = mvc.perform(get(CHECKS + "/" + checkId).header(HEADER, KEY_1))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
         JsonNode fetched = mapper.readTree(response);
         assertThat(fetched.get("cached").asBoolean()).isFalse();
+        assertThat(fetched.get("analysisVersion").asText()).isEqualTo("etsy-2026-11");
         ObjectNode expected = created.deepCopy();
         expected.put("cached", false);
         assertThat(fetched).isEqualTo(expected);

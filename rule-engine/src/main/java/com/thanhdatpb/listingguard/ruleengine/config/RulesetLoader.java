@@ -36,7 +36,7 @@ import java.util.Set;
  */
 public final class RulesetLoader {
 
-    private static final Set<String> TOP_LEVEL_KEYS = Set.of("marketplace", "version", "checked_at", "rules");
+    private static final Set<String> TOP_LEVEL_KEYS = Set.of("pack_id", "marketplace", "version", "checked_at", "rules");
     private static final Set<String> RESERVED_RULE_KEYS = Set.of("severity", "source", "enabled", "categories");
     private static final Set<String> OVERRIDE_CONTROL_KEYS = Set.of("severity", "source", "enabled");
 
@@ -77,9 +77,15 @@ public final class RulesetLoader {
         }
 
         String marketplace = requiredText(root, "marketplace", "ruleset").toUpperCase(Locale.ROOT);
+        String packId = root.has("pack_id")
+                ? requiredText(root, "pack_id", "ruleset").toLowerCase(Locale.ROOT)
+                : RulesetConfig.DEFAULT_PACK_ID;
+        if (!packId.matches("[a-z][a-z0-9-]{0,63}")) {
+            throw new RulesetException("Ruleset pack_id must match [a-z][a-z0-9-]{0,63}");
+        }
         String version = requiredText(root, "version", "ruleset");
         LocalDate checkedAt = parseDate(requiredText(root, "checked_at", "ruleset"));
-        return new RulesetConfig(marketplace, version, checkedAt, sha256(text), parseRules(root.get("rules")));
+        return new RulesetConfig(packId, marketplace, version, checkedAt, sha256(text), parseRules(root.get("rules")));
     }
 
     /** LF line endings, no BOM. This is the text that gets hashed. */
