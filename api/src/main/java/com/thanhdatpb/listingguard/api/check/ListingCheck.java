@@ -23,6 +23,9 @@ public class ListingCheck {
     @Column(name = "client_id", nullable = false)
     private UUID clientId;
 
+    @Column(name = "pack_id", length = 64)
+    private String packId;
+
     @Column(name = "content_hash", nullable = false)
     private String contentHash;
 
@@ -37,18 +40,24 @@ public class ListingCheck {
     @Column(name = "ruleset_version_id")
     private Long rulesetVersionId;
 
+    @Column(name = "analysis_version", length = 128)
+    private String analysisVersion;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
     protected ListingCheck() {
     }
 
-    public ListingCheck(UUID clientId, String contentHash, String marketplaceCode, CheckStatus status, Long rulesetVersionId) {
+    public ListingCheck(UUID clientId, String packId, String contentHash, String marketplaceCode, CheckStatus status,
+                        Long rulesetVersionId, String analysisVersion) {
         this.clientId = clientId;
+        this.packId = packId;
         this.contentHash = contentHash;
         this.marketplaceCode = marketplaceCode;
         this.status = status;
         this.rulesetVersionId = rulesetVersionId;
+        this.analysisVersion = analysisVersion;
     }
 
     public UUID getId() {
@@ -57,6 +66,10 @@ public class ListingCheck {
 
     public UUID getClientId() {
         return clientId;
+    }
+
+    public String getPackId() {
+        return packId;
     }
 
     public String getContentHash() {
@@ -73,6 +86,10 @@ public class ListingCheck {
 
     public Long getRulesetVersionId() {
         return rulesetVersionId;
+    }
+
+    public String getAnalysisVersion() {
+        return analysisVersion;
     }
 
     public Instant getCreatedAt() {

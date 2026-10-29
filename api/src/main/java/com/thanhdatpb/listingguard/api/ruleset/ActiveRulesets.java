@@ -3,10 +3,12 @@ package com.thanhdatpb.listingguard.api.ruleset;
 import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetException;
+import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetLoader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -33,7 +35,7 @@ public class ActiveRulesets implements SmartInitializingSingleton {
     private final RulesetVersionRepository versions;
     private final TransactionTemplate transactions;
 
-    private volatile Map<String, Active> byMarketplace = Map.of();
+    private volatile Map<Identity, Active> byPackAndMarketplace = Map.of();
 
     public ActiveRulesets(RulesetProperties properties, ResourceLoader resources, RuleEngine engine,
                           RulesetVersionRepository versions, TransactionTemplate transactions) {
@@ -46,23 +48,30 @@ public class ActiveRulesets implements SmartInitializingSingleton {
 
     @Override
     public void afterSingletonsInstantiated() {
-        Map<String, Active> loaded = new HashMap<>();
+        Map<Identity, Active> loaded = new HashMap<>();
         for (String location : properties.locations()) {
             RulesetConfig config = load(location);
             engine.validate(config);
-            if (loaded.containsKey(config.marketplace())) {
-                throw new IllegalStateException("More than one ruleset configured for marketplace " + config.marketplace());
+            Identity identity = key(config.packId(), config.marketplace());
+            if (loaded.containsKey(identity)) {
+                throw new IllegalStateException("More than one ruleset configured for pack " + config.packId()
+                        + " and marketplace " + config.marketplace());
             }
-            loaded.put(config.marketplace(), register(config));
+            loaded.put(identity, register(config));
         }
-        byMarketplace = Map.copyOf(loaded);
+        byPackAndMarketplace = Map.copyOf(loaded);
     }
 
     /** @throws IllegalStateException if no ruleset is active for the marketplace */
     public Active get(String marketplace) {
-        Active active = byMarketplace.get(marketplace);
+        return get(RulesetConfig.DEFAULT_PACK_ID, marketplace);
+    }
+
+    /** @throws IllegalStateException if no ruleset is active for the pack and marketplace */
+    public Active get(String packId, String marketplace) {
+        Active active = byPackAndMarketplace.get(key(packId, marketplace));
         if (active == null) {
-            throw new IllegalStateException("No active ruleset for marketplace " + marketplace);
+            throw new IllegalStateException("No active ruleset for pack " + packId + " and marketplace " + marketplace);
         }
         return active;
     }
@@ -82,7 +91,11 @@ public class ActiveRulesets implements SmartInitializingSingleton {
     }
 
     private Active registerOrConfirm(RulesetConfig config) {
-        Optional<RulesetVersion> existing = versions.findByMarketplaceCodeAndVersion(config.marketplace(), config.version());
+        Optional<RulesetVersion> existing = versions.findByPackIdAndMarketplaceCodeAndVersion(
+                config.packId(), config.marketplace(), config.version());
+        if (existing.isEmpty()) {
+            existing = versions.findByMarketplaceCodeAndVersion(config.marketplace(), config.version());
+        }
         if (existing.isPresent()) {
             RulesetVersion row = existing.get();
             if (!row.getContentHash().equals(config.contentHash())) {
@@ -91,11 +104,22 @@ public class ActiveRulesets implements SmartInitializingSingleton {
                         + " but its content now hashes to " + config.contentHash()
                         + ". Do not edit a published ruleset; bump its version instead.");
             }
+            if (!row.getPackId().equals(config.packId())) {
+                throw new IllegalStateException("Ruleset " + config.version() + " (" + config.marketplace()
+                        + ") is registered under pack " + row.getPackId() + ", not " + config.packId());
+            }
             return new Active(config, row.getId());
         }
-        RulesetVersion saved = versions.saveAndFlush(new RulesetVersion(config.marketplace(), config.version(),
-                config.contentHash(), config.checkedAt(), String.join("\n", config.sourceUrls())));
+        RulesetVersion saved = versions.saveAndFlush(new RulesetVersion(config.packId(), config.marketplace(),
+                config.version(), config.contentHash(), config.checkedAt(), String.join("\n", config.sourceUrls())));
         return new Active(config, saved.getId());
+    }
+
+    private static Identity key(String packId, String marketplace) {
+        return new Identity(packId.trim().toLowerCase(Locale.ROOT), marketplace.trim().toUpperCase(Locale.ROOT));
+    }
+
+    private record Identity(String packId, String marketplace) {
     }
 
     private RulesetConfig load(String location) {

@@ -18,6 +18,9 @@ public class RulesetVersion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "pack_id", length = 64)
+    private String packId;
+
     @Column(name = "marketplace_code", nullable = false)
     private String marketplaceCode;
 
@@ -39,7 +42,9 @@ public class RulesetVersion {
     protected RulesetVersion() {
     }
 
-    public RulesetVersion(String marketplaceCode, String version, String contentHash, LocalDate checkedAt, String source) {
+    public RulesetVersion(String packId, String marketplaceCode, String version, String contentHash,
+                          LocalDate checkedAt, String source) {
+        this.packId = packId;
         this.marketplaceCode = marketplaceCode;
         this.version = version;
         this.contentHash = contentHash;
@@ -49,6 +54,10 @@ public class RulesetVersion {
 
     public Long getId() {
         return id;
+    }
+
+    public String getPackId() {
+        return packId;
     }
 
     public String getMarketplaceCode() {

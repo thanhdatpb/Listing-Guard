@@ -36,6 +36,7 @@ class RulesetLoaderTest {
     void loadsTheEtsyRuleset() {
         RulesetConfig config = RulesetLoader.loadClasspath(ETSY);
 
+        assertThat(config.packId()).isEqualTo("listing-rules");
         assertThat(config.marketplace()).isEqualTo("ETSY");
         assertThat(config.version()).isEqualTo("etsy-2026-11");
         assertThat(config.checkedAt()).isEqualTo(LocalDate.of(2026, 10, 27));
@@ -107,6 +108,18 @@ class RulesetLoaderTest {
         assertThat(config.marketplace()).isEqualTo("ETSY");
         assertThat(config.rule("r1").severity()).isEqualTo(Severity.WARNING);
         assertThat(config.rule("r1").intParam("limit")).isEqualTo(5);
+    }
+
+    @Test
+    void acceptsAnExplicitPackIdWithoutChangingLegacyRulesetHashing() {
+        RulesetConfig legacy = RulesetLoader.parse(MINIMAL);
+        RulesetConfig explicit = RulesetLoader.parse(MINIMAL.replace("marketplace: etsy\n",
+                "marketplace: etsy\npack_id: visual-checks\n"));
+
+        assertThat(legacy.packId()).isEqualTo("listing-rules");
+        assertThat(explicit.packId()).isEqualTo("visual-checks");
+        assertThat(legacy.contentHash()).isEqualTo(RulesetLoader.parse(MINIMAL).contentHash());
+        assertThat(explicit.contentHash()).isNotEqualTo(legacy.contentHash());
     }
 
     @Test

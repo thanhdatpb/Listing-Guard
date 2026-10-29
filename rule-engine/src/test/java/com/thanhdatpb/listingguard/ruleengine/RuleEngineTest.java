@@ -26,11 +26,15 @@ class RuleEngineTest {
     }
 
     private static RulesetConfig config(RuleSettings... settings) {
+        return config("listing-rules", settings);
+    }
+
+    private static RulesetConfig config(String packId, RuleSettings... settings) {
         Map<String, RuleSettings> rules = new LinkedHashMap<>();
         for (RuleSettings s : settings) {
             rules.put(s.ruleId(), s);
         }
-        return new RulesetConfig("TEST", "test-1", LocalDate.of(2026, 10, 27), "hash", rules);
+        return new RulesetConfig(packId, "TEST", "test-1", LocalDate.of(2026, 10, 27), "hash", rules);
     }
 
     private static Rule rule(String id, boolean throwing) {
@@ -90,6 +94,17 @@ class RuleEngineTest {
         List<Finding> findings = engine.run(LISTING, config(settings("mine", Severity.ERROR)));
 
         assertThat(findings).extracting(Finding::ruleId).containsExactly("mine");
+    }
+
+    @Test
+    void rulePacksAreSelectedIndependentlyForTheSameMarketplace() {
+        RuleEngine engine = new RuleEngine(new RuleRegistry()
+                .register("listing-rules", "TEST", rule("text", false))
+                .register("image-rules", "TEST", rule("image", false)));
+
+        List<Finding> findings = engine.run(LISTING, config("image-rules", settings("image", Severity.INFO)));
+
+        assertThat(findings).extracting(Finding::ruleId).containsExactly("image");
     }
 
     @Test

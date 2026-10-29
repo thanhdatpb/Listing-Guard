@@ -37,6 +37,8 @@ class RulesetRegistrationIntegrationTest {
 
         RulesetVersion row = versions.findByMarketplaceCodeAndVersion("ETSY", "etsy-2026-11").orElseThrow();
 
+        assertThat(row.getPackId()).isEqualTo("listing-rules");
+        assertThat(rulesets.get("listing-rules", "ETSY")).isEqualTo(rulesets.get("ETSY"));
         assertThat(rulesets.get("ETSY").rulesetVersionId()).isEqualTo(row.getId());
         assertThat(row.getContentHash()).isEqualTo(config.contentHash()).matches("[0-9a-f]{64}");
         assertThat(row.getCheckedAt()).isEqualTo(LocalDate.of(2026, 10, 27));

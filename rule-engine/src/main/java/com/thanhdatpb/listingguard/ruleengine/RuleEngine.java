@@ -29,7 +29,7 @@ public final class RuleEngine {
      */
     public List<Finding> run(Listing listing, RulesetConfig config) {
         List<Finding> findings = new ArrayList<>();
-        for (Rule rule : registry.rulesFor(config.marketplace())) {
+        for (Rule rule : registry.rulesFor(config.packId(), config.marketplace())) {
             try {
                 if (!config.rule(rule.id(), listing.productType()).enabled()) {
                     continue;
@@ -47,7 +47,7 @@ public final class RuleEngine {
      * a configured rule without a class (usually a typo), or a missing or malformed parameter.
      */
     public void validate(RulesetConfig config) {
-        List<Rule> rules = registry.rulesFor(config.marketplace());
+        List<Rule> rules = registry.rulesFor(config.packId(), config.marketplace());
         Set<String> known = new HashSet<>();
         for (Rule rule : rules) {
             known.add(rule.id());

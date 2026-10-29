@@ -40,6 +40,8 @@ JUnit 5 + Testcontainers. Root package `com.thanhdatpb.listingguard`.
 docker compose up --build        # postgres + redis + api (override ports: POSTGRES_PORT, REDIS_PORT, API_PORT)
 ```
 
+Do not use `-DforkCount=0` in this repository: it can change the test working-directory context and break `rag-analyzer`'s relative `..\eval\retrieval\queries.yaml` path.
+
 Policy corpus (see README "Policy corpus and retrieval"):
 
 ```bash
