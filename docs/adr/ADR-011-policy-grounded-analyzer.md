@@ -4,9 +4,11 @@
 - Date: 2026-10-30
 - Depends on: [ADR-012](ADR-012-api-embedding-provider.md) (API embeddings); follows the pack and cache-identity
   conventions of [ADR-010](ADR-010-pack-identity-and-analysis-version.md) and ADR-005
-- Implementation order: a parallel track that starts after PR A (the trademark scanner,
-  [ADR-009](ADR-009-trademark-risk-scanner.md)). It does not block PR B (the image checker, ADR-008) and does
-  not depend on PR 0b of ADR-010, as item 1 below already states.
+- Implementation order: PR 1 and PR 2 of item 11 are merged (the API embedding provider, and the verification
+  core with `LlmProvider`, `ScriptedLlmProvider` and `CitationVerifier`). The rest is a parallel track that starts
+  after PR A (the trademark scanner, [ADR-009](ADR-009-trademark-risk-scanner.md)): "starts after PR A" applies
+  from PR 3 on. It does not block PR B (the image checker, ADR-008) and does not depend on PR 0b of ADR-010, as
+  item 1 below already states.
 - Acceptance convention: Keep Proposed until the implementing PRs are approved and merged. Then set Status to
   Accepted and Date to the merge date.
 
@@ -61,15 +63,15 @@ over an API. The analyzer suggests; it never edits or blocks a listing.
    differs between vendors, so the adapter must also work when a vendor ignores that parameter; the JSON check
    and the citation check in code (items 5 and 6) remain the only gate. `modelId()` is built from the base-url
    host and the model (for example `api:<host>:<model>`), so the cache identity changes when the vendor or the
-   model changes. The key is read only from `LISTING_GUARD_ANALYZER_LLM_API_KEY`. `model` must be a specific version,
-   with its date when the vendor gives one, never an alias that points at the latest model: an alias changes the
-   model while `modelId()` stays the same, and `modelId()` is part of the cache identity (item 2). This is a
-   documentation rule; the code is not required to detect an alias. Another vendor-specific adapter is added only when needed, each with its own test against a
-   simulated HTTP server; no test calls a real model. Key handling follows ADR-012 item 5 (own variable, header,
-   never logged, empty key refused when `analyzer.enabled`). The analyzer is off by default, and the whole build
-   and every test run without a key: `ScriptedLlmProvider` in `rag-analyzer` main, like
-   `HashingEmbeddingProvider`, returns canned JSON chosen from the request and is wired through
-   `TestcontainersConfig`. Temperature 0.
+   model changes. The key is read only from `LISTING_GUARD_ANALYZER_LLM_API_KEY`. `model` must be a specific
+   version, with its date when the vendor gives one, never an alias that points at the latest model: an alias
+   changes the model while `modelId()` stays the same, and `modelId()` is part of the cache identity (item 2). This
+   is a documentation rule; the code is not required to detect an alias. Another vendor-specific adapter is added
+   only when needed, each with its own test against a simulated HTTP server; no test calls a real model. Key
+   handling follows ADR-012 item 5 (own variable, header, never logged, empty key refused when
+   `analyzer.enabled`). The analyzer is off by default, and the whole build and every test run without a key:
+   `ScriptedLlmProvider` in `rag-analyzer` main, like `HashingEmbeddingProvider`, returns canned JSON chosen from
+   the request and is wired through `TestcontainersConfig`. Temperature 0.
 5. **Structured output.** The model returns `{"findings": [...]}`, at most 10 items, each: `ruleId` (enum
    `policy.<topic>`, topics listed in the profile: `production_partner`, `ai_disclosure`, `mockup_images`,
    `prohibited_item`, `ip_infringement`, `mature_content`, `other`), `severity` (`WARNING` or `INFO`), `field`

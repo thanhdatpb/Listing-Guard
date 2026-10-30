@@ -10,10 +10,11 @@ It never edits a listing, never publishes, and does no SEO.
   banned words), configured per marketplace in versioned YAML. Current ruleset: `etsy-2026-11`.
 - **RAG Analyzer** (`rag-analyzer/`): public marketplace policies in pgvector, plus an LLM step with
   code-verified citations. Built so far: policy manifest, HTML/PDF parsers, structural chunker,
-  `EmbeddingProvider` (none by default), `PolicyRetriever`, retrieval metrics. No LLM call is implemented yet.
-  ADR-011 designs an optional policy analyzer, off by default (`listing-guard.analyzer.enabled=false`), whose first
-  adapter is OpenAI-compatible; the build and every test never need a key. Nothing here is needed to run the rule
-  checks.
+  `EmbeddingProvider` (none by default), `PolicyRetriever`, retrieval metrics,
+  and (ADR-011) `LlmProvider`, `ScriptedLlmProvider` and `CitationVerifier`. No call to a real model is implemented
+  yet. ADR-011 designs an optional policy analyzer, off by default
+  (`listing-guard.analyzer.enabled=false`), whose first adapter is OpenAI-compatible; the build and every test
+  never need a key. Nothing here is needed to run the rule checks.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
@@ -34,11 +35,12 @@ It never edits a listing, never publishes, and does no SEO.
 
 Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR is right):
 
-1. PR 0a, then PR 0b (ADR-010).
+1. PR 0a (done, V7), then PR 0b (next) (ADR-010).
 2. PR A: trademark scanner (ADR-009).
 3. PR B: image checker (ADR-008, currently Deferred).
-4. A parallel track after PR A: run the retrieval evaluation and commit the real results, then build the policy
-   analyzer (ADR-011).
+4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
+   after PR A, in this order: run the retrieval evaluation and commit the real results, then PR 3 (`ApiLlmProvider`),
+   PR 4 (profile and retrieval), PR 5 (endpoint) and PR 6 (analyzer evaluation).
 
 No new pack gets a ruleset registered before PR 0b is complete.
 

@@ -274,7 +274,7 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 
 ## Roadmap
 
-1. PR 0a and PR 0b: pack identity and composite analysis versions
+1. PR 0a (pack identity expand, migration V7) is done; PR 0b is next: pack identity and composite analysis versions
    ([ADR-010](docs/adr/ADR-010-pack-identity-and-analysis-version.md)).
 2. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)).
 3. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)).
