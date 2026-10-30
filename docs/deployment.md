@@ -107,8 +107,8 @@ backup before starting the old version.
 
 ## Pack identity contract (ADR-010, PR 0b)
 
-Migrations V8 to V13 make the pack identity of rulesets and checks mandatory (`pack_id` and `analysis_version` become
-`NOT NULL`, `pack_id` loses its default), replace the registry identity `(marketplace_code, version)` with
+Migrations V8 to V14 make the pack identity of rulesets and checks mandatory (`pack_id`, `analysis_version` and
+`ruleset_version_id` become `NOT NULL`, `pack_id` loses its default), replace the registry identity `(marketplace_code, version)` with
 `(pack_id, marketplace_code, version)` and replace the completed-result cache index with one that also covers the pack,
 the ruleset version and the analysis version. `/api/v1/checks` does not change: same request, response, content hash,
 `rulesetVersion`, `analysisVersion` and cache hits.
@@ -125,14 +125,15 @@ new analysis pack until they have all been applied.
 | V11 | outside a transaction | builds the partial unique index `uq_listing_check_completed_identity` (`COMPLETED`) concurrently |
 | V12 | in a transaction | checks that index is valid |
 | V13 | outside a transaction | drops the old `uq_listing_check_completed` concurrently |
+| V14 | in a transaction | stops again if a check has no ruleset version, then sets `listing_check.ruleset_version_id` `NOT NULL` |
 
 Sequence for a single instance (an operator-coordinated maintenance window):
 
 1. The running release must already contain PR 0a (V7). Back up the database (see above).
 2. Stop the old process: `docker compose -f docker-compose.prod.yml --profile prod stop api`. No old instance may
    run or restart from here on.
-3. Set `LISTING_GUARD_VERSION` to the release that contains V8 to V13 and start it with
-   `docker compose -f docker-compose.prod.yml --profile prod up -d --no-deps api`. Flyway runs V8 to V13 before the API
+3. Set `LISTING_GUARD_VERSION` to the release that contains V8 to V14 and start it with
+   `docker compose -f docker-compose.prod.yml --profile prod up -d --no-deps api`. Flyway runs V8 to V14 before the API
    serves requests.
 4. Check the logs and `/health`, and send an identical `/api/v1/checks` request twice: the second answer is
    `cached: true` with the same `checkId`.
@@ -140,7 +141,7 @@ Sequence for a single instance (an operator-coordinated maintenance window):
 
 ### Checks without a ruleset version
 
-V8 stops, changes nothing and the API does not start when any `listing_check` row has `ruleset_version_id` NULL, because
+V8 (and V14 again) stops, changes nothing and the API does not start when any `listing_check` row has `ruleset_version_id` NULL, because
 its `analysis_version` cannot be derived. The error names the number of rows. Such rows come from checks stored
 before ruleset versions were recorded (V4). The migration never deletes them and never invents a value; an operator
 decides, after a backup:
@@ -176,5 +177,6 @@ DROP INDEX CONCURRENTLY uq_ruleset_version_pack;                -- or uq_listing
 DELETE FROM flyway_schema_history WHERE success = false;
 ```
 
-A failing build usually means duplicate rows for the identity (the error says so): find and resolve them first. Never
-accept an invalid or missing index.
+Duplicates are not a cause: V8 already blocks duplicate ruleset identities, and the new cache index is wider than the
+old one, so it cannot meet duplicates. A build that failed was cancelled, timed out or waited too long for a lock.
+Never accept an invalid or missing index.
