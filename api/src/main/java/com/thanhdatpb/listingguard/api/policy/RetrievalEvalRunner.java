@@ -35,17 +35,22 @@ public class RetrievalEvalRunner implements CommandLineRunner {
     private final EmbeddingProvider embeddings;
     private final JdbcTemplate jdbc;
     private final String evalDir;
+    private final CorpusModelGuard corpusGuard;
 
     public RetrievalEvalRunner(PolicyRetriever retriever, EmbeddingProvider embeddings, JdbcTemplate jdbc,
-                               @Value("${listing-guard.eval.dir:eval/retrieval}") String evalDir) {
+                               @Value("${listing-guard.eval.dir:eval/retrieval}") String evalDir,
+                               CorpusModelGuard corpusGuard) {
         this.retriever = retriever;
         this.embeddings = embeddings;
         this.jdbc = jdbc;
         this.evalDir = evalDir;
+        this.corpusGuard = corpusGuard;
     }
 
     @Override
     public void run(String... args) {
+        // numbers measured against a corpus of another model would be wrong, so the job fails before any query
+        corpusGuard.verify();
         Path dir = Path.of(evalDir);
         EvalSet set = EvalSet.load(dir.resolve("queries.yaml"));
 

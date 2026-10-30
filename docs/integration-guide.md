@@ -299,6 +299,7 @@ validation. Branch on `code`, not on `detail`.
 | 429 | `rate-limited` | Over the per-client limit. | Wait `Retry-After` seconds, then retry. |
 | 500 | `internal-error` | Unexpected failure. No details are exposed. | Retry later with backoff; report the `requestId`. |
 | 503 | `embedding-unavailable` | Only on routes that need the embedding backend. Not `POST /api/v1/checks`. | |
+| 503 | `corpus-model-mismatch` | Only on routes that search the policy corpus. The stored corpus was embedded with another model than the configured one, so searching is refused. Not `POST /api/v1/checks`. | An operator must run the ingest job again. |
 | 503 | `service-unavailable` | The API key could not be checked because the database did not answer. | Retry later with backoff. |
 
 Retrying `POST /api/v1/checks` is always safe: it has no side effect other than storing the result, and an

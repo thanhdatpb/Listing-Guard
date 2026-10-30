@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.web;
 import com.thanhdatpb.listingguard.api.check.CheckNotFoundException;
 import com.thanhdatpb.listingguard.api.check.MarketplaceNotYetSupportedException;
 import com.thanhdatpb.listingguard.api.check.UnknownMarketplaceException;
+import com.thanhdatpb.listingguard.api.policy.CorpusModelMismatchException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -54,10 +55,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return Problems.of(HttpStatus.BAD_REQUEST, "invalid-request", e.getMessage());
     }
 
-    /** The embedding backend (Ollama) is down or misconfigured; the message says what to check. */
+    /** The embedding backend (the embedding API or Ollama) is down or misconfigured; the message says what to check. */
     @ExceptionHandler(EmbeddingException.class)
     public ProblemDetail embeddingUnavailable(EmbeddingException e) {
         return Problems.of(HttpStatus.SERVICE_UNAVAILABLE, "embedding-unavailable", e.getMessage());
+    }
+
+    /** The stored corpus was embedded by another model; searching would return wrong results, so it is refused (ADR-012). */
+    @ExceptionHandler(CorpusModelMismatchException.class)
+    public ProblemDetail corpusModelMismatch(CorpusModelMismatchException e) {
+        return Problems.of(HttpStatus.SERVICE_UNAVAILABLE, "corpus-model-mismatch", e.getMessage());
     }
 
     /** Anything unexpected: logged with its request id, answered without internal details. */

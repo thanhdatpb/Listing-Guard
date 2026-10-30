@@ -35,6 +35,9 @@ public class PolicyIngestService {
 
     private static final Logger log = LoggerFactory.getLogger(PolicyIngestService.class);
 
+    /** Separates the chunking settings from the embedding model id in a stored {@code pipeline_version}. */
+    static final String MODEL_SEPARATOR = "|";
+
     public enum Outcome {
         INGESTED,
         UNCHANGED,
@@ -163,7 +166,12 @@ public class PolicyIngestService {
     /** Anything that changes chunk boundaries or vectors changes this, so stored documents get redone. */
     String pipelineVersion() {
         PolicyProperties.Chunking chunking = properties.chunking();
-        return PolicyChunker.VERSION + "|" + chunking.maxChars() + "/" + chunking.minChars() + "|" + embeddings.modelId();
+        return PolicyChunker.VERSION + "|" + chunking.maxChars() + "/" + chunking.minChars() + MODEL_SEPARATOR + embeddings.modelId();
+    }
+
+    /** True when a stored {@code pipeline_version} was built with this embedding model (it always ends with it). */
+    static boolean embeddedWith(String storedPipelineVersion, String modelId) {
+        return storedPipelineVersion.endsWith(MODEL_SEPARATOR + modelId);
     }
 
     private static byte[] read(Path file) {
