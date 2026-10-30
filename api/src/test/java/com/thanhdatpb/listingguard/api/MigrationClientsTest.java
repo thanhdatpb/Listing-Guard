@@ -44,7 +44,7 @@ class MigrationClientsTest {
              Statement statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO listing_check (content_hash, marketplace_code, status) VALUES ('" + hash + "', 'ETSY', 'COMPLETED')");
 
-            flyway("latest").migrate();
+            flyway("6").migrate();
 
             assertThat(scalar(statement, "SELECT active FROM client WHERE name = 'legacy'")).isEqualTo("f");
             assertThat(scalar(statement, "SELECT count(*) FROM api_key")).isEqualTo("0");
@@ -55,7 +55,7 @@ class MigrationClientsTest {
 
     @Test
     void theCompletedCheckIsUniquePerClientNotAcrossClients() throws Exception {
-        flyway("latest").migrate();
+        flyway("6").migrate();
         try (Connection connection = DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
              Statement statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO client (name) VALUES ('uniq-a'), ('uniq-b')");

@@ -35,7 +35,7 @@ class RulesetRegistrationIntegrationTest {
     void startupRegistersTheEtsyRulesetWithItsMetadata() {
         RulesetConfig config = rulesets.get("ETSY").config();
 
-        RulesetVersion row = versions.findByMarketplaceCodeAndVersion("ETSY", "etsy-2026-11").orElseThrow();
+        RulesetVersion row = versions.findByPackIdAndMarketplaceCodeAndVersion("listing-rules", "ETSY", "etsy-2026-11").orElseThrow();
 
         assertThat(row.getPackId()).isEqualTo("listing-rules");
         assertThat(rulesets.get("listing-rules", "ETSY")).isEqualTo(rulesets.get("ETSY"));
@@ -76,6 +76,6 @@ class RulesetRegistrationIntegrationTest {
         ActiveRulesets.Active active = rulesets.register(next);
 
         assertThat(active.rulesetVersionId()).isNotEqualTo(rulesets.get("ETSY").rulesetVersionId());
-        assertThat(versions.findByMarketplaceCodeAndVersion("ETSY", "etsy-2099-01")).isPresent();
+        assertThat(versions.findByPackIdAndMarketplaceCodeAndVersion("listing-rules", "ETSY", "etsy-2099-01")).isPresent();
     }
 }

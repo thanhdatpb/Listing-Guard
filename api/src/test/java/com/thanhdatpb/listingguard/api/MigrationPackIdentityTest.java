@@ -17,7 +17,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-/** PR 0a adds pack identity while old instances may still write the V6 schema. */
+/** PR 0a (V7) adds pack identity while old instances may still write the V6 schema; PR 0b is in {@link MigrationPackIdentityContractTest}. */
 @Testcontainers
 class MigrationPackIdentityTest {
 
@@ -127,7 +127,7 @@ class MigrationPackIdentityTest {
             insertCheck(connection, checkFromV6Writer, hashFromV6Writer, rulesetFromV6Writer, legacyClientId);
         }
 
-        flyway("latest").migrate();
+        flyway("7").migrate();
 
         try (Connection connection = DriverManager.getConnection(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
