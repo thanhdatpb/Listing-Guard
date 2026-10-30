@@ -38,8 +38,9 @@ import java.util.TreeSet;
  * <p>Then: each mark is normalized with the active {@link TextNormalizer}; a record is kept when at least one of its
  * classes is in {@code include_classes} and its status is in {@code include_status}; kept records with the same
  * normalized mark are merged into one entry: the classes are united, {@code common_word} is true if any record says
- * so, the status is the one declared first in {@link MarkStatus}, and the display form (with its source id) is the
- * smallest by {@code String.compareTo}, ties broken by the smaller source id. An import that keeps nothing is
+ * so, the status is the one declared first in {@link MarkStatus}, the source ids of all merged records are kept
+ * (ascending, without duplicates), and the display form is the smallest by {@code String.compareTo}, ties broken by
+ * the smaller source id. An import that keeps nothing is
  * rejected.
  */
 public final class CatalogImport {
@@ -202,18 +203,19 @@ public final class CatalogImport {
             Row display = group.getValue().stream()
                     .min(Comparator.comparing(Row::display).thenComparing(Row::sourceId)).orElseThrow();
             Set<Integer> classes = new TreeSet<>();
+            Set<String> sourceIds = new TreeSet<>();
             MarkStatus status = null;
             boolean common = false;
             for (Row row : group.getValue()) {
                 classes.addAll(row.classes());
+                sourceIds.add(row.sourceId());
                 common |= row.commonWord();
                 if (status == null || row.status().compareTo(status) < 0) {
                     status = row.status();
                 }
             }
-            entries.add(new PreparedCatalog.Entry(
-                    new CatalogMark(group.getKey(), display.display(), List.copyOf(classes), status, common),
-                    display.sourceId()));
+            entries.add(new PreparedCatalog.Entry(new CatalogMark(group.getKey(), display.display(),
+                    List.copyOf(classes), status, common, List.copyOf(sourceIds))));
         }
         return entries;
     }
@@ -230,9 +232,8 @@ public final class CatalogImport {
                 + "format_version=" + entry.formatVersion() + "\n"
                 + "filters=" + filtersJson + "\n"
                 + "pack_id=" + identity.packId() + "\n"
-                + "ruleset_version=" + identity.rulesetVersion() + "\n"
-                + "ruleset_content_hash=" + identity.rulesetContentHash() + "\n"
-                + "normalization_version=" + identity.normalizationVersion() + "\n";
+                + "normalization_version=" + identity.normalizationVersion() + "\n"
+                + "normalization_hash=" + identity.normalizationHash() + "\n";
         return sha256(text.getBytes(StandardCharsets.UTF_8));
     }
 

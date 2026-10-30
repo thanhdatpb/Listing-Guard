@@ -13,15 +13,16 @@ import java.util.List;
  * @param recordsRead     data lines read
  * @param recordsFiltered lines dropped by the filters
  * @param recordsMerged   kept lines folded into another line with the same normalized mark
- * @param entries         the marks to store, ordered by normalized form
+ * @param entries         the marks to store (each with the ids of the records merged into it), ordered by normalized
+ *                        form
  */
 public record PreparedCatalog(String version, String label, String sourceName, String sourceReference,
                               String sourceLicense, LocalDate sourceDate, String fileSha256, String formatVersion,
                               String filtersJson, NormalizationIdentity normalization, int recordsRead,
                               int recordsFiltered, int recordsMerged, List<Entry> entries) {
 
-    /** A mark to store and the source id of the record whose display form it kept. */
-    public record Entry(CatalogMark mark, String sourceId) {
+    /** A mark to store. Its source ids are in {@link CatalogMark#sourceIds()}. */
+    public record Entry(CatalogMark mark) {
     }
 
     public PreparedCatalog {

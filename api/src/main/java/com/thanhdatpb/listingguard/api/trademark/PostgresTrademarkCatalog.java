@@ -27,7 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 public final class PostgresTrademarkCatalog implements TrademarkCatalog {
 
-    private static final String COLUMNS = "e.normalized, e.display, e.nice_classes, e.status, e.common_word";
+    private static final String COLUMNS = "e.normalized, e.display, e.nice_classes, e.status, e.common_word, e.source_ids";
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
@@ -96,7 +96,11 @@ public final class PostgresTrademarkCatalog implements TrademarkCatalog {
         for (Object value : (Object[]) classes.getArray()) {
             niceClasses.add(((Number) value).intValue());
         }
+        List<String> sourceIds = new ArrayList<>();
+        for (Object value : (Object[]) rs.getArray("source_ids").getArray()) {
+            sourceIds.add((String) value);
+        }
         return new CatalogMark(rs.getString("normalized"), rs.getString("display"), niceClasses,
-                MarkStatus.valueOf(rs.getString("status")), rs.getBoolean("common_word"));
+                MarkStatus.valueOf(rs.getString("status")), rs.getBoolean("common_word"), sourceIds);
     }
 }

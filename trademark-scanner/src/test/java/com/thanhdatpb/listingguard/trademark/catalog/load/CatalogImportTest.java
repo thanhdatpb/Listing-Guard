@@ -111,16 +111,30 @@ class CatalogImportTest {
         assertThat(mark.niceClasses()).containsExactly(9, 25, 35);
         assertThat(mark.commonWord()).isTrue();
         assertThat(mark.status()).isEqualTo(MarkStatus.REGISTERED);
-        // "ZORVEX" < "Zorvex!" < "zorvex": the smallest display form by String.compareTo, with its source id
+        // "ZORVEX" < "Zorvex!" < "zorvex": the smallest display form by String.compareTo
         assertThat(mark.display()).isEqualTo("ZORVEX");
-        assertThat(merged.sourceId()).isEqualTo("b2");
+        // every merged record keeps its id, ascending; b0 was filtered out (cancelled) and is not merged
+        assertThat(mark.sourceIds()).containsExactly("b1", "b2", "b3");
     }
 
     @Test
     void theDisplayTieGoesToTheSmallerSourceId() throws IOException {
         String data = line("Zorvex", "REGISTERED", "[25]", "z9") + "\n" + line("Zorvex", "REGISTERED", "[25]", "a1") + "\n";
 
-        assertThat(prepare(entry(data)).entries().get(0).sourceId()).isEqualTo("a1");
+        PreparedCatalog.Entry merged = prepare(entry(data)).entries().get(0);
+
+        assertThat(merged.mark().display()).isEqualTo("Zorvex");
+        assertThat(merged.mark().sourceIds()).containsExactly("a1", "z9");
+    }
+
+    @Test
+    void aSourceIdListedTwiceIsKeptOnce() throws IOException {
+        String data = line("Zorvex", "REGISTERED", "[25]", "k1") + "\n" + line("ZORVEX", "PENDING", "[35]", "k1") + "\n"
+                + line("Zorvex!", "REGISTERED", "[25]", "j0") + "\n";
+
+        assertThat(prepare(entry(data)).entries().get(0).mark().sourceIds()).containsExactly("j0", "k1");
+        assertThat(prepare(entry(line("Brask", "REGISTERED", "[25]", "only") + "\n")).entries().get(0).mark()
+                .sourceIds()).containsExactly("only");
     }
 
     @Test
@@ -294,12 +308,29 @@ class CatalogImportTest {
         assertThat(prepare(withLicense(restored, "another license")).version()).isNotEqualTo(baseVersion);
         assertThat(prepare(withSourceDate(restored, LocalDate.of(2026, 10, 31))).version()).isNotEqualTo(baseVersion);
 
-        TrademarkRuleset edited = TestRulesets.variant("final_threshold: 0.80", "final_threshold: 0.81");
-        assertThat(CatalogImport.prepare(restored, raw, normalizer, NormalizationIdentity.of(edited)).version())
+        TrademarkRuleset otherMapping = TestRulesets.variant("\"0\": \"o\"", "\"0\": \"q\"");
+        assertThat(CatalogImport.prepare(restored, raw, normalizer, NormalizationIdentity.of(otherMapping)).version())
                 .isNotEqualTo(baseVersion);
-        NormalizationIdentity newerNormalizer = new NormalizationIdentity(identity.packId(), identity.rulesetVersion(),
-                identity.rulesetContentHash(), "normalization-2");
+        NormalizationIdentity newerNormalizer = new NormalizationIdentity(identity.packId(), "normalization-2",
+                identity.normalizationHash());
         assertThat(CatalogImport.prepare(restored, raw, normalizer, newerNormalizer).version()).isNotEqualTo(baseVersion);
+    }
+
+    @Test
+    void aRulesetThatOnlyChangesThresholdsOrWordListsIsTheSameVersion() throws IOException {
+        String data = line("Zorvex", "REGISTERED", "[25]", "a") + "\n";
+        CatalogManifest.Entry entry = entry(data);
+        String baseVersion = prepare(entry).version();
+
+        for (TrademarkRuleset other : List.of(
+                TestRulesets.variant("final_threshold: 0.80", "final_threshold: 0.81"),
+                TestRulesets.variant("max_token_distance: 2", "max_token_distance: 3"),
+                TestRulesets.variant("    - Aldwick\n", "    - Aldwyck\n"),
+                TestRulesets.variant("version: trademark-test-1", "version: trademark-test-2"))) {
+            assertThat(other.contentHash()).isNotEqualTo(ruleset.contentHash());
+            assertThat(CatalogImport.prepare(entry, raw, new TextNormalizer(other.normalization()),
+                    NormalizationIdentity.of(other)).version()).isEqualTo(baseVersion);
+        }
     }
 
     private static CatalogManifest.Entry withLicense(CatalogManifest.Entry e, String license) {
@@ -313,11 +344,9 @@ class CatalogImportTest {
     }
 
     @Test
-    void theNormalizationIdentityIsTheRulesetAndNormalizerVersion() {
+    void theNormalizationIdentityIsThePackTheNormalizerVersionAndTheSettingsHash() {
         assertThat(identity.packId()).isEqualTo("trademark-risk");
-        assertThat(identity.rulesetVersion()).isEqualTo(ruleset.version());
-        assertThat(identity.rulesetContentHash()).isEqualTo(ruleset.contentHash());
         assertThat(identity.normalizationVersion()).isEqualTo(TextNormalizer.VERSION);
-        assertThat(List.of(identity.packId())).isNotEmpty();
+        assertThat(identity.normalizationHash()).isEqualTo(ruleset.normalization().canonicalHash()).matches("[0-9a-f]{64}");
     }
 }

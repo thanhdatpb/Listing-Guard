@@ -54,8 +54,7 @@ public class TrademarkCatalogImporter {
     private Result importOrConfirm(PreparedCatalog catalog) {
         List<Map<String, Object>> existing = jdbc.queryForList("""
                 SELECT id, label, source_name, source_reference, source_license, source_date, file_sha256,
-                       format_version, filters_json, pack_id, ruleset_version, ruleset_content_hash,
-                       normalization_version
+                       format_version, filters_json, pack_id, normalization_version, normalization_hash
                 FROM trademark_catalog_version WHERE version = ?""", catalog.version());
         if (!existing.isEmpty()) {
             Map<String, Object> row = existing.get(0);
@@ -67,19 +66,17 @@ public class TrademarkCatalogImporter {
         }
         long id = jdbc.queryForObject("""
                 INSERT INTO trademark_catalog_version (version, label, source_name, source_reference, source_license,
-                    source_date, file_sha256, format_version, filters_json, pack_id, ruleset_version,
-                    ruleset_content_hash, normalization_version, records_read, records_filtered, records_merged,
-                    records_loaded)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""", Long.class,
+                    source_date, file_sha256, format_version, filters_json, pack_id, normalization_version,
+                    normalization_hash, records_read, records_filtered, records_merged, records_loaded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""", Long.class,
                 catalog.version(), catalog.label(), catalog.sourceName(), catalog.sourceReference(),
                 catalog.sourceLicense(), Date.valueOf(catalog.sourceDate()), catalog.fileSha256(),
                 catalog.formatVersion(), catalog.filtersJson(), catalog.normalization().packId(),
-                catalog.normalization().rulesetVersion(), catalog.normalization().rulesetContentHash(),
-                catalog.normalization().normalizationVersion(), catalog.recordsRead(), catalog.recordsFiltered(),
-                catalog.recordsMerged(), catalog.recordsLoaded());
+                catalog.normalization().normalizationVersion(), catalog.normalization().normalizationHash(),
+                catalog.recordsRead(), catalog.recordsFiltered(), catalog.recordsMerged(), catalog.recordsLoaded());
         jdbc.batchUpdate("""
                 INSERT INTO trademark_entry (catalog_version_id, normalized, display, nice_classes, status,
-                    common_word, source_id)
+                    common_word, source_ids)
                 VALUES (?, ?, ?, ?, ?, ?, ?)""", catalog.entries(), BATCH, (ps, entry) -> {
             Array classes = ps.getConnection().createArrayOf("int2", entry.mark().niceClasses().toArray());
             ps.setLong(1, id);
@@ -88,7 +85,7 @@ public class TrademarkCatalogImporter {
             ps.setArray(4, classes);
             ps.setString(5, entry.mark().status().name());
             ps.setBoolean(6, entry.mark().commonWord());
-            ps.setString(7, entry.sourceId());
+            ps.setArray(7, ps.getConnection().createArrayOf("text", entry.mark().sourceIds().toArray()));
         });
         return new Result(Outcome.IMPORTED, id, catalog);
     }
@@ -103,8 +100,7 @@ public class TrademarkCatalogImporter {
                 && catalog.formatVersion().equals(row.get("format_version"))
                 && catalog.filtersJson().equals(row.get("filters_json"))
                 && catalog.normalization().packId().equals(row.get("pack_id"))
-                && catalog.normalization().rulesetVersion().equals(row.get("ruleset_version"))
-                && catalog.normalization().rulesetContentHash().equals(String.valueOf(row.get("ruleset_content_hash")).trim())
-                && catalog.normalization().normalizationVersion().equals(row.get("normalization_version"));
+                && catalog.normalization().normalizationVersion().equals(row.get("normalization_version"))
+                && catalog.normalization().normalizationHash().equals(String.valueOf(row.get("normalization_hash")).trim());
     }
 }

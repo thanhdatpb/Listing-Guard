@@ -90,6 +90,8 @@ class PostgresTrademarkCatalogContractTest {
         assertThat(zorvex.niceClasses()).containsExactly(25, 35);
         assertThat(zorvex.status().name()).isEqualTo("REGISTERED");
         assertThat(zorvex.commonWord()).isTrue();
+        assertThat(zorvex.sourceIds()).containsExactly("S-001", "S-002");
+        assertThat(postgres.findExact(List.of("brask")).get("brask").sourceIds()).containsExactly("S-006", "S-007");
         assertThat(postgres.findExact(List.of("quillmark")).get("quillmark").commonWord()).isFalse();
     }
 

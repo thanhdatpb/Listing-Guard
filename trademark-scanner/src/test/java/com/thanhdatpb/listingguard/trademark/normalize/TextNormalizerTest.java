@@ -165,4 +165,58 @@ class TextNormalizerTest {
 
         assertThat(normalizer.tokenize(text)).isEqualTo(normalizer.tokenize(text));
     }
+
+    // --- the canonical hash of the settings: what a catalog's normalization identity is made of ---
+
+    private static String hashOf(String yaml) {
+        return com.thanhdatpb.listingguard.trademark.config.TrademarkRulesetLoader.parse(yaml).normalization()
+                .canonicalHash();
+    }
+
+    @Test
+    void theCanonicalHashIsStableAndHex() {
+        String hash = ruleset.normalization().canonicalHash();
+
+        assertThat(hash).matches("[0-9a-f]{64}").isEqualTo(TestRulesets.test().normalization().canonicalHash());
+    }
+
+    @Test
+    void aCommentTheOrderOfKeysAndTheQuotingDoNotChangeTheHash() {
+        String base = hashOf(TestRulesets.text(TestRulesets.TEST));
+
+        assertThat(hashOf(TestRulesets.variantText("normalization:\n", "normalization:\n  # a comment\n"))).isEqualTo(base);
+        assertThat(hashOf(TestRulesets.variantText("    \"\u0111\": \"d\"\n    \"\u00F0\": \"d\"\n",
+                "    \"\u00F0\": \"d\"\n    \"\u0111\": \"d\"\n"))).isEqualTo(base);
+        assertThat(hashOf(TestRulesets.variantText("\"\u00F8\": \"o\"", "'\u00F8': 'o'"))).isEqualTo(base);
+        assertThat(hashOf(TestRulesets.variantText("      \"0\": \"o\"\n      \"1\": \"i\"\n",
+                "      \"1\": \"i\"\n      \"0\": \"o\"\n"))).isEqualTo(base);
+    }
+
+    @Test
+    void theRestOfTheRulesetDoesNotChangeTheHash() {
+        String base = ruleset.normalization().canonicalHash();
+
+        assertThat(TestRulesets.variant("final_threshold: 0.80", "final_threshold: 0.9").normalization().canonicalHash())
+                .isEqualTo(base);
+        assertThat(TestRulesets.variant("    - Aldwick\n", "    - Aldwyck\n").normalization().canonicalHash())
+                .isEqualTo(base);
+        assertThat(TestRulesets.variant("version: trademark-test-1", "version: trademark-test-9").normalization()
+                .canonicalHash()).isEqualTo(base);
+        assertThat(TestRulesets.shipped().normalization().canonicalHash()).isEqualTo(base);
+    }
+
+    @Test
+    void changingAnyNormalizationSettingChangesTheHash() {
+        String base = ruleset.normalization().canonicalHash();
+
+        for (TrademarkRuleset changed : List.of(
+                TestRulesets.variant("\"\u00F8\": \"o\"", "\"\u00F8\": \"e\""),
+                TestRulesets.variant("    \"\u00F8\": \"o\"\n", ""),
+                TestRulesets.variant("\"0\": \"o\"", "\"0\": \"q\""),
+                TestRulesets.variant("min_letters_around: 1", "min_letters_around: 2"),
+                TestRulesets.variant("    delete_chars:\n", "    delete_chars:\n      - \"-\"\n"),
+                TestRulesets.variant("\"а\": \"a\"", "\"а\": \"b\""))) {
+            assertThat(changed.normalization().canonicalHash()).isNotEqualTo(base);
+        }
+    }
 }

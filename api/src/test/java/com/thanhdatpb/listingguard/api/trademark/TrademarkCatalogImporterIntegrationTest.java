@@ -64,7 +64,7 @@ class TrademarkCatalogImporterIntegrationTest {
 
     private List<Map<String, Object>> entryRows(long versionId) {
         return jdbc.queryForList("SELECT id, catalog_version_id, normalized, display, nice_classes::text AS nice_classes, status, "
-                        + "common_word, source_id FROM trademark_entry WHERE catalog_version_id = ? ORDER BY normalized",
+                        + "common_word, source_ids::text AS source_ids FROM trademark_entry WHERE catalog_version_id = ? ORDER BY normalized",
                 versionId).stream().map(TrademarkCatalogImporterIntegrationTest::text).toList();
     }
 
@@ -85,8 +85,9 @@ class TrademarkCatalogImporterIntegrationTest {
         assertThat(row.get("format_version")).isEqualTo("jsonl-1");
         assertThat(row.get("filters_json")).isEqualTo("{\"include_classes\":[25,35],\"include_status\":[\"REGISTERED\",\"PENDING\"]}");
         assertThat(row.get("pack_id")).isEqualTo("trademark-risk");
-        assertThat(row.get("ruleset_version")).isEqualTo(rulesets.ruleset().version());
-        assertThat(row.get("ruleset_content_hash").toString().trim()).isEqualTo(rulesets.ruleset().contentHash());
+        assertThat(row.get("normalization_hash").toString().trim())
+                .isEqualTo(rulesets.ruleset().normalization().canonicalHash()).matches("[0-9a-f]{64}");
+        assertThat(row.keySet()).doesNotContain("ruleset_version", "ruleset_content_hash");
         assertThat(row.get("normalization_version")).isEqualTo("normalization-1");
         assertThat(row.get("records_read")).isEqualTo(11);
         assertThat(row.get("records_filtered")).isEqualTo(2);
@@ -108,7 +109,9 @@ class TrademarkCatalogImporterIntegrationTest {
         assertThat(zorvex.get("display")).isEqualTo("ZORVEX");
         assertThat(zorvex.get("status")).isEqualTo(MarkStatus.REGISTERED.name());
         assertThat(zorvex.get("common_word")).isEqualTo("true");
-        assertThat(zorvex.get("source_id")).isEqualTo("S-002");
+        // every merged record keeps its id: S-001 (cancelled records are filtered out before the merge) and S-002
+        assertThat(zorvex.get("source_ids")).isEqualTo("{S-001,S-002}");
+        assertThat(entries.get(1).get("source_ids")).isEqualTo("{S-006,S-007}");
         assertThat(zorvex.get("nice_classes")).isEqualTo("{25,35}");
         assertThat(entries.get(1).get("display")).isEqualTo("Brask");
     }
@@ -165,7 +168,8 @@ class TrademarkCatalogImporterIntegrationTest {
         PreparedCatalog good = prepared(uniqueLabel());
         List<PreparedCatalog.Entry> entries = new java.util.ArrayList<>(good.entries());
         // the database refuses an entry without a class, after the version row and the first entries went in
-        entries.add(new PreparedCatalog.Entry(new CatalogMark("zzz last", "ZZZ Last", List.of(), MarkStatus.REGISTERED, false), "S-999"));
+        entries.add(new PreparedCatalog.Entry(new CatalogMark("zzz last", "ZZZ Last", List.of(), MarkStatus.REGISTERED, false,
+                List.of("S-999"))));
         PreparedCatalog broken = new PreparedCatalog(good.version(), good.label(), good.sourceName(),
                 good.sourceReference(), good.sourceLicense(), good.sourceDate(), good.fileSha256(), good.formatVersion(),
                 good.filtersJson(), good.normalization(), good.recordsRead(), good.recordsFiltered(),

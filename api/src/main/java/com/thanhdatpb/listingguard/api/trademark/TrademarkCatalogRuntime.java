@@ -19,8 +19,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <ul>
  *   <li>{@code DISABLED}: no catalog version is configured. The application starts and everything else works.</li>
- *   <li>{@code REFUSED}: the configured catalog does not exist, or its normalization identity (pack, ruleset
- *       version, ruleset content hash, normalizer version) differs from the active ruleset and normalizer. Marks
+ *   <li>{@code REFUSED}: the configured catalog does not exist, or its normalization identity (pack, normalizer
+ *       version, hash of the normalization settings) differs from the active ruleset and normalizer. A ruleset that
+ *       only changes thresholds or word lists keeps serving it. Marks
  *       normalized one way are never compared with input normalized another way (the same idea as the corpus model
  *       guard of ADR-012). {@code /checks} still works.</li>
  *   <li>{@code READY}: the scanner, with a {@link PostgresTrademarkCatalog} on exactly the configured version.</li>
@@ -78,7 +79,7 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
         }
         String version = properties.catalogVersion();
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT id, file_sha256, pack_id, ruleset_version, ruleset_content_hash, normalization_version
+                SELECT id, file_sha256, pack_id, normalization_version, normalization_hash
                 FROM trademark_catalog_version WHERE version = ?""", version);
         if (rows.isEmpty()) {
             return status = new Status(State.REFUSED, "catalog version '" + version + "' does not exist; "
@@ -86,8 +87,7 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
         }
         Map<String, Object> row = rows.get(0);
         NormalizationIdentity stored = new NormalizationIdentity((String) row.get("pack_id"),
-                (String) row.get("ruleset_version"), (String) row.get("ruleset_content_hash"),
-                (String) row.get("normalization_version"));
+                (String) row.get("normalization_version"), ((String) row.get("normalization_hash")).trim());
         NormalizationIdentity active = NormalizationIdentity.of(rulesets.ruleset());
         List<String> differences = differences(stored, active);
         if (!differences.isEmpty()) {
@@ -105,9 +105,8 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
     private static List<String> differences(NormalizationIdentity stored, NormalizationIdentity active) {
         List<String> differences = new ArrayList<>();
         compare(differences, "pack", stored.packId(), active.packId());
-        compare(differences, "ruleset version", stored.rulesetVersion(), active.rulesetVersion());
-        compare(differences, "ruleset content hash", stored.rulesetContentHash(), active.rulesetContentHash());
         compare(differences, "normalizer version", stored.normalizationVersion(), active.normalizationVersion());
+        compare(differences, "normalization settings hash", stored.normalizationHash(), active.normalizationHash());
         return differences;
     }
 
