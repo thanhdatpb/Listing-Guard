@@ -251,6 +251,9 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 - [ADR-005: API auth, rate limit, and result cache](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md)
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
+- [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Proposed)
+- [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed)
+- [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed)
 
 ## License
 MIT © 2026 Thanh Dat Tran. See [LICENSE](LICENSE).
