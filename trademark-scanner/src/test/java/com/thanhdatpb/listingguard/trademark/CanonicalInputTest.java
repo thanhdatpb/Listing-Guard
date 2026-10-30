@@ -18,7 +18,7 @@ class CanonicalInputTest {
 
     @Test
     void theHashOfAFixedInputIsPinned() {
-        assertThat(hash(SAMPLE)).isEqualTo("74e8cd5da0c43b2acabe7d924510975b7ccf74cebcfa8d92bd77193178e25dac");
+        assertThat(hash(SAMPLE)).isEqualTo("820ef8b4f1e93c61f6579b81ca9bc0b0bc31f7e006a82519e7b31d2e98ab1598");
     }
 
     @Test
@@ -26,9 +26,9 @@ class CanonicalInputTest {
         CanonicalInput canonical = CanonicalInput.of(SAMPLE);
 
         assertThat(canonical.fields()).extracting(CanonicalInput.Field::name).containsExactly("title", "tags[0]",
-                "tags[1]", "description", "brand", "shop_name", "category");
+                "tags[1]", "description", "brand", "shop_name", "search_terms", "category");
         assertThat(canonical.fields()).extracting(CanonicalInput.Field::text).containsExactly("Zorvex Mug", "gift",
-                "mug", "A plain mug", "Acme", "Acme Shop", "Home");
+                "mug", "A plain mug", "Acme", "Acme Shop", "", "Home");
     }
 
     @Test
@@ -116,5 +116,45 @@ class CanonicalInputTest {
     @Test
     void theHashIsHex() {
         assertThat(hash(SAMPLE)).matches("[0-9a-f]{64}");
+    }
+
+    private static final TrademarkCheckInput AMAZON = new TrademarkCheckInput("Title", List.of("tag"),
+            List.of("first bullet", "second bullet"), "Description", "Brand", "Shop", "search terms here", "Cat");
+
+    @Test
+    void amazonFieldsHaveAFixedPositionAndKeepTheirIndexes() {
+        CanonicalInput canonical = CanonicalInput.of(AMAZON);
+
+        assertThat(canonical.fields()).extracting(CanonicalInput.Field::name).containsExactly("title", "tags[0]",
+                "bullet_points[0]", "bullet_points[1]", "description", "brand", "shop_name", "search_terms", "category");
+        assertThat(canonical.fields()).extracting(CanonicalInput.Field::text).containsExactly("Title", "tag",
+                "first bullet", "second bullet", "Description", "Brand", "Shop", "search terms here", "Cat");
+        CanonicalInput blank = CanonicalInput.of(new TrademarkCheckInput("t", List.of(), List.of("a", " ", "c"), null,
+                null, null, null, null));
+        assertThat(blank.fields()).extracting(CanonicalInput.Field::name).contains("bullet_points[1]");
+        assertThat(blank.fields().get(2).text()).isEmpty();
+    }
+
+    @Test
+    void bulletPointsAndSearchTermsTakePartInTheHash() {
+        String base = hash(AMAZON);
+
+        assertThat(hash(new TrademarkCheckInput("Title", List.of("tag"), List.of("first bullet"), "Description",
+                "Brand", "Shop", "search terms here", "Cat"))).isNotEqualTo(base);
+        assertThat(hash(new TrademarkCheckInput("Title", List.of("tag"), List.of("second bullet", "first bullet"),
+                "Description", "Brand", "Shop", "search terms here", "Cat"))).isNotEqualTo(base);
+        assertThat(hash(new TrademarkCheckInput("Title", List.of("tag"), List.of("first bullet", "second bullet"),
+                "Description", "Brand", "Shop", "other", "Cat"))).isNotEqualTo(base);
+    }
+
+    @Test
+    void aBulletPointCannotImitateATagOrASearchTerm() {
+        assertThat(hash(new TrademarkCheckInput("t", List.of("a"), List.of(), null, null, null, null, null)))
+                .isNotEqualTo(hash(new TrademarkCheckInput("t", List.of(), List.of("a"), null, null, null, null, null)));
+        assertThat(hash(new TrademarkCheckInput("t", List.of(), List.of("a"), null, null, null, null, null)))
+                .isNotEqualTo(hash(new TrademarkCheckInput("t", List.of(), List.of(), null, null, null, "a", null)));
+        assertThat(hash(new TrademarkCheckInput("t", List.of(), List.of("ab", "c"), null, null, null, null, null)))
+                .isNotEqualTo(hash(new TrademarkCheckInput("t", List.of(), List.of("a", "bc"), null, null, null, null,
+                        null)));
     }
 }

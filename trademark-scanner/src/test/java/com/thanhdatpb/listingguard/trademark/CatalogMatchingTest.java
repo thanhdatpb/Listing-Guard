@@ -273,4 +273,32 @@ class CatalogMatchingTest {
 
         assertThat(scanner.scan(input)).isEqualTo(scanner.scan(input));
     }
+
+    @Test
+    void aMarkInSearchTermsAndInABulletPointIsFoundWithTheRightSpanAndFieldName() {
+        String searchTerms = "gift  mug zorvex premium";
+        String bullet = "  Soft cotton, Quillmark inside";
+        TrademarkCheckInput input = new TrademarkCheckInput("plain", List.of(), List.of("nothing here", bullet),
+                "plain", null, null, searchTerms, null);
+
+        TrademarkResult result = scanner.scan(input);
+
+        assertThat(ruleset.matching().scanFields()).contains("bullet_points", "search_terms");
+        assertThat(result.findings()).extracting(f -> f.evidence().field())
+                .containsExactly("bullet_points[1]", "search_terms");
+        Evidence inBullet = result.findings().get(0).evidence();
+        assertThat(bullet.strip().substring(inBullet.start(), inBullet.end())).isEqualTo("Quillmark");
+        assertThat(inBullet.matchedMark()).isEqualTo("Quillmark");
+        Evidence inSearch = result.findings().get(1).evidence();
+        assertThat(searchTerms.substring(inSearch.start(), inSearch.end())).isEqualTo("zorvex");
+        assertThat(inSearch.matchType()).isEqualTo(MatchType.EXACT);
+    }
+
+    @Test
+    void bulletPointsAreSeparateFieldsAndAreNotJoinedIntoAPhrase() {
+        TrademarkResult result = scanner.scan(new TrademarkCheckInput("plain", List.of(),
+                List.of("blue harbor", "tools"), "plain", null, null, "tools", null));
+
+        assertThat(result.findings()).isEmpty();
+    }
 }

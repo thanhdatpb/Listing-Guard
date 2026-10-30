@@ -67,7 +67,7 @@ class TrademarkRulesetLoaderTest {
     @Test
     void shippedRulesetIsFrozen() {
         assertThat(TestRulesets.shipped().contentHash())
-                .isEqualTo("f3b43b0d3a935616ca1b26871d98b9631852b090b271bfd0cc614f81a4bc4b29");
+                .isEqualTo("57c8523ad2306c7f1058a79df6006a042395764b1d9dca4d69c9a9c715274707");
     }
 
     @Test

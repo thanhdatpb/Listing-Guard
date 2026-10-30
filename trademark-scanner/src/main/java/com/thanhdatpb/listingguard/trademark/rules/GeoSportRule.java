@@ -15,7 +15,8 @@ import java.util.Set;
  * A place name and a sport term in the same field, at most {@code max_token_distance} tokens apart, as in "Northvale
  * Baseball Jersey" (ADR-009). It needs no catalog match. Distance is counted in normalized tokens of one field: the
  * last token of the earlier term to the first token of the later one, so adjacent words are 1 apart. A place alone, a
- * sport term alone and words in different fields give nothing.
+ * sport term alone and words in different fields give nothing. A sport word that lies entirely inside a place name
+ * matched in the same field is ignored, so "Port Hockey" is a place, not a place and a sport.
  */
 final class GeoSportRule implements TrademarkRule {
 
@@ -39,7 +40,11 @@ final class GeoSportRule implements TrademarkRule {
         List<Candidate> result = new ArrayList<>(soFar);
         for (NormalizedField field : context.fields()) {
             List<Occurrence> placeHits = occurrences(field, places, longest);
-            List<Occurrence> sportHits = occurrences(field, sports, longest);
+            // a sport word that is part of a matched place name (such as "Port Hockey") is not a sport term here
+            List<Occurrence> sportHits = occurrences(field, sports, longest).stream()
+                    .filter(sport -> placeHits.stream().noneMatch(place -> place.from() <= sport.from()
+                            && sport.to() <= place.to()))
+                    .toList();
             for (Occurrence place : placeHits) {
                 Occurrence nearest = null;
                 int nearestDistance = Integer.MAX_VALUE;

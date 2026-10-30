@@ -81,13 +81,15 @@ matching:
   source:
     status: unverified
     note: Starting values, to be tuned on the synthetic tuning set (never on the held-out set).
-  # Input fields the rules read. `tags` stands for every tag, each its own field.
+  # Input fields the rules read. `tags` and `bullet_points` stand for every item, each its own field.
   scan_fields:
     - title
     - tags
     - description
     - brand
     - shop_name
+    - bullet_points
+    - search_terms
   # Longest n-gram, in tokens, compared with the catalog. A whole field is never compared with a mark.
   max_ngram_tokens: 3
   # A gram shorter or longer than this (characters) is only matched exactly.

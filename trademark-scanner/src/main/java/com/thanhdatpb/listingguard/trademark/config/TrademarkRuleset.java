@@ -36,14 +36,15 @@ public record TrademarkRuleset(
 
     /** The input fields a ruleset may ask the rules to scan. */
     public static final Set<String> SCANNABLE_FIELDS =
-            Set.of("title", "tags", "description", "brand", "shop_name", "category");
+            Set.of("title", "tags", "bullet_points", "description", "brand", "shop_name", "search_terms",
+                    "category");
 
     public TrademarkRuleset {
         ruleOrder = List.copyOf(ruleOrder);
     }
 
     /**
-     * @param scanFields             input fields the rules read ({@code tags} stands for every tag)
+     * @param scanFields             input fields the rules read ({@code tags} and {@code bullet_points} stand for every item)
      * @param maxNgramTokens         longest n-gram, in tokens, compared with the catalog
      * @param fuzzyMinChars          shortest gram (characters) that is compared fuzzily
      * @param fuzzyMaxChars          longest gram (characters) that is compared fuzzily
