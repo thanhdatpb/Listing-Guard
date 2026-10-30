@@ -5,19 +5,31 @@
 # Each entry:
 #   version        label of the catalog; the stored version is this label plus a digest of the import, and that
 #                  stored version is what listing-guard.trademark.catalog-version names
-#   file           a plain file name inside catalogs/raw/
 #   format_version jsonl-1: UTF-8 JSON Lines, one record per line with the keys
 #                  mark, status (REGISTERED | PENDING | EXPIRED | CANCELLED), nice_classes (1 to 45), source_id and
-#                  optionally common_word (default false)
+#                  optionally common_word (default false); the same for every file of the entry
+#   filters        include_classes: keep records with at least one of these Nice classes
+#                  include_status: keep records with one of these statuses
+#                  (they apply to the whole catalog, whatever the number of files)
+#
+# The data files are described in one of two ways:
+#
+#   one file       the keys file, source_name, url, license, source_date and sha256 sit in the entry; the source ids
+#                  are stored as the file gives them
+#   several files  a `sources:` list, each element with the keys below; every source id is stored as
+#                  <source_key>:<source_id>, and a mark that several files share becomes one entry (classes united,
+#                  source ids gathered, common_word true if any file says so)
+#
+# The keys of a data file:
+#   source_key     (several files only) [a-z0-9][a-z0-9._-]{0,31}, unique in the entry; the prefix of the source ids
+#   file           a plain file name inside catalogs/raw/
 #   source_name    name of the data source
 #   url            where the data comes from (public location or other reference)
 #   license        the terms the data may be used under; required
 #   source_date    date of the data, ISO yyyy-MM-dd; required
-#   sha256         SHA-256 of the file; the import is refused when the file differs
-#   filters        include_classes: keep records with at least one of these Nice classes
-#                  include_status: keep records with one of these statuses
+#   sha256         SHA-256 of the file; the whole catalog is refused when one file differs
 #
-# Example (not active):
+# Examples (not active):
 #
 #   - version: example-2026-11
 #     file: example.jsonl
@@ -27,6 +39,27 @@
 #     license: the license or terms of the source
 #     source_date: 2026-11-01
 #     sha256: 0000000000000000000000000000000000000000000000000000000000000000
+#     filters:
+#       include_classes: [25, 35]
+#       include_status: [REGISTERED, PENDING]
+#
+#   - version: example-merged-2026-11
+#     format_version: jsonl-1
+#     sources:
+#       - source_key: public
+#         file: public.jsonl
+#         source_name: Example public source
+#         url: https://example.invalid/data
+#         license: the license or terms of the source
+#         source_date: 2026-11-01
+#         sha256: 0000000000000000000000000000000000000000000000000000000000000000
+#       - source_key: internal
+#         file: internal.jsonl
+#         source_name: Example internal list
+#         url: internal list kept by the operator
+#         license: internal use
+#         source_date: 2026-11-01
+#         sha256: 0000000000000000000000000000000000000000000000000000000000000000
 #     filters:
 #       include_classes: [25, 35]
 #       include_status: [REGISTERED, PENDING]

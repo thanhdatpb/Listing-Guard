@@ -324,4 +324,107 @@ class MigrationTrademarkCatalogTest {
             assertThat(upgraded).isEqualTo(fresh);
         }
     }
+
+    // --- V18 (ADR-009, PR A2b): one source row per data file ---
+
+    private static void insertSource(Connection connection, long versionId, String key, String sha) throws SQLException {
+        try (PreparedStatement insert = connection.prepareStatement("""
+                INSERT INTO trademark_catalog_source (catalog_version_id, source_key, source_name, url, license,
+                    source_date, sha256) VALUES (?, ?, 'name', 'url', 'license', current_date, ?)""")) {
+            insert.setLong(1, versionId);
+            insert.setString(2, key);
+            insert.setString(3, sha);
+            insert.executeUpdate();
+        }
+    }
+
+    @Test
+    void v18GivesEveryCatalogVersionThatExistedOneSourceRowFromItsSummary() throws SQLException {
+        flyway("17").migrate();
+        try (Connection connection = open()) {
+            insertVersion(connection, "before-18-a");
+            insertVersion(connection, "before-18-b");
+
+            flyway("latest").migrate();
+
+            assertThat(scalar(connection, "SELECT count(*) FROM trademark_catalog_source")).isEqualTo("2");
+            assertThat(scalar(connection, """
+                    SELECT count(*) FROM trademark_catalog_source s JOIN trademark_catalog_version v
+                      ON v.id = s.catalog_version_id
+                    WHERE s.source_key IS NULL AND s.source_name = v.source_name AND s.url = v.source_reference
+                      AND s.license = v.source_license AND s.source_date = v.source_date
+                      AND s.sha256 = v.file_sha256""")).isEqualTo("2");
+        }
+    }
+
+    @Test
+    void aSourceKeyIsUsedOncePerVersionAndTheKeylessRowOnceAsWell() throws SQLException {
+        flyway("latest").migrate();
+        try (Connection connection = open()) {
+            long first = insertVersion(connection, "v1");
+            long second = insertVersion(connection, "v2");
+            String sha = "c".repeat(64);
+            insertSource(connection, first, "uspto", sha);
+            insertSource(connection, first, "internal", sha);
+            insertSource(connection, second, "uspto", sha);
+            insertSource(connection, second, null, sha);
+
+            assertThatThrownBy(() -> insertSource(connection, first, "uspto", sha)).isInstanceOf(SQLException.class)
+                    .hasMessageContaining("uq_trademark_catalog_source");
+            assertThatThrownBy(() -> insertSource(connection, second, null, sha)).isInstanceOf(SQLException.class)
+                    .hasMessageContaining("uq_trademark_catalog_source");
+        }
+    }
+
+    @Test
+    void aSourceNeedsAKeyOfTheManifestPatternAndAHexHash() throws SQLException {
+        flyway("latest").migrate();
+        try (Connection connection = open()) {
+            long version = insertVersion(connection, "v1");
+
+            assertThatThrownBy(() -> insertSource(connection, version, "Bad Key", "c".repeat(64)))
+                    .isInstanceOf(SQLException.class).hasMessageContaining("source_key_check");
+            assertThatThrownBy(() -> insertSource(connection, version, "a:b", "c".repeat(64)))
+                    .isInstanceOf(SQLException.class).hasMessageContaining("source_key_check");
+            assertThatThrownBy(() -> insertSource(connection, version, "ok", "xyz"))
+                    .isInstanceOf(SQLException.class);
+            assertThatThrownBy(() -> insertSource(connection, version, "ok", "C".repeat(64)))
+                    .isInstanceOf(SQLException.class).hasMessageContaining("sha256_check");
+            assertThatThrownBy(() -> insertSource(connection, 987654L, "ok", "c".repeat(64)))
+                    .isInstanceOf(SQLException.class);
+        }
+    }
+
+    @Test
+    void aSourceRowCannotBeUpdatedAndIsDeletedWithItsVersion() throws SQLException {
+        flyway("latest").migrate();
+        try (Connection connection = open(); Statement statement = connection.createStatement()) {
+            long version = insertVersion(connection, "v1");
+            insertSource(connection, version, "uspto", "c".repeat(64));
+
+            assertThatThrownBy(() -> statement.executeUpdate("UPDATE trademark_catalog_source SET license = 'x'"))
+                    .isInstanceOf(SQLException.class).hasMessageContaining("append-only");
+            statement.executeUpdate("DELETE FROM trademark_catalog_version WHERE id = " + version);
+            assertThat(scalar(connection, "SELECT count(*) FROM trademark_catalog_source")).isEqualTo("0");
+        }
+    }
+
+    @Test
+    void aFreshDatabaseAndAnUpgradeFrom17HaveTheSameSourceTable() throws SQLException {
+        flyway("latest").migrate();
+        List<String> fresh;
+        try (Connection connection = open()) {
+            fresh = new ArrayList<>(columns(connection, "trademark_catalog_source"));
+        }
+        flyway("latest").clean();
+        try (Connection connection = open(); Statement statement = connection.createStatement()) {
+            statement.execute("DROP EXTENSION IF EXISTS pg_trgm CASCADE");
+        }
+        flyway("17").migrate();
+        flyway("latest").migrate();
+
+        try (Connection connection = open()) {
+            assertThat(columns(connection, "trademark_catalog_source")).isEqualTo(fresh).isNotEmpty();
+        }
+    }
 }

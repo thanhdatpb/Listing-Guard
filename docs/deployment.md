@@ -215,6 +215,45 @@ docker compose run --rm trademark-import --catalog=<version label of the manifes
 TRADEMARK_CATALOG_VERSION=<label>-<digest>      # in .env, then recreate the api
 ```
 
+**A catalog from several files (ADR-009, PR A2b).** An entry of the manifest may list `sources:` (each with its own
+`source_key`, `file`, `source_name`, `url`, `license`, `source_date` and `sha256`) instead of one `file`; the header of
+`catalogs/manifest.yaml` shows both forms. The steps for a catalog that joins a public register with a list of your own:
+
+1. Get the public data from its official source yourself and check its terms of use. The importer never downloads
+   anything. Put the file in `catalogs/raw/` (git-ignored).
+2. Convert it to `jsonl-1`. The `uspto-convert` job for the USPTO bulk XML is not part of this branch yet: it waits for the
+   official USPTO documentation (ADR-009, "USPTO conversion and multi-source catalogs"). Any other source can be
+   converted by your own script into UTF-8 JSON Lines, one record per line:
+   `{"mark":"...","status":"REGISTERED","nice_classes":[25],"source_id":"...","common_word":false}`.
+3. Write your own list in the same format, for example the marks seen in your IP cases, with `"common_word": true` on
+   a mark that is an everyday word (it can be a mark that also appears in the public file: the records merge). Use only
+   the marks you are entitled to keep; the list is stored in the database.
+4. Declare both files in the manifest with a `source_key` each (for example `uspto` and `internal`), one
+   `format_version: jsonl-1`, the `sha256` of each file (`sha256sum`, or `Get-FileHash -Algorithm SHA256`) and the
+   filters of the whole catalog. For print-on-demand products the classes to start from are 25 (clothing), 21
+   (household goods, mugs), 16 (paper goods, posters), 24 (textiles, blankets) and 28 (games and toys); you decide the
+   list. Keep the statuses you want to warn about, usually `REGISTERED` and `PENDING`.
+5. Run `docker compose run --rm trademark-import --catalog=<version label>`, then set `TRADEMARK_CATALOG_VERSION` to the
+   printed version and recreate the api.
+
+Stored source ids are `<source_key>:<source_id>` for this form. One file whose hash differs from the manifest refuses the
+whole catalog; changing any file, term, date, filter or the list of sources is another version (the old one stays).
+`trademark_catalog_version` keeps a summary for several files: the source names, urls and terms as `<key>: <value>`
+joined by ` | ` (limits of 200, 500 and 200 characters, checked before anything is written), the oldest source date and
+a combined hash of the file hashes. The facts of each file are in `trademark_catalog_source` (migration V18, one row per
+file, also for the one-file form).
+
+**A large catalog.** The import reads every file as a stream and writes it through a temporary table, in one
+transaction, so the memory of the job does not depend on the size of the files: a heap of a few tens of megabytes is
+enough (a test runs a 60 MB file with 40 MB). Two things grow with the file instead:
+
+- The database: the kept records are written twice (the temporary table, then `trademark_entry` with its trigram index),
+  and the final grouping uses `work_mem` and temporary files. Give the database disk for the file's kept records at
+  least twice over, and expect the import to take minutes for millions of records. The temporary table disappears with the
+  transaction.
+- The transaction: it is one, so a failure at the end repeats the whole import. `listing-guard.trademark.import.batch-size`
+  (`LISTING_GUARD_TRADEMARK_IMPORT_BATCHSIZE`, 5,000 by default) is the number of records sent to the database in one JDBC batch.
+
 In production put `catalogs/` next to the compose file (or set `CATALOGS_DIR` and mount it) and run the same job with
 the production compose file. Changing the active catalog is a configuration change plus a restart; the old version
 stays in the database. The API logs `Trademark checks are ready on catalog version ...`, `are off` (nothing
