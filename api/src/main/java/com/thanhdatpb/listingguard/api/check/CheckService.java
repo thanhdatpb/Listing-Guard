@@ -65,7 +65,8 @@ public class CheckService {
         String packId = ruleset.config().packId();
         String analysisVersion = ruleset.config().version();
 
-        Optional<CheckResult> cached = findCached(clientId, marketplace, contentHash, rulesetVersionId);
+        Optional<CheckResult> cached = findCached(clientId, marketplace, packId, contentHash, rulesetVersionId,
+                analysisVersion);
         if (cached.isPresent()) {
             return cached.get();
         }
@@ -78,7 +79,8 @@ public class CheckService {
         } catch (DataIntegrityViolationException e) {
             // another request of this client stored the same listing between our lookup and our insert: answer from its row
             log.debug("Concurrent identical check for {} {}; answering from the stored result", marketplace, contentHash);
-            return findCached(clientId, marketplace, contentHash, rulesetVersionId).orElseThrow(() -> e);
+            return findCached(clientId, marketplace, packId, contentHash, rulesetVersionId, analysisVersion)
+                    .orElseThrow(() -> e);
         }
     }
 
@@ -90,9 +92,11 @@ public class CheckService {
         return toResult(checks.findByIdAndClientId(id, clientId).orElseThrow(() -> new CheckNotFoundException(id)), false);
     }
 
-    private Optional<CheckResult> findCached(UUID clientId, String marketplace, String contentHash, long rulesetVersionId) {
-        return checks.findFirstByClientIdAndMarketplaceCodeAndContentHashAndRulesetVersionIdAndStatus(
-                clientId, marketplace, contentHash, rulesetVersionId, CheckStatus.COMPLETED).map(check -> toResult(check, true));
+    private Optional<CheckResult> findCached(UUID clientId, String marketplace, String packId, String contentHash,
+                                             long rulesetVersionId, String analysisVersion) {
+        return checks.findFirstByClientIdAndMarketplaceCodeAndPackIdAndContentHashAndRulesetVersionIdAndAnalysisVersionAndStatus(
+                clientId, marketplace, packId, contentHash, rulesetVersionId, analysisVersion, CheckStatus.COMPLETED)
+                .map(check -> toResult(check, true));
     }
 
     private UUID persist(UUID clientId, String packId, String marketplace, String contentHash, long rulesetVersionId,
@@ -110,8 +114,8 @@ public class CheckService {
                 .toList();
         String rulesetVersion = check.getRulesetVersionId() == null ? null
                 : rulesetVersions.findById(check.getRulesetVersionId()).map(RulesetVersion::getVersion).orElse(null);
-        String analysisVersion = check.getAnalysisVersion() == null ? rulesetVersion : check.getAnalysisVersion();
-        return new CheckResult(check.getId(), check.getStatus(), check.getMarketplaceCode(), rulesetVersion, analysisVersion,
-                check.getContentHash(), cached, check.getCreatedAt(), CheckResult.Summary.of(views), views);
+        return new CheckResult(check.getId(), check.getStatus(), check.getMarketplaceCode(), rulesetVersion,
+                check.getAnalysisVersion(), check.getContentHash(), cached, check.getCreatedAt(),
+                CheckResult.Summary.of(views), views);
     }
 }

@@ -23,7 +23,7 @@ public class ListingCheck {
     @Column(name = "client_id", nullable = false)
     private UUID clientId;
 
-    @Column(name = "pack_id", length = 64)
+    @Column(name = "pack_id", nullable = false, length = 64)
     private String packId;
 
     @Column(name = "content_hash", nullable = false)
@@ -36,11 +36,11 @@ public class ListingCheck {
     @Column(nullable = false)
     private CheckStatus status;
 
-    /** The ruleset this check was produced with; null for checks stored before versions were recorded. */
+    /** The ruleset this check was produced with. */
     @Column(name = "ruleset_version_id")
     private Long rulesetVersionId;
 
-    @Column(name = "analysis_version", length = 128)
+    @Column(name = "analysis_version", nullable = false, length = 128)
     private String analysisVersion;
 
     @Column(name = "created_at", nullable = false)
