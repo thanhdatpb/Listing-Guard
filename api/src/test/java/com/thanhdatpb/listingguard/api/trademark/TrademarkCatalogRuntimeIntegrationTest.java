@@ -46,6 +46,9 @@ class TrademarkCatalogRuntimeIntegrationTest {
     @Autowired
     TransactionTemplate transactions;
 
+    @Autowired
+    com.thanhdatpb.listingguard.api.ruleset.RulesetVersionRepository versionsRepository;
+
     @TempDir
     Path dir;
 
@@ -115,33 +118,65 @@ class TrademarkCatalogRuntimeIntegrationTest {
     }
 
     @Test
-    void aCatalogNormalizedWithAnotherRulesetIsRefused() throws Exception {
+    void aCatalogNormalizedWithOtherNormalizationSettingsIsRefused() throws Exception {
         String yaml = new ClassPathResource("rulesets/trademark-risk-2026-11.yaml")
                 .getContentAsString(StandardCharsets.UTF_8);
-        TrademarkRuleset edited = TrademarkRulesetLoader.parse(yaml + "\n# an edit that changes the content hash\n");
-        PreparedCatalog prepared = importSynthetic(NormalizationIdentity.of(edited),
-                new TextNormalizer(edited.normalization()));
+        TrademarkRuleset otherMapping = TrademarkRulesetLoader.parse(yaml.replace("\"0\": \"o\"", "\"0\": \"q\""));
+        PreparedCatalog prepared = importSynthetic(NormalizationIdentity.of(otherMapping),
+                new TextNormalizer(otherMapping.normalization()));
         TrademarkCatalogRuntime runtime = runtimeFor(prepared.version());
 
         TrademarkCatalogRuntime.Status status = runtime.evaluate();
 
         assertThat(status.state()).isEqualTo(TrademarkCatalogRuntime.State.REFUSED);
-        assertThat(status.detail()).contains("ruleset content hash " + edited.contentHash())
-                .contains("(active: " + rulesets.ruleset().contentHash() + ")").contains("Import the catalog again");
+        assertThat(status.detail()).contains("normalization settings hash " + otherMapping.normalization().canonicalHash())
+                .contains("(active: " + rulesets.ruleset().normalization().canonicalHash() + ")")
+                .contains("Import the catalog again");
         assertThat(status.detail()).doesNotContain("pack ").doesNotContain("normalizer version");
         assertThatThrownBy(runtime::scanner).isInstanceOf(TrademarkUnavailableException.class);
     }
 
     @Test
-    void aCatalogNormalizedWithAnotherNormalizerVersionOrRulesetVersionIsRefused() {
+    void aCatalogNormalizedWithAnotherNormalizerVersionIsRefused() {
         TrademarkRuleset active = rulesets.ruleset();
-        PreparedCatalog otherNormalizer = importSynthetic(new NormalizationIdentity(active.packId(), active.version(),
-                active.contentHash(), "normalization-0"), new TextNormalizer(active.normalization()));
-        PreparedCatalog otherVersion = importSynthetic(new NormalizationIdentity(active.packId(), "trademark-risk-2020-01",
-                active.contentHash(), TextNormalizer.VERSION), new TextNormalizer(active.normalization()));
+        PreparedCatalog otherNormalizer = importSynthetic(new NormalizationIdentity(active.packId(), "normalization-0",
+                active.normalization().canonicalHash()), new TextNormalizer(active.normalization()));
 
-        assertThat(runtimeFor(otherNormalizer.version()).evaluate().detail()).contains("normalizer version normalization-0");
-        assertThat(runtimeFor(otherVersion.version()).evaluate().detail()).contains("ruleset version trademark-risk-2020-01");
+        TrademarkCatalogRuntime.Status status = runtimeFor(otherNormalizer.version()).evaluate();
+
+        assertThat(status.state()).isEqualTo(TrademarkCatalogRuntime.State.REFUSED);
+        assertThat(status.detail()).contains("normalizer version normalization-0");
+    }
+
+    @Test
+    void aRulesetThatOnlyChangesThresholdsOrWordListsStillServesTheCatalog() throws Exception {
+        PreparedCatalog prepared = importWithActiveRuleset();
+        String yaml = new ClassPathResource("rulesets/trademark-risk-2026-11.yaml")
+                .getContentAsString(StandardCharsets.UTF_8);
+        // a new ruleset version that changes a threshold and a word list but not the normalization settings
+        byte[] newerYaml = yaml.replace("version: trademark-risk-2026-11", "version: trademark-risk-2099-01")
+                .replace("final_threshold: 0.80", "final_threshold: 0.85").replace("    - Northvale\n", "    - Northvael\n")
+                .getBytes(StandardCharsets.UTF_8);
+        TrademarkRulesets newer = new TrademarkRulesets(new TrademarkProperties("classpath:ignored.yaml",
+                List.of("ETSY"), "", "catalogs"), new org.springframework.core.io.DefaultResourceLoader() {
+            @Override
+            public org.springframework.core.io.Resource getResource(String location) {
+                return new org.springframework.core.io.ByteArrayResource(newerYaml);
+            }
+        }, versionsRepository, transactions);
+        assertThat(newer.ruleset().contentHash()).isNotEqualTo(rulesets.ruleset().contentHash());
+        assertThat(newer.ruleset().normalization().canonicalHash())
+                .isEqualTo(rulesets.ruleset().normalization().canonicalHash());
+
+        TrademarkCatalogRuntime runtime = new TrademarkCatalogRuntime(new TrademarkProperties(
+                "classpath:rulesets/trademark-risk-2026-11.yaml", List.of("ETSY"), prepared.version(), "catalogs"),
+                jdbc, transactions, newer);
+
+        assertThat(newer.ruleset().version()).isEqualTo("trademark-risk-2099-01");
+        assertThat(runtime.evaluate()).isEqualTo(new TrademarkCatalogRuntime.Status(TrademarkCatalogRuntime.State.READY,
+                prepared.version()));
+        assertThat(runtime.scanner().scan(TrademarkCheckInput.ofTitle("Zorvex")).rulesetVersion())
+                .isEqualTo("trademark-risk-2099-01");
     }
 
     @Test

@@ -59,11 +59,11 @@ class MigrationTrademarkCatalogTest {
     private static long insertVersion(Connection connection, String version) throws SQLException {
         try (PreparedStatement insert = connection.prepareStatement("""
                 INSERT INTO trademark_catalog_version (version, label, source_name, source_reference, source_license,
-                    source_date, file_sha256, format_version, filters_json, pack_id, ruleset_version,
-                    ruleset_content_hash, normalization_version, records_read, records_filtered, records_merged,
+                    source_date, file_sha256, format_version, filters_json, pack_id,
+                    normalization_version, normalization_hash, records_read, records_filtered, records_merged,
                     records_loaded)
                 VALUES (?, 'label', 'synthetic', 'ref', 'test', current_date, repeat('a', 64), 'jsonl-1', '{}',
-                    'trademark-risk', 'v', repeat('b', 64), 'normalization-1', 3, 1, 0, 2) RETURNING id
+                    'trademark-risk', 'normalization-1', repeat('b', 64), 3, 1, 0, 2) RETURNING id
                 """)) {
             insert.setString(1, version);
             try (ResultSet rows = insert.executeQuery()) {
@@ -76,8 +76,8 @@ class MigrationTrademarkCatalogTest {
     private static void insertEntry(Connection connection, long versionId, String normalized, String status)
             throws SQLException {
         try (PreparedStatement insert = connection.prepareStatement("""
-                INSERT INTO trademark_entry (catalog_version_id, normalized, display, nice_classes, status, source_id)
-                VALUES (?, ?, ?, ARRAY[25, 35]::smallint[], ?, 's1')
+                INSERT INTO trademark_entry (catalog_version_id, normalized, display, nice_classes, status, source_ids)
+                VALUES (?, ?, ?, ARRAY[25, 35]::smallint[], ?, ARRAY['s1'])
                 """)) {
             insert.setLong(1, versionId);
             insert.setString(2, normalized);
@@ -150,11 +150,15 @@ class MigrationTrademarkCatalogTest {
             try (Statement statement = connection.createStatement()) {
                 assertThatThrownBy(() -> statement.execute("""
                         INSERT INTO trademark_entry (catalog_version_id, normalized, display, nice_classes, status,
-                            source_id) VALUES (%d, 'x', 'x', ARRAY[]::smallint[], 'REGISTERED', 's')""".formatted(version)))
+                            source_ids) VALUES (%d, 'x', 'x', ARRAY[]::smallint[], 'REGISTERED', ARRAY['s'])""".formatted(version)))
                         .isInstanceOf(SQLException.class).hasMessageContaining("ck_trademark_entry_classes");
                 assertThatThrownBy(() -> statement.execute("""
                         INSERT INTO trademark_entry (catalog_version_id, normalized, display, nice_classes, status,
-                            source_id) VALUES (%d, '', 'x', ARRAY[25]::smallint[], 'REGISTERED', 's')""".formatted(version)))
+                            source_ids) VALUES (%d, 'y', 'y', ARRAY[25]::smallint[], 'REGISTERED', ARRAY[]::text[])""".formatted(version)))
+                        .isInstanceOf(SQLException.class).hasMessageContaining("ck_trademark_entry_source_ids");
+                assertThatThrownBy(() -> statement.execute("""
+                        INSERT INTO trademark_entry (catalog_version_id, normalized, display, nice_classes, status,
+                            source_ids) VALUES (%d, '', 'x', ARRAY[25]::smallint[], 'REGISTERED', ARRAY['s'])""".formatted(version)))
                         .isInstanceOf(SQLException.class);
             }
         }
@@ -181,8 +185,8 @@ class MigrationTrademarkCatalogTest {
         try (Connection connection = open(); Statement statement = connection.createStatement()) {
             long version = insertVersion(connection, "v1");
             statement.execute("""
-                    INSERT INTO trademark_entry (catalog_version_id, normalized, display, nice_classes, status, source_id)
-                    SELECT %d, md5(g::text) || ' brand', 'x', ARRAY[25]::smallint[], 'REGISTERED', 's'
+                    INSERT INTO trademark_entry (catalog_version_id, normalized, display, nice_classes, status, source_ids)
+                    SELECT %d, md5(g::text) || ' brand', 'x', ARRAY[25]::smallint[], 'REGISTERED', ARRAY['s']
                     FROM generate_series(1, 20000) g""".formatted(version));
             insertEntry(connection, version, "zorvex", "REGISTERED");
             // the btree index of the unique constraint is the other index the planner could scan; leave only the trigram one
