@@ -279,7 +279,7 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 - [ADR-002: Ruleset versioning](docs/adr/ADR-002-ruleset-versioning.md)
 - [ADR-003: Chunking strategy](docs/adr/ADR-003-chunking-strategy.md)
 - [ADR-004: Embedding provider](docs/adr/ADR-004-embedding-provider.md)
-- [ADR-012: Embeddings default to an external API](docs/adr/ADR-012-api-embedding-provider.md) (Proposed; supersedes ADR-004's default provider)
+- [ADR-012: Embeddings default to an external API](docs/adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)
 - [ADR-005: API auth, rate limit, and result cache](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md)
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
