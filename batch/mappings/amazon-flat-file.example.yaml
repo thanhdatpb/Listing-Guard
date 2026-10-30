@@ -1,0 +1,31 @@
+# Mapping for an Amazon inventory flat file, for the batch-check job (docs/batch-check.md).
+#
+# EXAMPLE ONLY, NOT VERIFIED. No real flat file was available when this was written, so none of the column names below
+# comes from a source: every line is marked "# unverified". Open your own file, compare its header row with this file and
+# change every name to match it exactly (case and spaces matter). The job refuses to start if a column named here is not
+# in the header, and it says which one.
+#
+# If your file has lines before the header row (some templates do), set csv.skip_lines to how many; the header row is
+# the first line after them. The default is 0.
+#
+# Copy this file under another name before editing it, and keep the copy out of the repository if it is specific to your
+# store. The keys on the left are the fields of docs/input-schema.md (AMAZON) and may not be renamed.
+#
+# Fields your file has no column for are simply absent from the check. The required_fields rule then reports each one
+# it requires for every listing (see the Amazon ruleset): map every field your file has.
+#
+#   docker compose run --rm batch-check --input=/batch/input/<file>.txt \
+#     --mapping=/batch/mappings/<your mapping>.yaml --client=<client> --marketplace=AMAZON
+csv:
+  delimiter: tab                          # unverified
+  encoding: UTF-8                         # unverified
+  skip_lines: 0                           # unverified
+id: item_sku                              # unverified: SKU, ASIN or any column that is filled for every row
+title: item_name                          # unverified
+brand: brand_name                         # unverified
+bullet_points: [bullet_point1, bullet_point2, bullet_point3, bullet_point4, bullet_point5]   # unverified
+description: product_description          # unverified
+search_terms: generic_keywords            # unverified
+product_type: feed_product_type           # unverified
+price: standard_price                     # unverified: a plain number such as 19.99, no currency symbol
+quantity: quantity                        # unverified

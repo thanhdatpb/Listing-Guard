@@ -342,6 +342,23 @@ class BatchMappingTest {
                 .isInstanceOf(BatchConfigException.class).hasMessageContaining("no column 'takedown'");
     }
 
+    // ---- the examples in batch/mappings
+
+    @Test
+    void theExampleMappingsAreValidAndEveryLineThatNamesAColumnIsMarkedUnverified() throws IOException {
+        Path mappings = Path.of("..", "batch", "mappings");
+        String[][] examples = {{"etsy-listings-export.example.yaml", "ETSY"}, {"amazon-flat-file.example.yaml", "AMAZON"}};
+        for (String[] example : examples) {
+            String text = Files.readString(mappings.resolve(example[0]));
+
+            assertThat(BatchMapping.parse(text, example[1])).as(example[0]).isNotNull();
+            assertThat(text).as(example[0]).contains("NOT VERIFIED").contains("compare its header row");
+            text.lines().filter(line -> !line.isBlank() && !line.startsWith("#") && !line.equals("csv:"))
+                    .forEach(line -> assertThat(line).as("%s: a column name without a source must say so", example[0])
+                            .contains("# unverified"));
+        }
+    }
+
     // ---- the mapping can only name fields the input schema has
 
     @Test
