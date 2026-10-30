@@ -61,10 +61,11 @@ Modules:
 |---|---|
 | `core/` | Plain Java domain types shared by all modules: `Listing`, `Money`, `Finding`, `Severity`. No Spring. |
 | `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
-| `trademark-scanner/` | Trademark risk scanner core (ADR-009): versioned ruleset, canonical input hash, normalization with offsets, the `TrademarkCatalog` port with an in-memory catalog, exact/phrase/fuzzy matching, color and place context rules, risk aggregation and the pack fingerprint. No Spring, no database. |
+| `trademark-scanner/` | Trademark risk scanner core (ADR-009): versioned ruleset, canonical input hash, normalization with offsets, the `TrademarkCatalog` port with an in-memory catalog, exact/phrase/fuzzy matching, color and place context rules, risk aggregation, the pack fingerprint, and the catalog manifest and data file reader. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, fake), `PolicyRetriever`, retrieval metrics. No Spring. |
 | `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
+| `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
 | `policies/` | `manifest.yaml` (committed) and `raw/` (local files, git-ignored) |
 | `docs/adr/` | Architecture decision records |
 | `docs/api/` | `openapi.json`, the committed API contract (a test fails when it drifts from the code) |
@@ -234,6 +235,30 @@ It writes `eval/retrieval/results.md`: recall@5 (a query is a hit when the top 5
 least one of its section labels) and MRR@10 separately for each language, the embedding model and the
 hash of every ingested file. Nothing in it is estimated: it only exists after a real run.
 
+## Trademark catalog
+
+Trademark checks (ADR-009) match a listing against a catalog of marks that you load yourself. The catalog is optional:
+without it the application and `/checks` run as before and trademark checks are off. No trademark data is committed
+and the import never calls the network. **You are responsible for checking that the terms of your data source allow
+this storage and use.**
+
+1. **Prepare the file.** UTF-8 JSON Lines in `catalogs/raw/` (git-ignored), one record per line:
+   `{"mark": "Zorvex", "status": "REGISTERED", "nice_classes": [25], "source_id": "123", "common_word": false}`
+   (`status` is `REGISTERED`, `PENDING`, `EXPIRED` or `CANCELLED`; `nice_classes` are 1 to 45; `common_word` is
+   optional).
+2. **Describe it in `catalogs/manifest.yaml`:** a `version` label, `file`, `format_version: jsonl-1`, `source_name`,
+   `url`, `license`, `source_date`, the file's `sha256` (`sha256sum`) and the `filters` (`include_classes`,
+   `include_status`). A missing license or date, or a hash that differs from the file, is refused.
+3. **Import:** `docker compose run --rm trademark-import --catalog=<version label>`. It validates the whole file
+   (one bad line rejects the batch and names the line), keeps the records that match the filters, merges records
+   that normalize to the same mark, writes one new catalog version and prints its name (the label plus a digest).
+   Running it again with the same file, filters and ruleset changes nothing; a different file, filter or ruleset
+   makes a new version and never edits an old one.
+4. **Serve it:** set `TRADEMARK_CATALOG_VERSION` (`listing-guard.trademark.catalog-version`) to that name and restart
+   the API. Leave it empty to keep trademark checks off. A catalog that does not exist, or that was imported with
+   another trademark ruleset or normalizer, is refused at start-up (the API still starts and `/checks` still works):
+   import it again with the current ruleset and configure the new name.
+
 ## Rulesets
 
 `rule-engine/src/main/resources/rulesets/etsy-2026-11.yaml` holds every threshold, word list and
@@ -278,7 +303,8 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 1. PR 0a (pack identity expand, migration V7) and PR 0b (contract, migrations V8-V14) are done: pack identity and
    composite analysis versions ([ADR-010](docs/adr/ADR-010-pack-identity-and-analysis-version.md); the packs that
    follow implement the rest of the ADR).
-2. Next: trademark scanner, PR A ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)).
+2. Trademark scanner, PR A ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)): A1 (core) and A2 (catalog) are
+   done; next A3 (endpoint) and A4 (evaluation).
 3. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)).
 4. In parallel after step 2: run the retrieval evaluation and record the measured results (this needs an embedding
    provider: an API key or Ollama), then build the policy analyzer

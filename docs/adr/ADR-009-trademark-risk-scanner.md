@@ -244,6 +244,60 @@ that the Decision above leaves open:
 - **Not in A1.** The compatibility/descriptive-use context rules mentioned in the Decision are not implemented; A1
   implements the three color and place rules only.
 
+## Catalog (PR A2)
+
+PR A2 adds the catalog around the core: migration V15, the offline importer, the PostgreSQL adapter, the registration
+of the ruleset and the runtime fingerprint. It has no endpoint and no result tables (A3) and no evaluation data (A4).
+
+- **Schema (V15).** `CREATE EXTENSION IF NOT EXISTS pg_trgm` is explicit, so a database or role that cannot create
+  it fails the migration. `trademark_catalog_version` and `trademark_entry` refuse `UPDATE` (a trigger); a version is
+  only ever added. `trademark_entry` is unique per `(catalog_version_id, normalized)` and has a GIN `gin_trgm_ops`
+  index on `normalized` (a `TEXT` column, so the planner does not cast it away from the index). The status is a string
+  with a CHECK constraint, kept in sync with `MarkStatus` (`REGISTERED`, `PENDING`, `EXPIRED`, `CANCELLED`).
+- **Data file `jsonl-1`.** UTF-8 JSON Lines, one record per non-blank line: `mark` (the display form), `status`,
+  `nice_classes` (non-empty, each 1 to 45), `source_id` and optionally `common_word` (default false). An unknown key,
+  a wrong type, an unknown status, a class outside 1 to 45, a mark that normalizes to nothing or invalid UTF-8
+  rejects the whole batch, and the message gives the line number and never the text of a mark. The whole file is
+  validated before the filters run.
+- **Manifest `catalogs/manifest.yaml`** (committed; `catalogs/raw/` is git-ignored like `policies/raw/`): per entry
+  `version` (a label), `file` (a plain file name in `raw/`), `format_version`, `source_name`, `url`, `license`,
+  `source_date`, `sha256` and `filters` (`include_classes`, `include_status`). A missing license or source date, an
+  unknown key or a file whose SHA-256 differs from the manifest is refused. The operator is responsible for checking
+  that the terms of the source allow this use and storage. No real trademark data is committed.
+- **Filter and merge.** A record is kept when at least one of its classes is in `include_classes` and its status is in
+  `include_status`. Kept records with the same normalized mark (normalized with the active trademark ruleset's
+  normalizer) become one entry: the classes are united, `common_word` is true if any record says so, the status is
+  the one declared first in `MarkStatus`, and the display form (with its `source_id`) is the smallest by
+  `String.compareTo`, ties to the smaller source id. An import that keeps nothing is rejected. The version row stores
+  the counts read, filtered, merged and loaded; the log has the counts and no marks.
+- **Version and idempotence.** The stored version is the manifest label plus the first 12 hex digits of a SHA-256
+  over the label, the source fields, the file hash, the format version, the canonical filters JSON and the
+  normalization identity. The same import therefore finds the version it made and changes nothing; a changed file,
+  filter, source field or normalization identity is another version, and an existing version is never modified. The
+  version row and all entries are written in one transaction.
+- **Normalization identity** of a catalog: pack id, trademark ruleset version, ruleset content hash and normalizer
+  version. Because the whole ruleset hash is part of it, any new ruleset version needs a new import.
+- **Active catalog.** `listing-guard.trademark.catalog-version` names one stored version exactly; there is no
+  "latest". At start-up `TrademarkCatalogRuntime` is `DISABLED` when nothing is configured (the application starts), and
+  `REFUSED` when the version does not exist or its normalization identity differs from the active ruleset and
+  normalizer, like the corpus model guard of ADR-012 (`/checks` keeps working). Only `READY` serves a scanner.
+- **PostgreSQL adapter.** `findExact` is `normalized = ANY(...)`. `fuzzyCandidates` runs in one transaction:
+  `set_config('pg_trgm.similarity_threshold', t, true)` with the ruleset's candidate threshold, then
+  `e.normalized % f.form` over `unnest` of all forms, so the session setting is never used and the local setting
+  ends with the transaction. Reads are limited to the configured version. Results are ordered by form and by mark in
+  binary order, the order of `InMemoryTrademarkCatalog`; a contract test runs the same marks through both.
+  `pg_trgm` compares in single precision, so a pair whose similarity equals the threshold to the last digit could
+  differ from the in-memory double; the synthetic contract set avoids such pairs, and the evaluation tunes the
+  threshold with margin. Non-ASCII letters are split into trigrams according to the database locale.
+- **Registration.** `trademark-risk-2026-11` is registered in `ruleset_version` for ETSY and AMAZON with pack
+  `trademark-risk` (ADR-010), and startup fails if the version exists with another hash. `/checks` still selects the
+  pack `listing-rules` only.
+- **Fingerprint.** The runtime supplies the `external.*` components: `catalog_version`, `catalog_file_sha256`,
+  `pg_major` (from `server_version_num`), `pg_trgm_extversion` and `marketplace`. They are read once at start-up.
+- **Carried for later.** `CatalogMark` also has `niceClasses`, `status` and `commonWord`. The scanner does not read
+  them: using them (for example to lower the weight of a common word or to skip an expired mark) changes findings, so
+  it needs a new ruleset version and a new PR.
+
 ## Offline data and source governance
 
 The importer accepts only local files and is a one-shot administrative job. It validates the
