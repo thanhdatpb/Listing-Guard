@@ -104,3 +104,77 @@ The new API applies pending Flyway migrations automatically. Check container log
 upgrade. To roll back, set the previous image version and recreate the API in the same way. If the new
 version applied a migration incompatible with the previous image, restore the matching pre-upgrade database
 backup before starting the old version.
+
+## Pack identity contract (ADR-010, PR 0b)
+
+Migrations V8 to V13 make the pack identity of rulesets and checks mandatory (`pack_id` and `analysis_version` become
+`NOT NULL`, `pack_id` loses its default), replace the registry identity `(marketplace_code, version)` with
+`(pack_id, marketplace_code, version)` and replace the completed-result cache index with one that also covers the pack,
+the ruleset version and the analysis version. `/api/v1/checks` does not change: same request, response, content hash,
+`rulesetVersion`, `analysisVersion` and cache hits.
+
+Flyway applies them when the release containing them starts. Rolling the image back does not undo them, and an
+instance older than PR 0a (V7) cannot write after them (its inserts omit `pack_id`). Do not enable a ruleset for a
+new analysis pack until they have all been applied.
+
+| Migration | Runs | What it does |
+| --- | --- | --- |
+| V8 | in a transaction | backfills NULL `pack_id` and `analysis_version`, verifies, sets `NOT NULL`, drops the `pack_id` default |
+| V9 | outside a transaction | builds the unique index `uq_ruleset_version_pack` concurrently |
+| V10 | in a transaction | checks that index is valid, attaches it as a constraint, drops the old `uq_ruleset_version` |
+| V11 | outside a transaction | builds the partial unique index `uq_listing_check_completed_identity` (`COMPLETED`) concurrently |
+| V12 | in a transaction | checks that index is valid |
+| V13 | outside a transaction | drops the old `uq_listing_check_completed` concurrently |
+
+Sequence for a single instance (an operator-coordinated maintenance window):
+
+1. The running release must already contain PR 0a (V7). Back up the database (see above).
+2. Stop the old process: `docker compose -f docker-compose.prod.yml --profile prod stop api`. No old instance may
+   run or restart from here on.
+3. Set `LISTING_GUARD_VERSION` to the release that contains V8 to V13 and start it with
+   `docker compose -f docker-compose.prod.yml --profile prod up -d --no-deps api`. Flyway runs V8 to V13 before the API
+   serves requests.
+4. Check the logs and `/health`, and send an identical `/api/v1/checks` request twice: the second answer is
+   `cached: true` with the same `checkId`.
+5. Only now enable rulesets or endpoints of a new pack.
+
+### Checks without a ruleset version
+
+V8 stops, changes nothing and the API does not start when any `listing_check` row has `ruleset_version_id` NULL, because
+its `analysis_version` cannot be derived. The error names the number of rows. Such rows come from checks stored
+before ruleset versions were recorded (V4). The migration never deletes them and never invents a value; an operator
+decides, after a backup:
+
+```sql
+SELECT id, marketplace_code, status, created_at FROM listing_check WHERE ruleset_version_id IS NULL;
+```
+
+- If the ruleset that produced them is known, assign it (its `version` becomes their `analysis_version`):
+
+  ```sql
+  UPDATE listing_check
+  SET ruleset_version_id = (SELECT id FROM ruleset_version
+                            WHERE pack_id = 'listing-rules' AND marketplace_code = 'ETSY' AND version = 'etsy-2026-10')
+  WHERE ruleset_version_id IS NULL AND marketplace_code = 'ETSY';
+  ```
+
+- If they are not worth keeping, remove them (their findings and feedback go with them) with
+  `DELETE FROM listing_check WHERE ruleset_version_id IS NULL;`. These rows never answer a cached request.
+
+Then start the API again; Flyway repeats V8.
+
+### An index build that failed
+
+`CREATE UNIQUE INDEX CONCURRENTLY` (V9, V11) can leave an `INVALID` index behind, and a non-transactional migration
+that failed stays in the schema history as failed. V10 and V12 also stop when their index is missing or invalid, and
+then the old constraint or index is still in place. To retry, find the invalid index, drop only that one, and clear
+the failed history row (this is what Flyway's repair does):
+
+```sql
+SELECT c.relname FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE NOT i.indisvalid;
+DROP INDEX CONCURRENTLY uq_ruleset_version_pack;                -- or uq_listing_check_completed_identity
+DELETE FROM flyway_schema_history WHERE success = false;
+```
+
+A failing build usually means duplicate rows for the identity (the error says so): find and resolve them first. Never
+accept an invalid or missing index.

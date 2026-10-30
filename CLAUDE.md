@@ -35,14 +35,15 @@ It never edits a listing, never publishes, and does no SEO.
 
 Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR is right):
 
-1. PR 0a (done, V7), then PR 0b (next) (ADR-010).
-2. PR A: trademark scanner (ADR-009).
+1. PR 0a (done, V7) and PR 0b (done, V8-V13) (ADR-010).
+2. PR A (next): trademark scanner (ADR-009).
 3. PR B: image checker (ADR-008, currently Deferred).
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
    after PR A, in this order: run the retrieval evaluation and commit the real results, then PR 3 (`ApiLlmProvider`),
    PR 4 (profile and retrieval), PR 5 (endpoint) and PR 6 (analyzer evaluation).
 
-No new pack gets a ruleset registered before PR 0b is complete.
+PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
+has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
 
 ## Stack
 

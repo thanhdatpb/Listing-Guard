@@ -173,8 +173,8 @@ class CheckControllerIntegrationTest {
         String body = validBody();
         JsonNode first = postOk(body);
         Long otherVersion = jdbc.queryForObject("""
-                INSERT INTO ruleset_version (marketplace_code, version, content_hash, checked_at, source)
-                VALUES ('ETSY', ?, 'f', current_date, 'test') RETURNING id
+                INSERT INTO ruleset_version (pack_id, marketplace_code, version, content_hash, checked_at, source)
+                VALUES ('listing-rules', 'ETSY', ?, 'f', current_date, 'test') RETURNING id
                 """, Long.class, "etsy-test-" + UUID.randomUUID());
         jdbc.update("UPDATE listing_check SET ruleset_version_id = ? WHERE id = ?", otherVersion, UUID.fromString(first.get("checkId").asText()));
 
@@ -226,7 +226,6 @@ class CheckControllerIntegrationTest {
     void aStoredCheckCanBeReadBackById() throws Exception {
         JsonNode created = postOk(violatingBody());
         UUID checkId = UUID.fromString(created.get("checkId").asText());
-        jdbc.update("UPDATE listing_check SET analysis_version = NULL WHERE id = ?", checkId);
 
         String response = mvc.perform(get(CHECKS + "/" + checkId).header(HEADER, KEY_1))
                 .andExpect(status().isOk())

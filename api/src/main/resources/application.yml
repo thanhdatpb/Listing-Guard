@@ -67,6 +67,10 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+    postgresql:
+      # The default transactional advisory lock keeps a transaction open on Flyway's own connection, and
+      # CREATE/DROP INDEX CONCURRENTLY (V9, V11, V13) waits for every open transaction: the migration would hang.
+      transactional-lock: false
   mvc:
     problemdetails:
       enabled: true

@@ -93,9 +93,6 @@ public class ActiveRulesets implements SmartInitializingSingleton {
     private Active registerOrConfirm(RulesetConfig config) {
         Optional<RulesetVersion> existing = versions.findByPackIdAndMarketplaceCodeAndVersion(
                 config.packId(), config.marketplace(), config.version());
-        if (existing.isEmpty()) {
-            existing = versions.findByMarketplaceCodeAndVersion(config.marketplace(), config.version());
-        }
         if (existing.isPresent()) {
             RulesetVersion row = existing.get();
             if (!row.getContentHash().equals(config.contentHash())) {
@@ -103,10 +100,6 @@ public class ActiveRulesets implements SmartInitializingSingleton {
                         + ") is already registered with content hash " + row.getContentHash()
                         + " but its content now hashes to " + config.contentHash()
                         + ". Do not edit a published ruleset; bump its version instead.");
-            }
-            if (!row.getPackId().equals(config.packId())) {
-                throw new IllegalStateException("Ruleset " + config.version() + " (" + config.marketplace()
-                        + ") is registered under pack " + row.getPackId() + ", not " + config.packId());
             }
             return new Active(config, row.getId());
         }
