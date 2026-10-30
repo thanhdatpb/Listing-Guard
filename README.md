@@ -53,8 +53,6 @@ Client backend -- POST /api/v1/checks + X-API-Key --> Listing Guard API (Spring 
   policies/manifest.yaml + policies/raw/<marketplace>/*.html|pdf
        -> parse -> structural chunks -> embeddings -> pgvector
   PolicyRetriever / GET /policies/search (debug; feature-gated)
-
-  Redis: declared in compose; not used by the current API.
 ```
 
 Modules:
@@ -77,14 +75,14 @@ Requirements: JDK 21, Docker.
 
 ```bash
 ./mvnw -B verify            # build and test (Testcontainers needs Docker running)
-docker compose up --build   # postgres (pgvector/pgvector:pg16), redis, ollama, api
+docker compose up --build   # postgres (pgvector/pgvector:pg16), ollama, api
 ```
 
 On Windows use `mvnw.cmd`.
 
 The compose file has dev defaults, overridable with environment variables or a local `.env`:
 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and host ports `POSTGRES_PORT` (5432),
-`REDIS_PORT` (6379), `OLLAMA_PORT` (11434), `API_PORT` (8080).
+`OLLAMA_PORT` (11434), `API_PORT` (8080).
 
 Listing Guard is one service for many clients (ADR-007). Every API key belongs to a client; checks, cached
 results and the rate limit belong to the client. Clients and keys live in the database and are managed with the

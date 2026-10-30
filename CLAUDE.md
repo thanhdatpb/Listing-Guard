@@ -29,7 +29,7 @@ It never edits a listing, never publishes, and does no SEO.
 
 ## Stack
 
-Java 21, Spring Boot 3.5, Maven multi-module, PostgreSQL 16 + pgvector, Redis, Flyway,
+Java 21, Spring Boot 3.5, Maven multi-module, PostgreSQL 16 + pgvector, Flyway,
 JUnit 5 + Testcontainers. Root package `com.thanhdatpb.listingguard`.
 
 ## Commands
@@ -37,7 +37,7 @@ JUnit 5 + Testcontainers. Root package `com.thanhdatpb.listingguard`.
 ```bash
 ./mvnw -B verify                 # build + all tests (needs Docker for Testcontainers)
 ./mvnw -B -pl core,rule-engine,rag-analyzer verify   # fast: no Docker needed
-docker compose up --build        # postgres + redis + api (override ports: POSTGRES_PORT, REDIS_PORT, API_PORT)
+docker compose up --build        # postgres + api (override ports: POSTGRES_PORT, API_PORT)
 ```
 
 Do not use `-DforkCount=0` in this repository: it can change the test working-directory context and break `rag-analyzer`'s relative `..\eval\retrieval\queries.yaml` path.
