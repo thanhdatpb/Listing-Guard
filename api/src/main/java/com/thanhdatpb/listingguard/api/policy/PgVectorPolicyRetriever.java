@@ -32,13 +32,16 @@ public class PgVectorPolicyRetriever implements PolicyRetriever {
     private final JdbcTemplate jdbc;
     private final EmbeddingProvider embeddings;
     private final TransactionTemplate transactions;
+    private final CorpusModelGuard corpusGuard;
 
     private volatile Boolean iterativeScanSupported;
 
-    public PgVectorPolicyRetriever(JdbcTemplate jdbc, EmbeddingProvider embeddings, TransactionTemplate transactions) {
+    public PgVectorPolicyRetriever(JdbcTemplate jdbc, EmbeddingProvider embeddings, TransactionTemplate transactions,
+                                   CorpusModelGuard corpusGuard) {
         this.jdbc = jdbc;
         this.embeddings = embeddings;
         this.transactions = transactions;
+        this.corpusGuard = corpusGuard;
     }
 
     @Override
@@ -53,6 +56,8 @@ public class PgVectorPolicyRetriever implements PolicyRetriever {
             throw new IllegalArgumentException("k must be between 1 and " + MAX_TOP_K + ", got " + topK);
         }
         String code = marketplace.trim().toUpperCase(Locale.ROOT);
+        // before embedding: a query from the current model must never be ranked against vectors of another one
+        corpusGuard.verify();
         String vector = PolicyRepository.vectorLiteral(embeddings.embed(query, EmbeddingProvider.Kind.QUERY));
 
         return transactions.execute(status -> {

@@ -30,6 +30,8 @@ administration.
 
    Set `LISTING_GUARD_VERSION` to a published image version without the leading `v` (for example, `0.2.0`).
    Set a strong, unique `POSTGRES_PASSWORD`, plus the database name, user, and unused local API port.
+   Set `LISTING_GUARD_EMBEDDING_API_KEY` to the key of the embedding API (Google Gemini, ADR-012); the API does
+   not start while it is empty. It is a secret like the database password.
    The Compose file has no database password fallback and fails if a required variable is missing.
 3. If the GHCR package is public, pull it directly. For a private package, authenticate Docker to GHCR first
    using a token with `read:packages` permission; do not put that token in `.env`.
@@ -42,7 +44,7 @@ administration.
 
    PostgreSQL uses a named persistent volume and must pass its healthcheck before the API starts. On API
    startup, Flyway automatically applies pending database migrations; Hibernate validates the resulting
-   schema. The production profile does not start Ollama, expose PostgreSQL, register a development API key,
+   schema. The production profile does not start Ollama (embeddings come from the API), expose PostgreSQL, register a development API key,
    or enable Swagger UI.
 5. Create a client and its first API key with the one-shot admin job. The key is printed only once; store it
    in the client's secret manager, not in source control or logs:

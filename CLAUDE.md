@@ -45,10 +45,13 @@ Do not use `-DforkCount=0` in this repository: it can change the test working-di
 Policy corpus (see README "Policy corpus and retrieval"):
 
 ```bash
-docker compose up -d ollama && docker compose run --rm ollama-pull   # once: pull nomic-embed-text
+# needs LISTING_GUARD_EMBEDDING_API_KEY in .env (Google Gemini, ADR-012); no Ollama
 docker compose run --rm ingest                                       # policies/ -> pgvector (profile `ingest`)
 docker compose run --rm eval-retrieval                               # writes eval/retrieval/results.md
 ```
+
+Ingest and eval send public policy text (and eval questions) to the Google Gemini API. Ollama is optional:
+`EMBEDDING_PROVIDER=ollama`, `docker compose --profile ollama up -d ollama`, `docker compose --profile ollama run --rm ollama-pull`.
 
 On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 
@@ -80,8 +83,9 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 - Ingest only reads local files and is idempotent; a document is redone when its file, manifest entry,
   `PolicyChunker.VERSION`/limits or `EmbeddingProvider.modelId()` changes. Bump `PolicyChunker.VERSION` when
   the chunking rules change. The manifest `version` must equal the page's "Last updated" date.
-- Ingest, eval and admin are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`), not HTTP endpoints,
-  and need no API keys. `GET /policies/search` is a debug view (API key needed) that answers 404 unless
+- Ingest, eval and admin are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`), not HTTP endpoints.
+  They need no client API keys; `ingest` and `eval-retrieval` need the embedding key (below), `admin` does not
+  (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
 - **Clients** (ADR-007): everything but `/health` needs `X-API-Key`, and every key belongs to one client. Clients
   and keys are rows (`client`, `api_key`, only the SHA-256 of a key is stored), managed by the `admin` job
@@ -98,7 +102,17 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `LISTING_GUARD_SWAGGER_UI=true` warns and is refused under `prod`; compose sets `SPRING_PROFILES_ACTIVE=dev`.
 - Retrieval filters by marketplace before ranking. Chunk text is stored exactly as on the page (later
   citation checks compare against it); only the embedding input has the section path prepended.
-- Embeddings: tests use `HashingEmbeddingProvider` (set through `TestcontainersConfig`), never Ollama.
+- **Embeddings** (ADR-012): the default provider is `api` (`ApiEmbeddingProvider`, Google `gemini-embedding-2`,
+  768 dimensions, `modelId()` `api:google:<model>:<dims>`); `ollama` is optional, `hashing` is for tests and `admin`.
+  The key is `LISTING_GUARD_EMBEDDING_API_KEY`: header only, never in a URL, log, exception message or
+  `EmbeddingProperties.toString`; an empty key with `provider=api` stops start-up in `EmbeddingConfig` (so jobs
+  without a web server are covered). The vendor mapping (`Kind` prefixes, one request per text in
+  `batchEmbedContents`, because several inputs in one content become one vector) lives in that class only. Retrieval
+  and `eval-retrieval` refuse (`CorpusModelGuard`, problem code `corpus-model-mismatch`) while a stored document was
+  embedded with another model: never return results ranked across two models. Ingest and eval send policy text to
+  Google; client listing text is never embedded by ingest.
+- Embeddings in tests: use `HashingEmbeddingProvider` (set through `TestcontainersConfig`) and a local stub HTTP
+  server for the API provider; never Ollama, never the real API.
   Evaluation numbers are only ever produced by a real run; never write or estimate them by hand. The
   evaluation labels in `eval/retrieval/queries.yaml` are reviewed by the maintainer before a run. Labels
   always name a specific section (never a whole document); recall@5 is a hit when the top 5 contain at

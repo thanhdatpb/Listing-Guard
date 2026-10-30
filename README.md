@@ -62,7 +62,7 @@ Modules:
 | `core/` | Plain Java domain types shared by all modules: `Listing`, `Money`, `Finding`, `Severity`. No Spring. |
 | `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (Ollama, fake), `PolicyRetriever`, retrieval metrics. No Spring. |
-| `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, policy ingest and pgvector retrieval |
+| `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, policy ingest and pgvector retrieval, the default `ApiEmbeddingProvider` (Google Gemini) |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `policies/` | `manifest.yaml` (committed) and `raw/` (local files, git-ignored) |
 | `docs/adr/` | Architecture decision records |
@@ -75,14 +75,19 @@ Requirements: JDK 21, Docker.
 
 ```bash
 ./mvnw -B verify            # build and test (Testcontainers needs Docker running)
-docker compose up --build   # postgres (pgvector/pgvector:pg16), ollama, api
+docker compose up --build   # postgres (pgvector/pgvector:pg16), api
 ```
 
 On Windows use `mvnw.cmd`.
 
+The `api` service embeds search questions with the Google Gemini API (ADR-012) and **refuses to start while
+`LISTING_GUARD_EMBEDDING_API_KEY` is empty**. Put the key in a local `.env` next to `docker-compose.yml` (it is a
+secret; `.env` is git-ignored) before `docker compose up`. Ollama is not needed (see "Optional: Ollama instead of
+the API").
+
 The compose file has dev defaults, overridable with environment variables or a local `.env`:
-`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and host ports `POSTGRES_PORT` (5432),
-`OLLAMA_PORT` (11434), `API_PORT` (8080).
+`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LISTING_GUARD_EMBEDDING_API_KEY`, `EMBEDDING_PROVIDER`
+(`api`, or `ollama`), and host ports `POSTGRES_PORT` (5432), `API_PORT` (8080).
 
 Listing Guard is one service for many clients (ADR-007). Every API key belongs to a client; checks, cached
 results and the rate limit belong to the client. Clients and keys live in the database and are managed with the
@@ -135,62 +140,88 @@ the contract in [docs/api/openapi.json](docs/api/openapi.json) (after an intende
 Policy documents are read from local files, never fetched at run time, so ingest needs no network
 except the embedding backend.
 
+> **Text that leaves the machine (ADR-012).** With the default embedding API, `ingest` sends the public policy
+> text (each chunk's text with its section path) to the Google Gemini API, and `eval-retrieval` and
+> `GET /policies/search` send their questions. Listing text from clients is never embedded by ingest. Google's
+> terms for API data (notably the free tier) are not checked here: confirm them before production use. To keep
+> everything local, use Ollama (below).
+
 1. **Save the pages.** Raw files go in `policies/raw/<marketplace in lower case>/` (for example
    `policies/raw/etsy/seller-policy.html`). They are copyrighted marketplace text, so `policies/raw/`
    is git-ignored and each contributor saves their own copy. Only `policies/manifest.yaml` is
    committed: for each file its `marketplace`, `title`, canonical `url`, `fetched_at` and `version`, the
    page's own "Last updated" date. Ingest checks that date against the page and refuses a mismatch.
-2. **Get Ollama with the model `nomic-embed-text`.** Two ways; pick one.
-
-   **A. Ollama in Docker** (the compose `ollama` service; its image is several GB because it bundles GPU
-   libraries, so make sure the Docker disk has room):
+2. **Set the embedding API key.** Embeddings come from the Google Gemini API (`gemini-embedding-2`, 768
+   dimensions; model, dimensions and base URL are configurable under `listing-guard.embedding.api`). No local
+   model or service is needed. Put the key in `.env` next to `docker-compose.yml`:
    ```bash
-   docker compose up -d ollama
-   docker compose run --rm ollama-pull        # ollama pull nomic-embed-text
+   LISTING_GUARD_EMBEDDING_API_KEY=<your key>
    ```
+   The key is sent in the `x-goog-api-key` header and is never logged or printed. The application, `ingest` and
+   `eval-retrieval` refuse to start while it is empty (`admin` and the tests use no embeddings and need no key).
 
-   **B. Ollama on the host** (for example the Windows installer from ollama.com). The application reads
-   `OLLAMA_URL`, default `http://localhost:11434`, so nothing needs configuring:
-   ```bash
-   ollama pull nomic-embed-text
-   ```
-   Do not run a plain `docker compose up` in this case (it would also start the large `ollama` image); start
-   only what you need: `docker compose up -d postgres`.
-
-3. **Ingest.** It is a one-shot job, not an HTTP endpoint (it is batch work on local files and needs no API
-   key). With A, run it in Docker; with B, run it on the host from the repository root
+3. **Ingest.** It is a one-shot job, not an HTTP endpoint (it is batch work on local files). Run it in Docker
+   (the key comes from `.env`), or on the host from the repository root with the key in the environment
    (defaults: database `localhost:5432`, `policies/` and `eval/retrieval/` relative to the working directory;
    set `DB_URL` if you changed `POSTGRES_PORT`):
    ```bash
-   # A: docker compose run --rm ingest
-   # B:
+   docker compose run --rm ingest
+   # on the host instead (PowerShell: $env:LISTING_GUARD_EMBEDDING_API_KEY = "<your key>"):
    ./mvnw -B -DskipTests package
-   java -jar api/target/listing-guard-api.jar --spring.profiles.active=ingest
+   LISTING_GUARD_EMBEDDING_API_KEY=<your key> java -jar api/target/listing-guard-api.jar --spring.profiles.active=ingest
    ```
    Ingest is idempotent. A document whose file, manifest entry, chunking settings and embedding model
    are unchanged is skipped; a changed document gets its chunks replaced; a document removed from the
    manifest is deleted (only for marketplaces that appear in the manifest). Every file is checked before
    anything is written.
-4. **Search** (debug view, off by default; the compose file turns it on). The compose `api` service reaches
-   Ollama at `http://ollama:11434`, so with way B run the application on the host instead
-   (`java -jar api/target/listing-guard-api.jar --listing-guard.policies.search-endpoint.enabled=true`):
+4. **Search** (debug view, off by default; the compose file turns it on; the `api` service gets the key from
+   `.env`):
    ```bash
    curl -H 'X-API-Key: <key>' 'http://localhost:8080/policies/search?marketplace=ETSY&q=can+I+sell+counterfeit+items&k=5'
    ```
    Returns the chunks with `score`, `url` (with the section anchor) and `sectionPath`. The marketplace
    filter is applied before the vector ranking, so another marketplace can never appear.
 
+   Search is refused while any stored document was embedded with another model than the configured one (for
+   example after changing `listing-guard.embedding.api.model`): it answers `503` with the problem code
+   `corpus-model-mismatch` instead of returning results ranked across two models. Run ingest again to re-embed.
+
+### Optional: Ollama instead of the API
+
+For a fully local setup set `EMBEDDING_PROVIDER=ollama` (compose) or `LISTING_GUARD_EMBEDDING_PROVIDER=ollama`
+(host). It uses the model `nomic-embed-text` (768 dimensions); no key is needed and nothing leaves the machine.
+The corpus is embedded by one model: after switching provider, run ingest again (until then search and
+`eval-retrieval` refuse, see above). Two ways to get Ollama; pick one.
+
+**A. Ollama in Docker** (the compose `ollama` service is in the `ollama` profile, so a plain `docker compose up`
+never starts it; its image is several GB because it bundles GPU libraries, so make sure the Docker disk has
+room; host port `OLLAMA_PORT`, default 11434):
+```bash
+docker compose --profile ollama up -d ollama
+docker compose --profile ollama run --rm ollama-pull        # ollama pull nomic-embed-text
+EMBEDDING_PROVIDER=ollama docker compose run --rm ingest
+```
+
+**B. Ollama on the host** (for example the Windows installer from ollama.com). The application reads
+`OLLAMA_URL`, default `http://localhost:11434`, so nothing needs configuring on the host:
+```bash
+ollama pull nomic-embed-text
+```
+The compose services reach it with `OLLAMA_URL=http://host.docker.internal:11434`, or run the jar on the host
+with `--listing-guard.embedding.provider=ollama`.
+
 ### Evaluating retrieval
 
 `eval/retrieval/queries.yaml` holds questions (each in English and Vietnamese) with the sections that
-should answer them. After the corpus is ingested:
+should answer them. After the corpus is ingested (the evaluation questions are sent to the embedding API too, and
+the job fails if the corpus was embedded with another model than the configured one):
 
 ```bash
-# A: docker compose run --rm eval-retrieval
-# B: java -jar api/target/listing-guard-api.jar --spring.profiles.active=eval-retrieval
+docker compose run --rm eval-retrieval
+# on the host: LISTING_GUARD_EMBEDDING_API_KEY=<your key> java -jar api/target/listing-guard-api.jar --spring.profiles.active=eval-retrieval
 ```
 
-Either way it writes `eval/retrieval/results.md`: recall@5 (a query is a hit when the top 5 contain at
+It writes `eval/retrieval/results.md`: recall@5 (a query is a hit when the top 5 contain at
 least one of its section labels) and MRR@10 separately for each language, the embedding model and the
 hash of every ingested file. Nothing in it is estimated: it only exists after a real run.
 
@@ -248,6 +279,7 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 - [ADR-002: Ruleset versioning](docs/adr/ADR-002-ruleset-versioning.md)
 - [ADR-003: Chunking strategy](docs/adr/ADR-003-chunking-strategy.md)
 - [ADR-004: Embedding provider](docs/adr/ADR-004-embedding-provider.md)
+- [ADR-012: Embeddings default to an external API](docs/adr/ADR-012-api-embedding-provider.md) (Proposed; supersedes ADR-004's default provider)
 - [ADR-005: API auth, rate limit, and result cache](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md)
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)

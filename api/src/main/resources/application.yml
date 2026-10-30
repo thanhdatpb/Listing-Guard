@@ -32,7 +32,18 @@ listing-guard:
     search-endpoint:
       enabled: false
   embedding:
-    provider: ollama
+    # api (default, Google Gemini, ADR-012), ollama (optional local server) or hashing (tests and the admin job).
+    provider: api
+    api:
+      base-url: https://generativelanguage.googleapis.com/v1beta
+      model: gemini-embedding-2
+      # must equal the vector(768) column of policy_chunk
+      dimensions: 768
+      # the key is a secret: it comes from the environment only and is never printed
+      key: ${LISTING_GUARD_EMBEDDING_API_KEY:}
+      batch-size: 16
+      timeout: 30s
+      retry-backoff: 1s
     ollama:
       base-url: ${OLLAMA_URL:http://localhost:11434}
       model: nomic-embed-text
