@@ -39,6 +39,11 @@ public class TestcontainersConfig {
             registry.add("listing-guard.security.auth-cache-ttl", () -> "0s");
             // no marketplace is planned in production; the tests need one to exercise the 422 "not yet supported" answer
             registry.add("listing-guard.marketplaces.planned", () -> "WALMART");
+            // the scheduled trademark cleanup stays off so it cannot delete rows under a test; a test of the schedule itself
+            // sets test.scheduled-cleanup=true and its own listing-guard.trademark.retention.* values
+            if (!environment.getProperty("test.scheduled-cleanup", Boolean.class, false)) {
+                registry.add("listing-guard.trademark.retention.cleanup-enabled", () -> "false");
+            }
             // generous by default so tests never trip the limit; a test that exercises it sets test.custom-rate-limit=true
             // and its own listing-guard.rate-limit.* values
             if (!environment.getProperty("test.custom-rate-limit", Boolean.class, false)) {
