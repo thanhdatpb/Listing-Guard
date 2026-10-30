@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.policy;
 
+import com.thanhdatpb.listingguard.rag.embedding.DisabledEmbeddingProvider;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingProvider;
 import com.thanhdatpb.listingguard.rag.policy.ParsedPolicy;
 import com.thanhdatpb.listingguard.rag.policy.PolicyChunk;
@@ -71,10 +72,12 @@ public class PolicyIngestService {
     }
 
     /**
-     * Everything that can be checked without the embedding backend (files exist, pages parse, versions match,
-     * content is not empty) is checked for all documents first, so a bad file fails the run before any change.
+     * Fails first when no embedding provider is selected. Everything else that can be checked without the embedding
+     * backend (files exist, pages parse, versions match, content is not empty) is checked for all documents first,
+     * so a bad file fails the run before any change.
      */
     public Report ingest(Path policiesDir) {
+        DisabledEmbeddingProvider.requireConfigured(embeddings);
         PolicyManifest manifest = PolicyManifestLoader.load(policiesDir.resolve("manifest.yaml"));
         PolicyChunker chunker = new PolicyChunker(properties.chunkerConfig());
         String pipelineVersion = pipelineVersion();

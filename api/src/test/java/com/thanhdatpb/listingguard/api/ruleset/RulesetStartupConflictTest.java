@@ -35,13 +35,11 @@ class RulesetStartupConflictTest {
 
     /** Command-line arguments win over application.yml, so they can replace the datasource and rulesets. */
     private ConfigurableApplicationContext start(String... extraArgs) {
-        String[] args = new String[4 + extraArgs.length];
+        String[] args = new String[3 + extraArgs.length];
         args[0] = "--spring.datasource.url=" + POSTGRES.getJdbcUrl();
         args[1] = "--spring.datasource.username=" + POSTGRES.getUsername();
         args[2] = "--spring.datasource.password=" + POSTGRES.getPassword();
-        // the default provider is the embedding API, which needs a key; nothing here embeds anything
-        args[3] = "--listing-guard.embedding.provider=hashing";
-        System.arraycopy(extraArgs, 0, args, 4, extraArgs.length);
+        System.arraycopy(extraArgs, 0, args, 3, extraArgs.length);
         return new SpringApplicationBuilder(ListingGuardApplication.class)
                 .web(WebApplicationType.NONE)
                 .run(args);

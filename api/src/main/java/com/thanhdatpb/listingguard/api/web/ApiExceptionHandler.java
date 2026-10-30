@@ -5,6 +5,7 @@ import com.thanhdatpb.listingguard.api.check.MarketplaceNotYetSupportedException
 import com.thanhdatpb.listingguard.api.check.UnknownMarketplaceException;
 import com.thanhdatpb.listingguard.api.policy.CorpusModelMismatchException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
+import com.thanhdatpb.listingguard.rag.embedding.EmbeddingNotConfiguredException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail invalidInput(IllegalArgumentException e) {
         return Problems.of(HttpStatus.BAD_REQUEST, "invalid-request", e.getMessage());
+    }
+
+    /** No embedding provider is selected (the default); only what needs embeddings is affected, rule checks are not (ADR-012). */
+    @ExceptionHandler(EmbeddingNotConfiguredException.class)
+    public ProblemDetail embeddingNotConfigured(EmbeddingNotConfiguredException e) {
+        return Problems.of(HttpStatus.SERVICE_UNAVAILABLE, "embedding-not-configured", e.getMessage());
     }
 
     /** The embedding backend (the embedding API or Ollama) is down or misconfigured; the message says what to check. */

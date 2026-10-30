@@ -7,12 +7,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 /**
  * Embedding backend selection (ADR-004, ADR-012).
  *
- * @param provider {@code api} (the default, a hosted embedding API), {@code ollama} (optional, a local server) or
- *                 {@code hashing}, a deterministic fake for tests and the admin job only
+ * @param provider {@code none} (the default: no model, no key; policy retrieval is off), {@code api} (a hosted
+ *                 embedding API), {@code ollama} (a local server) or {@code hashing}, a deterministic fake for
+ *                 tests and the admin job only
  */
 @ConfigurationProperties(prefix = "listing-guard.embedding")
 public record EmbeddingProperties(
-        @DefaultValue("api") String provider,
+        @DefaultValue("none") String provider,
         @DefaultValue Api api,
         @DefaultValue Ollama ollama) {
 
