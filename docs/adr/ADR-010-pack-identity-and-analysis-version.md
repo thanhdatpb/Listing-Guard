@@ -1,7 +1,7 @@
 # ADR-010: Pack identity, ruleset registry and composite analysis versions
 
 - Status: Proposed
-- Date: 2026-10-28
+- Date: 2026-10-30
 - Applies to: existing listing checks and future independent analysis packs
 - Acceptance convention: Keep Proposed until the PR implementing this ADR is approved and merged.
   Then set Status to Accepted and Date to the actual acceptance/merge date.
@@ -206,10 +206,14 @@ tested.
    unique identities, and remove old unique/cache indexes. No new pack rulesets may be registered
    before 0b completes. For single-instance deployment, use the coordinated maintenance sequence
    described above.
-3. **PR A — Image:** implement ADR-008 after PR 0b is approved and complete. Add the separate endpoint,
-   storage, safety limits, versioned profiles and generated-image tests.
-4. **PR B — Trademark:** implement ADR-009 after PR A. Add the separate endpoint, offline importer,
-   versioned catalog, explicit-threshold matcher and synthetic held-out evaluation.
+3. **PR A — Trademark:** implement ADR-009 after PR 0b is approved and complete. Add the separate
+   endpoint, offline importer, versioned catalog, explicit-threshold matcher, color and place context
+   rules and synthetic held-out evaluation.
+4. **PR B — Image:** implement ADR-008 after PR A. Add the separate endpoint, storage, safety limits,
+   versioned profiles and generated-image tests.
+
+Trademark goes first because an intellectual-property problem can directly cost a seller the listing or
+put the account at risk, while image v1 cannot detect logos (ADR-008 defers logo detection).
 
 Each implementation PR remains separate, is not merged automatically, preserves existing `/checks`
 behavior, and updates OpenAPI and integration documentation for its public contract.

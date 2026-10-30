@@ -1,8 +1,10 @@
 # ADR-009: Trademark risk scanner
 
 - Status: Proposed
-- Date: 2026-10-28
+- Date: 2026-10-30
 - Depends on: [ADR-010](ADR-010-pack-identity-and-analysis-version.md)
+- Implementation order: PR A, directly after PR 0b; the image checker ([ADR-008](ADR-008-image-compliance-checker.md))
+  follows as PR B.
 - Acceptance convention: Keep Proposed until the implementation PR is approved and merged. Then set
   Status to Accepted and Date to the actual acceptance/merge date.
 
@@ -37,6 +39,8 @@ offline during a check. It reports possible risk, not a legal conclusion.
   entire title/description and a mark.
 - Context rules distinguish descriptive/compatibility use from a mark presented as the product's own
   brand. Such rules are configurable and advisory; they must not assert that a use is legally allowed.
+  Listings that describe a product only by color or place are handled by the rules in "Context rules
+  for color-descriptive listings" below.
 - The initial catalog is global and versioned, not client-specific. No real trademark corpus or
   client data is committed. A small illustrative seed uses synthetic names only. Clients cannot
   change the shared ruleset or catalog through this endpoint.
@@ -49,6 +53,48 @@ This incomplete-result behavior differs from the legacy `RuleEngine`, which logs
 rule. It applies only to the new endpoint/pack because its response explicitly represents
 completeness. Changing the legacy behavior could break `/checks` consumers and is not required for
 the new isolated contract.
+
+## Context rules for color-descriptive listings
+
+Sellers often sell a product, for example a jersey, in the color scheme of a well-known sports team
+without using the team's name or mark. A color is not a trademark by itself, but some ways of writing
+it still point at one. The scanner must tell the following cases apart. Every result below is a
+reference warning, not a legal conclusion.
+
+The rules run in this pack after normalization and ordinary catalog matching. Their word lists (places,
+sport terms, color words, pattern words), token distance and risk levels are keys of the immutable
+versioned ruleset, not constants in Java (ADR-001); a change to any of them is a new ruleset version and
+changes the analysis fingerprint. Their `source.status` is `unverified`: they are internal heuristics,
+not a marketplace or legal rule.
+
+- **Geographic + sport combination.** A place name (city or state, from the configured list) and a sport
+  term or sporting-goods term (from the configured list), in the same input field and within the
+  configured maximum token distance, such as "Northvale Baseball Jersey", produce a finding at the
+  configured level, `MEDIUM` initially, even when no catalog mark matches. Distance is counted in
+  normalized tokens within one field; words in different fields are never combined. A place without a
+  sport term, or a sport term without a place, produces nothing from this rule.
+- **Color name containing a mark.** A color phrase that contains a token or phrase matching the catalog,
+  such as "Zorvex Blue", is **not** exempt because it is "a color name", even when the phrase is a common
+  color name. It is evaluated as an ordinary match, with the same match types, thresholds and risk level
+  as the same token outside a color phrase. The evidence states that the match lies inside a color
+  phrase; that note explains the finding and never lowers its risk.
+- **Pure color description.** A phrase made only of configured color words and pattern words, such as
+  "Royal Blue White Pinstripe", with no token matching the catalog (exact, phrase or fuzzy candidate
+  above the final threshold), returns an informational `LOW` finding that says no trademark reference
+  was detected in that phrase. Neither the message nor the suggestion may say or imply that the text is
+  "safe", "allowed", "permitted", "compliant" or otherwise legally valid, in English or Vietnamese. This
+  finding does not raise `riskLevel` above `LOW`.
+
+When more than one rule matches overlapping spans in the same field, the finding with the highest risk
+wins for that span and the lower ones are not reported separately; the winner's evidence lists the other
+rule IDs that matched. Equal risk is resolved by the order the rules are declared in the ruleset, so the
+result is deterministic. Overall `riskLevel` aggregation, incomplete results and `UNKNOWN` behave as
+described under Decision.
+
+Seed data, tests and examples for these rules use synthetic names only. Do not commit a real team name,
+a real city + team pairing, or data belonging to any company. The committed ruleset ships a small
+synthetic place list for tests; a production place list is a later ruleset version supplied and reviewed
+by the maintainer, and contains places and sport terms only, never place + team pairs.
 
 ## Data, privacy and retention
 
@@ -162,6 +208,24 @@ most 3 false positives among 160 negatives; at that boundary precision is `32 / 
 0.914, above 0.90. FPR changes in steps of 1/160 (0.625 percentage points), so the 2% gate permits
 three false positives, not a precise estimate.
 
+The tuning and held-out datasets are both synthetic and both contain these groups, in these minimum
+proportions (of the 40 positives and 160 negatives for the held-out set; the tuning set uses the same
+proportions):
+
+| Group | Role | Held-out minimum | Share of its class |
+|---|---|---|---|
+| Geographic + sport positives | positive | 8 | 20% of positives |
+| Color-name-containing-mark positives | positive | 8 | 20% of positives |
+| Other positives (exact, misspelled, fuzzy marks) | positive | 24 | 60% of positives |
+| Color-only negatives | negative | 24 | 15% of negatives |
+| Hard negatives: a place name with no sport term | negative | 24 | 15% of negatives |
+| Other negatives (compatibility/descriptive patterns, plain text) | negative | 112 | 70% of negatives |
+
+For this gate a case is positive, expected and predicted, when its overall `riskLevel` is `MEDIUM` or
+`HIGH`. The informational `LOW` finding on a pure color description counts as a negative; otherwise
+every color-only negative would be a false positive by construction. The gate size, precision, recall
+and false-positive-rate thresholds above are unchanged.
+
 The 40 positive examples make this a **small synthetic regression gate**, not an estimate of real
 world accuracy, legal risk or marketplace outcomes. README must state this limitation next to any
 reported results. Metrics may be published only after running the evaluation, with the held-out
@@ -192,6 +256,24 @@ hash update; it must not be silently accepted.
   verify the PostgreSQL-major/`pg_trgm`-`extversion` fingerprint. Candidate retrieval tests verify
   the transaction-local SQL threshold and that fuzzy comparisons use input tokens/n-grams rather
   than whole title/description fields.
+- Context-rule tests, with the lists, distance and levels read from the test ruleset rather than
+  hard-coded, cover each rule:
+  - Geographic + sport: place and sport term within the distance give `MEDIUM` with no catalog match;
+    one token beyond the distance, a place alone, a sport term alone, and the two in different fields
+    give no finding from this rule. Changing a list, the distance or the level in the ruleset changes
+    the result, which shows nothing is hard-coded.
+  - Color name containing a mark: a catalog token inside a color phrase, including a common color name,
+    gets the same risk as the same token outside it, and its evidence marks the color phrase.
+  - Pure color description: a color-and-pattern-only phrase gives an informational `LOW` finding that
+    leaves `riskLevel` at `LOW`; a phrase with one catalog token does not. A test scans every configured
+    message and suggestion for the forbidden validity wording ("safe", "allowed", "permitted",
+    "compliant" and their Vietnamese equivalents).
+  - Precedence: overlapping matches report the highest risk, and an equal-risk tie follows ruleset
+    order.
+  - Startup validation rejects these rules if `source.status` is not `unverified`.
+- Both evaluation datasets contain the groups and minimum proportions in the table above; a test counts
+  them, and the existing hash and tuning/held-out separation tests still apply. Seed and dataset
+  names are synthetic, which the maintainer reviews before a run.
 - Import tests cover local-only operation, invalid source data, idempotency, version immutability and
   catalog isolation by version.
 - API tests cover disclaimer, evidence, client isolation, cache identity, GET, retention, and no

@@ -1,8 +1,10 @@
 # ADR-008: Image compliance checker
 
 - Status: Deferred. The policy analyzer and the trademark scanner (ADR-009) come first.
-- Date: 2026-10-28
+- Date: 2026-10-30
 - Depends on: [ADR-010](ADR-010-pack-identity-and-analysis-version.md)
+- Implementation order: PR B, after the trademark scanner ([ADR-009](ADR-009-trademark-risk-scanner.md)) is
+  implemented as PR A.
 - Acceptance convention: Keep Proposed until the implementation PR is approved and merged. Then set
   Status to Accepted and Date to the actual acceptance/merge date.
 
@@ -30,11 +32,17 @@ its measured result recorded; it does not postpone the approved Amazon image pro
 - Add `GET /api/v1/image-checks/{id}` to retrieve the stored result. It must filter by the authenticated
   `clientId`; another client's result is indistinguishable from a missing result and returns 404.
 - Use a separate input hash for image checks. Canonical hash input includes the image bytes, their order
-  when order is semantically meaningful, marketplace, image role (such as main or additional), and
-  profile/product type. Include the relevant ruleset and algorithm fingerprints in `analysisVersion`
+  when order is semantically meaningful, marketplace, image role (such as main or additional), image
+  source (see below), and profile/product type. Include the relevant ruleset and algorithm fingerprints in `analysisVersion`
   and cache identity as specified in ADR-010. Do not use the text-listing hash as a proxy for image
   identity.
 - Do not persist original image bytes. Persist result metadata and bounded evidence only.
+- Each image may carry an optional `source`, supplied with its other per-image metadata such as the
+  role: `SELLER`, `CUSTOMER_CONTENT` or `UNKNOWN`. It is the caller's declaration about where the image
+  came from; the checker cannot verify it. An omitted value means `UNKNOWN`. Any other value is a
+  request-level validation error (HTTP 400), not an incomplete image. The hash uses the effective
+  value, so an omitted `source` and an explicit `UNKNOWN` have the same identity, and changing the
+  source of any image changes the input hash.
 - PNG alpha handling: composite each pixel onto opaque white before testing whether edge pixels are
   near white. Fully transparent pixels therefore count as white; record that the input had alpha in
   image metadata/evidence. This matches the chosen white-canvas interpretation and is deterministic,
@@ -71,6 +79,13 @@ source status, thresholds and severity. V1 checks are limited to:
 - Amazon main-image white-background proportion (edge-pixel tolerance and proportion configured in
   YAML), and product occupancy ratio.
 - Blur detection using variance of the Laplacian, only as a configured deterministic quality signal.
+- Declared image source: an image whose `source` is `CUSTOMER_CONTENT` produces a `WARNING` that an
+  image supplied by a customer may contain a third-party logo or trademark and should be checked by
+  hand before it goes on a listing. `SELLER` and `UNKNOWN` produce no finding from this rule. Severity
+  and message come from the image ruleset, like every other rule, and the rule is `unverified`, so it may
+  use only `WARNING` or `INFO`. It reads only the declared value, so it applies even when the image
+  itself cannot be decoded. It does not look at pixels and does not detect logos, and the absence of
+  this finding does not mean an image is free of third-party marks.
 
 No exact marketplace image threshold has been verified for this proposal. Until the maintainer has
 reviewed an accessible official source, **every image threshold is `unverified` and may use only
@@ -123,7 +138,8 @@ Image and per-image result schema proposal:
 
 - `image_check`: check ID, `client_id`, marketplace, profile/product type, canonical input hash,
   pack ID, ruleset version ID, `analysis_version`, status, completeness, summary, and timestamps.
-- `image_check_item`: parent check ID, ordinal, image hash, completeness, and bounded image metadata.
+- `image_check_item`: parent check ID, ordinal, image hash, `source` (stored as a string with a `CHECK`
+  constraint, kept in sync with the Java enum), completeness, and bounded image metadata.
   Do not persist a client filename unless a later decision establishes a need.
 - `image_check_finding`: item ID, rule ID, severity, evidence and message/suggestion, or an equivalent
   versioned result representation. The storage design must not alter the existing `finding` contract
@@ -216,6 +232,11 @@ These are operational safety controls and are separate from marketplace threshol
 - Tests generate images in code and cover pass/fail for supported format, dimensions, aspect ratio,
   image count, white background, occupancy and blur; cover malformed extensions/magic, corrupt and
   CMYK inputs, decompression/pixel limits, size limits and incomplete results.
+- Tests cover the image `source`: the input hash changes when the `source` of an image changes, and an
+  omitted value hashes the same as `UNKNOWN`; an invalid value is rejected with HTTP 400; a
+  `CUSTOMER_CONTENT` image yields exactly one `WARNING` for that image with the severity and message
+  from the ruleset, while `SELLER` and `UNKNOWN` yield none; the rule also fires for an undecodable
+  image; startup validation rejects `ERROR` severity for it while it is `unverified`.
 - Tests prove a failed image rule yields `INCOMPLETE`, retains known findings, and never produces a
   clean-pass summary.
 - Tests prove client isolation, cache identity changes for every included input component, GET
