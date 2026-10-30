@@ -3,6 +3,8 @@
 - Status: Proposed
 - Date: 2026-10-30
 - Depends on: [ADR-010](ADR-010-pack-identity-and-analysis-version.md)
+- Implementation order: PR A, directly after PR 0b; the image checker ([ADR-008](ADR-008-image-compliance-checker.md))
+  follows as PR B.
 - Acceptance convention: Keep Proposed until the implementation PR is approved and merged. Then set
   Status to Accepted and Date to the actual acceptance/merge date.
 
