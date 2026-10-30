@@ -295,6 +295,29 @@ class CatalogMatchingTest {
     }
 
     @Test
+    void evidenceCarriesTheSourceIdsOfTheMatchedMarkAndNoneForAContextFinding() {
+        TrademarkCatalog catalog = new com.thanhdatpb.listingguard.trademark.catalog.InMemoryTrademarkCatalog(CATALOG_VERSION,
+                List.of(new CatalogMark("zorvex", "Zorvex", List.of(25), null, false, List.of("S-001", "S-002")),
+                        new CatalogMark("quillmark", "Quillmark", List.of(35), null, false, List.of("S-004"))));
+        TrademarkScanner withIds = new TrademarkScanner(ruleset, catalog);
+        String place = ScannerFixtures.place(ruleset, 0);
+        String sport = ScannerFixtures.sport(ruleset, 0);
+
+        TrademarkResult result = scanTitle(withIds, "Zorvex " + place + " " + sport + " Quilmark");
+
+        Evidence exact = result.findings().stream().filter(f -> f.ruleId().equals(RuleIds.CATALOG_EXACT)).findFirst()
+                .orElseThrow().evidence();
+        assertThat(exact.sourceIds()).containsExactly("S-001", "S-002");
+        Evidence fuzzy = result.findings().stream().filter(f -> f.ruleId().equals(RuleIds.CATALOG_FUZZY)).findFirst()
+                .orElseThrow().evidence();
+        assertThat(fuzzy.matchedMark()).isEqualTo("Quillmark");
+        assertThat(fuzzy.sourceIds()).containsExactly("S-004");
+        Evidence context = result.findings().stream().filter(f -> f.ruleId().equals(RuleIds.GEO_SPORT_COMBINATION)).findFirst()
+                .orElseThrow().evidence();
+        assertThat(context.sourceIds()).isEmpty();
+    }
+
+    @Test
     void bulletPointsAreSeparateFieldsAndAreNotJoinedIntoAPhrase() {
         TrademarkResult result = scanner.scan(new TrademarkCheckInput("plain", List.of(),
                 List.of("blue harbor", "tools"), "plain", null, null, "tools", null));

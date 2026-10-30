@@ -38,8 +38,16 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
     public record Status(State state, String detail) {
     }
 
-    private record Ready(TrademarkScanner scanner, String catalogVersion, String fileSha256, String postgresMajor,
-                         String trigramVersion) {
+    private record Ready(TrademarkScanner scanner, long catalogVersionId, String catalogVersion, String fileSha256,
+                         String postgresMajor, String trigramVersion) {
+    }
+
+    /**
+     * Everything one trademark check needs, read from one consistent state: the scanner, the analysis fingerprint
+     * for the marketplace and the catalog version it serves (its row id and its name).
+     */
+    public record Serving(TrademarkScanner scanner, AnalysisFingerprint fingerprint, long catalogVersionId,
+                          String catalogVersion) {
     }
 
     private static final Logger log = LoggerFactory.getLogger(TrademarkCatalogRuntime.class);
@@ -97,8 +105,8 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
         }
         long id = ((Number) row.get("id")).longValue();
         PostgresTrademarkCatalog catalog = new PostgresTrademarkCatalog(jdbc, transactions, id, version);
-        ready = new Ready(new TrademarkScanner(rulesets.ruleset(), catalog), version, ((String) row.get("file_sha256")).trim(),
-                postgresMajor(), trigramVersion());
+        ready = new Ready(new TrademarkScanner(rulesets.ruleset(), catalog), id, version,
+                ((String) row.get("file_sha256")).trim(), postgresMajor(), trigramVersion());
         return status = new Status(State.READY, version);
     }
 
@@ -133,7 +141,23 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
      * @throws TrademarkUnavailableException unless the status is READY
      */
     public AnalysisFingerprint fingerprint(String marketplace) {
+        return fingerprint(requireReady(), marketplace);
+    }
+
+    /**
+     * The scanner, the fingerprint for the marketplace and the catalog version, from one read of the state, so a
+     * re-evaluation between two calls cannot pair a scanner with another catalog's fingerprint.
+     *
+     * @throws TrademarkUnavailableException unless the status is READY
+     * @throws IllegalArgumentException      if trademark checks are not configured for the marketplace
+     */
+    public Serving serving(String marketplace) {
         Ready current = requireReady();
+        return new Serving(current.scanner(), fingerprint(current, marketplace), current.catalogVersionId(),
+                current.catalogVersion());
+    }
+
+    private AnalysisFingerprint fingerprint(Ready current, String marketplace) {
         String code = marketplace.trim().toUpperCase(Locale.ROOT);
         if (properties.marketplaces().stream().noneMatch(m -> m.trim().toUpperCase(Locale.ROOT).equals(code))) {
             throw new IllegalArgumentException("Trademark checks are not configured for marketplace " + marketplace);

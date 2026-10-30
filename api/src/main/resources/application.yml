@@ -37,6 +37,15 @@ listing-guard:
     catalog-version: ${LISTING_GUARD_TRADEMARK_CATALOG_VERSION:}
     # manifest.yaml and raw/ for the import job
     catalogs-dir: ${CATALOGS_DIR:catalogs}
+    retention:
+      # How long a trademark result, its input hash and its evidence are kept (ADR-009). An operational proposal, not a
+      # legal guarantee. GET and the cache lookup treat a row past this as absent whether or not the cleanup has run.
+      period: 30d
+      # The scheduled cleanup of expired results runs in every API instance; an advisory lock lets one delete at a time.
+      cleanup-enabled: true
+      cleanup-interval: 1h
+      cleanup-initial-delay: 1m
+      cleanup-batch-size: 500
   policies:
     dir: ${POLICIES_DIR:policies}
     chunking:

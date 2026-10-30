@@ -52,6 +52,22 @@ class RateLimitIntegrationTest {
     }
 
     @Test
+    void trademarkChecksUseTheSameBucketAsChecks() throws Exception {
+        String client = "rl" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+        provisioning.createClient(client);
+        String key = provisioning.createKey(client, "only").secret();
+
+        call(key, 404);
+        mvc.perform(get("/api/v1/trademark-checks/" + UUID.randomUUID()).header(HEADER, key)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/trademark-checks/" + UUID.randomUUID()).header(HEADER, key)).andExpect(status().isNotFound());
+
+        mvc.perform(get("/api/v1/trademark-checks/" + UUID.randomUUID()).header(HEADER, key))
+                .andExpect(status().isTooManyRequests()).andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("rate-limited"));
+        call(key, 429);
+    }
+
+    @Test
     void theKeysOfOneClientShareOneLimit() throws Exception {
         String client = "rl" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
         provisioning.createClient(client);

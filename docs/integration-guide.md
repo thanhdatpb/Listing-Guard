@@ -279,6 +279,157 @@ stored. `GET /api/v1/checks/{id}` always returns the result as it was stored, wi
 newer analysis version exists now. Treat `rulesetVersion` and `analysisVersion` as opaque strings: compare for
 equality, do not parse them.
 
+## Trademark checks
+
+`POST /api/v1/trademark-checks` compares the text of a listing with a catalog of trademark marks and reports possible
+references. It is a separate check with its own endpoint, result and retention: `POST /api/v1/checks` does not change,
+does not contain trademark findings and does not depend on it. The result is a **reference warning, not a legal
+conclusion**; show the `disclaimer` it carries next to it.
+
+The trademark check is optional on the server. When the operator has not configured a catalog (or the configured one is
+refused), it answers `503` (`trademark-not-configured`) and everything else works as before.
+
+### Suggested flow
+
+```text
+Client backend                               Listing Guard
+      |  POST /api/v1/checks                       |
+      |------------------------------------------->|  rules, milliseconds
+      |<-------------------------------------------|  200 findings  -> show them at once
+      |                                            |
+      |  POST /api/v1/trademark-checks  (same JSON)|
+      |------------------------------------------->|  catalog lookup
+      |<-------------------------------------------|  200 trademark findings -> add them when they arrive
+```
+
+Call `/checks` first and show its findings immediately, then call `/trademark-checks` with **the same JSON** and add its
+findings when they arrive. The trademark check reads the database catalog, so it can take longer than the rules; a
+failure or a `503` of the trademark check must not hold back the rule findings or block publishing.
+
+### Request
+
+The body is exactly the one of `POST /api/v1/checks` (`marketplace` and `listing`, in the marketplace's standard input
+format, [`input-schema.md`](input-schema.md)); it goes through the same normalization. The text that is read:
+
+| Marketplace | Fields read |
+|---|---|
+| `ETSY` | `title`, `description`, `tags[i]` |
+| `AMAZON` | `title`, `description`, `brand`, `bullet_points[i]`, `search_terms` |
+
+The category (`category`, or `product_type` for Amazon) is part of the identity of the input but is not scanned. The standard
+input has no shop name, so none is read. Nothing is added to the input schema.
+
+### Response
+
+`200` (a new check or a stored one, `cached`). Example with invented names only:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/trademark-checks \
+  -H 'X-API-Key: <key>' -H 'Content-Type: application/json' \
+  -d '{"marketplace":"ETSY","listing":{
+        "title":"Zorvex Style Northvale Baseball Jersey","description":"Soft cotton jersey.",
+        "tags":["jersey","royal blue white pinstripe"],
+        "price":{"amount":2999,"divisor":100,"currency_code":"USD"},"quantity":5}}'
+```
+
+```json
+{
+  "checkId": "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+  "marketplace": "ETSY",
+  "rulesetVersion": "trademark-risk-2026-11",
+  "catalogVersion": "synthetic-2026-11-0123456789ab",
+  "analysisVersion": "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+  "cached": false,
+  "completeness": "COMPLETE",
+  "riskLevel": "HIGH",
+  "failedRuleIds": [],
+  "disclaimer": "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+  "createdAt": "2026-10-30T09:15:30.123456Z",
+  "expiresAt": "2026-11-29T09:15:30.123456Z",
+  "findings": [
+    {"ruleId": "catalog_exact", "risk": "HIGH", "field": "title", "start": 0, "end": 6, "snippet": "Zorvex",
+     "mark": "ZORVEX", "matchType": "EXACT", "score": 1.0, "insideColorPhrase": false, "otherRuleIds": [],
+     "sourceIds": ["S-001", "S-002"],
+     "message": "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
+     "suggestion": "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."}
+  ]
+}
+```
+
+(Shortened to one of the three findings; the full example is in the OpenAPI document.)
+
+| Field | Meaning |
+|---|---|
+| `checkId` | Identifier of the stored result; `GET /api/v1/trademark-checks/{id}` until `expiresAt`. |
+| `rulesetVersion`, `catalogVersion`, `analysisVersion` | What produced the result. Opaque strings: compare for equality, do not parse. |
+| `cached` | `true` when the stored result of an identical earlier request is returned. |
+| `completeness` | `COMPLETE`, or `INCOMPLETE` when a rule failed (see below). |
+| `riskLevel` | `LOW`, `MEDIUM`, `HIGH` or `UNKNOWN` (see below). |
+| `failedRuleIds` | The rules that failed; empty when `COMPLETE`. |
+| `disclaimer` | The statement that the result is a reference warning. Show it with the result. |
+| `createdAt`, `expiresAt` | When the result was stored and when it stops being readable (UTC). |
+| `findings[]` | One entry per possible reference, most serious first within a field. |
+
+A finding: `ruleId` (`catalog_exact`, `catalog_phrase`, `catalog_fuzzy`, `geo_sport_combination`,
+`pure_color_description`), `risk` (`LOW` is informational, `MEDIUM`, `HIGH`), `field`, `start` and `end`, `snippet`
+(the text of the span, cut to a length limit), `mark` (the catalog mark, `null` for a finding without one), `matchType`
+(`EXACT`, `PHRASE`, `FUZZY`, `CONTEXT`), `score` (1.0 for `EXACT` and `PHRASE`, the similarity for `FUZZY`, `null` for
+`CONTEXT`), `insideColorPhrase` (the match lies in a color description; this explains the finding and never lowers it),
+`otherRuleIds` (other rules that matched an overlapping span and lost to this one), `sourceIds` (ids of the source
+records of the mark), and `message` and `suggestion` (Vietnamese text). Branch on `ruleId`, `risk` and `field`, not on
+the text. `geo_sport_combination` (a place name next to a sport term) and `pure_color_description` (a phrase of only
+color and pattern words; always `LOW`, and it never raises `riskLevel`) need no catalog mark. A `LOW` finding is not a
+statement that anything is allowed.
+
+### Highlighting a finding
+
+`field`, `start` and `end` locate a finding in **the text the API worked on**: the field's value after the cleaning of
+[`input-schema.md`](input-schema.md), then **Unicode NFC, then trimmed**. `start` is inclusive, `end` exclusive, and both
+count **UTF-16 code units**. A JavaScript or Java string is UTF-16 too, so a client does not convert anything: it
+normalizes and trims its own text the same way and cuts the string.
+
+```js
+const canonical = (value) => value.normalize('NFC').trim();   // JavaScript
+const text = canonical(listing.title);                           // field "title"
+const f = result.findings[0];
+const marked = text.slice(0, f.start) + '[' + text.slice(f.start, f.end) + ']' + text.slice(f.end);
+// text.slice(f.start, f.end) === f.snippet  (unless the snippet was cut to its length limit)
+```
+
+Field names: `title`, `description`, `brand` and `search_terms` are the field itself; `tags[i]` and `bullet_points[i]` are the
+zero-based position **in the cleaned list**, the same convention as the findings of `/checks`: blank entries are
+dropped before counting, so if you send blank tags or bullet points the index can differ from your own list. A mark in
+Amazon `search_terms` sent as an array is located in the terms joined by single spaces. Two limits of the "same
+trimming": the API removes whitespace as Java's `trim` and `strip` do, which keeps no-break spaces (U+00A0, U+2007,
+U+202F) that JavaScript's `trim()` removes, and offsets are not code points: a character outside the Basic Multilingual
+Plane (an emoji) counts as two. If your text has those at the very start or end of a field, strip them the Java way
+before computing offsets, or match on `snippet`.
+
+### `riskLevel`, `INCOMPLETE` and `UNKNOWN`
+
+`riskLevel` is the highest level among the findings, and `LOW` when a complete check found nothing above `LOW`. If a
+rule fails (a catalog lookup error, for example) the result is `INCOMPLETE`: the findings of the rules that succeeded
+are kept and `failedRuleIds` names the others. The level is then the highest established one if that is `MEDIUM` or
+`HIGH`; otherwise it is **`UNKNOWN`**, never `LOW`, because the check could not rule the risk out. Treat `UNKNOWN`
+as "not checked", not as "clean". An `INCOMPLETE` result has a `checkId` and can be read with GET, but it is never
+returned for another request: repeating the request runs the analysis again.
+
+### Retention and caching
+
+Only a hash of the submitted text, the result and the findings' short evidence are stored; **the listing text itself is not**.
+A result is kept for **30 days** (`expiresAt`; an operational setting, not a guarantee). After that `GET
+/api/v1/trademark-checks/{id}` answers `404` whether or not the server's cleanup has run, an expired `checkId` never
+becomes readable again, and the same listing sent again is analysed again and gets a new `checkId`.
+
+An identical request of the same client (same marketplace, same text, same `analysisVersion`) returns the stored
+`COMPLETE` result with `cached: true`. The text counts as identical after Unicode NFC and trimming, before any matching
+normalization, so `ZORVEX` and `zorvex` are two different inputs. A new ruleset version, catalog, algorithm,
+PostgreSQL major version or `pg_trgm` version changes `analysisVersion` and with it the cache. Another client never
+reads your results, and a `checkId` of another client answers `404` exactly like one that does not exist. The rate
+limit is the one of the client, shared with the other endpoints.
+
+Known limitation: the catalog is shared, so if your own brand matches a mark in it the check can report a false positive.
+
 ## Errors
 
 Errors are `application/problem+json` (RFC 7807) with these members: `type` (`urn:listing-guard:problem:<code>`),
@@ -291,6 +442,7 @@ validation. Branch on `code`, not on `detail`.
 | 400 | `unknown-marketplace` | The marketplace code is not known. | Fix the code. `detail` lists the supported ones. |
 | 401 | `unauthorized` | Missing or invalid `X-API-Key`. | Check the key. Do not retry in a loop. |
 | 404 | `check-not-found` | No check with that id for your client. A check of another client gives this same answer. | The id is wrong, or it is not yours. |
+| 404 | `trademark-check-not-found` | `GET /api/v1/trademark-checks/{id}`: no retained trademark check with that id for your client. A check of another client, an id that never existed and an expired check give this same answer. | The id is wrong, not yours, or past its retention: send the listing again. |
 | 404 | `not-found` | Unknown route. | Check the URL. |
 | 405 | `method-not-allowed` | Wrong HTTP method. | |
 | 413 | `payload-too-large` | Body over 256 KB. | Send less. |
@@ -301,6 +453,7 @@ validation. Branch on `code`, not on `detail`.
 | 503 | `embedding-not-configured` | Only on routes that need embeddings (the policy search debug view). The deployment runs without an embedding provider, which is the default. Not `POST /api/v1/checks`. | An operator must choose a provider; retrying does not help. |
 | 503 | `embedding-unavailable` | Only on routes that need the embedding backend. Not `POST /api/v1/checks`. | |
 | 503 | `corpus-model-mismatch` | Only on routes that search the policy corpus. The stored corpus was embedded with another model than the configured one, so searching is refused. Not `POST /api/v1/checks`. | An operator must run the ingest job again. |
+| 503 | `trademark-not-configured` | Only `POST /api/v1/trademark-checks`. The deployment has no trademark catalog configured, or the configured one is refused. `POST /api/v1/checks` is not affected. | Skip the trademark check; retrying does not help. An operator must configure a catalog. |
 | 503 | `service-unavailable` | The API key could not be checked because the database did not answer. | Retry later with backoff. |
 
 Retrying `POST /api/v1/checks` is always safe: it has no side effect other than storing the result, and an
@@ -330,5 +483,5 @@ the operator creates one.
 
 Mapping a client's own listing format to the standard input format (that is done on the client's side),
 rules that differ per client, an admin UI, billing, policy-grounded LLM findings, feedback on findings,
-image checks, configured product-type-specific Amazon limits (no overrides are configured until sources are
+image checks, compatibility or descriptive-use rules for trademarks, a client-specific trademark catalog, configured product-type-specific Amazon limits (no overrides are configured until sources are
 verified), and stores other than the US one.

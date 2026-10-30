@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.api.trademark;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.thanhdatpb.listingguard.api.ApiTestKeys;
@@ -31,6 +32,15 @@ class TrademarkRefusedStartupTest {
     void theApplicationStartsAndTheConfiguredCatalogIsRefused() {
         assertThat(runtime.status().state()).isEqualTo(TrademarkCatalogRuntime.State.REFUSED);
         assertThat(runtime.status().detail()).contains("configured-but-never-imported-0123456789ab");
+    }
+
+    @Test
+    void trademarkChecksAnswer503WhileTheCatalogIsRefused() throws Exception {
+        mvc.perform(post("/api/v1/trademark-checks").header(ApiTestKeys.HEADER, ApiTestKeys.KEY_1)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"marketplace\":\"ETSY\",\"listing\":{\"title\":\"Plain mug\"}}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("trademark-not-configured"))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("configured-but-never-imported-0123456789ab")));
     }
 
     @Test

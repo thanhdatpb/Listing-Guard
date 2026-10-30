@@ -275,8 +275,9 @@ class MigrationTrademarkCatalogTest {
         flyway("latest").migrate();
 
         try (Connection connection = open()) {
-            assertThat(scalar(connection, "SELECT max(version::int) FROM flyway_schema_history WHERE success"))
-                    .isEqualTo("16");
+            assertThat(scalar(connection, "SELECT count(*) FROM flyway_schema_history WHERE version = '16' AND success"))
+                    .as("V16 applied once the old catalogs were gone").isEqualTo("1");
+            assertThat(columns(connection, "trademark_catalog_version")).contains("normalization_hash");
         }
     }
 
