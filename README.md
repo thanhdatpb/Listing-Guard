@@ -252,12 +252,13 @@ this storage and use.**
 3. **Import:** `docker compose run --rm trademark-import --catalog=<version label>`. It validates the whole file
    (one bad line rejects the batch and names the line), keeps the records that match the filters, merges records
    that normalize to the same mark, writes one new catalog version and prints its name (the label plus a digest).
-   Running it again with the same file, filters and ruleset changes nothing; a different file, filter or ruleset
-   makes a new version and never edits an old one.
+   Running it again with the same file, filters and normalization settings changes nothing; a different file, filter or
+   normalization makes a new version and never edits an old one.
 4. **Serve it:** set `TRADEMARK_CATALOG_VERSION` (`listing-guard.trademark.catalog-version`) to that name and restart
    the API. Leave it empty to keep trademark checks off. A catalog that does not exist, or that was imported with
-   another trademark ruleset or normalizer, is refused at start-up (the API still starts and `/checks` still works):
-   import it again with the current ruleset and configure the new name.
+   other normalization settings or another normalizer version, is refused at start-up (the API still starts and
+   `/checks` still works): import it again and configure the new name. A ruleset that only changes thresholds or word
+   lists still serves the catalog.
 
 ## Rulesets
 

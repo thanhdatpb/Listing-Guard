@@ -267,20 +267,26 @@ of the ruleset and the runtime fingerprint. It has no endpoint and no result tab
 - **Filter and merge.** A record is kept when at least one of its classes is in `include_classes` and its status is in
   `include_status`. Kept records with the same normalized mark (normalized with the active trademark ruleset's
   normalizer) become one entry: the classes are united, `common_word` is true if any record says so, the status is
-  the one declared first in `MarkStatus`, and the display form (with its `source_id`) is the smallest by
-  `String.compareTo`, ties to the smaller source id. An import that keeps nothing is rejected. The version row stores
+  the one declared first in `MarkStatus`, the display form is the smallest by `String.compareTo` (ties to the
+  smaller source id), and `source_ids` keeps the id of every merged record, ascending and without duplicates (stored
+  as `TEXT[]`, carried by `CatalogMark.sourceIds`). An import that keeps nothing is rejected. The version row stores
   the counts read, filtered, merged and loaded; the log has the counts and no marks.
 - **Version and idempotence.** The stored version is the manifest label plus the first 12 hex digits of a SHA-256
   over the label, the source fields, the file hash, the format version, the canonical filters JSON and the
-  normalization identity. The same import therefore finds the version it made and changes nothing; a changed file,
+  normalization identity (pack, normalizer version, normalization hash). The same import therefore finds the version it made and changes nothing; a changed file,
   filter, source field or normalization identity is another version, and an existing version is never modified. The
   version row and all entries are written in one transaction.
-- **Normalization identity** of a catalog: pack id, trademark ruleset version, ruleset content hash and normalizer
-  version. Because the whole ruleset hash is part of it, any new ruleset version needs a new import.
+- **Normalization identity** of a catalog: the pack id, the normalizer version (`normalization-1`) and
+  `normalization_hash`, the SHA-256 of the canonical form of the ruleset's `normalization` section after parsing
+  (every table sorted by code point, keys and values as hexadecimal code points; not the YAML bytes, so a comment, the
+  order of keys or the quoting do not change it, while any mapping, the leet distance or a deleted character does).
+  The rest of the ruleset is not part of it: a new ruleset version that changes thresholds, word lists, risk levels or
+  messages keeps serving the catalog, and only a change of the normalization settings or of the normalizer needs a
+  new import. This replaces storing the ruleset version and content hash with the catalog.
 - **Active catalog.** `listing-guard.trademark.catalog-version` names one stored version exactly; there is no
   "latest". At start-up `TrademarkCatalogRuntime` is `DISABLED` when nothing is configured (the application starts), and
-  `REFUSED` when the version does not exist or its normalization identity differs from the active ruleset and
-  normalizer, like the corpus model guard of ADR-012 (`/checks` keeps working). Only `READY` serves a scanner.
+  `REFUSED` when the version does not exist or its normalization identity differs from the active normalizer and
+  normalization settings, like the corpus model guard of ADR-012 (`/checks` keeps working). Only `READY` serves a scanner.
 - **PostgreSQL adapter.** `findExact` is `normalized = ANY(...)`. `fuzzyCandidates` runs in one transaction:
   `set_config('pg_trgm.similarity_threshold', t, true)` with the ruleset's candidate threshold, then
   `e.normalized % f.form` over `unnest` of all forms, so the session setting is never used and the local setting

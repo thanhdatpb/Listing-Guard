@@ -202,6 +202,8 @@ TRADEMARK_CATALOG_VERSION=<label>-<digest>      # in .env, then recreate the api
 In production put `catalogs/` next to the compose file (or set `CATALOGS_DIR` and mount it) and run the same job with
 the production compose file. Changing the active catalog is a configuration change plus a restart; the old version
 stays in the database. The API logs `Trademark checks are ready on catalog version ...`, `are off` (nothing
-configured) or `are refused` (the version does not exist, or it was imported with another trademark ruleset version,
-ruleset content hash or normalizer version): import it again and configure the new version. `/checks` is not
+configured) or `are refused` (the version does not exist, or it was imported with another normalizer version or other
+normalization settings): import it again and configure the new version. A new trademark ruleset version that only
+changes thresholds, word lists, risk levels or messages does not need a new import, because a catalog depends only on
+the `normalization` section of the ruleset and the normalizer version. `/checks` is not
 affected by any of these states. Importing needs the database but no network and no embedding provider.

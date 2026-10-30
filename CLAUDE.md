@@ -118,7 +118,8 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   them), only `catalogs/manifest.yaml` is committed, tests use synthetic files only. A catalog version is append-only
   (DB trigger) and its stored name is the manifest label plus a digest of the import; never edit one, import again. The
   active catalog is named exactly in `listing-guard.trademark.catalog-version` (never "latest") and is refused when its
-  normalization identity (pack, ruleset version, ruleset hash, normalizer version) differs from the active ruleset.
+  normalization identity (pack, normalizer version, hash of the parsed `normalization` section) differs from the active
+  one; a ruleset that only changes thresholds or word lists still serves it.
 - Ingest, eval, admin and trademark-import are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`,
   `trademark-import`), not HTTP endpoints.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
