@@ -148,6 +148,78 @@
           }
         },
         "type" : "object"
+      },
+      "TrademarkCheckResult" : {
+        "properties" : {
+          "analysisVersion" : {
+            "description" : "Version of everything that decides the result (ruleset, algorithms, catalog, database). Opaque: compare for equality only. Two checks of one client with the same marketplace, the same listing text and the same analysisVersion have the same result.",
+            "example" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+            "type" : "string"
+          },
+          "cached" : {
+            "description" : "True when the stored result of an identical earlier check is returned instead of a new analysis. Only a COMPLETE result is ever returned from the cache.",
+            "type" : "boolean"
+          },
+          "catalogVersion" : {
+            "description" : "Version of the trademark catalog the text was compared with. Opaque.",
+            "example" : "synthetic-2026-11-0123456789ab",
+            "type" : "string"
+          },
+          "checkId" : {
+            "description" : "Identifier of the stored check; use it with GET /api/v1/trademark-checks/{id} until expiresAt.",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "completeness" : {
+            "description" : "COMPLETE when every rule ran. INCOMPLETE when a rule failed: the findings of the rules that succeeded are kept, failedRuleIds names the others, and riskLevel is the highest established level or UNKNOWN.",
+            "enum" : [ "COMPLETE", "INCOMPLETE" ],
+            "type" : "string"
+          },
+          "createdAt" : {
+            "description" : "When the check was first stored (UTC).",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "disclaimer" : {
+            "description" : "Statement that the result is a reference warning and not a legal conclusion. Show it with the result.",
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "description" : "When the stored result stops being readable (UTC). After this instant GET answers 404 and the same listing is analysed again.",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failedRuleIds" : {
+            "description" : "Rules that failed; empty for a COMPLETE result.",
+            "example" : [ ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "findings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FindingView"
+            },
+            "type" : "array"
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, upper case.",
+            "example" : "ETSY",
+            "type" : "string"
+          },
+          "riskLevel" : {
+            "description" : "The highest level among the findings (LOW when a complete check found nothing above LOW). UNKNOWN means the risk could not be determined because the check is INCOMPLETE; it is never reported as LOW.",
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
+            "type" : "string"
+          },
+          "rulesetVersion" : {
+            "description" : "Version of the trademark ruleset that produced the result.",
+            "example" : "trademark-risk-2026-11",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
       }
     },
     "securitySchemes" : {
@@ -169,7 +241,7 @@
     "/api/v1/checks" : {
       "post" : {
         "description" : "Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content was already checked by the calling client with the same analysisVersion, the stored result is returned instead and `cached` is true (no new check is created); results are never shared between clients. The listing is the marketplace's own format; for Etsy it is the Open API v3 style JSON with snake_case fields, for Amazon the simple format with title, brand, bullet_points, description, search_terms, product_type, price, quantity and images.",
-        "operationId" : "check",
+        "operationId" : "check_1",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -503,7 +575,7 @@
     "/api/v1/checks/{id}" : {
       "get" : {
         "description" : "Returns the stored result of an earlier check of the calling client, in the same shape as the POST response (`cached` is false).",
-        "operationId" : "get",
+        "operationId" : "get_1",
         "parameters" : [ {
           "description" : "checkId returned by POST /api/v1/checks",
           "in" : "path",
@@ -653,6 +725,467 @@
         "tags" : [ "Checks" ]
       }
     },
+    "/api/v1/trademark-checks" : {
+      "post" : {
+        "description" : "Takes the same request as `POST /api/v1/checks` (`marketplace` and `listing` in the marketplace's own format), so a client can send one JSON to both endpoints. Compares the listing's text with the configured trademark catalog and returns findings with evidence: the field, the span in the text the API worked on (after trimming and Unicode NFC, UTF-16 offsets), the matched mark and how it matched. The result is a reference warning, not a legal conclusion; show the `disclaimer` with it. If the same client already sent the same listing text with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so its id can be read again, and is never reused for another request. Results are kept for a limited time (`expiresAt`); only the listing's hash and the result are stored, not the listing text.",
+        "operationId" : "check",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "examples" : {
+                "etsy-listing" : {
+                  "description" : "etsy-listing",
+                  "summary" : "An Etsy listing (synthetic names)",
+                  "value" : {
+                    "listing" : {
+                      "description" : "Soft cotton jersey.",
+                      "price" : {
+                        "amount" : 2999,
+                        "currency_code" : "USD",
+                        "divisor" : 100
+                      },
+                      "quantity" : 5,
+                      "tags" : [ "jersey", "royal blue white pinstripe" ],
+                      "title" : "Zorvex Style Northvale Baseball Jersey"
+                    },
+                    "marketplace" : "ETSY"
+                  }
+                }
+              },
+              "schema" : {
+                "$ref" : "#/components/schemas/CheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "cached" : {
+                    "description" : "cached",
+                    "summary" : "The same listing again: the stored result",
+                    "value" : {
+                      "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+                      "cached" : true,
+                      "catalogVersion" : "synthetic-2026-11-0123456789ab",
+                      "checkId" : "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-10-30T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+                      "expiresAt" : "2026-11-29T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "end" : 6,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : "ZORVEX",
+                        "matchType" : "EXACT",
+                        "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "HIGH",
+                        "ruleId" : "catalog_exact",
+                        "score" : 1.0,
+                        "snippet" : "Zorvex",
+                        "sourceIds" : [ "S-001", "S-002" ],
+                        "start" : 0,
+                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                      }, {
+                        "end" : 31,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : null,
+                        "matchType" : "CONTEXT",
+                        "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "MEDIUM",
+                        "ruleId" : "geo_sport_combination",
+                        "score" : null,
+                        "snippet" : "Northvale Baseball",
+                        "sourceIds" : [ ],
+                        "start" : 13,
+                        "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                      }, {
+                        "end" : 26,
+                        "field" : "tags[1]",
+                        "insideColorPhrase" : false,
+                        "mark" : null,
+                        "matchType" : "CONTEXT",
+                        "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "LOW",
+                        "ruleId" : "pure_color_description",
+                        "score" : null,
+                        "snippet" : "royal blue white pinstripe",
+                        "sourceIds" : [ ],
+                        "start" : 0,
+                        "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                      } ],
+                      "marketplace" : "ETSY",
+                      "riskLevel" : "HIGH",
+                      "rulesetVersion" : "trademark-risk-2026-11"
+                    }
+                  },
+                  "findings" : {
+                    "description" : "findings",
+                    "summary" : "A fresh check with findings",
+                    "value" : {
+                      "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+                      "cached" : false,
+                      "catalogVersion" : "synthetic-2026-11-0123456789ab",
+                      "checkId" : "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-10-30T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+                      "expiresAt" : "2026-11-29T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "end" : 6,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : "ZORVEX",
+                        "matchType" : "EXACT",
+                        "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "HIGH",
+                        "ruleId" : "catalog_exact",
+                        "score" : 1.0,
+                        "snippet" : "Zorvex",
+                        "sourceIds" : [ "S-001", "S-002" ],
+                        "start" : 0,
+                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                      }, {
+                        "end" : 31,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : null,
+                        "matchType" : "CONTEXT",
+                        "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "MEDIUM",
+                        "ruleId" : "geo_sport_combination",
+                        "score" : null,
+                        "snippet" : "Northvale Baseball",
+                        "sourceIds" : [ ],
+                        "start" : 13,
+                        "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                      }, {
+                        "end" : 26,
+                        "field" : "tags[1]",
+                        "insideColorPhrase" : false,
+                        "mark" : null,
+                        "matchType" : "CONTEXT",
+                        "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "LOW",
+                        "ruleId" : "pure_color_description",
+                        "score" : null,
+                        "snippet" : "royal blue white pinstripe",
+                        "sourceIds" : [ ],
+                        "start" : 0,
+                        "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                      } ],
+                      "marketplace" : "ETSY",
+                      "riskLevel" : "HIGH",
+                      "rulesetVersion" : "trademark-risk-2026-11"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/TrademarkCheckResult"
+                }
+              }
+            },
+            "description" : "The trademark check result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-request" : {
+                    "description" : "invalid-request",
+                    "value" : {
+                      "code" : "invalid-request",
+                      "detail" : "The request is not valid; see errors.",
+                      "errors" : [ {
+                        "field" : "listing",
+                        "message" : "must not be null"
+                      } ],
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-request"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request (code `invalid-request`) or unknown marketplace (`unknown-marketplace`)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "payload-too-large",
+                  "detail" : "The request body is larger than the limit of 262144 bytes.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 413,
+                  "title" : "Payload Too Large",
+                  "type" : "urn:listing-guard:problem:payload-too-large"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request body is over the size limit (256 KB)."
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not application/json (code `unsupported-media-type`)."
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`)."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client (the same limit as the other endpoints); see the Retry-After header."
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "trademark-not-configured",
+                  "detail" : "Trademark checks are unavailable: no catalog version is configured (listing-guard.trademark.catalog-version)",
+                  "instance" : "/api/v1/trademark-checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 503,
+                  "title" : "Service Unavailable",
+                  "type" : "urn:listing-guard:problem:trademark-not-configured"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Trademark checks are not available on this server: no catalog is configured or the configured one is refused (code `trademark-not-configured`). `POST /api/v1/checks` is not affected. Retrying does not help; an operator must configure a catalog."
+          }
+        },
+        "summary" : "Check a listing for possible trademark references",
+        "tags" : [ "Trademark checks" ]
+      }
+    },
+    "/api/v1/trademark-checks/{id}" : {
+      "get" : {
+        "description" : "Returns the stored result of an earlier trademark check of the calling client while it is retained, in the same shape as the POST response (`cached` is false). After `expiresAt`, for an unknown id and for another client's check the answer is the same 404.",
+        "operationId" : "get",
+        "parameters" : [ {
+          "description" : "checkId returned by POST /api/v1/trademark-checks",
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+                  "cached" : false,
+                  "catalogVersion" : "synthetic-2026-11-0123456789ab",
+                  "checkId" : "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+                  "completeness" : "COMPLETE",
+                  "createdAt" : "2026-10-30T09:15:30.123456Z",
+                  "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+                  "expiresAt" : "2026-11-29T09:15:30.123456Z",
+                  "failedRuleIds" : [ ],
+                  "findings" : [ {
+                    "end" : 6,
+                    "field" : "title",
+                    "insideColorPhrase" : false,
+                    "mark" : "ZORVEX",
+                    "matchType" : "EXACT",
+                    "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
+                    "otherRuleIds" : [ ],
+                    "risk" : "HIGH",
+                    "ruleId" : "catalog_exact",
+                    "score" : 1.0,
+                    "snippet" : "Zorvex",
+                    "sourceIds" : [ "S-001", "S-002" ],
+                    "start" : 0,
+                    "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                  }, {
+                    "end" : 31,
+                    "field" : "title",
+                    "insideColorPhrase" : false,
+                    "mark" : null,
+                    "matchType" : "CONTEXT",
+                    "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
+                    "otherRuleIds" : [ ],
+                    "risk" : "MEDIUM",
+                    "ruleId" : "geo_sport_combination",
+                    "score" : null,
+                    "snippet" : "Northvale Baseball",
+                    "sourceIds" : [ ],
+                    "start" : 13,
+                    "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                  }, {
+                    "end" : 26,
+                    "field" : "tags[1]",
+                    "insideColorPhrase" : false,
+                    "mark" : null,
+                    "matchType" : "CONTEXT",
+                    "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
+                    "otherRuleIds" : [ ],
+                    "risk" : "LOW",
+                    "ruleId" : "pure_color_description",
+                    "score" : null,
+                    "snippet" : "royal blue white pinstripe",
+                    "sourceIds" : [ ],
+                    "start" : 0,
+                    "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                  } ],
+                  "marketplace" : "ETSY",
+                  "riskLevel" : "HIGH",
+                  "rulesetVersion" : "trademark-risk-2026-11"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/TrademarkCheckResult"
+                }
+              }
+            },
+            "description" : "The stored result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The id is not a UUID."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "trademark-check-not-found",
+                  "detail" : "No trademark check with id 0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+                  "instance" : "/api/v1/trademark-checks/0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 404,
+                  "title" : "Not Found",
+                  "type" : "urn:listing-guard:problem:trademark-check-not-found"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No retained trademark check with this id for the calling client (code `trademark-check-not-found`). A check of another client, an id that never existed and an expired check give the same answer."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read a stored trademark check",
+        "tags" : [ "Trademark checks" ]
+      }
+    },
     "/health" : {
       "get" : {
         "description" : "200 when PostgreSQL can be queried, 503 otherwise. No API key needed.",
@@ -681,6 +1214,9 @@
     "ApiKeyAuth" : [ ]
   } ],
   "tags" : [ {
+    "description" : "Possible trademark references in a listing's text, as a reference warning.",
+    "name" : "Trademark checks"
+  }, {
     "description" : "Check a listing and read stored results.",
     "name" : "Checks"
   } ]

@@ -4,6 +4,8 @@ import com.thanhdatpb.listingguard.api.check.CheckNotFoundException;
 import com.thanhdatpb.listingguard.api.check.MarketplaceNotYetSupportedException;
 import com.thanhdatpb.listingguard.api.check.UnknownMarketplaceException;
 import com.thanhdatpb.listingguard.api.policy.CorpusModelMismatchException;
+import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckNotFoundException;
+import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingNotConfiguredException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,6 +50,18 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(CheckNotFoundException.class)
     public ProblemDetail checkNotFound(CheckNotFoundException e) {
         return Problems.of(HttpStatus.NOT_FOUND, "check-not-found", e.getMessage());
+    }
+
+    /** A trademark check of another client, an unknown one and an expired one all answer alike (ADR-007, ADR-009). */
+    @ExceptionHandler(TrademarkCheckNotFoundException.class)
+    public ProblemDetail trademarkCheckNotFound(TrademarkCheckNotFoundException e) {
+        return Problems.of(HttpStatus.NOT_FOUND, "trademark-check-not-found", e.getMessage());
+    }
+
+    /** No trademark catalog is served (not configured, or refused); only trademark checks are affected, not /checks (ADR-009). */
+    @ExceptionHandler(TrademarkUnavailableException.class)
+    public ProblemDetail trademarkNotConfigured(TrademarkUnavailableException e) {
+        return Problems.of(HttpStatus.SERVICE_UNAVAILABLE, "trademark-not-configured", e.getMessage());
     }
 
     /** Input that a lower layer rejected, such as a listing that is not a JSON object. */

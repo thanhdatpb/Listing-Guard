@@ -251,6 +251,178 @@ public final class ApiExamples {
             }
             """;
 
+    /** Synthetic names only: the marks of the test catalog and the invented place "Northvale". */
+    public static final String TRADEMARK_REQUEST = """
+            {
+              "marketplace": "ETSY",
+              "listing": {
+                "title": "Zorvex Style Northvale Baseball Jersey",
+                "description": "Soft cotton jersey.",
+                "tags": ["jersey", "royal blue white pinstripe"],
+                "price": {"amount": 2999, "divisor": 100, "currency_code": "USD"},
+                "quantity": 5
+              }
+            }
+            """;
+
+    public static final String TRADEMARK_RESULT = """
+            {
+              "checkId": "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+              "marketplace": "ETSY",
+              "rulesetVersion": "trademark-risk-2026-11",
+              "catalogVersion": "synthetic-2026-11-0123456789ab",
+              "analysisVersion": "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+              "cached": false,
+              "completeness": "COMPLETE",
+              "riskLevel": "HIGH",
+              "failedRuleIds": [],
+              "disclaimer": "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+              "createdAt": "2026-10-30T09:15:30.123456Z",
+              "expiresAt": "2026-11-29T09:15:30.123456Z",
+              "findings": [
+                {
+                  "ruleId": "catalog_exact",
+                  "risk": "HIGH",
+                  "field": "title",
+                  "start": 0,
+                  "end": 6,
+                  "snippet": "Zorvex",
+                  "mark": "ZORVEX",
+                  "matchType": "EXACT",
+                  "score": 1.0,
+                  "insideColorPhrase": false,
+                  "otherRuleIds": [],
+                  "sourceIds": ["S-001", "S-002"],
+                  "message": "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
+                  "suggestion": "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                },
+                {
+                  "ruleId": "geo_sport_combination",
+                  "risk": "MEDIUM",
+                  "field": "title",
+                  "start": 13,
+                  "end": 31,
+                  "snippet": "Northvale Baseball",
+                  "mark": null,
+                  "matchType": "CONTEXT",
+                  "score": null,
+                  "insideColorPhrase": false,
+                  "otherRuleIds": [],
+                  "sourceIds": [],
+                  "message": "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
+                  "suggestion": "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                },
+                {
+                  "ruleId": "pure_color_description",
+                  "risk": "LOW",
+                  "field": "tags[1]",
+                  "start": 0,
+                  "end": 26,
+                  "snippet": "royal blue white pinstripe",
+                  "mark": null,
+                  "matchType": "CONTEXT",
+                  "score": null,
+                  "insideColorPhrase": false,
+                  "otherRuleIds": [],
+                  "sourceIds": [],
+                  "message": "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
+                  "suggestion": "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                }
+              ]
+            }
+            """;
+
+    public static final String TRADEMARK_RESULT_CACHED = """
+            {
+              "checkId": "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+              "marketplace": "ETSY",
+              "rulesetVersion": "trademark-risk-2026-11",
+              "catalogVersion": "synthetic-2026-11-0123456789ab",
+              "analysisVersion": "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+              "cached": true,
+              "completeness": "COMPLETE",
+              "riskLevel": "HIGH",
+              "failedRuleIds": [],
+              "disclaimer": "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+              "createdAt": "2026-10-30T09:15:30.123456Z",
+              "expiresAt": "2026-11-29T09:15:30.123456Z",
+              "findings": [
+                {
+                  "ruleId": "catalog_exact",
+                  "risk": "HIGH",
+                  "field": "title",
+                  "start": 0,
+                  "end": 6,
+                  "snippet": "Zorvex",
+                  "mark": "ZORVEX",
+                  "matchType": "EXACT",
+                  "score": 1.0,
+                  "insideColorPhrase": false,
+                  "otherRuleIds": [],
+                  "sourceIds": ["S-001", "S-002"],
+                  "message": "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
+                  "suggestion": "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                },
+                {
+                  "ruleId": "geo_sport_combination",
+                  "risk": "MEDIUM",
+                  "field": "title",
+                  "start": 13,
+                  "end": 31,
+                  "snippet": "Northvale Baseball",
+                  "mark": null,
+                  "matchType": "CONTEXT",
+                  "score": null,
+                  "insideColorPhrase": false,
+                  "otherRuleIds": [],
+                  "sourceIds": [],
+                  "message": "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
+                  "suggestion": "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                },
+                {
+                  "ruleId": "pure_color_description",
+                  "risk": "LOW",
+                  "field": "tags[1]",
+                  "start": 0,
+                  "end": 26,
+                  "snippet": "royal blue white pinstripe",
+                  "mark": null,
+                  "matchType": "CONTEXT",
+                  "score": null,
+                  "insideColorPhrase": false,
+                  "otherRuleIds": [],
+                  "sourceIds": [],
+                  "message": "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
+                  "suggestion": "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                }
+              ]
+            }
+            """;
+
+    public static final String PROBLEM_TRADEMARK_NOT_CONFIGURED = """
+            {
+              "type": "urn:listing-guard:problem:trademark-not-configured",
+              "title": "Service Unavailable",
+              "status": 503,
+              "detail": "Trademark checks are unavailable: no catalog version is configured (listing-guard.trademark.catalog-version)",
+              "instance": "/api/v1/trademark-checks",
+              "code": "trademark-not-configured",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
+    public static final String PROBLEM_TRADEMARK_NOT_FOUND = """
+            {
+              "type": "urn:listing-guard:problem:trademark-check-not-found",
+              "title": "Not Found",
+              "status": 404,
+              "detail": "No trademark check with id 0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+              "instance": "/api/v1/trademark-checks/0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+              "code": "trademark-check-not-found",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
     public static final String PROBLEM_TOO_LARGE = """
             {
               "type": "urn:listing-guard:problem:payload-too-large",
