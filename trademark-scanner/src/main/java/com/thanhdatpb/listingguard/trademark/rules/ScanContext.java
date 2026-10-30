@@ -43,7 +43,7 @@ public final class ScanContext {
 
     private static boolean isScanned(TrademarkRuleset ruleset, String fieldName) {
         for (String scan : ruleset.matching().scanFields()) {
-            if (scan.equals(fieldName) || (scan.equals("tags") && fieldName.startsWith("tags["))) {
+            if (scan.equals(fieldName) || fieldName.startsWith(scan + "[")) {
                 return true;
             }
         }

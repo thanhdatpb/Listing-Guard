@@ -264,4 +264,36 @@ class ContextRulesTest {
 
         assertThat(ruleIds(result)).containsExactly(RuleIds.CATALOG_EXACT, RuleIds.GEO_SPORT_COMBINATION);
     }
+
+    // --- a sport word inside a place name ---
+
+    @Test
+    void aSportWordInsideAMatchedPlaceNameIsNotASportTerm() {
+        String placeWithSport = "Port Hockey";
+        assertThat(ruleset.lexicon().places()).contains(List.of("port", "hockey"));
+        assertThat(ruleset.lexicon().sportTerms()).contains(List.of("hockey"));
+
+        assertThat(scanTitle(scanner, place + " " + placeWithSport).findings()).isEmpty();
+        assertThat(scanTitle(scanner, placeWithSport + " " + place).findings()).isEmpty();
+        assertThat(scanTitle(scanner, placeWithSport).findings()).isEmpty();
+    }
+
+    @Test
+    void aPlaceNameContainingASportWordStillPairsWithARealSportTerm() {
+        TrademarkResult result = scanTitle(scanner, "Port Hockey " + sport);
+
+        assertThat(ruleIds(result)).containsExactly(RuleIds.GEO_SPORT_COMBINATION);
+        assertThat(result.findings().get(0).message()).contains("port hockey").contains(sport);
+    }
+
+    @Test
+    void aSportWordOutsideThePlaceNameStillCounts() {
+        String title = "Port Hockey" + filler(distance + 1) + " " + place + " hockey";
+
+        TrademarkResult result = scanTitle(scanner, title);
+
+        assertThat(ruleIds(result)).containsExactly(RuleIds.GEO_SPORT_COMBINATION);
+        Evidence evidence = result.findings().get(0).evidence();
+        assertThat(title.substring(evidence.start(), evidence.end())).isEqualTo(place + " hockey");
+    }
 }
