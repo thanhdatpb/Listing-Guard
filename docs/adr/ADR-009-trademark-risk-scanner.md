@@ -226,9 +226,17 @@ that the Decision above leaves open:
   they are also reported as failed when a catalog rule failed: a color description is never called free of trademark
   references when the lookup failed. Overall risk is the highest finding level; an incomplete scan keeps it only if
   it is MEDIUM or HIGH, otherwise it is `UNKNOWN`.
-- **Input hash.** SHA-256 over `listing-guard/trademark-input/v1` and the fields in the order title, tags (in the
-  order sent), description, brand, shop name, category, each as `name:byteLength:text` after NFC and `strip`, with
-  the tag count after the last tag. A blank tag keeps its position so `tags[i]` is always the i-th tag sent.
+- **Input hash.** SHA-256 over `listing-guard/trademark-input/v1` and the fields in this order: title, tags,
+  bullet points, description, brand, shop name, search terms, category. Tags and bullet points keep the order the
+  caller sent; each field is `name:byteLength:text` after NFC and `strip`, and each list is followed by a line
+  `name:count` (`tags:2`, `bullet_points:5`) so the serialization says where it ends. A blank tag or bullet point
+  keeps its position, so `tags[i]` and `bullet_points[i]` are always the i-th item sent. The Amazon fields
+  (`bullet_points`, `search_terms`) are empty for an Etsy listing. The ruleset scans `bullet_points` and
+  `search_terms` like the other fields, and evidence names the field with its index (`bullet_points[1]`).
+- **Sport word inside a place name.** In the geographic + sport rule, a sport term that lies entirely inside a place
+  name matched in the same field is ignored: with the place "Port Hockey" in the list, "Northvale Port Hockey" is
+  not the pair Northvale + hockey, while "Port Hockey Baseball" is still a place and a sport term. A sport word
+  outside the place name still counts.
 - **Analysis fingerprint.** A text of `key=value` lines (`pack_id`, ruleset version and hash, normalization,
   matcher and scoring versions, then `external.*` components sorted by key), hashed with SHA-256. The caller
   supplies the external components: the catalog version and hash, the PostgreSQL major version, the `pg_trgm`
