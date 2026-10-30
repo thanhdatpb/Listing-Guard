@@ -254,6 +254,13 @@ of the ruleset and the runtime fingerprint. It has no endpoint and no result tab
   only ever added. `trademark_entry` is unique per `(catalog_version_id, normalized)` and has a GIN `gin_trgm_ops`
   index on `normalized` (a `TEXT` column, so the planner does not cast it away from the index). The status is a string
   with a CHECK constraint, kept in sync with `MarkStatus` (`REGISTERED`, `PENDING`, `EXPIRED`, `CANCELLED`).
+- **Schema (V16).** V15 was applied before the design settled on two points, and an applied migration is not edited, so
+  V16 changes them: the normalization identity of a catalog is `pack_id`, `normalization_version` and
+  `normalization_hash` (V15 had the ruleset version and content hash), and an entry has `source_ids TEXT[]` with a
+  CHECK of at least one id (V15 had a single `source_id`). The hash and the merged ids cannot be derived from V15
+  data, so V16 raises an error that names the row counts while any catalog exists; the operator deletes the old
+  catalogs and imports them again (docs/deployment.md). On empty tables V16 applies by itself. The descriptions below
+  are of the schema after V16.
 - **Data file `jsonl-1`.** UTF-8 JSON Lines, one record per non-blank line: `mark` (the display form), `status`,
   `nice_classes` (non-empty, each 1 to 45), `source_id` and optionally `common_word` (default false). An unknown key,
   a wrong type, an unknown status, a class outside 1 to 45, a mark that normalizes to nothing or invalid UTF-8

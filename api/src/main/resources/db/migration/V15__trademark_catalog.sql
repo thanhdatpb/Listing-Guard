@@ -20,12 +20,12 @@ CREATE TABLE trademark_catalog_version (
     format_version        VARCHAR(32)  NOT NULL,
     -- canonical JSON of the filters that were applied (sorted keys, sorted values)
     filters_json          TEXT         NOT NULL,
-    -- identity of the normalization the marks were normalized with: the catalog is only served while all three equal
-    -- the active ones. It is the pack, the version of the normalizer steps and the SHA-256 of the parsed normalization
-    -- settings of the ruleset (not of the whole ruleset: a ruleset that changes a threshold or a word list serves it)
+    -- identity of the normalization the marks were normalized with: the catalog is only served while all four equal
+    -- the active trademark ruleset and normalizer
     pack_id               VARCHAR(64)  NOT NULL,
+    ruleset_version       VARCHAR(64)  NOT NULL,
+    ruleset_content_hash  CHAR(64)     NOT NULL,
     normalization_version VARCHAR(64)  NOT NULL,
-    normalization_hash    CHAR(64)     NOT NULL,
     records_read          INTEGER      NOT NULL CHECK (records_read >= 0),
     records_filtered      INTEGER      NOT NULL CHECK (records_filtered >= 0),
     records_merged        INTEGER      NOT NULL CHECK (records_merged >= 0),
@@ -45,11 +45,9 @@ CREATE TABLE trademark_entry (
     -- keep in sync with com.thanhdatpb.listingguard.trademark.catalog.MarkStatus
     status             VARCHAR(16)  NOT NULL CHECK (status IN ('REGISTERED', 'PENDING', 'EXPIRED', 'CANCELLED')),
     common_word        BOOLEAN      NOT NULL DEFAULT FALSE,
-    -- the ids of every source record merged into this mark, ascending
-    source_ids         TEXT[]       NOT NULL,
+    source_id          VARCHAR(100) NOT NULL,
     CONSTRAINT uq_trademark_entry UNIQUE (catalog_version_id, normalized),
-    CONSTRAINT ck_trademark_entry_classes CHECK (cardinality(nice_classes) > 0),
-    CONSTRAINT ck_trademark_entry_source_ids CHECK (cardinality(source_ids) > 0)
+    CONSTRAINT ck_trademark_entry_classes CHECK (cardinality(nice_classes) > 0)
 );
 
 CREATE INDEX idx_trademark_entry_normalized_trgm ON trademark_entry USING gin (normalized gin_trgm_ops);

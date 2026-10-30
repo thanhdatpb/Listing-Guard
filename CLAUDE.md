@@ -20,8 +20,8 @@ It never edits a listing, never publishes, and does no SEO.
   `source.status` must be `unverified`), canonical input hash, normalization with offsets, the `TrademarkCatalog` port
   with `InMemoryTrademarkCatalog`, exact/phrase/fuzzy matching (final score: optimal string alignment, `osa-similarity-1`),
   the three color and place context rules, risk aggregation with `INCOMPLETE`/`UNKNOWN`, and `AnalysisFingerprint`.
-  No Spring, no database, no HTTP. **Catalog (A2)**: V15 (`pg_trgm`, `trademark_catalog_version`, `trademark_entry`,
-  append-only), the `trademark-import` job (`catalogs/manifest.yaml` + git-ignored `catalogs/raw/`, JSONL `jsonl-1`),
+  No Spring, no database, no HTTP. **Catalog (A2)**: V15 and V16 (`pg_trgm`, `trademark_catalog_version`,
+  `trademark_entry`, append-only; V16 refuses to run over existing catalogs, see docs/deployment.md), the `trademark-import` job (`catalogs/manifest.yaml` + git-ignored `catalogs/raw/`, JSONL `jsonl-1`),
   `PostgresTrademarkCatalog`, and `TrademarkCatalogRuntime` (DISABLED / READY / REFUSED, configured by
   `listing-guard.trademark.catalog-version`, never "latest"). The endpoint and evaluation are A3 and A4.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
