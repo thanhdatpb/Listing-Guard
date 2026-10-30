@@ -16,38 +16,56 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
- * Turns one local data file into a {@link PreparedCatalog} (ADR-009, PR A2). Reads a file and nothing else: no
- * network, no database. The whole file is validated before anything is filtered, so one bad line rejects the batch,
- * and the error names the line number but never the text of a mark.
+ * Turns the local data files of one manifest entry into a {@link PreparedCatalog} (ADR-009, PR A2 and A2b). Reads
+ * files and nothing else: no network, no database. Every file is validated whole before anything is filtered, so one
+ * bad line rejects the batch, and the error names the source and the line number but never the text of a mark. A file
+ * whose SHA-256 differs from the manifest refuses the whole catalog.
  *
  * <p>Data file ({@value #FORMAT_VERSION}): UTF-8 JSON Lines, one record per non-blank line with the keys
  * {@code mark} (the display form), {@code status}, {@code nice_classes} (non-empty, each 1 to 45),
  * {@code source_id} and optionally {@code common_word} (default false).
  *
  * <p>Then: each mark is normalized with the active {@link TextNormalizer}; a record is kept when at least one of its
- * classes is in {@code include_classes} and its status is in {@code include_status}; kept records with the same
- * normalized mark are merged into one entry: the classes are united, {@code common_word} is true if any record says
- * so, the status is the one declared first in {@link MarkStatus}, the source ids of all merged records are kept
- * (ascending, without duplicates), and the display form is the smallest by {@code String.compareTo}, ties broken by
- * the smaller source id. An import that keeps nothing is
- * rejected.
+ * classes is in {@code include_classes} and its status is in {@code include_status} (the filters apply to the whole
+ * catalog); kept records of all files with the same normalized mark are merged into one entry: the classes are
+ * united, {@code common_word} is true if any record says so, the status is the one declared first in
+ * {@link MarkStatus}, the source ids of all merged records are kept (ascending, without duplicates), and the display
+ * form is the smallest by {@code String.compareTo}, ties broken by the smaller source id. An import that keeps
+ * nothing is rejected.
+ *
+ * <p>With the {@code sources:} form every source id is stored as {@code <source_key>:<source_id>}, so the ids of
+ * different files cannot collide and show where a mark came from; the one-file form stores the ids as the file gives
+ * them. The outcome does not depend on the order of the sources.
  */
 public final class CatalogImport {
 
     public static final String FORMAT_VERSION = "jsonl-1";
+    /** The digest of a one-file entry. Do not change it: the versions already imported would stop being found. */
     public static final String IDENTITY_FORMAT = "listing-guard/trademark-catalog-identity/v1";
+    /** The digest of an entry with {@code sources:}: it lists every source, ordered by key. */
+    public static final String IDENTITY_FORMAT_SOURCES = "listing-guard/trademark-catalog-identity/v2";
 
+    private static final String FILES_FORMAT = "listing-guard/trademark-catalog-files/v1";
+    private static final String SOURCE_SEPARATOR = " | ";
+    /** Widths of source_name, source_reference and source_license in migration V15. */
+    private static final int MAX_NAME_CHARS = 200;
+    private static final int MAX_REFERENCE_CHARS = 500;
+    private static final int MAX_LICENSE_CHARS = 200;
     private static final Set<String> RECORD_KEYS = Set.of("mark", "status", "nice_classes", "source_id", "common_word");
     private static final int MAX_MARK_CHARS = 300;
     private static final int MAX_SOURCE_ID_CHARS = 100;
@@ -61,8 +79,8 @@ public final class CatalogImport {
     }
 
     /**
-     * @param rawDir the directory holding the data file named by the manifest entry
-     * @throws CatalogFormatException the file or the manifest entry is invalid, or the file hash differs
+     * @param rawDir the directory holding the data files named by the manifest entry
+     * @throws CatalogFormatException a file or the manifest entry is invalid, or a file hash differs
      */
     public static PreparedCatalog prepare(CatalogManifest.Entry entry, Path rawDir, TextNormalizer normalizer,
                                           NormalizationIdentity identity) {
@@ -71,23 +89,12 @@ public final class CatalogImport {
             throw new CatalogFormatException(where + ": format_version '" + entry.formatVersion()
                     + "' is not supported (use " + FORMAT_VERSION + ")");
         }
-        Path file = rawDir.resolve(entry.file()).normalize();
-        if (!file.startsWith(rawDir.normalize()) || !Files.isRegularFile(file)) {
-            throw new CatalogFormatException(where + ": the data file " + entry.file() + " is not in " + rawDir);
+        List<Row> rows = new ArrayList<>();
+        for (CatalogManifest.Source source : entry.sources()) {
+            String sourceWhere = entry.keyed() ? where + ", source '" + source.key() + "'" : where;
+            rows.addAll(parse(sourceWhere, decode(sourceWhere, verified(sourceWhere, source, rawDir)), normalizer,
+                    source.key()));
         }
-        byte[] bytes;
-        try {
-            bytes = Files.readAllBytes(file);
-        } catch (IOException e) {
-            throw new CatalogFormatException(where + ": cannot read " + entry.file(), e);
-        }
-        String actualHash = sha256(bytes);
-        if (!actualHash.equals(entry.sha256())) {
-            throw new CatalogFormatException(where + ": the SHA-256 of " + entry.file() + " is " + actualHash
-                    + " but the manifest says " + entry.sha256() + "; the file changed, or the manifest is stale");
-        }
-
-        List<Row> rows = parse(where, decode(where, bytes), normalizer);
         List<Row> kept = new ArrayList<>();
         for (Row row : rows) {
             if (row.status() != null && entry.includeStatus().contains(row.status())
@@ -102,9 +109,68 @@ public final class CatalogImport {
         }
         String filtersJson = entry.filtersJson();
         String version = entry.version() + "-" + digest(entry, filtersJson, identity).substring(0, 12);
-        return new PreparedCatalog(version, entry.version(), entry.sourceName(), entry.url(), entry.license(),
-                entry.sourceDate(), actualHash, entry.formatVersion(), filtersJson, identity, rows.size(),
+        String sourceName = joined(where, "source_name", MAX_NAME_CHARS, entry, CatalogManifest.Source::sourceName);
+        String reference = joined(where, "url", MAX_REFERENCE_CHARS, entry, CatalogManifest.Source::url);
+        String license = joined(where, "license", MAX_LICENSE_CHARS, entry, CatalogManifest.Source::license);
+        // the catalog is no newer than its oldest source
+        LocalDate sourceDate = entry.sources().stream().map(CatalogManifest.Source::sourceDate)
+                .min(Comparator.naturalOrder()).orElseThrow();
+        return new PreparedCatalog(version, entry.version(), sourceName, reference, license, sourceDate,
+                filesHash(entry), entry.formatVersion(), filtersJson, identity, rows.size(),
                 rows.size() - kept.size(), kept.size() - entries.size(), entries);
+    }
+
+    /** The bytes of a source file, after checking that it is inside {@code rawDir} and has the hash of the manifest. */
+    private static byte[] verified(String where, CatalogManifest.Source source, Path rawDir) {
+        Path file = rawDir.resolve(source.file()).normalize();
+        if (!file.startsWith(rawDir.normalize()) || !Files.isRegularFile(file)) {
+            throw new CatalogFormatException(where + ": the data file " + source.file() + " is not in " + rawDir);
+        }
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(file);
+        } catch (IOException e) {
+            throw new CatalogFormatException(where + ": cannot read " + source.file(), e);
+        }
+        String actualHash = sha256(bytes);
+        if (!actualHash.equals(source.sha256())) {
+            throw new CatalogFormatException(where + ": the SHA-256 of " + source.file() + " is " + actualHash
+                    + " but the manifest says " + source.sha256() + "; the file changed, or the manifest is stale");
+        }
+        return bytes;
+    }
+
+    /**
+     * What goes in a single-valued column of the catalog table: the value itself for one file, and for several files
+     * {@code key: value} of each source, ordered by key. It must fit the column, which the database would otherwise
+     * report as a bare SQL error.
+     */
+    private static String joined(String where, String field, int maxChars, CatalogManifest.Entry entry,
+                                 Function<CatalogManifest.Source, String> value) {
+        String text = entry.keyed()
+                ? entry.sources().stream().map(source -> source.key() + ": " + value.apply(source))
+                        .collect(Collectors.joining(SOURCE_SEPARATOR))
+                : value.apply(entry.sources().get(0));
+        if (text.codePointCount(0, text.length()) > maxChars) {
+            throw new CatalogFormatException(where + ": " + field + " of the sources is " + text.length()
+                    + " characters together but the catalog table holds " + maxChars + "; shorten it");
+        }
+        return text;
+    }
+
+    /**
+     * The value stored as the file hash: the hash of the file for one file, and for several a SHA-256 over the lines
+     * {@code <key> <hash>} ordered by key, so a change of any source changes it.
+     */
+    private static String filesHash(CatalogManifest.Entry entry) {
+        if (!entry.keyed()) {
+            return entry.sources().get(0).sha256();
+        }
+        StringBuilder text = new StringBuilder(FILES_FORMAT).append('\n');
+        for (CatalogManifest.Source source : entry.sources()) {
+            text.append(source.key()).append(' ').append(source.sha256()).append('\n');
+        }
+        return sha256(text.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     private static String decode(String where, byte[] bytes) {
@@ -116,7 +182,7 @@ public final class CatalogImport {
         }
     }
 
-    private static List<Row> parse(String where, String text, TextNormalizer normalizer) {
+    private static List<Row> parse(String where, String text, TextNormalizer normalizer, String sourceKey) {
         List<Row> rows = new ArrayList<>();
         String[] lines = text.split("\n", -1);
         for (int i = 0; i < lines.length; i++) {
@@ -124,12 +190,12 @@ public final class CatalogImport {
             if (line.isBlank()) {
                 continue;
             }
-            rows.add(row(where + ", line " + (i + 1), line, normalizer));
+            rows.add(row(where + ", line " + (i + 1), line, normalizer, sourceKey));
         }
         return rows;
     }
 
-    private static Row row(String where, String line, TextNormalizer normalizer) {
+    private static Row row(String where, String line, TextNormalizer normalizer, String sourceKey) {
         JsonNode node;
         try {
             node = JSON.readTree(line);
@@ -182,7 +248,8 @@ public final class CatalogImport {
         if (normalized.length() > MAX_MARK_CHARS) {
             throw new CatalogFormatException(where + ": the normalized mark is too long");
         }
-        return new Row(display, normalized, status, niceClasses, sourceId, commonWord);
+        String storedId = sourceKey == null ? sourceId : sourceKey + ":" + sourceId;
+        return new Row(display, normalized, status, niceClasses, storedId, commonWord);
     }
 
     private static String requiredText(String where, JsonNode node, String key) {
@@ -222,13 +289,48 @@ public final class CatalogImport {
 
     /** A digest of everything that identifies the import, so any difference is a different catalog version. */
     static String digest(CatalogManifest.Entry entry, String filtersJson, NormalizationIdentity identity) {
+        if (entry.keyed()) {
+            return digestOfSources(entry, filtersJson, identity);
+        }
+        CatalogManifest.Source source = entry.sources().get(0);
         String text = IDENTITY_FORMAT + "\n"
                 + "label=" + entry.version() + "\n"
-                + "source_name=" + entry.sourceName() + "\n"
-                + "url=" + entry.url() + "\n"
-                + "license=" + entry.license() + "\n"
-                + "source_date=" + entry.sourceDate() + "\n"
-                + "file_sha256=" + entry.sha256() + "\n"
+                + "source_name=" + source.sourceName() + "\n"
+                + "url=" + source.url() + "\n"
+                + "license=" + source.license() + "\n"
+                + "source_date=" + source.sourceDate() + "\n"
+                + "file_sha256=" + source.sha256() + "\n"
+                + "format_version=" + entry.formatVersion() + "\n"
+                + "filters=" + filtersJson + "\n"
+                + "pack_id=" + identity.packId() + "\n"
+                + "normalization_version=" + identity.normalizationVersion() + "\n"
+                + "normalization_hash=" + identity.normalizationHash() + "\n";
+        return sha256(text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Every source, ordered by key (the order in the manifest changes nothing), as one JSON array of escaped text. */
+    private static String digestOfSources(CatalogManifest.Entry entry, String filtersJson,
+                                          NormalizationIdentity identity) {
+        List<Map<String, String>> sources = new ArrayList<>();
+        for (CatalogManifest.Source source : entry.sources()) {
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("source_key", source.key());
+            fields.put("source_name", source.sourceName());
+            fields.put("url", source.url());
+            fields.put("license", source.license());
+            fields.put("source_date", source.sourceDate().toString());
+            fields.put("file_sha256", source.sha256());
+            sources.add(fields);
+        }
+        String sourcesJson;
+        try {
+            sourcesJson = JSON.writeValueAsString(sources);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Cannot write the sources of the catalog identity", e);
+        }
+        String text = IDENTITY_FORMAT_SOURCES + "\n"
+                + "label=" + entry.version() + "\n"
+                + "sources=" + sourcesJson + "\n"
                 + "format_version=" + entry.formatVersion() + "\n"
                 + "filters=" + filtersJson + "\n"
                 + "pack_id=" + identity.packId() + "\n"

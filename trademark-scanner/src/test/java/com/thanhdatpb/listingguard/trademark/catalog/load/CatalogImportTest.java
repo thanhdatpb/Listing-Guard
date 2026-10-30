@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -37,9 +38,19 @@ class CatalogImportTest {
             throws IOException {
         byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
         Files.write(raw.resolve("marks.jsonl"), bytes);
-        return new CatalogManifest.Entry("synthetic-1", "marks.jsonl", CatalogImport.FORMAT_VERSION, "Synthetic set",
+        return CatalogManifest.Entry.single("synthetic-1", "marks.jsonl", CatalogImport.FORMAT_VERSION, "Synthetic set",
                 "https://example.invalid/synthetic", "test only", LocalDate.of(2026, 10, 30),
                 CatalogImport.sha256(bytes), classes, statuses);
+    }
+
+    private static String sha(CatalogManifest.Entry entry) {
+        return entry.sources().get(0).sha256();
+    }
+
+    private static CatalogManifest.Entry withSource(CatalogManifest.Entry e,
+                                                    UnaryOperator<CatalogManifest.Source> change) {
+        return new CatalogManifest.Entry(e.version(), e.formatVersion(), e.sources().stream().map(change).toList(),
+                e.includeClasses(), e.includeStatus());
     }
 
     private CatalogManifest.Entry entry(String content) throws IOException {
@@ -68,7 +79,7 @@ class CatalogImportTest {
         assertThat(catalog.recordsLoaded()).isEqualTo(3);
         assertThat(catalog.entries()).extracting(e -> e.mark().normalized()).containsExactly("brask", "quillmark",
                 "zorvex");
-        assertThat(catalog.fileSha256()).isEqualTo(entry(data).sha256());
+        assertThat(catalog.fileSha256()).isEqualTo(sha(entry(data)));
         assertThat(catalog.filtersJson()).isEqualTo("{\"include_classes\":[25,35],\"include_status\":[\"REGISTERED\",\"PENDING\"]}");
     }
 
@@ -223,9 +234,9 @@ class CatalogImportTest {
     void rejectsAFileThatIsNotUtf8() throws IOException {
         byte[] bytes = new byte[]{'{', (byte) 0xC3, (byte) 0x28, '}', '\n'};
         Files.write(raw.resolve("marks.jsonl"), bytes);
-        CatalogManifest.Entry entry = new CatalogManifest.Entry("synthetic-1", "marks.jsonl", CatalogImport.FORMAT_VERSION,
-                "s", "u", "l", LocalDate.of(2026, 10, 30), CatalogImport.sha256(bytes), Set.of(25),
-                Set.of(MarkStatus.REGISTERED));
+        CatalogManifest.Entry entry = CatalogManifest.Entry.single("synthetic-1", "marks.jsonl",
+                CatalogImport.FORMAT_VERSION, "s", "u", "l", LocalDate.of(2026, 10, 30), CatalogImport.sha256(bytes),
+                Set.of(25), Set.of(MarkStatus.REGISTERED));
 
         assertThatThrownBy(() -> prepare(entry)).hasMessageContaining("UTF-8");
     }
@@ -236,7 +247,7 @@ class CatalogImportTest {
         Files.writeString(raw.resolve("marks.jsonl"), line("Brask", "REGISTERED", "[25]", "a") + "\n");
 
         assertThatThrownBy(() -> prepare(entry)).isInstanceOf(CatalogFormatException.class)
-                .hasMessageContaining("SHA-256").hasMessageContaining(entry.sha256());
+                .hasMessageContaining("SHA-256").hasMessageContaining(sha(entry));
     }
 
     @Test
@@ -250,8 +261,8 @@ class CatalogImportTest {
     @Test
     void rejectsAFormatVersionTheCodeDoesNotRead() throws IOException {
         CatalogManifest.Entry good = entry(line("Zorvex", "REGISTERED", "[25]", "a") + "\n");
-        CatalogManifest.Entry other = new CatalogManifest.Entry(good.version(), good.file(), "jsonl-2", good.sourceName(),
-                good.url(), good.license(), good.sourceDate(), good.sha256(), good.includeClasses(), good.includeStatus());
+        CatalogManifest.Entry other = new CatalogManifest.Entry(good.version(), "jsonl-2", good.sources(),
+                good.includeClasses(), good.includeStatus());
 
         assertThatThrownBy(() -> prepare(other)).hasMessageContaining("format_version");
     }
@@ -262,12 +273,10 @@ class CatalogImportTest {
         Path outside = raw.getParent().resolve("outside-" + System.nanoTime() + ".jsonl");
         Files.writeString(outside, line("Zorvex", "REGISTERED", "[25]", "a") + "\n");
         try {
-            CatalogManifest.Entry escaping = new CatalogManifest.Entry(good.version(),
-                    "../" + outside.getFileName(), good.formatVersion(), good.sourceName(), good.url(), good.license(),
-                    good.sourceDate(), good.sha256(), good.includeClasses(), good.includeStatus());
-            CatalogManifest.Entry missing = new CatalogManifest.Entry(good.version(), "absent.jsonl",
-                    good.formatVersion(), good.sourceName(), good.url(), good.license(), good.sourceDate(),
-                    good.sha256(), good.includeClasses(), good.includeStatus());
+            CatalogManifest.Entry escaping = withSource(good, s -> new CatalogManifest.Source(s.key(),
+                    "../" + outside.getFileName(), s.sourceName(), s.url(), s.license(), s.sourceDate(), s.sha256()));
+            CatalogManifest.Entry missing = withSource(good, s -> new CatalogManifest.Source(s.key(), "absent.jsonl",
+                    s.sourceName(), s.url(), s.license(), s.sourceDate(), s.sha256()));
 
             assertThatThrownBy(() -> prepare(escaping)).isInstanceOf(CatalogFormatException.class)
                     .hasMessageContaining("is not in");
@@ -334,13 +343,13 @@ class CatalogImportTest {
     }
 
     private static CatalogManifest.Entry withLicense(CatalogManifest.Entry e, String license) {
-        return new CatalogManifest.Entry(e.version(), e.file(), e.formatVersion(), e.sourceName(), e.url(), license,
-                e.sourceDate(), e.sha256(), e.includeClasses(), e.includeStatus());
+        return withSource(e, s -> new CatalogManifest.Source(s.key(), s.file(), s.sourceName(), s.url(), license,
+                s.sourceDate(), s.sha256()));
     }
 
     private static CatalogManifest.Entry withSourceDate(CatalogManifest.Entry e, LocalDate date) {
-        return new CatalogManifest.Entry(e.version(), e.file(), e.formatVersion(), e.sourceName(), e.url(), e.license(),
-                date, e.sha256(), e.includeClasses(), e.includeStatus());
+        return withSource(e, s -> new CatalogManifest.Source(s.key(), s.file(), s.sourceName(), s.url(), s.license(),
+                date, s.sha256()));
     }
 
     @Test

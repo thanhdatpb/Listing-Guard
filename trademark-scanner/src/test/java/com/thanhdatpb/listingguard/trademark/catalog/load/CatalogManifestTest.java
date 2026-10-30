@@ -38,13 +38,17 @@ class CatalogManifestTest {
         CatalogManifest manifest = CatalogManifest.parse(VALID);
 
         CatalogManifest.Entry entry = manifest.entry("synthetic-2026-11");
-        assertThat(entry.file()).isEqualTo("synthetic.jsonl");
         assertThat(entry.formatVersion()).isEqualTo("jsonl-1");
-        assertThat(entry.sourceName()).isEqualTo("Synthetic marks");
-        assertThat(entry.url()).isEqualTo("https://example.invalid/synthetic");
-        assertThat(entry.license()).isEqualTo("test only");
-        assertThat(entry.sourceDate()).isEqualTo(LocalDate.of(2026, 10, 30));
-        assertThat(entry.sha256()).isEqualTo(SHA);
+        assertThat(entry.keyed()).as("the one-file form has no source key").isFalse();
+        assertThat(entry.sources()).hasSize(1);
+        CatalogManifest.Source source = entry.sources().get(0);
+        assertThat(source.key()).isNull();
+        assertThat(source.file()).isEqualTo("synthetic.jsonl");
+        assertThat(source.sourceName()).isEqualTo("Synthetic marks");
+        assertThat(source.url()).isEqualTo("https://example.invalid/synthetic");
+        assertThat(source.license()).isEqualTo("test only");
+        assertThat(source.sourceDate()).isEqualTo(LocalDate.of(2026, 10, 30));
+        assertThat(source.sha256()).isEqualTo(SHA);
         assertThat(entry.includeClasses()).containsExactlyInAnyOrder(25, 35);
         assertThat(entry.includeStatus()).containsExactlyInAnyOrder(MarkStatus.REGISTERED, MarkStatus.PENDING);
         assertThat(entry.filtersJson()).isEqualTo("{\"include_classes\":[25,35],\"include_status\":[\"REGISTERED\",\"PENDING\"]}");
@@ -113,6 +117,111 @@ class CatalogManifestTest {
         assertRejected(VALID.replace("[35, 25]", "['25']"), "1 to 45");
         assertRejected(VALID.replace("[PENDING, REGISTERED]", "[FAMOUS]"), "unknown status");
         assertRejected(VALID.replace("[PENDING, REGISTERED]", "[]"), "include_status");
+    }
+
+    // --- the sources: form (ADR-009, PR A2b) ---
+
+    private static final String SOURCES = """
+            catalogs:
+              - version: pod-2026-11
+                format_version: jsonl-1
+                sources:
+                  - source_key: uspto
+                    file: uspto.jsonl
+                    source_name: Synthetic office data
+                    url: https://example.invalid/office
+                    license: test only
+                    source_date: 2026-10-30
+                    sha256: %s
+                  - source_key: internal
+                    file: internal.jsonl
+                    source_name: Synthetic internal list
+                    url: https://example.invalid/internal
+                    license: internal use
+                    source_date: 2026-09-01
+                    sha256: %s
+                filters:
+                  include_classes: [25, 21]
+                  include_status: [REGISTERED]
+            """.formatted(SHA, "b".repeat(64));
+
+    @Test
+    void readsAnEntryWithSourcesOrderedByKey() {
+        CatalogManifest.Entry entry = CatalogManifest.parse(SOURCES).entry("pod-2026-11");
+
+        assertThat(entry.keyed()).isTrue();
+        assertThat(entry.formatVersion()).isEqualTo("jsonl-1");
+        assertThat(entry.sources()).extracting(CatalogManifest.Source::key).containsExactly("internal", "uspto");
+        CatalogManifest.Source internal = entry.sources().get(0);
+        assertThat(internal.file()).isEqualTo("internal.jsonl");
+        assertThat(internal.sourceName()).isEqualTo("Synthetic internal list");
+        assertThat(internal.url()).isEqualTo("https://example.invalid/internal");
+        assertThat(internal.license()).isEqualTo("internal use");
+        assertThat(internal.sourceDate()).isEqualTo(LocalDate.of(2026, 9, 1));
+        assertThat(internal.sha256()).isEqualTo("b".repeat(64));
+        assertThat(entry.includeClasses()).containsExactlyInAnyOrder(21, 25);
+        assertThat(entry.filtersJson()).isEqualTo("{\"include_classes\":[21,25],\"include_status\":[\"REGISTERED\"]}");
+    }
+
+    @Test
+    void theOrderOfTheSourcesInTheFileDoesNotMatter() {
+        String swapped = SOURCES.replace("source_key: uspto", "source_key: aaa-first");
+
+        assertThat(CatalogManifest.parse(swapped).entry("pod-2026-11").sources())
+                .extracting(CatalogManifest.Source::key).containsExactly("aaa-first", "internal");
+    }
+
+    @Test
+    void theOneFileFormAndTheSourcesFormCanShareAManifest() {
+        String both = SOURCES + VALID.substring(VALID.indexOf("  - version"));
+
+        CatalogManifest manifest = CatalogManifest.parse(both);
+
+        assertThat(manifest.catalogs()).extracting(CatalogManifest.Entry::version)
+                .containsExactly("pod-2026-11", "synthetic-2026-11");
+    }
+
+    @Test
+    void rejectsMixingTheTwoForms() {
+        assertRejected(SOURCES.replace("    sources:\n", "    file: x.jsonl\n    sources:\n"), "belongs inside each source");
+        assertRejected(SOURCES.replace("    sources:\n", "    sha256: " + SHA + "\n    sources:\n"),
+                "belongs inside each source");
+    }
+
+    @Test
+    void rejectsABadSourcesList() {
+        assertRejected(SOURCES.replaceFirst("(?s)sources:.*(?=\\s{4}filters:)", "sources: []\n"), "non-empty list");
+        assertRejected(SOURCES.replaceFirst("(?s)sources:.*(?=\\s{4}filters:)", "sources: nope\n"), "non-empty list");
+        assertRejected(SOURCES.replaceFirst("(?s)sources:.*(?=\\s{4}filters:)", "sources:\n      - plain\n"),
+                "must be a mapping");
+    }
+
+    @Test
+    void rejectsASourceWithAMissingOrUnknownKey() {
+        for (String key : new String[]{"source_key", "file", "source_name", "url", "license", "source_date", "sha256"}) {
+            assertThatThrownBy(() -> CatalogManifest.parse(SOURCES.replaceFirst("(?m)^( +(- )?)" + key + ":", "$1x_" + key + ":")))
+                    .as(key).isInstanceOf(CatalogFormatException.class);
+        }
+        assertRejected(SOURCES.replaceFirst("(?m)^ {8}license:.*\n", ""), "license");
+        assertRejected(SOURCES.replace("license: internal use\n", "license: internal use\n        extra: 1\n"),
+                "Unknown key 'extra'");
+    }
+
+    @Test
+    void rejectsABadOrRepeatedSourceKeyOrFile() {
+        assertRejected(SOURCES.replace("source_key: uspto", "source_key: Uspto"), "source_key");
+        assertRejected(SOURCES.replace("source_key: uspto", "source_key: 'a:b'"), "source_key");
+        assertRejected(SOURCES.replace("source_key: uspto", "source_key: internal"), "source_key 'internal' is listed twice");
+        assertRejected(SOURCES.replace("file: uspto.jsonl", "file: internal.jsonl"), "file 'internal.jsonl' is listed twice");
+        assertRejected(SOURCES.replace("file: uspto.jsonl", "file: ../uspto.jsonl"), "plain file name");
+        assertRejected(SOURCES.replace(SHA, "xyz"), "sha256");
+        assertRejected(SOURCES.replace("2026-09-01", "01/09/2026"), "ISO date");
+    }
+
+    @Test
+    void theFiltersOfASourcesEntryAreStillRequired() {
+        assertRejected(SOURCES.replace("include_classes: [25, 21]", "include_classes: []"), "include_classes");
+        assertRejected(SOURCES.replaceFirst("(?s)\\s{4}filters:.*", "\n"), "filters");
     }
 
     @Test
