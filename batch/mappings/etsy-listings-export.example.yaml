@@ -1,0 +1,28 @@
+# Mapping for an Etsy listings export (a CSV from Shop Manager), for the batch-check job (docs/batch-check.md).
+#
+# EXAMPLE ONLY, NOT VERIFIED. No real export file was available when this was written, so none of the column names below
+# comes from a source: every line is marked "# unverified". Open your own export, compare its header row with this file
+# and change every name to match it exactly (case and spaces matter). The job refuses to start if a column named here is
+# not in the header, and it says which one.
+#
+# Copy this file under another name before editing it, and keep the copy out of the repository if it is specific to your
+# shop. The keys on the left are the fields of docs/input-schema.md (ETSY) and may not be renamed.
+#
+# Fields your export has no column for are simply absent from the check. The required_fields rule then reports each one
+# it requires for every listing (see the Etsy ruleset): map every field your export has.
+#
+#   docker compose run --rm batch-check --input=/batch/input/<export>.csv \
+#     --mapping=/batch/mappings/<your mapping>.yaml --client=<client> --marketplace=ETSY
+csv:
+  delimiter: ","                          # unverified
+  encoding: UTF-8                         # unverified
+id: SKU                                   # unverified: any column that is filled for every row and names the listing
+title: TITLE                              # unverified
+description: DESCRIPTION                  # unverified
+tags: {column: TAGS, separator: ","}      # unverified: one cell holding all tags, cut at the separator
+materials: {column: MATERIALS, separator: ","}   # unverified
+price: PRICE                              # unverified: a plain number such as 19.99, no currency symbol
+quantity: QUANTITY                        # unverified
+# category: CATEGORY                      # unverified: map it if your export has such a column
+# who_made: WHO_MADE                      # unverified: map it if your export has such a column
+# when_made: WHEN_MADE                    # unverified: map it if your export has such a column

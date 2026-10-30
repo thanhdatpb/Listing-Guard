@@ -1,0 +1,9 @@
+# Profile for the one-shot batch check (docs/batch-check.md): no web server, the process ends when the job ends.
+spring:
+  main:
+    web-application-type: none
+
+listing-guard:
+  embedding:
+    # The batch job never embeds anything; this keeps it from needing an embedding API key (ADR-012).
+    provider: hashing

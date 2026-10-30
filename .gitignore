@@ -47,5 +47,11 @@ policies/raw/
 catalogs/raw/
 !catalogs/manifest.yaml
 
+# Batch check (docs/batch-check.md): real listing exports and the reports made from them are never committed; the
+# mappings in batch/mappings/ are
+batch/input/*
+!batch/input/.gitkeep
+batch/out/
+
 # Claude Code local state
 .claude/
