@@ -24,6 +24,19 @@ listing-guard:
     locations:
       - classpath:rulesets/etsy-2026-11.yaml
       - classpath:rulesets/amazon-2026-11.yaml
+  trademark:
+    # The trademark ruleset (ADR-009), registered for each marketplace below as pack `trademark-risk` (ADR-010).
+    ruleset: classpath:rulesets/trademark-risk-2026-11.yaml
+    marketplaces:
+      - ETSY
+      - AMAZON
+    # The catalog version served for trademark checks, exactly as the trademark-import job printed it. Empty (the
+    # default) turns trademark checks off; the application and /checks need nothing else. There is no "latest": a newer
+    # import changes nothing until this value changes. It must have been imported with the active ruleset, or trademark
+    # checks are refused.
+    catalog-version: ${LISTING_GUARD_TRADEMARK_CATALOG_VERSION:}
+    # manifest.yaml and raw/ for the import job
+    catalogs-dir: ${CATALOGS_DIR:catalogs}
   policies:
     dir: ${POLICIES_DIR:policies}
     chunking:

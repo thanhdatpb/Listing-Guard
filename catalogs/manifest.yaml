@@ -1,0 +1,33 @@
+# Trademark catalogs that the trademark-import job may load (ADR-009). Only this manifest is committed. The data files
+# live in catalogs/raw/ (git-ignored: third-party data under its own terms; never commit a trademark dataset or any
+# company's data). Tests use synthetic files only.
+#
+# Each entry:
+#   version        label of the catalog; the stored version is this label plus a digest of the import, and that
+#                  stored version is what listing-guard.trademark.catalog-version names
+#   file           a plain file name inside catalogs/raw/
+#   format_version jsonl-1: UTF-8 JSON Lines, one record per line with the keys
+#                  mark, status (REGISTERED | PENDING | EXPIRED | CANCELLED), nice_classes (1 to 45), source_id and
+#                  optionally common_word (default false)
+#   source_name    name of the data source
+#   url            where the data comes from (public location or other reference)
+#   license        the terms the data may be used under; required
+#   source_date    date of the data, ISO yyyy-MM-dd; required
+#   sha256         SHA-256 of the file; the import is refused when the file differs
+#   filters        include_classes: keep records with at least one of these Nice classes
+#                  include_status: keep records with one of these statuses
+#
+# Example (not active):
+#
+#   - version: example-2026-11
+#     file: example.jsonl
+#     format_version: jsonl-1
+#     source_name: Example source
+#     url: https://example.invalid/data
+#     license: the license or terms of the source
+#     source_date: 2026-11-01
+#     sha256: 0000000000000000000000000000000000000000000000000000000000000000
+#     filters:
+#       include_classes: [25, 35]
+#       include_status: [REGISTERED, PENDING]
+catalogs: []

@@ -43,5 +43,9 @@ Thumbs.db
 # Raw policy documents (copyrighted marketplace text); only policies/manifest.yaml is committed
 policies/raw/
 
+# Raw trademark catalog data (third-party data under its own terms); only catalogs/manifest.yaml is committed
+catalogs/raw/
+!catalogs/manifest.yaml
+
 # Claude Code local state
 .claude/

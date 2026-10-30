@@ -17,14 +17,16 @@ public interface TrademarkCatalog {
 
     /**
      * The marks whose normalized form equals one of {@code normalizedForms} (a token or n-gram of tokens joined by
-     * one space). The result is keyed by the form that matched; forms without a mark are absent.
+     * one space). The result is keyed by the form that matched, in binary order of the form; forms without a mark
+     * are absent.
      */
     Map<String, CatalogMark> findExact(Collection<String> normalizedForms);
 
     /**
      * Candidate marks for each bounded token or n-gram: marks whose trigram similarity to it is at least
      * {@code candidateThreshold}. This only narrows the search; the scanner scores the candidates and applies the
-     * final threshold itself. Forms without candidates are absent. Candidates are in a deterministic order.
+     * final threshold itself. Forms without candidates are absent. Forms are in binary order and the candidates of a form in binary order
+     * of the normalized mark.
      */
     Map<String, List<CatalogMark>> fuzzyCandidates(Collection<String> normalizedForms, double candidateThreshold);
 }

@@ -45,7 +45,7 @@ public final class InMemoryTrademarkCatalog implements TrademarkCatalog {
 
     @Override
     public Map<String, CatalogMark> findExact(Collection<String> normalizedForms) {
-        Map<String, CatalogMark> found = new LinkedHashMap<>();
+        Map<String, CatalogMark> found = new TreeMap<>();
         for (String form : normalizedForms) {
             CatalogMark mark = byNormalized.get(form);
             if (mark != null) {
@@ -58,7 +58,7 @@ public final class InMemoryTrademarkCatalog implements TrademarkCatalog {
     @Override
     public Map<String, List<CatalogMark>> fuzzyCandidates(Collection<String> normalizedForms,
                                                            double candidateThreshold) {
-        Map<String, List<CatalogMark>> result = new LinkedHashMap<>();
+        Map<String, List<CatalogMark>> result = new TreeMap<>();
         for (String form : normalizedForms) {
             List<CatalogMark> candidates = new ArrayList<>();
             for (CatalogMark mark : byNormalized.values()) {
