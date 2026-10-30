@@ -132,6 +132,29 @@ services:
     volumes:
       - ./catalogs:/catalogs:ro
 
+  # Checks every listing of a CSV export (rules and trademark) and writes findings.csv, listings.csv and summary.html
+  # (docs/batch-check.md). Local files and the database only: no network, no embedding provider. Put the export in
+  # batch/input/ and a mapping in batch/mappings/; the reports go to batch/out/ unless --out says otherwise.
+  #   docker compose run --rm batch-check --input=/batch/input/<file.csv> --mapping=/batch/mappings/<mapping.yaml> \
+  #     --client=<client name> --marketplace=ETSY|AMAZON [--out=/batch/out/<dir>] [--max-rows=<n>] [--label-column=<column>]
+  # The client must exist and be active (docker compose run --rm admin client create <name>). Trademark results need
+  # TRADEMARK_CATALOG_VERSION, as for the api; without it only the rules run and the reports say so.
+  batch-check:
+    image: listing-guard-api:dev
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: batch-check
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
+      DB_USER: ${POSTGRES_USER:-listingguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+      LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      BATCH_DIR: /batch
+    volumes:
+      - ./batch:/batch
+
   # Runs eval/retrieval/queries.yaml against the ingested corpus and writes eval/retrieval/results.md.
   # Needs an embedding provider (EMBEDDING_PROVIDER=api or ollama); with the default `none` it fails at once and says so.
   # With `api` the evaluation questions are sent to Google too. It fails if the corpus was embedded with another
