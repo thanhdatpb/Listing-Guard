@@ -215,5 +215,8 @@ tested.
 Trademark goes first because an intellectual-property problem can directly cost a seller the listing or
 put the account at risk, while image v1 cannot detect logos (ADR-008 defers logo detection).
 
+[ADR-011](ADR-011-policy-grounded-analyzer.md) (the policy analyzer) is a parallel track that starts after
+PR A. It is not part of the 0a/0b/A/B chain.
+
 Each implementation PR remains separate, is not merged automatically, preserves existing `/checks`
 behavior, and updates OpenAPI and integration documentation for its public contract.
