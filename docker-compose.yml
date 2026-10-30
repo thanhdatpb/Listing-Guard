@@ -40,9 +40,10 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
       DB_USER: ${POSTGRES_USER:-listingguard}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
-      # Embeddings (ADR-012): the hosted API by default. The application refuses to start with an empty key, so set
-      # LISTING_GUARD_EMBEDDING_API_KEY in .env (or EMBEDDING_PROVIDER=ollama, see the README). The key is a secret.
-      LISTING_GUARD_EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-api}
+      # Embeddings (ADR-012): none by default, so the api starts with no model and no key; the rule checks need
+      # nothing else. Policy retrieval is optional: set EMBEDDING_PROVIDER=api (with
+      # LISTING_GUARD_EMBEDDING_API_KEY, a secret, in .env) or EMBEDDING_PROVIDER=ollama, see the README.
+      LISTING_GUARD_EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-none}
       LISTING_GUARD_EMBEDDING_API_KEY: ${LISTING_GUARD_EMBEDDING_API_KEY:-}
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       # Debug endpoint GET /policies/search; off by default in the application, on here for development.
@@ -90,7 +91,8 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
 
   # Ingests policies/manifest.yaml and policies/raw/** into the database: docker compose run --rm ingest
-  # With the default embedding API this sends the public policy text to Google (chunk text and section path only).
+  # Needs an embedding provider (EMBEDDING_PROVIDER=api or ollama); with the default `none` it fails at once and says so.
+  # With `api` this sends the public policy text to Google (chunk text and section path only).
   ingest:
     image: listing-guard-api:dev
     profiles: ["tools"]
@@ -102,7 +104,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
       DB_USER: ${POSTGRES_USER:-listingguard}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
-      LISTING_GUARD_EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-api}
+      LISTING_GUARD_EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-none}
       LISTING_GUARD_EMBEDDING_API_KEY: ${LISTING_GUARD_EMBEDDING_API_KEY:-}
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       POLICIES_DIR: /policies
@@ -110,8 +112,9 @@ services:
       - ./policies:/policies:ro
 
   # Runs eval/retrieval/queries.yaml against the ingested corpus and writes eval/retrieval/results.md.
-  # With the default embedding API the evaluation questions are sent to Google too. It fails if the corpus was
-  # embedded with another model than the configured one.
+  # Needs an embedding provider (EMBEDDING_PROVIDER=api or ollama); with the default `none` it fails at once and says so.
+  # With `api` the evaluation questions are sent to Google too. It fails if the corpus was embedded with another
+  # model than the configured one.
   eval-retrieval:
     image: listing-guard-api:dev
     profiles: ["tools"]
@@ -123,7 +126,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
       DB_USER: ${POSTGRES_USER:-listingguard}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
-      LISTING_GUARD_EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-api}
+      LISTING_GUARD_EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-none}
       LISTING_GUARD_EMBEDDING_API_KEY: ${LISTING_GUARD_EMBEDDING_API_KEY:-}
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       POLICIES_DIR: /policies

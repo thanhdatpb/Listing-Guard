@@ -15,9 +15,13 @@ corpus column is `vector(768)` (V3) and retrieval is measured in English and Vie
 
 ## Decision
 
-1. **Default provider is an API.** Add `ApiEmbeddingProvider` in `api/` using Spring `RestClient`; request and
-   response mapping for the chosen vendor lives in that class only. `OllamaEmbeddingProvider` stays selectable
-   (`listing-guard.embedding.provider: ollama`), `hashing` stays for tests. The default becomes `api`. Texts are
+1. **Default is `none`; `api` and `ollama` are optional.** Add `ApiEmbeddingProvider` in `api/` using Spring
+   `RestClient`; request and response mapping for the chosen vendor lives in that class only.
+   `OllamaEmbeddingProvider` stays selectable (`listing-guard.embedding.provider: ollama`), `hashing` stays for
+   tests. The default is `none` (`DisabledEmbeddingProvider`, `modelId()` `none`): the application starts and
+   `/api/v1/checks` works with no model and no key, and what needs embeddings fails with the problem code
+   `embedding-not-configured` (503) or, in the jobs, at once with a message saying how to enable a provider. Reason:
+   the maintainer uses no model yet, and rule checks must not depend on a key or an outside service. Texts are
    sent in batches (size configurable, as the vendor's maximum is not always stated); ingest retries 429 and 5xx
    a few times with backoff, the request path at most once. Response size and dimensions are checked as the
    Ollama provider does.
