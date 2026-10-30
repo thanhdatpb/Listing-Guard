@@ -60,8 +60,16 @@ final class TrademarkFixtures {
         return catalogsDir(dir, label, resource(SYNTHETIC), "[25, 35]", "[REGISTERED, PENDING]");
     }
 
+    /** The in-memory reference of the import (the merge rule applied in Java). */
     static PreparedCatalog prepare(Path dir, String label, TrademarkRuleset ruleset) {
         return CatalogImport.prepare(CatalogManifest.load(dir).entry(label), dir.resolve("raw"),
+                new TextNormalizer(ruleset.normalization()), NormalizationIdentity.of(ruleset));
+    }
+
+    /** The real import: streamed into the staging table and merged by SQL. */
+    static TrademarkCatalogImporter.Result importCatalog(TrademarkCatalogImporter importer, Path dir, String label,
+                                                         TrademarkRuleset ruleset) {
+        return importer.importCatalog(CatalogManifest.load(dir).entry(label), dir.resolve("raw"),
                 new TextNormalizer(ruleset.normalization()), NormalizationIdentity.of(ruleset));
     }
 }

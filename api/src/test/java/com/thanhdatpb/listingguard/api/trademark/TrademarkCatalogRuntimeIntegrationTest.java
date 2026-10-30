@@ -7,10 +7,9 @@ import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.trademark.AnalysisFingerprint;
 import com.thanhdatpb.listingguard.trademark.TrademarkCheckInput;
 import com.thanhdatpb.listingguard.trademark.TrademarkResult;
-import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogImport;
+import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogHeader;
 import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogManifest;
 import com.thanhdatpb.listingguard.trademark.catalog.load.NormalizationIdentity;
-import com.thanhdatpb.listingguard.trademark.catalog.load.PreparedCatalog;
 import com.thanhdatpb.listingguard.trademark.config.TrademarkRuleset;
 import com.thanhdatpb.listingguard.trademark.config.TrademarkRulesetLoader;
 import com.thanhdatpb.listingguard.trademark.normalize.TextNormalizer;
@@ -57,16 +56,14 @@ class TrademarkCatalogRuntimeIntegrationTest {
                 List.of("ETSY", "AMAZON"), catalogVersion, "catalogs"), jdbc, transactions, rulesets);
     }
 
-    private PreparedCatalog importSynthetic(NormalizationIdentity identity, TextNormalizer normalizer) {
+    private CatalogHeader importSynthetic(NormalizationIdentity identity, TextNormalizer normalizer) {
         String label = "runtime-" + UUID.randomUUID().toString().substring(0, 8);
         TrademarkFixtures.syntheticDir(dir, label);
-        PreparedCatalog prepared = CatalogImport.prepare(CatalogManifest.load(dir).entry(label), dir.resolve("raw"),
-                normalizer, identity);
-        importer.importCatalog(prepared);
-        return prepared;
+        return importer.importCatalog(CatalogManifest.load(dir).entry(label), dir.resolve("raw"), normalizer, identity)
+                .catalog();
     }
 
-    private PreparedCatalog importWithActiveRuleset() {
+    private CatalogHeader importWithActiveRuleset() {
         TrademarkRuleset active = rulesets.ruleset();
         return importSynthetic(NormalizationIdentity.of(active), new TextNormalizer(active.normalization()));
     }
@@ -81,7 +78,7 @@ class TrademarkCatalogRuntimeIntegrationTest {
 
     @Test
     void aCatalogImportedWithTheActiveRulesetIsServed() {
-        PreparedCatalog prepared = importWithActiveRuleset();
+        CatalogHeader prepared = importWithActiveRuleset();
         TrademarkCatalogRuntime runtime = runtimeFor(prepared.version());
 
         TrademarkCatalogRuntime.Status status = runtime.evaluate();
@@ -95,7 +92,7 @@ class TrademarkCatalogRuntimeIntegrationTest {
 
     @Test
     void theConfiguredVersionIsExactNotTheLatest() {
-        PreparedCatalog older = importWithActiveRuleset();
+        CatalogHeader older = importWithActiveRuleset();
         importWithActiveRuleset();
 
         TrademarkCatalogRuntime runtime = runtimeFor(older.version());
@@ -122,7 +119,7 @@ class TrademarkCatalogRuntimeIntegrationTest {
         String yaml = new ClassPathResource("rulesets/trademark-risk-2026-11.yaml")
                 .getContentAsString(StandardCharsets.UTF_8);
         TrademarkRuleset otherMapping = TrademarkRulesetLoader.parse(yaml.replace("\"0\": \"o\"", "\"0\": \"q\""));
-        PreparedCatalog prepared = importSynthetic(NormalizationIdentity.of(otherMapping),
+        CatalogHeader prepared = importSynthetic(NormalizationIdentity.of(otherMapping),
                 new TextNormalizer(otherMapping.normalization()));
         TrademarkCatalogRuntime runtime = runtimeFor(prepared.version());
 
@@ -139,7 +136,7 @@ class TrademarkCatalogRuntimeIntegrationTest {
     @Test
     void aCatalogNormalizedWithAnotherNormalizerVersionIsRefused() {
         TrademarkRuleset active = rulesets.ruleset();
-        PreparedCatalog otherNormalizer = importSynthetic(new NormalizationIdentity(active.packId(), "normalization-0",
+        CatalogHeader otherNormalizer = importSynthetic(new NormalizationIdentity(active.packId(), "normalization-0",
                 active.normalization().canonicalHash()), new TextNormalizer(active.normalization()));
 
         TrademarkCatalogRuntime.Status status = runtimeFor(otherNormalizer.version()).evaluate();
@@ -150,7 +147,7 @@ class TrademarkCatalogRuntimeIntegrationTest {
 
     @Test
     void aRulesetThatOnlyChangesThresholdsOrWordListsStillServesTheCatalog() throws Exception {
-        PreparedCatalog prepared = importWithActiveRuleset();
+        CatalogHeader prepared = importWithActiveRuleset();
         String yaml = new ClassPathResource("rulesets/trademark-risk-2026-11.yaml")
                 .getContentAsString(StandardCharsets.UTF_8);
         // a new ruleset version that changes a threshold and a word list but not the normalization settings
@@ -181,7 +178,7 @@ class TrademarkCatalogRuntimeIntegrationTest {
 
     @Test
     void theFingerprintCarriesTheCatalogDatabaseAndMarketplaceComponents() {
-        PreparedCatalog prepared = importWithActiveRuleset();
+        CatalogHeader prepared = importWithActiveRuleset();
         TrademarkCatalogRuntime runtime = runtimeFor(prepared.version());
         runtime.evaluate();
 

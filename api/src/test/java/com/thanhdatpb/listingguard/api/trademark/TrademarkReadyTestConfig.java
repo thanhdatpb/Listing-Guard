@@ -25,20 +25,28 @@ public class TrademarkReadyTestConfig {
 
     static final String LABEL = "endpoint-synthetic";
 
-    private static final PreparedCatalog PREPARED = prepare();
+    private static final Path DIR = directory();
+    private static final TrademarkRuleset RULESET = ruleset();
+    private static final PreparedCatalog PREPARED = TrademarkFixtures.prepare(DIR, LABEL, RULESET);
 
     /** The catalog version these contexts serve. */
     public static String catalogVersion() {
         return PREPARED.version();
     }
 
-    private static PreparedCatalog prepare() {
+    private static Path directory() {
         try {
             Path dir = Files.createTempDirectory("trademark-endpoint-catalog");
-            TrademarkFixtures.syntheticDir(dir, LABEL);
-            TrademarkRuleset ruleset = TrademarkRulesetLoader.parse(
+            return TrademarkFixtures.syntheticDir(dir, LABEL);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static TrademarkRuleset ruleset() {
+        try {
+            return TrademarkRulesetLoader.parse(
                     new ClassPathResource("rulesets/trademark-risk-2026-11.yaml").getContentAsString(StandardCharsets.UTF_8));
-            return TrademarkFixtures.prepare(dir, LABEL, ruleset);
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
@@ -52,7 +60,7 @@ public class TrademarkReadyTestConfig {
     @Bean
     ApplicationRunner trademarkCatalogImport(TrademarkCatalogImporter importer, TrademarkCatalogRuntime runtime) {
         return args -> {
-            importer.importCatalog(PREPARED);
+            TrademarkFixtures.importCatalog(importer, DIR, LABEL, RULESET);
             runtime.evaluate();
         };
     }

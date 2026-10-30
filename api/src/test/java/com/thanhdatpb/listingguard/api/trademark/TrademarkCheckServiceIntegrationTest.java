@@ -14,7 +14,7 @@ import com.thanhdatpb.listingguard.trademark.CanonicalInput;
 import com.thanhdatpb.listingguard.trademark.TrademarkScanner;
 import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
 import com.thanhdatpb.listingguard.trademark.catalog.TrademarkCatalog;
-import com.thanhdatpb.listingguard.trademark.catalog.load.PreparedCatalog;
+import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogHeader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -260,9 +260,9 @@ class TrademarkCheckServiceIntegrationTest {
         CheckRequest request = request("Zorvex catalog " + unique());
         TrademarkCheckResult original = service.check(clientA(), request);
 
-        PreparedCatalog other = TrademarkFixtures.prepare(TrademarkFixtures.syntheticDir(dir, "endpoint-other-catalog"),
-                "endpoint-other-catalog", rulesets.ruleset());
-        importer.importCatalog(other);
+        CatalogHeader other = TrademarkFixtures.importCatalog(importer,
+                TrademarkFixtures.syntheticDir(dir, "endpoint-other-catalog"), "endpoint-other-catalog",
+                rulesets.ruleset()).catalog();
         TrademarkCatalogRuntime otherRuntime = new TrademarkCatalogRuntime(new TrademarkProperties(properties.ruleset(),
                 properties.marketplaces(), other.version(), properties.catalogsDir()), jdbc, transactions, rulesets);
         assertThat(otherRuntime.evaluate().state()).isEqualTo(TrademarkCatalogRuntime.State.READY);

@@ -68,7 +68,7 @@ class PostgresTrademarkCatalogContractTest {
         String label = "contract-" + UUID.randomUUID().toString().substring(0, 8);
         TrademarkFixtures.syntheticDir(dir, label);
         PreparedCatalog prepared = TrademarkFixtures.prepare(dir, label, rulesets.ruleset());
-        TrademarkCatalogImporter.Result result = importer.importCatalog(prepared);
+        TrademarkCatalogImporter.Result result = TrademarkFixtures.importCatalog(importer, dir, label, rulesets.ruleset());
         postgres = new PostgresTrademarkCatalog(jdbc, transactions, result.catalogVersionId(), prepared.version());
         inMemory = new InMemoryTrademarkCatalog(prepared.version(),
                 prepared.entries().stream().map(PreparedCatalog.Entry::mark).toList());

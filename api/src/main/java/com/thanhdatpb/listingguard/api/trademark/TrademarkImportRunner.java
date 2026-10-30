@@ -1,9 +1,7 @@
 package com.thanhdatpb.listingguard.api.trademark;
 
-import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogImport;
 import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogManifest;
 import com.thanhdatpb.listingguard.trademark.catalog.load.NormalizationIdentity;
-import com.thanhdatpb.listingguard.trademark.catalog.load.PreparedCatalog;
 import com.thanhdatpb.listingguard.trademark.normalize.TextNormalizer;
 import java.nio.file.Path;
 import java.util.List;
@@ -52,10 +50,11 @@ public class TrademarkImportRunner implements ApplicationRunner {
                     + manifest.catalogs().stream().map(CatalogManifest.Entry::version).toList());
         }
         log.info("Importing trademark catalog '{}' from {}", labels.get(0), dir.toAbsolutePath());
-        PreparedCatalog prepared = CatalogImport.prepare(manifest.entry(labels.get(0)), dir.resolve("raw"),
-                new TextNormalizer(rulesets.ruleset().normalization()), NormalizationIdentity.of(rulesets.ruleset()));
-        TrademarkCatalogImporter.Result result = importer.importCatalog(prepared);
+        TrademarkCatalogImporter.Result result = importer.importCatalog(manifest.entry(labels.get(0)),
+                dir.resolve("raw"), new TextNormalizer(rulesets.ruleset().normalization()),
+                NormalizationIdentity.of(rulesets.ruleset()));
         log.info("Trademark catalog version {} ({}). To serve it set LISTING_GUARD_TRADEMARK_CATALOG_VERSION "
-                + "(listing-guard.trademark.catalog-version) to that version.", prepared.version(), result.outcome());
+                + "(listing-guard.trademark.catalog-version) to that version.", result.catalog().version(),
+                result.outcome());
     }
 }
