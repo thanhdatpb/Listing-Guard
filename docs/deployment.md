@@ -190,6 +190,22 @@ extensions installed (the `pgvector/pgvector:pg16` image does). If it cannot, th
 start; it never falls back to another matching method. Supported: PostgreSQL 16 (the major version and the `pg_trgm`
 extension version are part of every trademark analysis fingerprint, so an upgrade of either makes new results).
 
+**Migrations.** V15 creates the extension and the catalog tables (already applied where PR #50 ran). V16 changes two
+things in them: a catalog's normalization identity becomes `pack_id`, `normalization_version` and
+`normalization_hash` (the old `ruleset_version` and `ruleset_content_hash` columns go), and an entry keeps all source
+ids in `source_ids` (the single `source_id` goes). Neither can be derived from what V15 stored, so **V16 refuses to
+run while any catalog exists** and stops the API from starting, with the number of rows in the message. The old
+catalogs are only imported data, so delete them and import again after the upgrade:
+
+```sql
+-- before the upgrade, only if V16 refused (the tables refuse UPDATE, not DELETE)
+DELETE FROM trademark_entry;
+DELETE FROM trademark_catalog_version;
+```
+
+then start the new API (V16 applies) and run `trademark-import` again for each catalog, and set
+`TRADEMARK_CATALOG_VERSION` to the printed version. With no catalog loaded, V16 applies on its own.
+
 Catalog versions are immutable rows; load one with the one-shot job and name it in the API configuration:
 
 ```bash
