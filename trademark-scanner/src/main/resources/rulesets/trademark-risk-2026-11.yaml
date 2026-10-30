@@ -1,0 +1,194 @@
+# Trademark risk ruleset (ADR-009). Thresholds, word lists, risk levels and messages live here; the logic lives in
+# Java (ADR-001).
+#
+# Any change to this file changes its content hash. Bump `version` for every change: a published version is
+# immutable (ADR-002).
+#
+# Every block has a `source`. All of them are `unverified`: these are internal heuristics, not a marketplace or legal
+# rule, and the loader refuses any other status. Everything here is synthetic. The place names are invented; a
+# production place list is a later ruleset version supplied by the maintainer (places and sport terms only, never
+# place + team pairs).
+#
+# Messages and suggestions are Vietnamese. They report a reference warning and never say a text is allowed or valid.
+pack_id: trademark-risk
+version: trademark-risk-2026-11
+checked_at: 2026-10-30
+
+disclaimer: Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.
+
+normalization:
+  source:
+    status: unverified
+    note: Internal normalization choices, tuned in the evaluation PR.
+  # Letters that Unicode decomposition leaves alone, mapped to ASCII. Keys are one character.
+  fold_map:
+    "đ": "d"
+    "ð": "d"
+    "ø": "o"
+    "ł": "l"
+    "ß": "ss"
+    "æ": "ae"
+    "œ": "oe"
+    "þ": "th"
+  # Look-alike letters (Cyrillic and Greek) mapped to the Latin letter they imitate.
+  homoglyphs:
+    "а": "a"   # Cyrillic a
+    "в": "b"   # Cyrillic ve
+    "е": "e"   # Cyrillic ie
+    "к": "k"   # Cyrillic ka
+    "м": "m"   # Cyrillic em
+    "н": "h"   # Cyrillic en
+    "о": "o"   # Cyrillic o
+    "р": "p"   # Cyrillic er
+    "с": "c"   # Cyrillic es
+    "т": "t"   # Cyrillic te
+    "у": "y"   # Cyrillic u
+    "х": "x"   # Cyrillic ha
+    "і": "i"   # Cyrillic i
+    "ο": "o"   # Greek omicron
+    "α": "a"   # Greek alpha
+    "ν": "v"   # Greek nu
+    "ρ": "p"   # Greek rho
+  # A digit or symbol that can stand for a letter, mapped only inside a word with at least `min_letters_around`
+  # letters before and after it, so "z0rvex" becomes "zorvex" but "3d" and "2xl" are left alone.
+  leet:
+    min_letters_around: 1
+    map:
+      "0": "o"
+      "1": "i"
+      "3": "e"
+      "4": "a"
+      "5": "s"
+      "7": "t"
+      "@": "a"
+      "$": "s"
+      "!": "i"
+  # Dropped without splitting a word. Any other character that is not a letter or a digit separates tokens.
+  punctuation:
+    delete_chars:
+      - "'"
+      - "’"   # right single quotation mark
+      - "ʼ"   # modifier letter apostrophe
+      - "`"
+      - "´"   # acute accent
+      - "­"   # soft hyphen
+      - "​"   # zero width space
+      - "‌"   # zero width non-joiner
+      - "‍"   # zero width joiner
+      - "﻿"   # zero width no-break space
+
+matching:
+  source:
+    status: unverified
+    note: Starting values, to be tuned on the synthetic tuning set (never on the held-out set).
+  # Input fields the rules read. `tags` stands for every tag, each its own field.
+  scan_fields:
+    - title
+    - tags
+    - description
+    - brand
+    - shop_name
+  # Longest n-gram, in tokens, compared with the catalog. A whole field is never compared with a mark.
+  max_ngram_tokens: 3
+  # A gram shorter or longer than this (characters) is only matched exactly.
+  fuzzy_min_chars: 5
+  fuzzy_max_chars: 40
+  # What the catalog uses to return candidates (pg_trgm similarity in the PostgreSQL adapter).
+  candidate_threshold: 0.30
+  # The Java score a candidate needs to become a fuzzy finding.
+  final_threshold: 0.80
+  # Optimal string alignment similarity: 1 - distance / length of the longer text. Must match the code.
+  scoring_algorithm_version: osa-similarity-1
+  # Longest text copied into evidence.
+  max_snippet_chars: 80
+
+lexicon:
+  source:
+    status: unverified
+    note: Synthetic places. Sport terms, color words and pattern words are generic English words.
+  places:
+    - Northvale
+    - Eastmere
+    - Brightwater
+    - Stonefield
+    - Aldermoor
+    - New Haverton
+  sport_terms:
+    - baseball
+    - basketball
+    - football
+    - soccer
+    - hockey
+    - ice hockey
+    - softball
+    - jersey
+  color_words:
+    - red
+    - blue
+    - navy
+    - royal
+    - white
+    - black
+    - gold
+    - silver
+    - green
+    - orange
+    - yellow
+    - purple
+    - grey
+    - gray
+    - maroon
+    - crimson
+    - teal
+  pattern_words:
+    - pinstripe
+    - pinstripes
+    - stripe
+    - striped
+    - plaid
+    - checkered
+    - camo
+    - solid
+    - gradient
+
+# The order here is the order the rules run in and the tie-break between findings of equal risk.
+rules:
+  catalog_exact:
+    risk: HIGH
+    source:
+      status: unverified
+    message: "Từ '{token}' ở {field} trùng với nhãn hiệu '{mark}' trong danh mục tham chiếu."
+    suggestion: "Xem lại việc dùng '{mark}' ở {field}. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+  catalog_phrase:
+    risk: HIGH
+    source:
+      status: unverified
+    message: "Cụm '{token}' ở {field} trùng với nhãn hiệu '{mark}' trong danh mục tham chiếu."
+    suggestion: "Xem lại việc dùng '{mark}' ở {field}. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+  catalog_fuzzy:
+    risk: MEDIUM
+    source:
+      status: unverified
+    message: "Cụm '{token}' ở {field} giống nhãn hiệu '{mark}' với độ tương đồng {score}%."
+    suggestion: "Kiểm tra xem '{token}' có phải cách viết sai hoặc biến thể của '{mark}' không. Đây chỉ là cảnh báo tham khảo."
+  geo_sport_combination:
+    risk: MEDIUM
+    # A place and a sport term in the same field, at most this many tokens apart (adjacent words are 1 apart).
+    max_token_distance: 3
+    source:
+      status: unverified
+    message: "{field} có địa danh '{place}' đi cùng từ thể thao '{sport}' (cách nhau {distance} từ, ngưỡng {max_distance} từ). Tổ hợp này có thể gợi đến một đội thể thao."
+    suggestion: "Xem lại cách mô tả sản phẩm ở {field}. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+  color_name_contains_mark:
+    source:
+      status: unverified
+    note: "Kết quả này nằm trong một cụm mô tả màu. Việc đó giải thích kết quả và không làm giảm mức rủi ro."
+  pure_color_description:
+    # Informational: always LOW, never raises the overall risk.
+    risk: LOW
+    # The shortest color/pattern phrase that is reported.
+    min_tokens: 2
+    source:
+      status: unverified
+    message: "Cụm '{phrase}' ở {field} chỉ gồm {tokens} từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này."
+    suggestion: "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
