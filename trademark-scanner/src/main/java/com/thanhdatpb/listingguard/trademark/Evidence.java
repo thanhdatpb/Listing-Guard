@@ -17,12 +17,22 @@ import java.util.List;
  * @param ruleId             the rule that produced the finding
  * @param insideColorPhrase  the match lies inside a color phrase; this explains the finding and never lowers it
  * @param otherRuleIds       other rules that matched an overlapping span of the same field and lost to this one
+ * @param sourceIds          the ids of the source records of the matched catalog mark, empty for a finding without a mark
  */
 public record Evidence(String field, int start, int end, String snippet, String normalizedToken, String matchedMark,
                        MatchType matchType, Double score, String catalogVersion, String ruleId,
-                       boolean insideColorPhrase, List<String> otherRuleIds) {
+                       boolean insideColorPhrase, List<String> otherRuleIds, List<String> sourceIds) {
 
     public Evidence {
         otherRuleIds = List.copyOf(otherRuleIds);
+        sourceIds = List.copyOf(sourceIds);
+    }
+
+    /** Evidence of a finding without a catalog mark, so without source ids. */
+    public Evidence(String field, int start, int end, String snippet, String normalizedToken, String matchedMark,
+                    MatchType matchType, Double score, String catalogVersion, String ruleId,
+                    boolean insideColorPhrase, List<String> otherRuleIds) {
+        this(field, start, end, snippet, normalizedToken, matchedMark, matchType, score, catalogVersion, ruleId,
+                insideColorPhrase, otherRuleIds, List.of());
     }
 }

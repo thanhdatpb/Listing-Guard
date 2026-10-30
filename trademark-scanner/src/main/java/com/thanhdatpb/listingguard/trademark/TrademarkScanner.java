@@ -117,7 +117,7 @@ public final class TrademarkScanner {
         Evidence evidence = new Evidence(candidate.field(), candidate.start(), candidate.end(),
                 context.snippet(field, candidate.start(), candidate.end()), candidate.normalizedToken(),
                 candidate.mark(), candidate.type(), candidate.score(), catalogVersion, candidate.ruleId(),
-                candidate.insideColorPhrase(), candidate.otherRuleIds());
+                candidate.insideColorPhrase(), candidate.otherRuleIds(), candidate.sourceIds());
         return new TrademarkFinding(candidate.ruleId(), candidate.risk(), message, suggestion, evidence);
     }
 
