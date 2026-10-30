@@ -128,7 +128,9 @@ class ApiEmbeddingProviderTest {
         for (JsonNode request : requests) {
             assertThat(request.get("model").asText()).isEqualTo("models/" + MODEL);
             assertThat(request.get("content").get("parts")).hasSize(1);
-            assertThat(request.get("outputDimensionality").asInt()).isEqualTo(DIMENSIONS);
+            assertThat(request.get("embedContentConfig").get("outputDimensionality").asInt()).isEqualTo(DIMENSIONS);
+            // the top-level field is deprecated (https://ai.google.dev/api/embeddings)
+            assertThat(request.has("outputDimensionality")).isFalse();
         }
     }
 

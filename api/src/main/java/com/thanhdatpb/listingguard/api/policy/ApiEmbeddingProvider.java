@@ -117,7 +117,7 @@ public final class ApiEmbeddingProvider implements EmbeddingProvider {
         for (String text : batch) {
             ObjectNode request = requests.addObject().put("model", "models/" + model);
             request.putObject("content").putArray("parts").addObject().put("text", prefix + text);
-            request.put("outputDimensionality", dimensions);
+            request.putObject("embedContentConfig").put("outputDimensionality", dimensions);
         }
         String payload = body.toString();
 
