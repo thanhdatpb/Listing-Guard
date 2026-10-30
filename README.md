@@ -278,11 +278,11 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
    ([ADR-010](docs/adr/ADR-010-pack-identity-and-analysis-version.md)).
 2. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)).
 3. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)).
-4. In parallel after step 2: the policy analyzer
-   ([ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md)). It is off by default and is enabled by configuring
-   an LLM.
-5. Run and review the retrieval evaluation against the maintained labels and record measured results, and add
-   Amazon product-type overrides only when their limits and sources have been verified.
+4. In parallel after step 2: run the retrieval evaluation and record the measured results (this needs an embedding
+   provider: an API key or Ollama), then build the policy analyzer
+   ([ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md)). The analyzer is off by default and is enabled by
+   configuring an LLM.
+5. Add Amazon product-type overrides only when their limits and sources have been verified.
 
 ## Documentation
 
