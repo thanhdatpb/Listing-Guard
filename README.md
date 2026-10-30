@@ -5,49 +5,93 @@
 [![License](https://img.shields.io/github/license/thanhdatpb/Listing-Guard)](LICENSE)
 [![GHCR image](https://img.shields.io/badge/GHCR-listing--guard-2496ED?logo=docker&logoColor=white)](https://github.com/thanhdatpb/Listing-Guard/pkgs/container/listing-guard)
 
-Pre-publish checker for marketplace listings (Etsy and Amazon). Listing Guard checks a
-listing and suggests fixes before you publish. It does not edit or publish anything, and it does not
-do SEO.
+Self-hosted pre-publish compliance API for Etsy and Amazon listings. Listing Guard checks a listing before you
+publish and reports what it found, each finding with the field it refers to and the evidence behind it. It does not
+edit or publish anything, and it does not do SEO.
 
-- **Rule Engine**: Etsy and Amazon deterministic rules. Thresholds, word lists and severities are
-  configured in versioned YAML per marketplace; Amazon rulesets support product-type overrides.
-- **RAG Analyzer**: policy documents can be ingested and retrieved from pgvector. Retrieval evaluation
-  has not been run, and the LLM analyzer and citation verification are not implemented.
+- **Marketplace rules** (`POST /api/v1/checks`): deterministic Etsy and Amazon rules. Thresholds, word lists and
+  severities are configured in versioned YAML per marketplace; Amazon rulesets support product-type overrides.
+- **Trademark risk** (`POST /api/v1/trademark-checks`): matches the text of a listing against an offline, versioned
+  catalog of marks that you load yourself (exact, phrase and fuzzy matching, plus color and place context rules).
+  Every finding carries explainable evidence (field, span, matched mark, match type, score, source ids) and every
+  result carries a disclaimer: it is a reference warning, not a legal conclusion.
+- **Batch check** (the `batch-check` job): checks a whole export file (an Etsy CSV, an Amazon flat file) with both
+  checks and writes CSV and HTML reports, without an integration.
+- **Multi-client REST API**: every API key belongs to a client; results, cache and rate limit are per client.
+- **Policy retrieval** (optional): marketplace policy documents can be ingested and retrieved from pgvector. It needs an
+  embedding provider and is off by default.
 
 ## Status
 
-The Etsy and Amazon rule engines work end to end. `POST /api/v1/checks` normalizes a listing, runs the
-rules for its marketplace, stores the check and findings in the caller's client scope, and returns them.
-Repeated checks reuse stored results within that client. The API supports client API keys, per-client
-rate limits, and per-client check isolation; see the [integration guide](docs/integration-guide.md).
+Working end to end:
 
-Policy ingestion and retrieval are implemented, but retrieval has not been evaluated yet. The policy-grounded
-LLM analyzer and citation verification are not implemented.
+- The Etsy and Amazon rule checks. `POST /api/v1/checks` normalizes a listing, runs the rules for its marketplace,
+  stores the check and findings in the caller's client scope, and returns them. Repeated checks reuse stored results
+  within that client.
+- The trademark check, once you configure a catalog. `POST /api/v1/trademark-checks` is a separate check with its own
+  endpoint and result; it does not change `/checks`. Only a hash of the listing and short evidence snippets are
+  stored, for 30 days.
+- The `batch-check` job, which calls the same services as the two endpoints.
+- Client API keys, per-client rate limits and per-client isolation; see the
+  [integration guide](docs/integration-guide.md).
+
+Before you rely on it:
+
+- **The trademark catalog is yours to load.** No trademark data is shipped or downloaded. You prepare the data, check
+  that the terms of its source allow this storage and use, and import it (see [Trademark catalog](#trademark-catalog)).
+  Without a catalog the trademark check answers `503` and the rule checks are not affected. There is no importer for an
+  official register yet: the USPTO converter waits for the official documentation, so you convert your data to the
+  `jsonl-1` format yourself.
+- **No accuracy has been measured on real data.** The evaluation of the trademark check (ADR-009, PR A4) has not been
+  run, and every threshold and word list of the trademark ruleset is marked `unverified`. `batch-check` can count how
+  often listings you labelled were flagged (`--label-column`); that is a measurement on a small set, not an accuracy.
+- **Marketplace limits are only as verified as their source.** Each rule records a source status (`verified`,
+  `secondary` or `unverified`) in its ruleset; see [Rulesets](#rulesets).
+- **Policy retrieval has not been evaluated.** There is no recall figure yet, because the evaluation needs a real run
+  with an embedding provider.
+
+What is not built yet is listed in the [Roadmap](#roadmap). Changes between versions are in
+[docs/releases/](docs/releases/v0.4.0.md).
 
 ## Architecture
 
 ```text
-Client backend -- POST /api/v1/checks + X-API-Key --> Listing Guard API (Spring Boot)
-                                                      |
+Client backend -- X-API-Key --> Listing Guard API (Spring Boot)
+   POST /api/v1/checks               |
+   POST /api/v1/trademark-checks     |
                          API key --> authenticated client
                          rate limit per client
-                                                      |
+                                     |
                               NormalizerRegistry
                                /             \
                     EtsyNormalizer       AmazonNormalizer
                                \             /
                                 Listing (core)
-                                      |
-                RuleEngine (rule-engine) <-- versioned ruleset YAML
-                  Etsy ruleset            Amazon ruleset
-                                           + product-type overrides
-                                      |
-                                Findings (core)
-                                      |
-                   client-scoped listing_check + finding
-                   cache key includes client_id
-                                      |
-                         PostgreSQL 16 + pgvector
+                         /                         \
+        /checks (pack `listing-rules`)    /trademark-checks (pack `trademark-risk`)
+                |                                    |
+   RuleEngine (rule-engine)               TrademarkScanner (trademark-scanner)
+     <-- versioned ruleset YAML             <-- versioned trademark ruleset YAML
+         Etsy ruleset, Amazon ruleset       exact / phrase / fuzzy + context rules
+         + product-type overrides                    |
+                |                           TrademarkCatalog port
+          Findings (core)                   PostgresTrademarkCatalog (pg_trgm)
+                |                           the catalog version is named in configuration
+   client-scoped listing_check + finding             |
+   cache key: client, marketplace,          client-scoped trademark_check + finding
+   content hash, analysis version           hash of the input + bounded evidence, 30 days
+                 \                                  /
+                  PostgreSQL 16 + pgvector + pg_trgm
+
+  Trademark catalog import job (profile `trademark-import`; no network, no model)
+  catalogs/manifest.yaml + catalogs/raw/*.jsonl (your data, git-ignored)
+       -> read as a stream -> staging table -> merge by SQL
+       -> trademark_catalog_version + trademark_entry (a version is never edited)
+
+  Batch check job (profile `batch-check`; no network, no HTTP, no model)
+  listing CSV + YAML column mapping
+       -> CheckService + TrademarkCheckService (the same services as the endpoints)
+       -> findings.csv, listings.csv, summary.html
 
   Policy ingest job (profile `ingest`)
   policies/manifest.yaml + policies/raw/<marketplace>/*.html|pdf
@@ -62,14 +106,18 @@ Modules:
 | `core/` | Plain Java domain types shared by all modules: `Listing`, `Money`, `Finding`, `Severity`. No Spring. |
 | `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
 | `trademark-scanner/` | Trademark risk scanner core (ADR-009): versioned ruleset, canonical input hash, normalization with offsets, the `TrademarkCatalog` port with an in-memory catalog, exact/phrase/fuzzy matching, color and place context rules, risk aggregation, the pack fingerprint, and the catalog manifest and data file reader. No Spring, no database. |
-| `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, fake), `PolicyRetriever`, retrieval metrics. No Spring. |
-| `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, the trademark catalog, check endpoint and retention cleanup, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
+| `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, hashing for tests), `PolicyRetriever`, retrieval metrics, and the `LlmProvider` contract with a scripted test provider and a `CitationVerifier` (no call to a real model is implemented). No Spring. |
+| `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, the `/checks` and `/trademark-checks` endpoints with the trademark retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and the `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
+| `batch/` | `mappings/` (example column mappings, committed); `input/` and `out/` (your exports and the reports, git-ignored) |
 | `policies/` | `manifest.yaml` (committed) and `raw/` (local files, git-ignored) |
 | `docs/adr/` | Architecture decision records |
 | `docs/api/` | `openapi.json`, the committed API contract (a test fails when it drifts from the code) |
 | `docs/integration-guide.md` | How a backend calls the API: auth, flow, field paths, errors |
+| `docs/batch-check.md` | How to check an export file and read the reports |
+| `docs/deployment.md` | Production deployment, upgrades, and the migration notes |
+| `docs/releases/` | Release notes, one file per version |
 
 ## Run
 
@@ -260,7 +308,9 @@ hash of every ingested file. Nothing in it is estimated: it only exists after a 
 Trademark checks (ADR-009) match a listing against a catalog of marks that you load yourself. The catalog is optional:
 without it the application and `/checks` run as before and trademark checks are off. No trademark data is committed
 and the import never calls the network. **You are responsible for checking that the terms of your data source allow
-this storage and use.**
+this storage and use.** No accuracy of this check has been measured on real data (see Status), and there is no converter
+for an official register yet: the USPTO converter waits for the official documentation, so you convert your data to
+`jsonl-1` yourself.
 
 1. **Prepare the file.** UTF-8 JSON Lines in `catalogs/raw/` (git-ignored), one record per line:
    `{"mark": "Zorvex", "status": "REGISTERED", "nice_classes": [25], "source_id": "123", "common_word": false}`
@@ -333,24 +383,27 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 
 ## Roadmap
 
-1. PR 0a (pack identity expand, migration V7) and PR 0b (contract, migrations V8-V14) are done: pack identity and
-   composite analysis versions ([ADR-010](docs/adr/ADR-010-pack-identity-and-analysis-version.md); the packs that
-   follow implement the rest of the ADR).
-2. Trademark scanner, PR A ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)): A1 (core), A2 (catalog) and A3
-   (endpoint) are done; A2b is half done (a catalog from several files; the USPTO converter waits for the official
-   documentation), then A4 (evaluation).
-3. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)).
-4. In parallel after step 2: run the retrieval evaluation and record the measured results (this needs an embedding
-   provider: an API key or Ollama), then build the policy analyzer
-   ([ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md)). The analyzer is off by default and is enabled by
-   configuring an LLM.
-5. Add Amazon product-type overrides only when their limits and sources have been verified.
+Done: pack identity (PR 0a, migration V7, and PR 0b, migrations V8-V14; composite analysis versions,
+[ADR-010](docs/adr/ADR-010-pack-identity-and-analysis-version.md)), the trademark scanner A1 (core), A2 (catalog) and A3
+(endpoint), the multi-file and streaming catalog import of A2b (V18), and the `batch-check` job. What follows, in this order,
+is **not built yet**:
+
+1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: the USPTO converter (it waits
+   for the official documentation) and A4, the evaluation that would give the first measured numbers.
+2. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)). Deferred; nothing is implemented.
+3. After step 1: run the retrieval evaluation and record the measured results (this needs an embedding provider: an API
+   key or Ollama), then build the policy analyzer ([ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md)). Only parts
+   exist today (the `LlmProvider` contract, a scripted test provider and the citation verifier); there is no call to a
+   real model and no endpoint. The analyzer is designed to be off by default and enabled by configuring an LLM.
+4. Add Amazon product-type overrides only when their limits and sources have been verified.
 
 ## Documentation
 
 - [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, and client isolation.
 - [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields.
 - [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
+- [Deployment](docs/deployment.md): production setup, backup, upgrades, the migration notes and the trademark catalog import.
+- [Release notes](docs/releases/v0.4.0.md): what changed in each version and what to do when upgrading.
 - [ADR-001: Rule configuration](docs/adr/ADR-001-rule-config.md)
 - [ADR-002: Ruleset versioning](docs/adr/ADR-002-ruleset-versioning.md)
 - [ADR-003: Chunking strategy](docs/adr/ADR-003-chunking-strategy.md)
@@ -360,9 +413,9 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
 - [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Deferred: PR B after ADR-009)
-- [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed)
-- [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed)
-- [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed)
+- [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3 and part of A2b are implemented)
+- [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
+- [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
 
 ## License
 MIT © 2026 Thanh Dat Tran. See [LICENSE](LICENSE).
