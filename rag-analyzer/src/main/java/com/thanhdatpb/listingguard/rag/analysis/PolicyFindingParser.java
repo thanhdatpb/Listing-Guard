@@ -14,13 +14,10 @@ import java.util.Set;
 /**
  * Reads the model's {@code {"findings": [...]}} (ADR-011 item 5). An item that does not match the schema is
  * dropped and counted, never repaired; an answer that is not that object at all throws
- * {@link InvalidLlmOutputException}. Only the first {@value #MAX_FINDINGS} items are looked at; the rest count
- * as invalid.
+ * {@link InvalidLlmOutputException}. Only the first {@code maxFindings} items are looked at; the rest count as
+ * invalid. The limits come from the analyzer profile, not from this class.
  */
 public final class PolicyFindingParser {
-
-    public static final int MAX_FINDINGS = 10;
-    public static final int MAX_TEXT_LENGTH = 400;
 
     private static final String RULE_PREFIX = "policy.";
 
@@ -31,17 +28,26 @@ public final class PolicyFindingParser {
 
     private final Set<String> topics;
     private final Set<String> fields;
+    private final int maxFindings;
+    private final int maxTextLength;
 
     /**
-     * @param topics allowed topics, so {@code ruleId} must be {@code policy.<topic>} for one of them
-     * @param fields allowed values of {@code field}
+     * @param topics        allowed topics, so {@code ruleId} must be {@code policy.<topic>} for one of them
+     * @param fields        allowed values of {@code field}
+     * @param maxFindings   how many items of the answer are looked at, positive
+     * @param maxTextLength most characters (code points) in {@code message} and in {@code suggestion}, positive
      */
-    public PolicyFindingParser(Set<String> topics, Set<String> fields) {
+    public PolicyFindingParser(Set<String> topics, Set<String> fields, int maxFindings, int maxTextLength) {
         if (topics.isEmpty() || fields.isEmpty()) {
             throw new IllegalArgumentException("topics and fields must not be empty");
         }
+        if (maxFindings <= 0 || maxTextLength <= 0) {
+            throw new IllegalArgumentException("maxFindings and maxTextLength must be positive");
+        }
         this.topics = Set.copyOf(topics);
         this.fields = Set.copyOf(fields);
+        this.maxFindings = maxFindings;
+        this.maxTextLength = maxTextLength;
     }
 
     public ParseResult parse(String text) {
@@ -64,7 +70,7 @@ public final class PolicyFindingParser {
         List<ProposedFinding> valid = new ArrayList<>();
         int index = 0;
         for (JsonNode item : findings) {
-            if (index++ >= MAX_FINDINGS) {
+            if (index++ >= maxFindings) {
                 continue;
             }
             parseItem(item).ifPresent(valid::add);
@@ -131,7 +137,7 @@ public final class PolicyFindingParser {
         }
     }
 
-    private static boolean validSentence(String s) {
-        return s != null && !s.isBlank() && s.codePointCount(0, s.length()) <= MAX_TEXT_LENGTH;
+    private boolean validSentence(String s) {
+        return s != null && !s.isBlank() && s.codePointCount(0, s.length()) <= maxTextLength;
     }
 }

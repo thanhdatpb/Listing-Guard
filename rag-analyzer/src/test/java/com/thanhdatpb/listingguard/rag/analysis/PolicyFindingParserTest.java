@@ -1,6 +1,8 @@
 package com.thanhdatpb.listingguard.rag.analysis;
 
 import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.FIELDS;
+import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.MAX_FINDINGS;
+import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.MAX_TEXT;
 import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.TOPICS;
 import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.finding;
 import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.findingsJson;
@@ -13,10 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -24,7 +28,7 @@ class PolicyFindingParserTest {
 
     private static final String QUOTE = "If a production partner helps make";
 
-    private final PolicyFindingParser parser = new PolicyFindingParser(TOPICS, FIELDS);
+    private final PolicyFindingParser parser = new PolicyFindingParser(TOPICS, FIELDS, MAX_FINDINGS, MAX_TEXT);
 
     @Test
     void readsAValidFinding() {
@@ -58,8 +62,8 @@ class PolicyFindingParserTest {
     @Test
     void messageAndSuggestionMayHaveExactlyTheLimit() {
         Map<String, Object> f = finding(7, QUOTE);
-        f.put("message", "m".repeat(PolicyFindingParser.MAX_TEXT_LENGTH));
-        f.put("suggestion", "s".repeat(PolicyFindingParser.MAX_TEXT_LENGTH));
+        f.put("message", "m".repeat(MAX_TEXT));
+        f.put("suggestion", "s".repeat(MAX_TEXT));
 
         assertThat(parser.parse(findingsJson(f)).valid()).hasSize(1);
     }
@@ -83,10 +87,8 @@ class PolicyFindingParserTest {
                 breaking("value is blank", f -> f.put("value", "   ")),
                 breaking("message missing", f -> f.remove("message")),
                 breaking("message blank", f -> f.put("message", " ")),
-                breaking("message over 400 characters",
-                        f -> f.put("message", "m".repeat(PolicyFindingParser.MAX_TEXT_LENGTH + 1))),
-                breaking("suggestion over 400 characters",
-                        f -> f.put("suggestion", "s".repeat(PolicyFindingParser.MAX_TEXT_LENGTH + 1))),
+                breaking("message over the limit", f -> f.put("message", "m".repeat(MAX_TEXT + 1))),
+                breaking("suggestion over the limit", f -> f.put("suggestion", "s".repeat(MAX_TEXT + 1))),
                 breaking("suggestion is null", f -> f.put("suggestion", null)),
                 breaking("citation missing", f -> f.remove("citation")),
                 breaking("citation is a string", f -> f.put("citation", "chunk 7")),
@@ -122,32 +124,68 @@ class PolicyFindingParserTest {
     }
 
     @Test
-    void moreThanTenFindingsKeepsTheFirstTenAndCountsTheRestAsInvalid() {
-        List<Object> items = new ArrayList<>();
-        for (int i = 1; i <= 12; i++) {
-            items.add(finding(i, QUOTE));
-        }
+    void moreFindingsThanTheLimitKeepsTheFirstOnesAndCountsTheRestAsInvalid() {
+        int extra = 2;
 
-        ParseResult result = parser.parse(findingsJson(items.toArray()));
+        ParseResult result = parser.parse(findingsJson(findings(MAX_FINDINGS + extra)));
 
-        assertThat(result.proposed()).isEqualTo(12);
-        assertThat(result.valid()).hasSize(PolicyFindingParser.MAX_FINDINGS);
+        assertThat(result.proposed()).isEqualTo(MAX_FINDINGS + extra);
+        assertThat(result.valid()).hasSize(MAX_FINDINGS);
         assertThat(result.valid()).extracting(ProposedFinding::chunkId)
-                .containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
-        assertThat(result.schemaInvalid()).isEqualTo(2);
+                .containsExactlyElementsOf(LongStream.rangeClosed(1, MAX_FINDINGS).boxed().toList());
+        assertThat(result.schemaInvalid()).isEqualTo(extra);
     }
 
     @Test
     void theLimitItselfIsAllowed() {
+        ParseResult result = parser.parse(findingsJson(findings(MAX_FINDINGS)));
+
+        assertThat(result.valid()).hasSize(MAX_FINDINGS);
+        assertThat(result.schemaInvalid()).isZero();
+    }
+
+    @Test
+    void theFindingLimitIsAParameter() {
+        int tighter = MAX_FINDINGS - 3;
+        PolicyFindingParser narrow = new PolicyFindingParser(TOPICS, FIELDS, tighter, MAX_TEXT);
+
+        ParseResult result = narrow.parse(findingsJson(findings(MAX_FINDINGS)));
+
+        assertThat(result.valid()).hasSize(tighter);
+        assertThat(result.schemaInvalid()).isEqualTo(MAX_FINDINGS - tighter);
+    }
+
+    @Test
+    void theTextLimitIsAParameter() {
+        PolicyFindingParser narrow = new PolicyFindingParser(TOPICS, FIELDS, MAX_FINDINGS, MAX_TEXT - 1);
+        Map<String, Object> f = finding(7, QUOTE);
+        f.put("message", "m".repeat(MAX_TEXT));
+
+        assertThat(parser.parse(findingsJson(f)).valid()).hasSize(1);
+        assertThat(narrow.parse(findingsJson(f)).valid()).isEmpty();
+    }
+
+    @Test
+    void theTextLimitCountsCodePointsNotUtf16Units() {
+        Map<String, Object> f = finding(7, QUOTE);
+        f.put("message", "😀".repeat(MAX_TEXT));
+
+        assertThat(parser.parse(findingsJson(f)).valid()).hasSize(1);
+    }
+
+    private static Object[] findings(int count) {
         List<Object> items = new ArrayList<>();
-        for (int i = 1; i <= PolicyFindingParser.MAX_FINDINGS; i++) {
+        for (int i = 1; i <= count; i++) {
             items.add(finding(i, QUOTE));
         }
+        return items.toArray();
+    }
 
-        ParseResult result = parser.parse(findingsJson(items.toArray()));
-
-        assertThat(result.valid()).hasSize(10);
-        assertThat(result.schemaInvalid()).isZero();
+    @ParameterizedTest(name = "maxFindings={0}, maxTextLength={1}")
+    @CsvSource({"0,1", "-1,1", "1,0", "1,-1", "0,0"})
+    void aLimitThatIsNotPositiveIsRefused(int maxFindings, int maxTextLength) {
+        assertThatThrownBy(() -> new PolicyFindingParser(TOPICS, FIELDS, maxFindings, maxTextLength))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @ParameterizedTest(name = "[{index}] {0}")
@@ -181,7 +219,7 @@ class PolicyFindingParserTest {
 
     @Test
     void topicsAndFieldsComeFromTheCaller() {
-        PolicyFindingParser narrow = new PolicyFindingParser(Set.of("other"), Set.of("title"));
+        PolicyFindingParser narrow = new PolicyFindingParser(Set.of("other"), Set.of("title"), MAX_FINDINGS, MAX_TEXT);
         Map<String, Object> f = finding(7, QUOTE);
 
         assertThat(narrow.parse(findingsJson(f)).valid()).isEmpty();
@@ -189,8 +227,10 @@ class PolicyFindingParserTest {
         f.put("ruleId", "policy.other");
         f.put("field", "title");
         assertThat(narrow.parse(findingsJson(f)).valid()).hasSize(1);
-        assertThatThrownBy(() -> new PolicyFindingParser(Set.of(), FIELDS)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new PolicyFindingParser(TOPICS, Set.of())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PolicyFindingParser(Set.of(), FIELDS, MAX_FINDINGS, MAX_TEXT))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PolicyFindingParser(TOPICS, Set.of(), MAX_FINDINGS, MAX_TEXT))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static String findingsItem() {

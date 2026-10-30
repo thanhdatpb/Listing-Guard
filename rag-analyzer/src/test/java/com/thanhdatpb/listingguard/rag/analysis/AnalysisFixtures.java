@@ -17,7 +17,11 @@ final class AnalysisFixtures {
     static final Set<String> FIELDS = Set.of("title", "description", "tags", "materials", "who_made", "when_made",
             "category");
 
+    /** Stand-ins for the profile values; every boundary test derives its inputs from these. */
     static final int MIN_QUOTE = 20;
+    static final int MAX_QUOTE = 120;
+    static final int MAX_FINDINGS = 10;
+    static final int MAX_TEXT = 400;
 
     /** Newline, NBSP, em and en dashes, curly quotes: the shapes a page has and a model rewrites. */
     static final RetrievedChunk PARTNER = chunk(1, "seller.html", "Seller > Selling Basics",
