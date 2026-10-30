@@ -223,3 +223,32 @@ normalization settings): import it again and configure the new version. A new tr
 changes thresholds, word lists, risk levels or messages does not need a new import, because a catalog depends only on
 the `normalization` section of the ruleset and the normalizer version. `/checks` is not
 affected by any of these states. Importing needs the database but no network and no embedding provider.
+
+## Trademark results and their retention (ADR-009, PR A3)
+
+Migration V17 creates `trademark_check` and `trademark_check_finding`. It adds tables only, so it applies on any
+database, and it can be rolled back by dropping them (nothing else refers to them). Trademark results hold a hash of the
+submitted text, the result and short evidence snippets (client-derived text), never the listing itself. They are kept
+for `listing-guard.trademark.retention.period` (30 days by default; as an environment variable
+`LISTING_GUARD_TRADEMARK_RETENTION_PERIOD=30d`). `GET` and the cache treat a result past that period as absent even if
+nothing has deleted it yet.
+
+**Cleanup.** Every API instance runs a scheduled cleanup that deletes expired results in batches:
+
+| Setting (`listing-guard.trademark.retention.*`) | Default | Meaning |
+|---|---|---|
+| `cleanup-enabled` | `true` | Whether this instance triggers the cleanup. The one-shot jobs never do (no web server). |
+| `cleanup-interval` | `1h` | Time between the end of one run and the start of the next. |
+| `cleanup-initial-delay` | `1m` | Time between start-up and the first run. |
+| `cleanup-batch-size` | `500` | Most check rows one transaction deletes; their findings go with them. |
+
+With several instances only one deletes at a time: each batch first takes the PostgreSQL advisory lock
+`pg_try_advisory_xact_lock(1279746628, 1380271182)` and skips the run if it cannot. **That key pair is reserved for
+this cleanup (ADR-010): do not use it for anything else** (another job taking it would make the cleanup skip). The lock is
+released when the batch ends. A cleanup that is late, off or skipped changes nothing a client sees; it only leaves expired
+rows in the table.
+
+**Catalog versions.** A stored result refers to the catalog version that produced it with a foreign key without cascade, so
+`DELETE FROM trademark_catalog_version` (the way out of a refused V16, above, or a clean-up of an old catalog) fails
+while a retained result uses that version. Wait for the retention period, or delete those results first
+(`DELETE FROM trademark_check WHERE catalog_version_id = <id>`; their findings go with them).

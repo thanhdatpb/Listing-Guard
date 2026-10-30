@@ -23,7 +23,12 @@ It never edits a listing, never publishes, and does no SEO.
   No Spring, no database, no HTTP. **Catalog (A2)**: V15 and V16 (`pg_trgm`, `trademark_catalog_version`,
   `trademark_entry`, append-only; V16 refuses to run over existing catalogs, see docs/deployment.md), the `trademark-import` job (`catalogs/manifest.yaml` + git-ignored `catalogs/raw/`, JSONL `jsonl-1`),
   `PostgresTrademarkCatalog`, and `TrademarkCatalogRuntime` (DISABLED / READY / REFUSED, configured by
-  `listing-guard.trademark.catalog-version`, never "latest"). The endpoint and evaluation are A3 and A4.
+  `listing-guard.trademark.catalog-version`, never "latest"). **Endpoint (A3, done)**: `POST /api/v1/trademark-checks`
+  (the `/checks` envelope and `Normalizer`, own DTO) and `GET /api/v1/trademark-checks/{id}`; V17 `trademark_check` +
+  `trademark_check_finding`, only the canonical input hash and bounded evidence are stored, 30-day retention enforced on
+  read and by a scheduled cleanup under the advisory lock `(1279746628, 1380271182)`, which is reserved for it; a catalog
+  that is DISABLED or REFUSED answers `503 trademark-not-configured` and `/checks` is unaffected. The next steps are A2b
+  and A4 (evaluation).
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
@@ -32,7 +37,7 @@ It never edits a listing, never publishes, and does no SEO.
 - Listing Guard is an independent product that many clients call over the API (ADR-007). There is no code or data
   for any single company in this repo; a client's own listing format is mapped to the standard input
   (`docs/input-schema.md`) on the client's side.
-- Current scope: Etsy and Amazon rule engines, the multi-client API, the trademark scanner core (no endpoint yet), and policy ingest + retrieval (no LLM call,
+- Current scope: Etsy and Amazon rule engines, the multi-client API, the trademark scanner core with its endpoint, and policy ingest + retrieval (no LLM call,
   no structured output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
@@ -45,8 +50,8 @@ It never edits a listing, never publishes, and does no SEO.
 Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR is right):
 
 1. PR 0a (done, V7) and PR 0b (done, V8-V14) (ADR-010).
-2. PR A: trademark scanner (ADR-009), delivered as A1 core (done), A2 catalog (done, V15), then A3 endpoint (next) and
-   A4 evaluation (may run in parallel with A3). ADR-009 "Pull requests" has the detail.
+2. PR A: trademark scanner (ADR-009), delivered as A1 core (done), A2 catalog (done, V15-V16) and A3 endpoint (done,
+   V17). Next are A2b and A4 evaluation. ADR-009 "Pull requests" has the detail (it does not define A2b yet).
 3. PR B: image checker (ADR-008, currently Deferred).
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
    after PR A, in this order: run the retrieval evaluation and commit the real results, then PR 3 (`ApiLlmProvider`),
@@ -120,6 +125,12 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   active catalog is named exactly in `listing-guard.trademark.catalog-version` (never "latest") and is refused when its
   normalization identity (pack, normalizer version, hash of the parsed `normalization` section) differs from the active
   one; a ruleset that only changes thresholds or word lists still serves it.
+- **Trademark results** (ADR-009 "Endpoint (PR A3)"): never store the submitted listing, only the canonical input hash and
+  bounded evidence. Expiry (`expires_at`, 30 days) is decided on read by GET and the cache lookup, never by the cleanup job
+  alone. Only a `COMPLETE` result is cached (partial unique index); an `INCOMPLETE` one is stored for GET and never
+  reused. Replacing an expired result deletes it and inserts in one transaction; only the unique violation of
+  `uq_trademark_check_cache` counts as a cache race. The advisory-lock key pair `(1279746628, 1380271182)` is reserved for
+  retention cleanup: no other query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
 - Ingest, eval, admin and trademark-import are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`,
   `trademark-import`), not HTTP endpoints.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once

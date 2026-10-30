@@ -63,7 +63,7 @@ Modules:
 | `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
 | `trademark-scanner/` | Trademark risk scanner core (ADR-009): versioned ruleset, canonical input hash, normalization with offsets, the `TrademarkCatalog` port with an in-memory catalog, exact/phrase/fuzzy matching, color and place context rules, risk aggregation, the pack fingerprint, and the catalog manifest and data file reader. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, fake), `PolicyRetriever`, retrieval metrics. No Spring. |
-| `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
+| `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, the trademark catalog, check endpoint and retention cleanup, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
 | `policies/` | `manifest.yaml` (committed) and `raw/` (local files, git-ignored) |
@@ -260,6 +260,13 @@ this storage and use.**
    `/checks` still works): import it again and configure the new name. A ruleset that only changes thresholds or word
    lists still serves the catalog.
 
+With a catalog served, `POST /api/v1/trademark-checks` (the same JSON as `/checks`) returns possible trademark
+references with the field and the span of each, and `GET /api/v1/trademark-checks/{id}` reads a stored result. The
+result is a reference warning, not a legal conclusion. Only a hash of the listing and the short evidence of each finding
+are stored, for 30 days (`listing-guard.trademark.retention.period`); a scheduled cleanup in the API deletes expired
+results. Without a catalog the endpoint answers `503` (`trademark-not-configured`) and nothing else changes. See the
+[integration guide](docs/integration-guide.md#trademark-checks) and [deployment](docs/deployment.md).
+
 ## Rulesets
 
 `rule-engine/src/main/resources/rulesets/etsy-2026-11.yaml` holds every threshold, word list and
@@ -304,8 +311,8 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 1. PR 0a (pack identity expand, migration V7) and PR 0b (contract, migrations V8-V14) are done: pack identity and
    composite analysis versions ([ADR-010](docs/adr/ADR-010-pack-identity-and-analysis-version.md); the packs that
    follow implement the rest of the ADR).
-2. Trademark scanner, PR A ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)): A1 (core) and A2 (catalog) are
-   done; next A3 (endpoint) and A4 (evaluation).
+2. Trademark scanner, PR A ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)): A1 (core), A2 (catalog) and A3
+   (endpoint) are done; next are A2b and A4 (evaluation).
 3. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)).
 4. In parallel after step 2: run the retrieval evaluation and record the measured results (this needs an embedding
    provider: an API key or Ollama), then build the policy analyzer

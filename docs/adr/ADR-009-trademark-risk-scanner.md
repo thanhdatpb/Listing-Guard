@@ -311,6 +311,59 @@ of the ruleset and the runtime fingerprint. It has no endpoint and no result tab
   them: using them (for example to lower the weight of a common word or to skip an expired mark) changes findings, so
   it needs a new ruleset version and a new PR.
 
+## Endpoint (PR A3)
+
+PR A3 adds `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}`, the result tables (migration V17), the
+cache identity, retention and the cleanup job. It changes nothing in `/checks`: request, response, content hash,
+`analysisVersion` and the frozen rulesets are as before. Choices that the sections above leave open:
+
+- **Request.** The same envelope as `/checks` (`marketplace`, `listing`), through the same `Normalizer`, so a client sends
+  one JSON to both endpoints. The input schema is not changed. The normalized listing maps to `TrademarkCheckInput` as
+  title, tags, bullet points, description, brand and search terms; the category is the Etsy category or, for Amazon, the
+  product type (hashed, not scanned). **The shop name is null**: the standard input has no such field. The
+  `TrademarkCheckInput` field exists for a later input schema version.
+- **Field index.** The `Normalizer` drops blank list entries (it is shared with `/checks` and may not change), so `tags[i]` and
+  `bullet_points[i]` count the cleaned list, as in the findings of `/checks`. The core still keeps a blank entry in its
+  position (see "Input hash" above), but at this boundary no blank reaches it. The integration guide says so, and
+  that a client can also match by `snippet`. An Amazon `search_terms` array is one string joined by single spaces.
+- **Response.** A dedicated DTO: `checkId`, `marketplace`, `rulesetVersion`, `catalogVersion`, `analysisVersion`,
+  `cached`, `completeness`, `riskLevel`, `failedRuleIds`, `disclaimer` (the ruleset's text, stored with the result),
+  `createdAt`, `expiresAt` and `findings` with `ruleId`, `risk`, `field`, `start`, `end`, `snippet`, `mark`, `matchType`,
+  `score`, `insideColorPhrase`, `otherRuleIds`, `sourceIds`, `message` and `suggestion`. `sourceIds` needed one additive
+  change in the core: `Evidence` and the internal candidate carry the source ids of the matched catalog mark (empty for
+  a context finding). No finding changes, so the matcher version does not change.
+- **Tables (V17).** `trademark_check` and `trademark_check_finding` (`ON DELETE CASCADE`). There is no `status` column:
+  a result is stored only when the analysis ended, so `completeness` says what `status` would. Evidence is stored as the
+  snippet (bounded by `matching.max_snippet_chars`, with a hard ceiling in the table), the span, the field, the matched
+  mark and the source ids. The normalized token of the evidence is **not** stored (it can span a whole color phrase).
+  `catalog_version_id` is a foreign key without cascade: a catalog version cannot be deleted while a retained check uses
+  it (at most the retention period), see docs/deployment.md.
+- **Cache identity.** `(client_id, marketplace_code, pack_id, input_hash, ruleset_version_id, analysis_version)` with
+  `analysis_version` the pack's fingerprint (ADR-010). The unique index is partial on `completeness = 'COMPLETE'` (the
+  trademark counterpart of ADR-010's `status = 'COMPLETED'`). An `INCOMPLETE` result is stored so its id can be read
+  with GET and is **never returned from the cache**; repeating the request analyses again and stores another row. Every
+  lookup also requires `expires_at > now()`.
+- **Replacing an expired result.** The index cannot say "not expired", so the request that replaces an expired complete
+  result deletes that row (its findings go by cascade) and inserts the new one in one transaction. Two requests that do
+  this at once: the loser's insert fails with the unique violation of `uq_trademark_check_cache`, its transaction is rolled
+  back, and it answers from the winner's row (`cached: true`). Only that violation, recognized by SQLSTATE `23505` and
+  the index name, is treated as the race; any other integrity failure is raised unchanged (HTTP 500) even if a
+  matching row happens to exist.
+- **Retention.** `listing-guard.trademark.retention.period`, 30 days by default. GET and the cache lookup compare
+  `expires_at` with the database clock, so they do not depend on cleanup. An expired id, an unknown id and another client's id are
+  the same `404` (`trademark-check-not-found`).
+- **Cleanup.** `TrademarkRetentionCleanup` runs on a fixed delay in every API instance that is a web application (the
+  one-shot job profiles have no web server and never start it; `cleanup-enabled=false` turns it off). Each batch is one
+  transaction that first takes `pg_try_advisory_xact_lock(1279746628, 1380271182)`; if it cannot, the run is skipped. That
+  key pair is reserved for retention cleanup (ADR-010) and is documented in the class. A batch deletes at most
+  `cleanup-batch-size` check rows (oldest expiry first, `FOR UPDATE SKIP LOCKED`, so a row a request is replacing is left
+  to the next run). Interval, first delay and batch size are settings.
+- **Errors.** No catalog served (`DISABLED` or `REFUSED`): `503`, `trademark-not-configured`, `/checks` unaffected; GET
+  needs no catalog and still reads retained results. Rate limit: the client's existing bucket (the filter covers every
+  `/api` route).
+- **Known limits.** The number of findings of one request is not capped (the body limit of 256 KB bounds it) and every
+  `INCOMPLETE` request stores a row until it expires. Both are bounded by the rate limit and the retention.
+
 ## Offline data and source governance
 
 The importer accepts only local files and is a one-shot administrative job. It validates the
@@ -386,7 +439,7 @@ ruleset that an earlier PR did not already contain.
 |---|---|---|
 | A1 | `trademark-scanner` core: ruleset `trademark-risk-*` and its loader, canonical input and hash, normalization with offsets, tokens and n-grams, the `TrademarkCatalog` port with an in-memory implementation, exact/phrase/fuzzy matching with the Java final score, the three context rules, risk aggregation, `INCOMPLETE`/`UNKNOWN`, evidence, and the pack fingerprint with room for the catalog/database components. No Spring, no database, no HTTP. | PR 0b (done) |
 | A2 | Catalog: `pg_trgm` migration, catalog tables, offline importer, the PostgreSQL adapter (transaction-local candidate threshold), and the PostgreSQL major version / `pg_trgm` `extversion` / catalog components of the fingerprint. | A1 |
-| A3 | `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}`, result tables, cache identity, retention and cleanup, OpenAPI and integration guide. | A2 |
+| A3 | `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}`, result tables, cache identity, retention and cleanup, OpenAPI and integration guide (done; see "Endpoint (PR A3)"). | A2 |
 | A4 | Synthetic tuning and held-out datasets, the evaluation run and its gate. | A2 (may run in parallel with A3) |
 
 Acceptance criteria below are met by the PR that owns the code they test: Unicode, homoglyph/leet,
