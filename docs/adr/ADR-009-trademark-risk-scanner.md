@@ -181,6 +181,61 @@ The migration must fail visibly if the extension is unavailable or the database 
 permission; startup must not silently switch to a different matching method. Deployment
 documentation must state the required PostgreSQL support and extension privilege.
 
+## Core implementation (PR A1)
+
+The `trademark-scanner` module implements the deterministic core with no Spring, database or HTTP. Choices
+that the Decision above leaves open:
+
+- **Ruleset.** `trademark-risk-2026-11` has `pack_id`, `version`, `checked_at`, a `disclaimer` and the sections
+  `normalization`, `matching`, `lexicon` and `rules`. It has no `marketplace` key: the words are English and the
+  file is marketplace-agnostic, so the registry (A2) registers it under each marketplace code. The loader rejects an
+  unknown or missing key, an unknown placeholder, a rule declared before a rule it reads, a risk other than LOW,
+  MEDIUM or HIGH, a pure-color risk other than LOW, and any `source.status` other than `unverified` in every block.
+  The ruleset names the scoring algorithm version, and the loader refuses a version the code does not implement.
+- **Normalization order**, per code point: configured deletions (apostrophes, zero-width characters, so they do not
+  split a word), lower case, compatibility decomposition (NFKD) without combining marks, the fold map (letters that
+  do not decompose, such as the Vietnamese d with stroke), the homoglyph map. Then, per word, the leet map: a leet
+  character is mapped only when at least `min_letters_around` letters precede and follow it in its word, so `z0rvex`
+  becomes `zorvex` but `3d`, `2xl` and `100%` stay; an unmapped leet symbol separates tokens. Everything else that
+  is not a letter or a digit separates tokens. Each token keeps its span in the canonical text (UTF-16 code units).
+  Version constant `normalization-1`.
+- **Grams.** Every run of 1 to `max_ngram_tokens` consecutive tokens inside one field. The catalog is asked about
+  these grams only, never about a whole field. A one-token mark that equals a gram is `EXACT`, a longer one is
+  `PHRASE`. Fuzzy candidates are requested for the grams that did not match exactly and have between
+  `fuzzy_min_chars` and `fuzzy_max_chars` characters. Version constant `matcher-1` (grams, matching, context rules,
+  precedence, aggregation).
+- **Final score: optimal string alignment similarity** (`osa-similarity-1`): the edit distance that counts an
+  insertion, a deletion, a substitution and the swap of two neighbouring characters as one edit each, scored as
+  `(longer - distance) / longer` on code points, computed as one integer division so equal inputs give the same
+  double everywhere. Reasons: it is symmetric, needs no tuning, one typo and one swapped pair (the usual
+  misspellings) cost one edit, and the longer length stops a short gram from matching a long mark. Rejected:
+  Jaro-Winkler (favors a shared prefix, as noted in the table above), plain Levenshtein (a swap costs two edits),
+  and using the trigram score alone (it ignores order, and it is the candidate filter, so the two measures check
+  each other). Among several candidates for one gram the highest score wins, ties by the normalized mark. The
+  candidate filter can miss a pair whose trigram similarity is below `candidate_threshold` although its final score
+  would pass; tuning `candidate_threshold` is part of the evaluation PR.
+- **Initial risk levels** (all unverified, tuned in A4): exact and phrase `HIGH`, fuzzy `MEDIUM`, geographic +
+  sport `MEDIUM`, pure color `LOW`.
+- **Color phrase.** A run of consecutive tokens that are each a color word, a pattern word or part of a catalog
+  match. A run with a color word and a catalog match is a color phrase containing a mark: the match keeps its rule
+  and risk, and its evidence has `insideColorPhrase` and the ruleset note. A run with a color word, at least
+  `min_tokens` tokens and no catalog match is a pure color description.
+- **Precedence.** Per field, candidates are sorted by risk (high first), ruleset order, score, then position, and each
+  candidate that overlaps an accepted one is dropped and its rule id is listed in the winner's `otherRuleIds`.
+- **Rule failure.** A rule that throws is reported in `failedRuleIds`. The two color rules read the catalog rules, so
+  they are also reported as failed when a catalog rule failed: a color description is never called free of trademark
+  references when the lookup failed. Overall risk is the highest finding level; an incomplete scan keeps it only if
+  it is MEDIUM or HIGH, otherwise it is `UNKNOWN`.
+- **Input hash.** SHA-256 over `listing-guard/trademark-input/v1` and the fields in the order title, tags (in the
+  order sent), description, brand, shop name, category, each as `name:byteLength:text` after NFC and `strip`, with
+  the tag count after the last tag. A blank tag keeps its position so `tags[i]` is always the i-th tag sent.
+- **Analysis fingerprint.** A text of `key=value` lines (`pack_id`, ruleset version and hash, normalization,
+  matcher and scoring versions, then `external.*` components sorted by key), hashed with SHA-256. The caller
+  supplies the external components: the catalog version and hash, the PostgreSQL major version, the `pg_trgm`
+  `extversion` and the marketplace.
+- **Not in A1.** The compatibility/descriptive-use context rules mentioned in the Decision are not implemented; A1
+  implements the three color and place rules only.
+
 ## Offline data and source governance
 
 The importer accepts only local files and is a one-shot administrative job. It validates the
@@ -245,6 +300,24 @@ hash update; it must not be silently accepted.
 - A global catalog makes shared updates simple but cannot encode client-specific rights or context.
 - Similarity settings and synthetic evaluation do not establish legal status or real-world
   precision/recall.
+
+## Pull requests
+
+PR A is delivered as four pull requests, because the core, the PostgreSQL catalog, the endpoint and the
+evaluation can each be reviewed and merged on their own. Each one preserves `/checks` and publishes no
+ruleset that an earlier PR did not already contain.
+
+| PR | Content | Needs |
+|---|---|---|
+| A1 | `trademark-scanner` core: ruleset `trademark-risk-*` and its loader, canonical input and hash, normalization with offsets, tokens and n-grams, the `TrademarkCatalog` port with an in-memory implementation, exact/phrase/fuzzy matching with the Java final score, the three context rules, risk aggregation, `INCOMPLETE`/`UNKNOWN`, evidence, and the pack fingerprint with room for the catalog/database components. No Spring, no database, no HTTP. | PR 0b (done) |
+| A2 | Catalog: `pg_trgm` migration, catalog tables, offline importer, the PostgreSQL adapter (transaction-local candidate threshold), and the PostgreSQL major version / `pg_trgm` `extversion` / catalog components of the fingerprint. | A1 |
+| A3 | `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}`, result tables, cache identity, retention and cleanup, OpenAPI and integration guide. | A2 |
+| A4 | Synthetic tuning and held-out datasets, the evaluation run and its gate. | A2 (may run in parallel with A3) |
+
+Acceptance criteria below are met by the PR that owns the code they test: Unicode, homoglyph/leet,
+boundaries, matching, context rules, aggregation, incomplete results, input hash, evidence spans and the
+`unverified` check are A1; `pg_trgm` and import tests are A2; API, cache, retention and race tests are A3;
+datasets and the gate are A4.
 
 ## Acceptance criteria for implementation
 

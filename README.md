@@ -61,6 +61,7 @@ Modules:
 |---|---|
 | `core/` | Plain Java domain types shared by all modules: `Listing`, `Money`, `Finding`, `Severity`. No Spring. |
 | `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
+| `trademark-scanner/` | Trademark risk scanner core (ADR-009): versioned ruleset, canonical input hash, normalization with offsets, the `TrademarkCatalog` port with an in-memory catalog, exact/phrase/fuzzy matching, color and place context rules, risk aggregation and the pack fingerprint. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, fake), `PolicyRetriever`, retrieval metrics. No Spring. |
 | `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
