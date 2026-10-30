@@ -61,7 +61,10 @@ over an API. The analyzer suggests; it never edits or blocks a listing.
    differs between vendors, so the adapter must also work when a vendor ignores that parameter; the JSON check
    and the citation check in code (items 5 and 6) remain the only gate. `modelId()` is built from the base-url
    host and the model (for example `api:<host>:<model>`), so the cache identity changes when the vendor or the
-   model changes. Another vendor-specific adapter is added only when needed, each with its own test against a
+   model changes. The key is read only from `LISTING_GUARD_ANALYZER_LLM_API_KEY`. `model` must be a specific version,
+   with its date when the vendor gives one, never an alias that points at the latest model: an alias changes the
+   model while `modelId()` stays the same, and `modelId()` is part of the cache identity (item 2). This is a
+   documentation rule; the code is not required to detect an alias. Another vendor-specific adapter is added only when needed, each with its own test against a
    simulated HTTP server; no test calls a real model. Key handling follows ADR-012 item 5 (own variable, header,
    never logged, empty key refused when `analyzer.enabled`). The analyzer is off by default, and the whole build
    and every test run without a key: `ScriptedLlmProvider` in `rag-analyzer` main, like

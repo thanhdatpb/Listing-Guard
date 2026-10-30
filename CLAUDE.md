@@ -10,8 +10,10 @@ It never edits a listing, never publishes, and does no SEO.
   banned words), configured per marketplace in versioned YAML. Current ruleset: `etsy-2026-11`.
 - **RAG Analyzer** (`rag-analyzer/`): public marketplace policies in pgvector, plus an LLM step with
   code-verified citations. Built so far: policy manifest, HTML/PDF parsers, structural chunker,
-  `EmbeddingProvider` (none by default), `PolicyRetriever`, retrieval metrics. No LLM yet. Nothing here is needed
-  to run the rule checks.
+  `EmbeddingProvider` (none by default), `PolicyRetriever`, retrieval metrics. No LLM call is implemented yet.
+  ADR-011 designs an optional policy analyzer, off by default (`listing-guard.analyzer.enabled=false`), whose first
+  adapter is OpenAI-compatible; the build and every test never need a key. Nothing here is needed to run the rule
+  checks.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
@@ -27,6 +29,18 @@ It never edits a listing, never publishes, and does no SEO.
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
   product type with no override gets the defaults, plus an INFO `category_not_covered` only when the ruleset has
   at least one override (none yet in `amazon-2026-11`, so it reports nothing today).
+
+## Planned work
+
+Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR is right):
+
+1. PR 0a, then PR 0b (ADR-010).
+2. PR A: trademark scanner (ADR-009).
+3. PR B: image checker (ADR-008, currently Deferred).
+4. A parallel track after PR A: run the retrieval evaluation and commit the real results, then build the policy
+   analyzer (ADR-011).
+
+No new pack gets a ruleset registered before PR 0b is complete.
 
 ## Stack
 
@@ -103,6 +117,17 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `docs/integration-guide.md` when behavior a client sees changes. Dev-only settings are fenced by
   `StartupSafetyCheck`: `LISTING_GUARD_DEV_API_KEY` needs profile `dev` (never `prod`), and
   `LISTING_GUARD_SWAGGER_UI=true` warns and is refused under `prod`; compose sets `SPRING_PROFILES_ACTIVE=dev`.
+- **Analysis packs** (ADR-010): each new analysis is its own pack, with its own `pack_id`, endpoint, DTO, result
+  tables and cache identity. `/checks` keeps its request, response, hash and `analysisVersion` as they are. A new
+  pack reports `completeness`: a failing rule gives `INCOMPLETE` and keeps the findings already established, never a
+  falsely clean result; a risk that cannot be determined is `UNKNOWN`, never `LOW`. The existing `RuleEngine` still
+  logs and skips a failing rule. Trademark seed, test and eval data use synthetic names only: never commit a real
+  trademark, a real catalog or any company's data.
+- **External models** (ADR-011, ADR-012): configure every embedding or LLM model as a specific version, with its date
+  when the vendor gives one. Never use an alias that points at the latest model: the alias changes the model while
+  `modelId()` stays the same, so the cache would be wrong. Keys come only from their own environment variables,
+  `LISTING_GUARD_EMBEDDING_API_KEY` and `LISTING_GUARD_ANALYZER_LLM_API_KEY`, and are never logged. No test calls a
+  real model.
 - Retrieval filters by marketplace before ranking. Chunk text is stored exactly as on the page (later
   citation checks compare against it); only the embedding input has the section path prepended.
 - **Embeddings** (ADR-012): the default provider is `none` (`DisabledEmbeddingProvider`): the app starts and
