@@ -1,12 +1,13 @@
 # ADR-008: Image compliance checker
 
-- Status: Deferred. The policy analyzer and the trademark scanner (ADR-009) come first.
+- Status: Deferred: implemented as PR B after the trademark scanner (ADR-009, PR A).
 - Date: 2026-10-30
 - Depends on: [ADR-010](ADR-010-pack-identity-and-analysis-version.md)
 - Implementation order: PR B, after the trademark scanner ([ADR-009](ADR-009-trademark-risk-scanner.md)) is
   implemented as PR A.
-- Acceptance convention: Keep Proposed until the implementation PR is approved and merged. Then set
-  Status to Accepted and Date to the actual acceptance/merge date.
+- Acceptance convention: Set Status to Proposed when implementation starts and keep it until the
+  implementation PR is approved and merged. Then set Status to Accepted and Date to the actual
+  acceptance/merge date.
 
 ## Context
 
