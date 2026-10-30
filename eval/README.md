@@ -12,7 +12,8 @@ Does retrieval find the policy section that answers a question?
 - `results.md`: written by the `eval-retrieval` job (`docker compose run --rm eval-retrieval`) after the
   corpus is ingested. It reports recall@5 and MRR@10 separately for English and Vietnamese, the embedding
   model, and the hash of every ingested file. It is generated, never edited or estimated by hand, and does
-  not exist until the job has run.
+  not exist until the job has run. With the default embedding API the questions are sent to Google (ADR-012), and
+  the job fails if the ingested corpus was embedded with another model than the configured one.
 
 How a result is scored:
 
