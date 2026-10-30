@@ -1,6 +1,6 @@
 # ADR-012: Embeddings default to an external API
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-30
 - Supersedes: [ADR-004](ADR-004-embedding-provider.md), the default-provider decision only. The
   `EmbeddingProvider` interface, `Kind`, and the rule that `modelId()` triggers re-embedding stay as written
