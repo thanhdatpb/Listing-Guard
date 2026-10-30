@@ -138,6 +138,26 @@ RFC 7807 problems. Everything about calling the API is in [docs/integration-guid
 the contract in [docs/api/openapi.json](docs/api/openapi.json) (after an intended API change refresh it with
 `./mvnw -B verify -Dopenapi.update=true`, then commit it).
 
+### Check a whole export without an integration
+
+To check a file of listings (an Etsy CSV, an Amazon flat file) with the rules and the trademark check, and get a report,
+use the `batch-check` job: a one-shot job on local files and the database, with no network and no model. You write a small
+YAML mapping from your file's columns to the [input schema](docs/input-schema.md); two examples are in
+[`batch/mappings/`](batch/mappings/) (their column names are **not verified**, compare them with your own header). The
+client must exist and be active, and results are stored under it like API results:
+
+```bash
+docker compose run --rm batch-check --input=/batch/input/etsy-export.csv \
+  --mapping=/batch/mappings/my-etsy-mapping.yaml --client=demo-client --marketplace=ETSY
+```
+
+`batch/input/` (put the export there) and `batch/out/` (the reports) are git-ignored: never commit a real export. The job
+writes `findings.csv` (one line per finding), `listings.csv` (one line per listing) and `summary.html` (one page for a
+manager). A row that cannot be read is reported with its line and the batch goes on. Without a trademark catalog only the
+rules run and the reports say so. With `--label-column` (a true/false column such as "was taken down") the summary also
+shows how often the trademark check flagged those listings, as a **measurement on a small set, not an accuracy**. See
+[docs/batch-check.md](docs/batch-check.md): preparing the file, writing the mapping, reading the reports, labelling.
+
 ## Policy corpus and retrieval
 
 This part is optional. The rule checks above need none of it, and by default no embedding model is configured
@@ -330,6 +350,7 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 
 - [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, and client isolation.
 - [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields.
+- [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
 - [ADR-001: Rule configuration](docs/adr/ADR-001-rule-config.md)
 - [ADR-002: Ruleset versioning](docs/adr/ADR-002-ruleset-versioning.md)
 - [ADR-003: Chunking strategy](docs/adr/ADR-003-chunking-strategy.md)

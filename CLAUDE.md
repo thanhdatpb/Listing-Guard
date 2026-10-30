@@ -38,11 +38,21 @@ It never edits a listing, never publishes, and does no SEO.
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Contract: `docs/api/openapi.json`,
   `docs/integration-guide.md`, `docs/input-schema.md`, ADR-005, ADR-007.
+- **Batch check** (`api/.../batch/`, `docs/batch-check.md`): the one-shot job `batch-check` (Spring profile and compose
+  service of that name; no network, no HTTP, no new endpoint, no migration). It reads a listing CSV as a stream, maps the
+  columns to the standard input with a YAML mapping (`batch/mappings/`, no version; every key but `id` and `csv` must be a
+  field of `docs/input-schema.md` for the marketplace, checked at start-up against the header), calls `CheckService` and
+  `TrademarkCheckService` directly for an existing, active client (same cache identity and retention as the API), and
+  writes `findings.csv`, `listings.csv` and `summary.html` to `--out` (default `batch/out`; `batch/input/` and
+  `batch/out/` are git-ignored). A row that cannot be read or whose check fails is reported with its line and the batch
+  goes on; a catalog that is DISABLED or REFUSED leaves the rules running and the report says so; a damaged file
+  completes the reports as unfinished and fails. `--label-column` adds a small-set measurement (flagged = MEDIUM or HIGH),
+  never "accuracy". The example mappings carry column names nobody has verified, so each says `# unverified`.
 - Listing Guard is an independent product that many clients call over the API (ADR-007). There is no code or data
   for any single company in this repo; a client's own listing format is mapped to the standard input
   (`docs/input-schema.md`) on the client's side.
-- Current scope: Etsy and Amazon rule engines, the multi-client API, the trademark scanner core with its endpoint, and policy ingest + retrieval (no LLM call,
-  no structured output, no citation verification yet).
+- Current scope: Etsy and Amazon rule engines, the multi-client API, the trademark scanner core with its endpoint, the
+  `batch-check` job, and policy ingest + retrieval (no LLM call, no structured output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
@@ -62,6 +72,10 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
    after PR A, in this order: run the retrieval evaluation and commit the real results, then PR 3 (`ApiLlmProvider`),
    PR 4 (profile and retrieval), PR 5 (endpoint) and PR 6 (analyzer evaluation).
+
+5. `batch-check` (done, `docs/batch-check.md`): an operator tool, independent of the packs above. It uses the services
+   of `/checks` and `/trademark-checks` as they are and changes neither; a new pack that should take part in the batch
+   gets its own part in the job and its own columns in the reports, never a change to the existing ones.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
@@ -94,6 +108,14 @@ docker compose run --rm eval-retrieval                               # writes ev
 The API and the rule checks need no model and no key. With `api`, ingest and eval send public policy text (and eval
 questions) to the Google Gemini API. Ollama is optional:
 `EMBEDDING_PROVIDER=ollama`, `docker compose --profile ollama up -d ollama`, `docker compose --profile ollama run --rm ollama-pull`.
+
+Batch check (see `docs/batch-check.md`; the client must exist and be active, trademark results need `TRADEMARK_CATALOG_VERSION`):
+
+```bash
+docker compose run --rm batch-check --input=/batch/input/<file.csv> --mapping=/batch/mappings/<mapping.yaml> \
+  --client=<client name> --marketplace=ETSY|AMAZON [--out=/batch/out/<dir>] [--max-rows=<n>] [--label-column=<column>]
+# ./batch is mounted at /batch; reports: findings.csv, listings.csv, summary.html (profile `batch-check`; no network, no model)
+```
 
 On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 
@@ -142,8 +164,8 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   reused. Replacing an expired result deletes it and inserts in one transaction; only the unique violation of
   `uq_trademark_check_cache` counts as a cache race. The advisory-lock key pair `(1279746628, 1380271182)` is reserved for
   retention cleanup: no other query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
-- Ingest, eval, admin and trademark-import are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`,
-  `trademark-import`), not HTTP endpoints.
+- Ingest, eval, admin, trademark-import and batch-check are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`,
+  `trademark-import`, `batch-check`), not HTTP endpoints.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
   with the default `none`, `admin` does not (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
