@@ -53,8 +53,6 @@ Client backend -- POST /api/v1/checks + X-API-Key --> Listing Guard API (Spring 
   policies/manifest.yaml + policies/raw/<marketplace>/*.html|pdf
        -> parse -> structural chunks -> embeddings -> pgvector
   PolicyRetriever / GET /policies/search (debug; feature-gated)
-
-  Redis: declared in compose; not used by the current API.
 ```
 
 Modules:
@@ -77,14 +75,14 @@ Requirements: JDK 21, Docker.
 
 ```bash
 ./mvnw -B verify            # build and test (Testcontainers needs Docker running)
-docker compose up --build   # postgres (pgvector/pgvector:pg16), redis, ollama, api
+docker compose up --build   # postgres (pgvector/pgvector:pg16), ollama, api
 ```
 
 On Windows use `mvnw.cmd`.
 
 The compose file has dev defaults, overridable with environment variables or a local `.env`:
 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and host ports `POSTGRES_PORT` (5432),
-`REDIS_PORT` (6379), `OLLAMA_PORT` (11434), `API_PORT` (8080).
+`OLLAMA_PORT` (11434), `API_PORT` (8080).
 
 Listing Guard is one service for many clients (ADR-007). Every API key belongs to a client; checks, cached
 results and the rate limit belong to the client. Clients and keys live in the database and are managed with the
@@ -253,6 +251,9 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 - [ADR-005: API auth, rate limit, and result cache](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md)
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
+- [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Proposed)
+- [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed)
+- [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed)
 
 ## License
 MIT © 2026 Thanh Dat Tran. See [LICENSE](LICENSE).

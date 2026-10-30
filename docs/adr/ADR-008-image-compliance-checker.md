@@ -1,6 +1,6 @@
 # ADR-008: Image compliance checker
 
-- Status: Proposed
+- Status: Deferred. The policy analyzer and the trademark scanner (ADR-009) come first.
 - Date: 2026-10-28
 - Depends on: [ADR-010](ADR-010-pack-identity-and-analysis-version.md)
 - Acceptance convention: Keep Proposed until the implementation PR is approved and merged. Then set

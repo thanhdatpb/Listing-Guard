@@ -15,16 +15,6 @@ services:
       timeout: 3s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   ollama:
     image: ollama/ollama:latest
     ports:
@@ -43,13 +33,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
       DB_USER: ${POSTGRES_USER:-listingguard}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
-      REDIS_HOST: redis
       OLLAMA_URL: http://ollama:11434
       # Debug endpoint GET /policies/search; off by default in the application, on here for development.
       LISTING_GUARD_POLICIES_SEARCHENDPOINT_ENABLED: ${POLICY_SEARCH_ENABLED:-true}
