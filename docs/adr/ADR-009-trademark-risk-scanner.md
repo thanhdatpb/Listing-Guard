@@ -246,6 +246,24 @@ hash update; it must not be silently accepted.
 - Similarity settings and synthetic evaluation do not establish legal status or real-world
   precision/recall.
 
+## Pull requests
+
+PR A is delivered as four pull requests, because the core, the PostgreSQL catalog, the endpoint and the
+evaluation can each be reviewed and merged on their own. Each one preserves `/checks` and publishes no
+ruleset that an earlier PR did not already contain.
+
+| PR | Content | Needs |
+|---|---|---|
+| A1 | `trademark-scanner` core: ruleset `trademark-risk-*` and its loader, canonical input and hash, normalization with offsets, tokens and n-grams, the `TrademarkCatalog` port with an in-memory implementation, exact/phrase/fuzzy matching with the Java final score, the three context rules, risk aggregation, `INCOMPLETE`/`UNKNOWN`, evidence, and the pack fingerprint with room for the catalog/database components. No Spring, no database, no HTTP. | PR 0b (done) |
+| A2 | Catalog: `pg_trgm` migration, catalog tables, offline importer, the PostgreSQL adapter (transaction-local candidate threshold), and the PostgreSQL major version / `pg_trgm` `extversion` / catalog components of the fingerprint. | A1 |
+| A3 | `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}`, result tables, cache identity, retention and cleanup, OpenAPI and integration guide. | A2 |
+| A4 | Synthetic tuning and held-out datasets, the evaluation run and its gate. | A2 (may run in parallel with A3) |
+
+Acceptance criteria below are met by the PR that owns the code they test: Unicode, homoglyph/leet,
+boundaries, matching, context rules, aggregation, incomplete results, input hash, evidence spans and the
+`unverified` check are A1; `pg_trgm` and import tests are A2; API, cache, retention and race tests are A3;
+datasets and the gate are A4.
+
 ## Acceptance criteria for implementation
 
 - Tests cover Unicode/diacritics, configured homoglyph and leet normalization, token/phrase

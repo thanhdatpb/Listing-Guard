@@ -36,7 +36,8 @@ It never edits a listing, never publishes, and does no SEO.
 Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR is right):
 
 1. PR 0a (done, V7) and PR 0b (done, V8-V14) (ADR-010).
-2. PR A (next): trademark scanner (ADR-009).
+2. PR A (next): trademark scanner (ADR-009), delivered as A1 core, then A2 catalog, then A3 endpoint and A4 evaluation
+   (ADR-009 "Pull requests").
 3. PR B: image checker (ADR-008, currently Deferred).
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
    after PR A, in this order: run the retrieval evaluation and commit the real results, then PR 3 (`ApiLlmProvider`),
