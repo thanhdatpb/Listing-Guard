@@ -15,6 +15,12 @@ It never edits a listing, never publishes, and does no SEO.
   yet. ADR-011 designs an optional policy analyzer, off by default
   (`listing-guard.analyzer.enabled=false`), whose first adapter is OpenAI-compatible; the build and every test
   never need a key. Nothing here is needed to run the rule checks.
+- **Trademark scanner** (`trademark-scanner/`, ADR-009, PR A1): the Java-only core of the trademark pack. Versioned
+  ruleset `rulesets/trademark-risk-2026-11.yaml` (every threshold, word list, risk level and Vietnamese message; every
+  `source.status` must be `unverified`), canonical input hash, normalization with offsets, the `TrademarkCatalog` port
+  with `InMemoryTrademarkCatalog`, exact/phrase/fuzzy matching (final score: optimal string alignment, `osa-similarity-1`),
+  the three color and place context rules, risk aggregation with `INCOMPLETE`/`UNKNOWN`, and `AnalysisFingerprint`.
+  No Spring, no database, no HTTP; the catalog adapter, endpoint and evaluation are A2 to A4.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
@@ -23,7 +29,7 @@ It never edits a listing, never publishes, and does no SEO.
 - Listing Guard is an independent product that many clients call over the API (ADR-007). There is no code or data
   for any single company in this repo; a client's own listing format is mapped to the standard input
   (`docs/input-schema.md`) on the client's side.
-- Current scope: Etsy and Amazon rule engines, the multi-client API, and policy ingest + retrieval (no LLM call,
+- Current scope: Etsy and Amazon rule engines, the multi-client API, the trademark scanner core (no endpoint yet), and policy ingest + retrieval (no LLM call,
   no structured output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
@@ -55,7 +61,7 @@ JUnit 5 + Testcontainers. Root package `com.thanhdatpb.listingguard`.
 
 ```bash
 ./mvnw -B verify                 # build + all tests (needs Docker for Testcontainers)
-./mvnw -B -pl core,rule-engine,rag-analyzer verify   # fast: no Docker needed
+./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner verify   # fast: no Docker needed
 docker compose up --build        # postgres + api (override ports: POSTGRES_PORT, API_PORT)
 ```
 
