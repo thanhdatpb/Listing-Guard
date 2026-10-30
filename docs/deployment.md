@@ -240,7 +240,19 @@ Stored source ids are `<source_key>:<source_id>` for this form. One file whose h
 whole catalog; changing any file, term, date, filter or the list of sources is another version (the old one stays).
 `trademark_catalog_version` keeps a summary for several files: the source names, urls and terms as `<key>: <value>`
 joined by ` | ` (limits of 200, 500 and 200 characters, checked before anything is written), the oldest source date and
-a combined hash of the file hashes. Every file is read whole into memory, so give the import enough heap for the largest.
+a combined hash of the file hashes. The facts of each file are in `trademark_catalog_source` (migration V18, one row per
+file, also for the one-file form).
+
+**A large catalog.** The import reads every file as a stream and writes it through a temporary table, in one
+transaction, so the memory of the job does not depend on the size of the files: a heap of a few tens of megabytes is
+enough (a test runs a 60 MB file with 40 MB). Two things grow with the file instead:
+
+- The database: the kept records are written twice (the temporary table, then `trademark_entry` with its trigram index),
+  and the final grouping uses `work_mem` and temporary files. Give the database disk for the file's kept records at
+  least twice over, and expect the import to take minutes for millions of records. The temporary table disappears with the
+  transaction.
+- The transaction: it is one, so a failure at the end repeats the whole import. `listing-guard.trademark.import.batch-size`
+  (`LISTING_GUARD_TRADEMARK_IMPORT_BATCHSIZE`, 5,000 by default) is the number of records sent to the database in one JDBC batch.
 
 In production put `catalogs/` next to the compose file (or set `CATALOGS_DIR` and mount it) and run the same job with
 the production compose file. Changing the active catalog is a configuration change plus a restart; the old version
