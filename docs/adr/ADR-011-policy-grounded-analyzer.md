@@ -4,6 +4,9 @@
 - Date: 2026-10-30
 - Depends on: [ADR-012](ADR-012-api-embedding-provider.md) (API embeddings); follows the pack and cache-identity
   conventions of [ADR-010](ADR-010-pack-identity-and-analysis-version.md) and ADR-005
+- Implementation order: a parallel track that starts after PR A (the trademark scanner,
+  [ADR-009](ADR-009-trademark-risk-scanner.md)). It does not block PR B (the image checker, ADR-008) and does
+  not depend on PR 0b of ADR-010, as item 1 below already states.
 - Acceptance convention: Keep Proposed until the implementing PRs are approved and merged. Then set Status to
   Accepted and Date to the merge date.
 
@@ -52,11 +55,18 @@ over an API. The analyzer suggests; it never edits or blocks a listing.
    implementation lives in `api` on Spring `RestClient`. Spring AI was compared: it brings a BOM, many
    transitive modules and a fast-moving API for one request shape, and its structured-output help is not needed
    because the code validates the JSON itself. `RestClient` is already on the classpath, adds no dependency and
-   matches ADR-012. The vendor is the maintainer's choice (open question); only the adapter is vendor-specific.
-   Key handling follows ADR-012 item 5 (own variable, header, never logged, empty key refused when
-   `analyzer.enabled`). For tests, `ScriptedLlmProvider` in `rag-analyzer` main, like `HashingEmbeddingProvider`:
-   canned JSON chosen from the request, wired through `TestcontainersConfig`; no test calls a real model.
-   Temperature 0.
+   matches ADR-012. The first adapter is **OpenAI-compatible Chat Completions** on `RestClient`, configured by
+   `listing-guard.analyzer.llm.base-url`, `model` and `api-key`. One adapter then serves many vendors and
+   internal servers, and a client only has to set a key and a URL. Support for `response_format` and JSON schema
+   differs between vendors, so the adapter must also work when a vendor ignores that parameter; the JSON check
+   and the citation check in code (items 5 and 6) remain the only gate. `modelId()` is built from the base-url
+   host and the model (for example `api:<host>:<model>`), so the cache identity changes when the vendor or the
+   model changes. Another vendor-specific adapter is added only when needed, each with its own test against a
+   simulated HTTP server; no test calls a real model. Key handling follows ADR-012 item 5 (own variable, header,
+   never logged, empty key refused when `analyzer.enabled`). The analyzer is off by default, and the whole build
+   and every test run without a key: `ScriptedLlmProvider` in `rag-analyzer` main, like
+   `HashingEmbeddingProvider`, returns canned JSON chosen from the request and is wired through
+   `TestcontainersConfig`. Temperature 0.
 5. **Structured output.** The model returns `{"findings": [...]}`, at most 10 items, each: `ruleId` (enum
    `policy.<topic>`, topics listed in the profile: `production_partner`, `ai_disclosure`, `mockup_images`,
    `prohibited_item`, `ip_infringement`, `mature_content`, `other`), `severity` (`WARNING` or `INFO`), `field`
@@ -159,8 +169,9 @@ over an API. The analyzer suggests; it never edits or blocks a listing.
     2. **Verification core** (`rag-analyzer`, no Spring): `LlmProvider`, `ScriptedLlmProvider`, `PolicyFinding`,
        output parser, `CitationVerifier` with normalization, severity clamp. Tests: a table test per drop reason,
        whitespace and quote normalization, ellipsis, quote from another chunk, unknown chunk, clamp, bad JSON.
-    3. **`ApiLlmProvider`** (`RestClient`): properties, timeouts, error mapping, key handling. Tests: stub HTTP
-       server for success, 429, 5xx, timeout, truncated output; key redaction; start-up refusal.
+    3. **`ApiLlmProvider`** (OpenAI-compatible Chat Completions on `RestClient`): properties, timeouts, error
+       mapping, key handling. Tests: stub HTTP server for success, 429, 5xx, timeout, truncated output, a vendor
+       that ignores `response_format`; key redaction; start-up refusal.
     4. **Profile and retrieval**: profile loader with pinned hash, query builder, batched `searchAll`, context
        assembler with caps. Tests: queries from fixed listings, caps, dedupe, marketplace filter, hash pin.
     5. **Endpoint**: migration (next free Flyway version), `PolicyCheckService`, fingerprint, cache, `POST` and
