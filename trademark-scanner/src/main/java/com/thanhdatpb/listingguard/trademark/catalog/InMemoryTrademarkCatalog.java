@@ -28,6 +28,16 @@ public final class InMemoryTrademarkCatalog implements TrademarkCatalog {
         }
     }
 
+    /** A catalog of marks that are already normalized, with their metadata. */
+    public InMemoryTrademarkCatalog(String version, Collection<CatalogMark> marks) {
+        this.version = version;
+        for (CatalogMark mark : marks) {
+            if (mark.normalized().isEmpty() || byNormalized.putIfAbsent(mark.normalized(), mark) != null) {
+                throw new IllegalArgumentException("Mark is empty or listed twice: '" + mark.display() + "'");
+            }
+        }
+    }
+
     @Override
     public String version() {
         return version;
