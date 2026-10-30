@@ -1,0 +1,4 @@
+# Profile for the one-shot trademark catalog import: no web server, the process ends when the job ends.
+spring:
+  main:
+    web-application-type: none

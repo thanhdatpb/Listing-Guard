@@ -180,3 +180,28 @@ DELETE FROM flyway_schema_history WHERE success = false;
 Duplicates are not a cause: V8 already blocks duplicate ruleset identities, and the new cache index is wider than the
 old one, so it cannot meet duplicates. A build that failed was cancelled, timed out or waited too long for a lock.
 Never accept an invalid or missing index.
+
+## Trademark catalog (ADR-009, PR A2)
+
+Migration V15 creates the `pg_trgm` extension and the catalog tables. **The database role that runs Flyway must be
+allowed to create the extension** (a superuser, or, on PostgreSQL 13 and later where `pg_trgm` is a trusted
+extension, a role with the `CREATE` privilege on the database), and the PostgreSQL server must have the `contrib`
+extensions installed (the `pgvector/pgvector:pg16` image does). If it cannot, the migration fails and the API does not
+start; it never falls back to another matching method. Supported: PostgreSQL 16 (the major version and the `pg_trgm`
+extension version are part of every trademark analysis fingerprint, so an upgrade of either makes new results).
+
+Catalog versions are immutable rows; load one with the one-shot job and name it in the API configuration:
+
+```bash
+# catalogs/manifest.yaml (committed) describes catalogs/raw/<file> (git-ignored); you check the source's terms
+docker compose run --rm trademark-import --catalog=<version label of the manifest entry>
+# logs: Trademark catalog version <label>-<digest> (IMPORTED | ALREADY_IMPORTED)
+TRADEMARK_CATALOG_VERSION=<label>-<digest>      # in .env, then recreate the api
+```
+
+In production put `catalogs/` next to the compose file (or set `CATALOGS_DIR` and mount it) and run the same job with
+the production compose file. Changing the active catalog is a configuration change plus a restart; the old version
+stays in the database. The API logs `Trademark checks are ready on catalog version ...`, `are off` (nothing
+configured) or `are refused` (the version does not exist, or it was imported with another trademark ruleset version,
+ruleset content hash or normalizer version): import it again and configure the new version. `/checks` is not
+affected by any of these states. Importing needs the database but no network and no embedding provider.

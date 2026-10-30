@@ -20,7 +20,10 @@ It never edits a listing, never publishes, and does no SEO.
   `source.status` must be `unverified`), canonical input hash, normalization with offsets, the `TrademarkCatalog` port
   with `InMemoryTrademarkCatalog`, exact/phrase/fuzzy matching (final score: optimal string alignment, `osa-similarity-1`),
   the three color and place context rules, risk aggregation with `INCOMPLETE`/`UNKNOWN`, and `AnalysisFingerprint`.
-  No Spring, no database, no HTTP; the catalog adapter, endpoint and evaluation are A2 to A4.
+  No Spring, no database, no HTTP. **Catalog (A2)**: V15 (`pg_trgm`, `trademark_catalog_version`, `trademark_entry`,
+  append-only), the `trademark-import` job (`catalogs/manifest.yaml` + git-ignored `catalogs/raw/`, JSONL `jsonl-1`),
+  `PostgresTrademarkCatalog`, and `TrademarkCatalogRuntime` (DISABLED / READY / REFUSED, configured by
+  `listing-guard.trademark.catalog-version`, never "latest"). The endpoint and evaluation are A3 and A4.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
@@ -42,8 +45,8 @@ It never edits a listing, never publishes, and does no SEO.
 Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR is right):
 
 1. PR 0a (done, V7) and PR 0b (done, V8-V14) (ADR-010).
-2. PR A (next): trademark scanner (ADR-009), delivered as A1 core, then A2 catalog, then A3 endpoint and A4 evaluation
-   (ADR-009 "Pull requests").
+2. PR A: trademark scanner (ADR-009), delivered as A1 core (done), A2 catalog (done, V15), then A3 endpoint (next) and
+   A4 evaluation (may run in parallel with A3). ADR-009 "Pull requests" has the detail.
 3. PR B: image checker (ADR-008, currently Deferred).
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
    after PR A, in this order: run the retrieval evaluation and commit the real results, then PR 3 (`ApiLlmProvider`),
@@ -72,6 +75,7 @@ Policy corpus (see README "Policy corpus and retrieval"):
 ```bash
 # optional: needs a provider, default is `none` and then both jobs fail at once (ADR-012).
 # EMBEDDING_PROVIDER=api + LISTING_GUARD_EMBEDDING_API_KEY in .env (Google Gemini), or EMBEDDING_PROVIDER=ollama
+docker compose run --rm trademark-import --catalog=<label>           # catalogs/ -> trademark_entry (profile `trademark-import`; no network, no model)
 docker compose run --rm ingest                                       # policies/ -> pgvector (profile `ingest`)
 docker compose run --rm eval-retrieval                               # writes eval/retrieval/results.md
 ```
@@ -110,7 +114,13 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 - Ingest only reads local files and is idempotent; a document is redone when its file, manifest entry,
   `PolicyChunker.VERSION`/limits or `EmbeddingProvider.modelId()` changes. Bump `PolicyChunker.VERSION` when
   the chunking rules change. The manifest `version` must equal the page's "Last updated" date.
-- Ingest, eval and admin are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`), not HTTP endpoints.
+- **Trademark catalogs** (ADR-009): `catalogs/raw/` is git-ignored (third-party data, own terms; the operator checks
+  them), only `catalogs/manifest.yaml` is committed, tests use synthetic files only. A catalog version is append-only
+  (DB trigger) and its stored name is the manifest label plus a digest of the import; never edit one, import again. The
+  active catalog is named exactly in `listing-guard.trademark.catalog-version` (never "latest") and is refused when its
+  normalization identity (pack, ruleset version, ruleset hash, normalizer version) differs from the active ruleset.
+- Ingest, eval, admin and trademark-import are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`,
+  `trademark-import`), not HTTP endpoints.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
   with the default `none`, `admin` does not (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
