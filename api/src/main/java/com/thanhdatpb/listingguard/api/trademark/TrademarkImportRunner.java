@@ -16,8 +16,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * One-shot job: {@code --spring.profiles.active=trademark-import --catalog=<version label>} imports one catalog of
- * {@code catalogs/manifest.yaml} from the local file {@code catalogs/raw/<file>}, then the application exits (the
- * profile turns the web server off). It reads local files and the database and makes no network call. It prints the
+ * {@code catalogs/manifest.yaml} from its local file or files in {@code catalogs/raw/} (one or several sources, ADR-009
+ * PR A2b), then the application exits (the profile turns the web server off). It reads local files and the database
+ * and makes no network call. It prints the
  * catalog version to configure as {@code listing-guard.trademark.catalog-version}. A refused file or an invalid
  * manifest makes the process exit with a non-zero code.
  *

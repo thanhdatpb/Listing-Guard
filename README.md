@@ -248,7 +248,10 @@ this storage and use.**
    optional).
 2. **Describe it in `catalogs/manifest.yaml`:** a `version` label, `file`, `format_version: jsonl-1`, `source_name`,
    `url`, `license`, `source_date`, the file's `sha256` (`sha256sum`) and the `filters` (`include_classes`,
-   `include_status`). A missing license or date, or a hash that differs from the file, is refused.
+   `include_status`). A missing license or date, or a hash that differs from the file, is refused. To join several
+   files (for example a public register and a list of your own), write a `sources:` list instead of `file`, with a
+   `source_key` for each; the filters apply to the whole catalog, the source ids are stored as `<source_key>:<id>`, and a
+   hash that differs in one file refuses the whole catalog (steps in [docs/deployment.md](docs/deployment.md)).
 3. **Import:** `docker compose run --rm trademark-import --catalog=<version label>`. It validates the whole file
    (one bad line rejects the batch and names the line), keeps the records that match the filters, merges records
    that normalize to the same mark, writes one new catalog version and prints its name (the label plus a digest).
@@ -312,7 +315,8 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
    composite analysis versions ([ADR-010](docs/adr/ADR-010-pack-identity-and-analysis-version.md); the packs that
    follow implement the rest of the ADR).
 2. Trademark scanner, PR A ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)): A1 (core), A2 (catalog) and A3
-   (endpoint) are done; next are A2b and A4 (evaluation).
+   (endpoint) are done; A2b is half done (a catalog from several files; the USPTO converter waits for the official
+   documentation), then A4 (evaluation).
 3. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)).
 4. In parallel after step 2: run the retrieval evaluation and record the measured results (this needs an embedding
    provider: an API key or Ollama), then build the policy analyzer

@@ -364,6 +364,72 @@ cache identity, retention and the cleanup job. It changes nothing in `/checks`: 
 - **Known limits.** The number of findings of one request is not capped (the body limit of 256 KB bounds it) and every
   `INCOMPLETE` request stores a row until it expires. Both are bounded by the rate limit and the retention.
 
+## USPTO conversion and multi-source catalogs (PR A2b)
+
+PR A2b has two parts that do not depend on each other. It adds no migration and changes nothing in `/checks`, in the
+scanner or in the ruleset: a catalog is still the same rows, built from more than one file.
+
+**Status.** The multi-source catalog is done. The USPTO converter is **not started**: it must read the structure of the
+bulk files from the official USPTO documentation (the DTD or the field documentation of the trademark application
+files), and no element name may be guessed. Neither the repository nor the maintainer's machine held that documentation
+when this section was written, and the converter downloads nothing, so that part waits until the maintainer saves the
+documents. The candidates, found by a web search and **not opened** (the maintainer confirms which one matches the files
+that will be converted):
+
+- Trademark application XML, USPTO bulk data: <https://data.uspto.gov/bulkdata/datasets> (the product page for
+  "Trademark Application XML (1884 - Present)", with the files and the DTD they cite).
+- Trademark Daily XML (TDXF) applications, the product description: <https://developer.uspto.gov/node/124>, and the
+  annual file set: <https://developer.uspto.gov/node/125>.
+- Field documentation of the daily application XML:
+  <https://www.uspto.gov/sites/default/files/products/tmdailyapp-documentation.pdf> (an older document, to be checked
+  against the DTD named in the files).
+- The case-file variable tables, which map each field to its XML element and describe the status codes:
+  <https://www.uspto.gov/sites/default/files/documents/casefiles_vartable_2023_final.pdf> and the dataset page
+  <https://www.uspto.gov/ip-policy/economic-research/research-datasets/trademark-case-files-dataset>.
+
+Once they are read, this section records: the title, version, date and URL of each document used; the element that holds
+the mark text, the Nice classes, the status code and the serial number; and the meaning of every status code. The
+converter's table from USPTO status code to `REGISTERED | PENDING | EXPIRED | CANCELLED` is then a versioned YAML file
+whose `source.status` stays `unverified` until the maintainer checks it, like the trademark ruleset.
+
+**Multi-source manifest.** An entry has one of two shapes (the header of `catalogs/manifest.yaml` shows both):
+
+- The **one-file form** of PR A2 (`file`, `source_name`, `url`, `license`, `source_date`, `sha256` in the entry) is
+  unchanged: the same source ids, the same stored columns and the same version digest, so a catalog already imported is
+  still found by the same import. A test writes the A2 digest text out again to pin this.
+- The **`sources:` form** lists the files. Each element has `source_key`, `file`, `source_name`, `url`, `license`,
+  `source_date` and `sha256`. `format_version` and `filters` stay in the entry and apply to every file and to the whole
+  catalog (a record is kept by its own classes and status, whatever file it came from). `source_key` is an addition to
+  the keys of the request: the stored source ids need a stable prefix, and a free-text `source_name` is a poor one. It
+  matches `[a-z0-9][a-z0-9._-]{0,31}` and is unique in the entry, as is `file`. The two forms cannot be mixed in one
+  entry.
+
+**Source ids.** In the `sources:` form every stored source id is `<source_key>:<source_id>`, for example `uspto:97123456`
+or `internal:case-0042`. Ids of different files cannot collide, and the prefix shows where a mark came from (a finding
+carries `sourceIds`). The one-file form stores the id as the file gives it. The prefix is added by the importer; a data
+file never contains it, so the converter writes the serial number as `source_id`.
+
+**Merge.** The A2 rule applies across files: records with the same normalized mark become one entry, with the classes
+united, the source ids of all merged records gathered, `common_word` true if any record says so, the status declared
+first in `MarkStatus` and the smallest display form. An internal list can therefore mark a mark that came from the
+USPTO file as `common_word`. The outcome does not depend on the order of the files or of the lines.
+
+**Identity and storage.** The version is the label plus the first 12 hex digits of a SHA-256 that covers every source
+(key, name, url, license, date, file hash), ordered by key, the format version, the filters and the normalization
+identity, in the text format `listing-guard/trademark-catalog-identity/v2`; the order in the manifest changes nothing.
+Changing any source, adding one or removing one is another version. One file whose hash differs from the manifest (or
+that is missing, or has a bad line) refuses the whole catalog before anything is written. The table of V15 has one
+column for each of these facts, and a migration is out of scope, so for several files the columns hold a summary:
+`source_name`, `source_reference` and `source_license` are `<key>: <value>` joined by ` | ` in key order, `source_date`
+is the oldest of the dates (the catalog is no newer than its oldest source) and `file_sha256` is the SHA-256 of the
+lines `<key> <sha256>` in key order, which the fingerprint (`external.catalog_file_sha256`) then carries. The import is
+refused with a message when such a text does not fit its column (200, 500 and 200 characters). The counts
+`records_read`, `records_filtered`, `records_merged` and `records_loaded` are totals over all files.
+
+**Limits.** Each data file is read whole into memory and validated before the filters run, as in A2. A very large file,
+such as the whole USPTO register converted without any restriction, needs a heap sized for it; the filters reduce what
+is kept, not what is read.
+
 ## Offline data and source governance
 
 The importer accepts only local files and is a one-shot administrative job. It validates the
@@ -439,6 +505,7 @@ ruleset that an earlier PR did not already contain.
 |---|---|---|
 | A1 | `trademark-scanner` core: ruleset `trademark-risk-*` and its loader, canonical input and hash, normalization with offsets, tokens and n-grams, the `TrademarkCatalog` port with an in-memory implementation, exact/phrase/fuzzy matching with the Java final score, the three context rules, risk aggregation, `INCOMPLETE`/`UNKNOWN`, evidence, and the pack fingerprint with room for the catalog/database components. No Spring, no database, no HTTP. | PR 0b (done) |
 | A2 | Catalog: `pg_trgm` migration, catalog tables, offline importer, the PostgreSQL adapter (transaction-local candidate threshold), and the PostgreSQL major version / `pg_trgm` `extversion` / catalog components of the fingerprint. | A1 |
+| A2b | Real catalog for a deployment: a catalog from several files (done) and a converter from the USPTO bulk XML to `jsonl-1` (waits for the official documentation); see "USPTO conversion and multi-source catalogs (PR A2b)". No migration. | A2 |
 | A3 | `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}`, result tables, cache identity, retention and cleanup, OpenAPI and integration guide (done; see "Endpoint (PR A3)"). | A2 |
 | A4 | Synthetic tuning and held-out datasets, the evaluation run and its gate. | A2 (may run in parallel with A3) |
 

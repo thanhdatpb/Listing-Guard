@@ -27,8 +27,10 @@ It never edits a listing, never publishes, and does no SEO.
   (the `/checks` envelope and `Normalizer`, own DTO) and `GET /api/v1/trademark-checks/{id}`; V17 `trademark_check` +
   `trademark_check_finding`, only the canonical input hash and bounded evidence are stored, 30-day retention enforced on
   read and by a scheduled cleanup under the advisory lock `(1279746628, 1380271182)`, which is reserved for it; a catalog
-  that is DISABLED or REFUSED answers `503 trademark-not-configured` and `/checks` is unaffected. The next steps are A2b
-  and A4 (evaluation).
+  that is DISABLED or REFUSED answers `503 trademark-not-configured` and `/checks` is unaffected. **A2b (in progress)**: an
+  entry of `catalogs/manifest.yaml` may list `sources:` (each with a `source_key`; stored source ids are `<key>:<id>`),
+  done; the `uspto-convert` job waits for the official USPTO documentation (ADR-009, never guess an element name). The
+  next steps are the rest of A2b and A4 (evaluation).
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
@@ -51,7 +53,8 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
 
 1. PR 0a (done, V7) and PR 0b (done, V8-V14) (ADR-010).
 2. PR A: trademark scanner (ADR-009), delivered as A1 core (done), A2 catalog (done, V15-V16) and A3 endpoint (done,
-   V17). Next are A2b and A4 evaluation. ADR-009 "Pull requests" has the detail (it does not define A2b yet).
+   V17). Next are A2b (multi-source manifest done, USPTO converter waits for the official documentation) and A4 evaluation.
+   ADR-009 "Pull requests" and "USPTO conversion and multi-source catalogs (PR A2b)" have the detail.
 3. PR B: image checker (ADR-008, currently Deferred).
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
    after PR A, in this order: run the retrieval evaluation and commit the real results, then PR 3 (`ApiLlmProvider`),
