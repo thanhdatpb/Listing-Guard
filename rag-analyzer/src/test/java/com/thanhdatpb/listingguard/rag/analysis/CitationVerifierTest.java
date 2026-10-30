@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.rag.analysis;
 
 import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.LISTING;
+import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.MAX_QUOTE;
 import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.MIN_QUOTE;
 import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.MOCKUP;
 import static com.thanhdatpb.listingguard.rag.analysis.AnalysisFixtures.PARTNER;
@@ -17,11 +18,12 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 class CitationVerifierTest {
 
-    private final CitationVerifier verifier = new CitationVerifier(MIN_QUOTE);
+    private final CitationVerifier verifier = new CitationVerifier(MIN_QUOTE, MAX_QUOTE);
 
     /** name, chunkId, quote, field, value, the reason it is dropped (null = kept) */
     static Stream<Arguments> cases() {
@@ -206,11 +208,71 @@ class CitationVerifierTest {
 
     @Test
     void theMinimumQuoteLengthIsAParameter() {
-        ProposedFinding p = proposed(2, "Mockups are not", "description", null);
+        String quote = "Mockups are not";
+        ProposedFinding p = proposed(2, quote, "description", null);
 
-        assertThat(new CitationVerifier(15).verify(parsed(p), RETRIEVED, LISTING).findings()).hasSize(1);
-        assertThat(new CitationVerifier(16).verify(parsed(p), RETRIEVED, LISTING).findings()).isEmpty();
-        assertThatThrownBy(() -> new CitationVerifier(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(new CitationVerifier(quote.length(), MAX_QUOTE).verify(parsed(p), RETRIEVED, LISTING).findings())
+                .hasSize(1);
+        assertThat(new CitationVerifier(quote.length() + 1, MAX_QUOTE).verify(parsed(p), RETRIEVED, LISTING)
+                .findings()).isEmpty();
+    }
+
+    @Test
+    void aQuoteLongerThanTheMaximumIsDroppedForItsLength() {
+        String content = "a".repeat(MAX_QUOTE + 10);
+        var chunk = AnalysisFixtures.chunk(5, "long.html", "Long > Section", content);
+
+        VerificationResult atLimit = verifier.verify(
+                parsed(proposed(5, "a".repeat(MAX_QUOTE), "description", null)), List.of(chunk), LISTING);
+        VerificationResult over = verifier.verify(
+                parsed(proposed(5, "a".repeat(MAX_QUOTE + 1), "description", null)), List.of(chunk), LISTING);
+
+        assertThat(atLimit.findings()).hasSize(1);
+        assertThat(over.findings()).isEmpty();
+        assertThat(over.stats().dropped(DropReason.QUOTE_LENGTH)).isEqualTo(1);
+    }
+
+    @Test
+    void theQuoteLengthIsCountedAfterNormalization() {
+        String normalized = "a".repeat(MAX_QUOTE - 2) + " a";
+        String raw = "  " + "a".repeat(MAX_QUOTE - 2) + " \n\t  a  ";
+        var chunk = AnalysisFixtures.chunk(5, "long.html", "Long > Section", normalized);
+
+        VerificationResult result = verifier.verify(
+                parsed(proposed(5, raw, "description", null)), List.of(chunk), LISTING);
+
+        assertThat(raw.length()).isGreaterThan(MAX_QUOTE);
+        assertThat(result.findings()).hasSize(1);
+    }
+
+    @Test
+    void theQuoteLengthCountsCodePointsNotUtf16Units() {
+        String emojis = "😀".repeat(MAX_QUOTE);
+        var chunk = AnalysisFixtures.chunk(5, "emoji.html", "Emoji > Section", emojis);
+
+        VerificationResult result = verifier.verify(
+                parsed(proposed(5, emojis, "description", null)), List.of(chunk), LISTING);
+
+        assertThat(emojis.length()).isGreaterThan(MAX_QUOTE);
+        assertThat(result.findings()).hasSize(1);
+    }
+
+    @Test
+    void aTightWindowAcceptsOnlyThatLength() {
+        String content = "a".repeat(MAX_QUOTE);
+        var chunk = AnalysisFixtures.chunk(5, "long.html", "Long > Section", content);
+        CitationVerifier exact = new CitationVerifier(MIN_QUOTE, MIN_QUOTE);
+
+        assertThat(exact.verify(parsed(proposed(5, "a".repeat(MIN_QUOTE), "description", null)), List.of(chunk),
+                LISTING).findings()).hasSize(1);
+        assertThat(exact.verify(parsed(proposed(5, "a".repeat(MIN_QUOTE + 1), "description", null)), List.of(chunk),
+                LISTING).findings()).isEmpty();
+    }
+
+    @ParameterizedTest(name = "min={0}, max={1}")
+    @CsvSource({"0,5", "-1,5", "5,4", "5,0", "5,-1"})
+    void limitsThatDoNotMakeAWindowAreRefused(int min, int max) {
+        assertThatThrownBy(() -> new CitationVerifier(min, max)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

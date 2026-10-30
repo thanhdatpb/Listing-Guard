@@ -13,8 +13,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Decides, in code and never by the model, which proposed findings are backed by the policy text (ADR-011
- * item 6). A finding is kept only if its chunk was retrieved for this request, its quote is long enough, has
- * no ellipsis and occurs verbatim in that chunk, and its value occurs in the named listing field. Everything
+ * item 6). A finding is kept only if its chunk was retrieved for this request, its quote is within the length
+ * limits, has no ellipsis and occurs verbatim in that chunk, and its value occurs in the named listing field. Everything
  * is compared in the {@link TextNormalizer} form, case-sensitive. A failing finding is removed and counted
  * under the first reason that applies, in this order: unknown chunk, quote length, quote not found, value not
  * found. Kept findings never carry {@code ERROR}.
@@ -24,13 +24,23 @@ public final class CitationVerifier {
     private static final Logger LOG = LoggerFactory.getLogger(CitationVerifier.class);
 
     private final int minQuoteLength;
+    private final int maxQuoteLength;
 
-    /** @param minQuoteLength fewest characters a normalized quote may have (the profile says 20) */
-    public CitationVerifier(int minQuoteLength) {
+    /**
+     * Both limits come from the analyzer profile and count code points of the normalized quote.
+     *
+     * @param minQuoteLength fewest characters a quote may have, positive
+     * @param maxQuoteLength most characters a quote may have, at least {@code minQuoteLength}
+     */
+    public CitationVerifier(int minQuoteLength, int maxQuoteLength) {
         if (minQuoteLength < 1) {
             throw new IllegalArgumentException("minQuoteLength must be positive");
         }
+        if (maxQuoteLength < minQuoteLength) {
+            throw new IllegalArgumentException("maxQuoteLength must not be smaller than minQuoteLength");
+        }
         this.minQuoteLength = minQuoteLength;
+        this.maxQuoteLength = maxQuoteLength;
     }
 
     /**
@@ -85,7 +95,8 @@ public final class CitationVerifier {
             return DropReason.UNKNOWN_CHUNK;
         }
         String quote = TextNormalizer.normalize(p.quote());
-        if (quote.codePointCount(0, quote.length()) < minQuoteLength || quote.contains("...")) {
+        int length = quote.codePointCount(0, quote.length());
+        if (length < minQuoteLength || length > maxQuoteLength || quote.contains("...")) {
             return DropReason.QUOTE_LENGTH;
         }
         if (!content.contains(quote)) {
