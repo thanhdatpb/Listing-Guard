@@ -9,6 +9,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
@@ -203,6 +205,122 @@ class MigrationTrademarkCatalogTest {
             }
 
             assertThat(plan.toString()).contains("idx_trademark_entry_normalized_trgm");
+        }
+    }
+
+    // --- V16: the normalization identity and the source ids, on top of the V15 that is already applied ---
+
+    private static void insertV15Catalog(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    INSERT INTO trademark_catalog_version (version, label, source_name, source_reference,
+                        source_license, source_date, file_sha256, format_version, filters_json, pack_id, ruleset_version,
+                        ruleset_content_hash, normalization_version, records_read, records_filtered, records_merged,
+                        records_loaded)
+                    VALUES ('old-1', 'old', 'synthetic', 'ref', 'test', current_date, repeat('a', 64), 'jsonl-1', '{}',
+                        'trademark-risk', 'trademark-risk-2026-11', repeat('b', 64), 'normalization-1', 1, 0, 0, 1)""");
+            statement.execute("""
+                    INSERT INTO trademark_entry (catalog_version_id, normalized, display, nice_classes, status, source_id)
+                    SELECT id, 'zorvex', 'Zorvex', ARRAY[25]::smallint[], 'REGISTERED', 'S-1'
+                    FROM trademark_catalog_version WHERE version = 'old-1'""");
+        }
+    }
+
+    private static List<String> columns(Connection connection, String table) throws SQLException {
+        List<String> names = new ArrayList<>();
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("SELECT column_name FROM information_schema.columns "
+                     + "WHERE table_name = '" + table + "' ORDER BY column_name")) {
+            while (rows.next()) {
+                names.add(rows.getString(1));
+            }
+        }
+        return names;
+    }
+
+    @Test
+    void v16RefusesToConvertAnExistingCatalogAndSaysWhy() throws SQLException {
+        flyway("15").migrate();
+        try (Connection connection = open()) {
+            insertV15Catalog(connection);
+        }
+
+        assertThatThrownBy(() -> flyway("latest").migrate()).isInstanceOf(FlywayException.class)
+                .hasMessageContaining("V16 cannot convert the existing trademark catalogs")
+                .hasMessageContaining("1 catalog version row(s), 1 entry row(s)")
+                .hasMessageContaining("normalization_hash")
+                .hasMessageContaining("import the catalogs again");
+
+        try (Connection connection = open()) {
+            // the failed migration changed nothing: V15 is still the schema, the data is still there
+            assertThat(columns(connection, "trademark_catalog_version")).contains("ruleset_version",
+                    "ruleset_content_hash").doesNotContain("normalization_hash");
+            assertThat(columns(connection, "trademark_entry")).contains("source_id").doesNotContain("source_ids");
+            assertThat(scalar(connection, "SELECT count(*) FROM trademark_entry")).isEqualTo("1");
+            assertThat(scalar(connection, "SELECT max(version::int) FROM flyway_schema_history WHERE success"))
+                    .isEqualTo("15");
+        }
+    }
+
+    @Test
+    void v16AppliesAfterTheOldCatalogsAreDeleted() throws SQLException {
+        flyway("15").migrate();
+        try (Connection connection = open(); Statement statement = connection.createStatement()) {
+            insertV15Catalog(connection);
+            statement.execute("DELETE FROM trademark_entry");
+            statement.execute("DELETE FROM trademark_catalog_version");
+        }
+
+        // the documented way out: delete the old catalogs (the tables refuse UPDATE, not DELETE), then upgrade
+        flyway("latest").migrate();
+
+        try (Connection connection = open()) {
+            assertThat(scalar(connection, "SELECT max(version::int) FROM flyway_schema_history WHERE success"))
+                    .isEqualTo("16");
+        }
+    }
+
+    @Test
+    void v16OnEmptyTablesGivesTheNewSchema() throws SQLException {
+        flyway("15").migrate();
+
+        flyway("latest").migrate();
+
+        try (Connection connection = open()) {
+            assertThat(columns(connection, "trademark_catalog_version")).contains("pack_id", "normalization_version",
+                    "normalization_hash").doesNotContain("ruleset_version", "ruleset_content_hash");
+            assertThat(columns(connection, "trademark_entry")).contains("source_ids").doesNotContain("source_id");
+            assertThat(scalar(connection, "SELECT character_maximum_length FROM information_schema.columns "
+                    + "WHERE table_name = 'trademark_catalog_version' AND column_name = 'normalization_hash'"))
+                    .isEqualTo("64");
+            assertThat(scalar(connection, "SELECT is_nullable FROM information_schema.columns "
+                    + "WHERE table_name = 'trademark_entry' AND column_name = 'source_ids'")).isEqualTo("NO");
+            assertThat(scalar(connection, "SELECT count(*) FROM pg_constraint "
+                    + "WHERE conname = 'ck_trademark_entry_source_ids'")).isEqualTo("1");
+            long version = insertVersion(connection, "after-16");
+            insertEntry(connection, version, "zorvex", "REGISTERED");
+        }
+    }
+
+    @Test
+    void aFreshDatabaseReachesTheSameSchemaAsTheUpgrade() throws SQLException {
+        flyway("latest").migrate();
+        List<String> fresh;
+        try (Connection connection = open()) {
+            fresh = new ArrayList<>(columns(connection, "trademark_catalog_version"));
+            fresh.addAll(columns(connection, "trademark_entry"));
+        }
+        flyway("latest").clean();
+        try (Connection connection = open(); Statement statement = connection.createStatement()) {
+            statement.execute("DROP EXTENSION IF EXISTS pg_trgm CASCADE");
+        }
+        flyway("15").migrate();
+        flyway("latest").migrate();
+
+        try (Connection connection = open()) {
+            List<String> upgraded = new ArrayList<>(columns(connection, "trademark_catalog_version"));
+            upgraded.addAll(columns(connection, "trademark_entry"));
+            assertThat(upgraded).isEqualTo(fresh);
         }
     }
 }
