@@ -274,10 +274,15 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 
 ## Roadmap
 
-1. Run and review the retrieval evaluation against the maintained labels; record measured results.
-2. Add Amazon product-type overrides only when their limits and sources have been verified.
-3. Implement policy-grounded LLM findings, structured output, and code-verified citations.
-4. Build feedback and broader evaluation workflows to measure and tune the analyzer.
+1. PR 0a and PR 0b: pack identity and composite analysis versions
+   ([ADR-010](docs/adr/ADR-010-pack-identity-and-analysis-version.md)).
+2. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)).
+3. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)).
+4. In parallel after step 2: the policy analyzer
+   ([ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md)). It is off by default and is enabled by configuring
+   an LLM.
+5. Run and review the retrieval evaluation against the maintained labels and record measured results, and add
+   Amazon product-type overrides only when their limits and sources have been verified.
 
 ## Documentation
 
@@ -291,9 +296,10 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 - [ADR-005: API auth, rate limit, and result cache](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md)
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
-- [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Proposed)
+- [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Deferred: PR B after ADR-009)
 - [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed)
+- [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed)
 
 ## License
 MIT © 2026 Thanh Dat Tran. See [LICENSE](LICENSE).
