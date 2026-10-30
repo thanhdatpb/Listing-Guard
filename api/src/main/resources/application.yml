@@ -46,6 +46,9 @@ listing-guard:
       cleanup-interval: 1h
       cleanup-initial-delay: 1m
       cleanup-batch-size: 500
+  batch:
+    # The batch-check job (docs/batch-check.md): mappings, inputs and reports; the reports go to <dir>/out by default.
+    dir: ${BATCH_DIR:batch}
   policies:
     dir: ${POLICIES_DIR:policies}
     chunking:
