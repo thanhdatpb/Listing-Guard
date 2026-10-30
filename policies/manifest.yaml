@@ -1,0 +1,51 @@
+# Policy documents to ingest. Raw files live in policies/raw/<marketplace>/ (git-ignored: copyrighted text,
+# each contributor saves them locally). Only this manifest is committed.
+#
+# file        - file name inside policies/raw/<marketplace in lower case>/
+# marketplace - marketplace code (must exist in the marketplace table)
+# title       - document title; first element of every chunk's section_path
+# url         - canonical public URL (no tracking parameters)
+# fetched_at  - date the file was saved
+# version     - the page's own "Last updated on" date, ISO format; ingest checks it against the page
+documents:
+  - file: seller-policy.html
+    marketplace: ETSY
+    title: Seller Policy
+    url: https://www.etsy.com/legal/sellers/
+    fetched_at: 2026-10-27
+    version: 2026-10-05
+
+  - file: prohibited-items-policy.html
+    marketplace: ETSY
+    title: Prohibited Items Policy
+    url: https://www.etsy.com/legal/prohibited/
+    fetched_at: 2026-10-27
+    version: 2026-10-06
+
+  - file: intellectual-property-policy.html
+    marketplace: ETSY
+    title: Intellectual Property Policy
+    url: https://www.etsy.com/legal/ip/
+    fetched_at: 2026-10-27
+    version: 2023-06-15
+
+  - file: creativity-standards.html
+    marketplace: ETSY
+    title: Etsy's Creativity Standards
+    url: https://www.etsy.com/legal/creativity/
+    fetched_at: 2026-10-27
+    version: 2025-06-10
+
+  - file: listing-image-requirements.html
+    marketplace: ETSY
+    title: Listing Image Requirements
+    url: https://www.etsy.com/legal/policy/listing-image-requirements/253962679005
+    fetched_at: 2026-10-27
+    version: 2026-10-22
+
+  - file: listing-mature-content.html
+    marketplace: ETSY
+    title: Listing Mature Content Correctly
+    url: https://www.etsy.com/legal/policy/listing-mature-content-correctly/242665462117
+    fetched_at: 2026-10-27
+    version: 2024-07-30
