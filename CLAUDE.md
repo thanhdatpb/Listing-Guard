@@ -35,7 +35,7 @@ It never edits a listing, never publishes, and does no SEO.
 
 Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR is right):
 
-1. PR 0a (done, V7) and PR 0b (done, V8-V13) (ADR-010).
+1. PR 0a (done, V7) and PR 0b (done, V8-V14) (ADR-010).
 2. PR A (next): trademark scanner (ADR-009).
 3. PR B: image checker (ADR-008, currently Deferred).
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts

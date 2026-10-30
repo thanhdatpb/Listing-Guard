@@ -37,7 +37,7 @@ public class ListingCheck {
     private CheckStatus status;
 
     /** The ruleset this check was produced with. */
-    @Column(name = "ruleset_version_id")
+    @Column(name = "ruleset_version_id", nullable = false)
     private Long rulesetVersionId;
 
     @Column(name = "analysis_version", nullable = false, length = 128)

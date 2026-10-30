@@ -30,7 +30,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-/** ADR-010 PR 0b (V8 to V13) makes the pack identity mandatory and replaces the registry and cache identities. */
+/** ADR-010 PR 0b (V8 to V14) makes the pack identity mandatory and replaces the registry and cache identities. */
 @Testcontainers
 class MigrationPackIdentityContractTest {
 
@@ -204,6 +204,17 @@ class MigrationPackIdentityContractTest {
     }
 
     @Test
+    void aCheckWithoutARulesetVersionCannotBeInsertedAfterV14() throws Exception {
+        flyway("latest").migrate();
+        try (Connection connection = open()) {
+
+            assertThatThrownBy(() -> insertLegacyCheck(connection, "no-ruleset", null, "listing-rules", "etsy-2026-11"))
+                    .isInstanceOf(SQLException.class).hasMessageContaining("ruleset_version_id");
+            assertThat(scalar(connection, "SELECT count(*) FROM listing_check")).isEqualTo("0");
+        }
+    }
+
+    @Test
     void thePackSeparatesRulesetIdentitiesAndTheTripleIsUnique() throws Exception {
         flyway("latest").migrate();
         try (Connection connection = open()) {
@@ -369,14 +380,15 @@ class MigrationPackIdentityContractTest {
 
         assertThat(recorder.outsideTransaction).containsEntry("8", false).containsEntry("9", true)
                 .containsEntry("10", false).containsEntry("11", true).containsEntry("12", false)
-                .containsEntry("13", true);
+                .containsEntry("13", true).containsEntry("14", false);
         for (String script : new String[] {"V9__ruleset_version_pack_unique_index",
                 "V11__listing_check_identity_index", "V13__drop_listing_check_old_cache_index"}) {
             assertThat(scriptText("db/migration/" + script + ".sql.conf")).contains("executeInTransaction=false");
             assertThat(scriptText("db/migration/" + script + ".sql")).contains("CONCURRENTLY");
         }
         for (String script : new String[] {"V8__pack_identity_contract_verify",
-                "V10__ruleset_version_pack_unique_constraint", "V12__listing_check_identity_index_verify"}) {
+                "V10__ruleset_version_pack_unique_constraint", "V12__listing_check_identity_index_verify",
+                "V14__listing_check_ruleset_version_not_null"}) {
             assertThat(scriptText("db/migration/" + script + ".sql")).doesNotContain("CONCURRENTLY");
         }
     }

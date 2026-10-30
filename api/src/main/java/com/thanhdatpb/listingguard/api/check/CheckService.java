@@ -112,8 +112,8 @@ public class CheckService {
                 .map(entity -> new CheckResult.FindingView(entity.getRuleId(), entity.getSource(), entity.getSeverity(),
                         entity.getField(), entity.getValue(), entity.getMessage(), entity.getSuggestion()))
                 .toList();
-        String rulesetVersion = check.getRulesetVersionId() == null ? null
-                : rulesetVersions.findById(check.getRulesetVersionId()).map(RulesetVersion::getVersion).orElse(null);
+        String rulesetVersion = rulesetVersions.findById(check.getRulesetVersionId()).map(RulesetVersion::getVersion)
+                .orElse(null);
         return new CheckResult(check.getId(), check.getStatus(), check.getMarketplaceCode(), rulesetVersion,
                 check.getAnalysisVersion(), check.getContentHash(), cached, check.getCreatedAt(),
                 CheckResult.Summary.of(views), views);
