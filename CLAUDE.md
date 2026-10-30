@@ -10,7 +10,8 @@ It never edits a listing, never publishes, and does no SEO.
   banned words), configured per marketplace in versioned YAML. Current ruleset: `etsy-2026-11`.
 - **RAG Analyzer** (`rag-analyzer/`): public marketplace policies in pgvector, plus an LLM step with
   code-verified citations. Built so far: policy manifest, HTML/PDF parsers, structural chunker,
-  `EmbeddingProvider`, `PolicyRetriever`, retrieval metrics. No LLM yet.
+  `EmbeddingProvider` (none by default), `PolicyRetriever`, retrieval metrics. No LLM yet. Nothing here is needed
+  to run the rule checks.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
@@ -45,12 +46,14 @@ Do not use `-DforkCount=0` in this repository: it can change the test working-di
 Policy corpus (see README "Policy corpus and retrieval"):
 
 ```bash
-# needs LISTING_GUARD_EMBEDDING_API_KEY in .env (Google Gemini, ADR-012); no Ollama
+# optional: needs a provider, default is `none` and then both jobs fail at once (ADR-012).
+# EMBEDDING_PROVIDER=api + LISTING_GUARD_EMBEDDING_API_KEY in .env (Google Gemini), or EMBEDDING_PROVIDER=ollama
 docker compose run --rm ingest                                       # policies/ -> pgvector (profile `ingest`)
 docker compose run --rm eval-retrieval                               # writes eval/retrieval/results.md
 ```
 
-Ingest and eval send public policy text (and eval questions) to the Google Gemini API. Ollama is optional:
+The API and the rule checks need no model and no key. With `api`, ingest and eval send public policy text (and eval
+questions) to the Google Gemini API. Ollama is optional:
 `EMBEDDING_PROVIDER=ollama`, `docker compose --profile ollama up -d ollama`, `docker compose --profile ollama run --rm ollama-pull`.
 
 On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
@@ -84,8 +87,8 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `PolicyChunker.VERSION`/limits or `EmbeddingProvider.modelId()` changes. Bump `PolicyChunker.VERSION` when
   the chunking rules change. The manifest `version` must equal the page's "Last updated" date.
 - Ingest, eval and admin are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`), not HTTP endpoints.
-  They need no client API keys; `ingest` and `eval-retrieval` need the embedding key (below), `admin` does not
-  (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
+  They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
+  with the default `none`, `admin` does not (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
 - **Clients** (ADR-007): everything but `/health` needs `X-API-Key`, and every key belongs to one client. Clients
   and keys are rows (`client`, `api_key`, only the SHA-256 of a key is stored), managed by the `admin` job
@@ -102,9 +105,11 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `LISTING_GUARD_SWAGGER_UI=true` warns and is refused under `prod`; compose sets `SPRING_PROFILES_ACTIVE=dev`.
 - Retrieval filters by marketplace before ranking. Chunk text is stored exactly as on the page (later
   citation checks compare against it); only the embedding input has the section path prepended.
-- **Embeddings** (ADR-012): the default provider is `api` (`ApiEmbeddingProvider`, Google `gemini-embedding-2`,
-  768 dimensions, `modelId()` `api:google:<model>:<dims>`); `ollama` is optional, `hashing` is for tests and `admin`.
-  The key is `LISTING_GUARD_EMBEDDING_API_KEY`: header only, never in a URL, log, exception message or
+- **Embeddings** (ADR-012): the default provider is `none` (`DisabledEmbeddingProvider`): the app starts and
+  `/api/v1/checks` works with no model and no key, and what needs embeddings fails (`embed()` throws
+  `EmbeddingNotConfiguredException`; search answers 503 `embedding-not-configured`; `ingest` and `eval-retrieval`
+  fail first thing). `api` (`ApiEmbeddingProvider`, Google `gemini-embedding-2`, 768 dimensions, `modelId()`
+  `api:google:<model>:<dims>`) and `ollama` are optional, `hashing` is for tests and `admin`. The key is `LISTING_GUARD_EMBEDDING_API_KEY`: header only, never in a URL, log, exception message or
   `EmbeddingProperties.toString`; an empty key with `provider=api` stops start-up in `EmbeddingConfig` (so jobs
   without a web server are covered). The vendor mapping (`Kind` prefixes, one request per text in
   `batchEmbedContents`, because several inputs in one content become one vector) lives in that class only. Retrieval

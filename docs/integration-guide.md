@@ -298,6 +298,7 @@ validation. Branch on `code`, not on `detail`.
 | 422 | `marketplace-not-yet-supported` | A marketplace that is planned but not supported yet. None is planned today, so you will not see it now. | Skip the check for it. |
 | 429 | `rate-limited` | Over the per-client limit. | Wait `Retry-After` seconds, then retry. |
 | 500 | `internal-error` | Unexpected failure. No details are exposed. | Retry later with backoff; report the `requestId`. |
+| 503 | `embedding-not-configured` | Only on routes that need embeddings (the policy search debug view). The deployment runs without an embedding provider, which is the default. Not `POST /api/v1/checks`. | An operator must choose a provider; retrying does not help. |
 | 503 | `embedding-unavailable` | Only on routes that need the embedding backend. Not `POST /api/v1/checks`. | |
 | 503 | `corpus-model-mismatch` | Only on routes that search the policy corpus. The stored corpus was embedded with another model than the configured one, so searching is refused. Not `POST /api/v1/checks`. | An operator must run the ingest job again. |
 | 503 | `service-unavailable` | The API key could not be checked because the database did not answer. | Retry later with backoff. |

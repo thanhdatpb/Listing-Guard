@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.policy;
 
+import com.thanhdatpb.listingguard.rag.embedding.DisabledEmbeddingProvider;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingProvider;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -27,8 +28,12 @@ public class CorpusModelGuard {
         this.embeddings = embeddings;
     }
 
-    /** @throws CorpusModelMismatchException if a stored document was embedded with a different model */
+    /**
+     * @throws com.thanhdatpb.listingguard.rag.embedding.EmbeddingNotConfiguredException if no provider is selected
+     * @throws CorpusModelMismatchException if a stored document was embedded with a different model
+     */
     public void verify() {
+        DisabledEmbeddingProvider.requireConfigured(embeddings);
         String current = embeddings.modelId();
         List<String> examples = new ArrayList<>();
         Set<String> storedModels = new LinkedHashSet<>();

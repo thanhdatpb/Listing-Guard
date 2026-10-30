@@ -61,8 +61,8 @@ Modules:
 |---|---|
 | `core/` | Plain Java domain types shared by all modules: `Listing`, `Money`, `Finding`, `Severity`. No Spring. |
 | `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
-| `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (Ollama, fake), `PolicyRetriever`, retrieval metrics. No Spring. |
-| `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, policy ingest and pgvector retrieval, the default `ApiEmbeddingProvider` (Google Gemini) |
+| `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, fake), `PolicyRetriever`, retrieval metrics. No Spring. |
+| `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `policies/` | `manifest.yaml` (committed) and `raw/` (local files, git-ignored) |
 | `docs/adr/` | Architecture decision records |
@@ -80,14 +80,15 @@ docker compose up --build   # postgres (pgvector/pgvector:pg16), api
 
 On Windows use `mvnw.cmd`.
 
-The `api` service embeds search questions with the Google Gemini API (ADR-012) and **refuses to start while
-`LISTING_GUARD_EMBEDDING_API_KEY` is empty**. Put the key in a local `.env` next to `docker-compose.yml` (it is a
-secret; `.env` is git-ignored) before `docker compose up`. Ollama is not needed (see "Optional: Ollama instead of
-the API").
+The `api` service needs **no model, no key and no outside service**: with the default `EMBEDDING_PROVIDER=none`
+(ADR-012) it starts and runs the rule checks (`POST /api/v1/checks`) on its own. Policy retrieval is optional: only
+after you pick a provider (`api` with a key, or `ollama`, see "Policy corpus and retrieval") can `ingest`,
+`eval-retrieval` and `GET /policies/search` run. Until then they fail with a message that says how to enable one
+(search answers `503` with the problem code `embedding-not-configured`).
 
 The compose file has dev defaults, overridable with environment variables or a local `.env`:
-`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LISTING_GUARD_EMBEDDING_API_KEY`, `EMBEDDING_PROVIDER`
-(`api`, or `ollama`), and host ports `POSTGRES_PORT` (5432), `API_PORT` (8080).
+`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `EMBEDDING_PROVIDER` (`none` by default, `api` or `ollama`),
+`LISTING_GUARD_EMBEDDING_API_KEY` (only for `api`), and host ports `POSTGRES_PORT` (5432), `API_PORT` (8080).
 
 Listing Guard is one service for many clients (ADR-007). Every API key belongs to a client; checks, cached
 results and the rate limit belong to the client. Clients and keys live in the database and are managed with the
@@ -137,10 +138,13 @@ the contract in [docs/api/openapi.json](docs/api/openapi.json) (after an intende
 
 ## Policy corpus and retrieval
 
+This part is optional. The rule checks above need none of it, and by default no embedding model is configured
+(`provider=none`): choose a provider (step 2) before `ingest`, `eval-retrieval` or `GET /policies/search` can run.
+
 Policy documents are read from local files, never fetched at run time, so ingest needs no network
 except the embedding backend.
 
-> **Text that leaves the machine (ADR-012).** With the default embedding API, `ingest` sends the public policy
+> **Text that leaves the machine (ADR-012).** With the `api` embedding provider, `ingest` sends the public policy
 > text (each chunk's text with its section path) to the Google Gemini API, and `eval-retrieval` and
 > `GET /policies/search` send their questions. Listing text from clients is never embedded by ingest. Google's
 > terms for API data (notably the free tier) are not checked here: confirm them before production use. To keep
@@ -151,14 +155,17 @@ except the embedding backend.
    is git-ignored and each contributor saves their own copy. Only `policies/manifest.yaml` is
    committed: for each file its `marketplace`, `title`, canonical `url`, `fetched_at` and `version`, the
    page's own "Last updated" date. Ingest checks that date against the page and refuses a mismatch.
-2. **Set the embedding API key.** Embeddings come from the Google Gemini API (`gemini-embedding-2`, 768
-   dimensions; model, dimensions and base URL are configurable under `listing-guard.embedding.api`). No local
-   model or service is needed. Put the key in `.env` next to `docker-compose.yml`:
+2. **Choose an embedding provider.** The default `none` runs no model, so ingest and search are unavailable until
+   you pick one. `api` uses the Google Gemini API (`gemini-embedding-2`, 768 dimensions; model, dimensions and
+   base URL are configurable under `listing-guard.embedding.api`) and needs no local model or service. Put this in
+   `.env` next to `docker-compose.yml`:
    ```bash
+   EMBEDDING_PROVIDER=api
    LISTING_GUARD_EMBEDDING_API_KEY=<your key>
    ```
-   The key is sent in the `x-goog-api-key` header and is never logged or printed. The application, `ingest` and
-   `eval-retrieval` refuse to start while it is empty (`admin` and the tests use no embeddings and need no key).
+   The key is sent in the `x-goog-api-key` header and is never logged or printed. With `api`, the application,
+   `ingest` and `eval-retrieval` refuse to start while it is empty (`admin` and the tests use no embeddings and
+   need no key). For a local model use `ollama` instead (below).
 
 3. **Ingest.** It is a one-shot job, not an HTTP endpoint (it is batch work on local files). Run it in Docker
    (the key comes from `.env`), or on the host from the repository root with the key in the environment
@@ -180,7 +187,8 @@ except the embedding backend.
    curl -H 'X-API-Key: <key>' 'http://localhost:8080/policies/search?marketplace=ETSY&q=can+I+sell+counterfeit+items&k=5'
    ```
    Returns the chunks with `score`, `url` (with the section anchor) and `sectionPath`. The marketplace
-   filter is applied before the vector ranking, so another marketplace can never appear.
+   filter is applied before the vector ranking, so another marketplace can never appear. With `provider=none`
+   search answers `503` with the problem code `embedding-not-configured`.
 
    Search is refused while any stored document was embedded with another model than the configured one (for
    example after changing `listing-guard.embedding.api.model`): it answers `503` with the problem code

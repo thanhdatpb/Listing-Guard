@@ -1,7 +1,10 @@
 package com.thanhdatpb.listingguard.api.policy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.thanhdatpb.listingguard.rag.embedding.DisabledEmbeddingProvider;
+import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingProvider;
 import com.thanhdatpb.listingguard.rag.embedding.HashingEmbeddingProvider;
 import org.junit.jupiter.api.Test;
@@ -26,12 +29,34 @@ class EmbeddingConfigTest {
     }
 
     @Test
-    void theDefaultProviderIsTheApiAndStartsOnlyWithAKey() {
+    void theDefaultProviderIsNoneAndStartsWithoutAKey() {
         runner.run(context -> {
+            assertThat(context).hasNotFailed();
+            EmbeddingProvider provider = context.getBean(EmbeddingProvider.class);
+            assertThat(provider).isInstanceOf(DisabledEmbeddingProvider.class);
+            assertThat(provider.modelId()).isEqualTo("none");
+        });
+    }
+
+    @Test
+    void theNoneProviderRefusesToEmbedAndSaysHowToEnableOne() {
+        runner.withPropertyValues("listing-guard.embedding.provider=none").run(context -> {
+            assertThat(context).hasNotFailed();
+            EmbeddingProvider provider = context.getBean(EmbeddingProvider.class);
+            assertThatThrownBy(() -> provider.embed("anything", EmbeddingProvider.Kind.DOCUMENT))
+                    .isInstanceOf(EmbeddingException.class)
+                    .hasMessageContaining("LISTING_GUARD_EMBEDDING_PROVIDER=api")
+                    .hasMessageContaining("LISTING_GUARD_EMBEDDING_PROVIDER=ollama");
+        });
+    }
+
+    @Test
+    void theApiProviderStartsOnlyWithAKey() {
+        runner.withPropertyValues("listing-guard.embedding.provider=api").run(context -> {
             assertThat(context).hasFailed();
             assertThat(allMessages(context.getStartupFailure())).contains("LISTING_GUARD_EMBEDDING_API_KEY");
         });
-        runner.withPropertyValues("listing-guard.embedding.api.key=" + KEY).run(context -> {
+        runner.withPropertyValues("listing-guard.embedding.provider=api", "listing-guard.embedding.api.key=" + KEY).run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(EmbeddingProvider.class).modelId()).isEqualTo("api:google:gemini-embedding-2:768");
         });
@@ -70,7 +95,8 @@ class EmbeddingConfigTest {
 
     @Test
     void modelDimensionsAndBaseUrlAreConfigurable() {
-        runner.withPropertyValues("listing-guard.embedding.api.key=" + KEY, "listing-guard.embedding.api.model=other-model",
+        runner.withPropertyValues("listing-guard.embedding.provider=api", "listing-guard.embedding.api.key=" + KEY,
+                "listing-guard.embedding.api.model=other-model",
                 "listing-guard.embedding.api.dimensions=1536", "listing-guard.embedding.api.base-url=http://localhost:9/v1beta")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
@@ -80,7 +106,8 @@ class EmbeddingConfigTest {
 
     @Test
     void theKeyIsNotInTheStartUpFailureOfAnotherSetting() {
-        runner.withPropertyValues("listing-guard.embedding.api.key=" + KEY, "listing-guard.embedding.api.batch-size=0").run(context -> {
+        runner.withPropertyValues("listing-guard.embedding.provider=api", "listing-guard.embedding.api.key=" + KEY,
+                "listing-guard.embedding.api.batch-size=0").run(context -> {
             assertThat(context).hasFailed();
             assertThat(allMessages(context.getStartupFailure())).doesNotContain(KEY);
         });

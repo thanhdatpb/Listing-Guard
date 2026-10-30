@@ -30,7 +30,10 @@ public class TestcontainersConfig {
     @Bean
     DynamicPropertyRegistrar testProperties(Environment environment) {
         return registry -> {
-            registry.add("listing-guard.embedding.provider", () -> "hashing");
+            // a test that proves the default configuration (provider none, no key) sets test.default-embedding-provider=true
+            if (!environment.getProperty("test.default-embedding-provider", Boolean.class, false)) {
+                registry.add("listing-guard.embedding.provider", () -> "hashing");
+            }
             registry.add("listing-guard.policies.search-endpoint.enabled", () -> "true");
             // no cache, so a test that revokes a key or deactivates a client sees it at once
             registry.add("listing-guard.security.auth-cache-ttl", () -> "0s");

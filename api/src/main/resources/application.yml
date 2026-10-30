@@ -32,8 +32,9 @@ listing-guard:
     search-endpoint:
       enabled: false
   embedding:
-    # api (default, Google Gemini, ADR-012), ollama (optional local server) or hashing (tests and the admin job).
-    provider: api
+    # none (default: no model and no key; rule checks work, policy retrieval is off), api (Google Gemini, ADR-012),
+    # ollama (local server) or hashing (tests and the admin job).
+    provider: none
     api:
       base-url: https://generativelanguage.googleapis.com/v1beta
       model: gemini-embedding-2

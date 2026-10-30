@@ -28,7 +28,9 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      # Embeddings (ADR-012): the application refuses to start while the key is empty.
+      # Embeddings (ADR-012): none by default, so no model and no key are needed. With provider `api` the application
+      # refuses to start while the key is empty.
+      LISTING_GUARD_EMBEDDING_PROVIDER: ${LISTING_GUARD_EMBEDDING_PROVIDER:-none}
       LISTING_GUARD_EMBEDDING_API_KEY: ${LISTING_GUARD_EMBEDDING_API_KEY:-}
       LISTING_GUARD_SWAGGER_UI: "false"
       LISTING_GUARD_POLICIES_SEARCHENDPOINT_ENABLED: "false"
