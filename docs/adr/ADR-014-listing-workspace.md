@@ -78,9 +78,10 @@ A rule called alone only produces a candidate. `RuleEngine` is what verifies it,
 1. Apply the fix to a copy of the listing. A fix that cannot be applied (unknown field, index out of range, the stored
    value no longer matches the finding's `value`) is dropped.
 2. Run the whole ruleset again on the copy.
-3. Drop the fix when any of these holds: a rule fails now that did not fail before; the finding it fixes is still
-   there; or the copy has more ERROR or WARNING findings than the original, counted per rule and field (and per value
-   for a tag, because positions move when a tag is removed). INFO findings are not compared.
+3. Drop the fix when any of these holds: the set of rules that fail is not the same as for the original listing; the
+   finding it fixes is not gone (its count per rule and field did not go down); or the copy has more ERROR or WARNING
+   findings than the original, counted per rule and field (and per value for a tag, because positions move when a tag
+   is removed). INFO findings are not compared.
    Example: cutting `handmade ceramic coffee mug` to `handmade ceramic` when `handmade ceramic` is already a tag would
    create a duplicate, so that suggestion is dropped.
 
@@ -106,7 +107,7 @@ recomputed. Part A does not touch `api`.
 `rule-engine/src/main/resources/readiness/readiness-2026-11.yaml` (strict loader, content hash pinned by a test,
 immutable like a ruleset: a change is a new file and a new version). Inputs and formula for `readiness-2026-11`:
 
-```
+```text
 raw   = max(0, 100 - 20 * errors - 5 * warnings - 1 * infos)
 ready = errors == 0  and  no rule failed during the run
 score = raw                    when ready
@@ -118,7 +119,8 @@ score = none (INCOMPLETE)      when a rule failed
   marketplace. The file says `source.status: unverified` and the weights are not calibrated against real publish
   outcomes. Do not read the number as a probability.
 - **A listing that is not ready never scores above 59**: `ready = false` implies the score is at most 59 (a test checks
-  it for any number of errors). An incomplete run has no number at all, as in ADR-010 an undetermined result is
+  it for 1 to 12 errors with 0 to 12 warnings, and with penalties small enough that the cap is what decides). An
+  incomplete run has no number at all, because as in ADR-010 an undetermined result is
   `UNKNOWN`, never a falsely clean 100. `RuleEngine.runDetailed()` returns the findings together with the ids of the
   rules that failed (`run()` is unchanged and returns the findings only).
 - `ready` means "none of our rules found an ERROR". It does not mean the marketplace will accept the listing: the rule
@@ -165,8 +167,12 @@ No decision is taken for part B except these constraints, which hold for any int
 
 - Sellers get a concrete value for the three cases where one is certain, and nothing for the rest; a missing
   suggestion never means "no problem", only "no certain fix".
-- Verification costs one extra rule run per suggested fix. The rule-layer performance test (under 50 ms per listing)
-  keeps measuring it.
+- Verification costs one extra rule run per candidate fix, and `RuleEngine.run` (so `/checks`) pays it. Measured with
+  `RulePerformanceTest` (16 candidate fixes and an 18 KB description, the worst listing in the repository), the average
+  went from about 2 ms to about 24 ms per listing against its 50 ms budget; a typical listing has a few candidates and
+  costs a few extra runs. If that margin becomes a problem, the next step is to re-run only the rules that read the
+  changed field, which needs rules to declare what they read; it is not done here because it would also change what
+  "run the whole ruleset" guarantees.
 - `Finding` grows by a nullable component; code that compares findings with `equals` now also compares the fix.
 - The score weights are a product judgment recorded in a versioned file. Changing them is a new file and a new
   version, never an edit.
