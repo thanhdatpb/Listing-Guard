@@ -74,10 +74,16 @@ It never edits a listing, never publishes, and does no SEO.
   needs the `batch` pack, stops at once with `quota-exceeded` when no unit is left, and marks rows `QUOTA_EXCEEDED` when the
   quota runs out midway. `plan set <client> <plan>` (admin job) changes a plan at once. The packs `policy-analyzer` and
   `sheet-connector` are reserved and not enforced yet: ADR-011 PR 5 and phase 4b (GĐ4b) will call `PlanService.requirePack` for them.
+- **Console** (ADR-014 part B, V21): optional server-rendered Thymeleaf pages, off by default. Keep its session/CSRF
+  Spring Security chain separate from the stateless API chain; API-key authentication remains in `ApiKeyFilter`.
+  Magic-link GET only displays confirmation; CSRF-protected POST consumes the hashed, 15-minute token and rotates the
+  session id. Build links only from `listing-guard.console.base-url`, never request headers. Only `dev` may log links;
+  enabled production console requires SMTP and HTTPS. Login limiting is shared PostgreSQL state: 5 per normalized email
+  and 30 per remote IP per 15 minutes. The first successful login provisions an account and a FREE client.
 - Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the `batch-check` job, and policy ingest + retrieval (no LLM call, no structured output, no citation
-  verification yet).
+  endpoint, the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
+  dashboard (no listing workspace pages yet; no LLM call, no structured output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
@@ -104,9 +110,9 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
    gets its own part in the job and its own columns in the reports, never a change to the existing ones.
 6. Client plans and monthly quota (done, ADR-013, V19; off by default). Next for it: ADR-011 PR 5 and the sheet connector
    (phase 4b) call `requirePack` for their packs. Billing, payment and a self-service upgrade are not planned here.
-7. Listing Workspace (ADR-014, Proposed). Part A and the optional API/batch integration are implemented; the feature
-   defaults off and V20 stores details. Next: part B, the interface, and `tag_count_underused` in the next Etsy ruleset
-   update.
+7. Listing Workspace (ADR-014, Accepted). Part A, the optional API/batch integration and part B authentication/dashboard
+   are implemented; fixes and console default off, V20/V21 store their respective data. Next: workspace pages and
+   `tag_count_underused` in the next Etsy ruleset update.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).

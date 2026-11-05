@@ -107,6 +107,7 @@ class ApiContractIntegrationTest {
     void unknownRoutesWrongMethodsAndWrongMediaTypesAreProblemsToo() throws Exception {
         assertProblem(mvc.perform(get("/nope").header(HEADER, KEY_1)), 404, "not-found");
         mvc.perform(get("/nope").header(HEADER, KEY_1)).andExpect(jsonPath("$.detail").value("No endpoint matches /nope"));
+        assertProblem(mvc.perform(get("/login").header(HEADER, KEY_1)), 404, "not-found");
 
         assertProblem(mvc.perform(delete(CHECKS).header(HEADER, KEY_1)), 405, "method-not-allowed");
         mvc.perform(delete(CHECKS).header(HEADER, KEY_1)).andExpect(header().exists("Allow"));

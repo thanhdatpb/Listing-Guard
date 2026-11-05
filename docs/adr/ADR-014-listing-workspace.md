@@ -1,11 +1,9 @@
 # ADR-014: Listing Workspace (fix suggestions and publish readiness)
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-05
-- Applies to: `core`, `rule-engine` (part A, this ADR's first PR); `api` and a user interface (later, see
-  "Part B" and "Deferred")
-- Acceptance convention: Keep Proposed until the PR implementing part A is approved and merged. Then set Status to
-  Accepted and Date to the merge date.
+- Applies to: `core`, `rule-engine` (part A); `api` and the optional web console (part B)
+- Acceptance: Part A has merged. Part B decisions are recorded as the console is implemented.
 
 ## Context
 
@@ -13,10 +11,11 @@ Listing Guard checks and suggests. It never edits a listing, never publishes, an
 carries a Vietnamese `suggestion` sentence ("Rút ngắn tiêu đề ít nhất 12 ký tự"), but a seller still has to work out
 the new value alone, and nothing says how close a listing is to being publishable. The Listing Workspace is the next
 stage: a place where a seller sees the findings of a listing, a concrete value for the fixes that can be known for
-sure, and one number that says how ready the listing is.
+sure, and one number that says how ready the listing is. Part B starts with a web console sign-in and dashboard; listing
+workspace pages remain subsequent work.
 
-It is built in two parts. **Part A** (this ADR, in detail) is the data and logic, in `core` and `rule-engine` only:
-fix suggestions and the publish readiness score. **Part B** (the interface) is only listed under "Planned".
+It is built in two parts. **Part A** is the data and logic, in `core` and `rule-engine`: fix suggestions and the publish
+readiness score. **Part B** is the optional Spring MVC console, starting with authentication and a dashboard.
 
 ## Decision: part A
 
@@ -165,9 +164,34 @@ unchanged hashes of the published rulesets.
   internal spacing; list indexes count the cleaned list. Tag fix descriptions name the tag value, and clients should
   match by value or submit the cleaned list before using an index. Listing Guard never edits or applies a proposal.
 
-## Part B: the interface (Planned, not designed here)
+## Part B: web console
 
-No decision is taken for part B except these constraints, which hold for any interface built on part A:
+### Authentication and dashboard (GĐ4 B2)
+
+- The console is disabled by default with `listing-guard.console.enabled=false`. When disabled, it registers no console
+  controllers or console security chain; the API keeps its API-key filter and response behavior.
+- The console uses a separate Spring Security filter chain from the API. Console pages use a server-side session and
+  CSRF protection; API endpoints remain stateless and continue to use `X-API-Key`.
+- One email form is used for registration and sign-in. The response is the same whether the address already has an
+  account. The email is trimmed and lowercased before persistence. First successful sign-in creates an `account` and a
+  client with the `FREE` plan.
+- A sign-in token is a cryptographically random, single-use value that expires after 15 minutes. Only its SHA-256 hash
+  is stored in `login_token`. `GET /login/verify` only validates and displays a confirmation page; it never consumes a
+  token, because email scanners prefetch GET links. A CSRF-protected `POST /login/verify` consumes it atomically.
+- The link origin is exclusively `listing-guard.console.base-url`; request `Host` headers are not used. The verify page
+  sends `Referrer-Policy: no-referrer`. Application logs use only the request path, and the Tomcat access-log pattern
+  omits query strings, so token values are not logged. The session id is rotated when a token is consumed. The session
+  cookie is HttpOnly, SameSite=Lax, Secure by default, and Secure may be disabled only for local development.
+- Login requests are limited in PostgreSQL by a normalized-email hash (5 per 15 minutes) and a remote-address hash
+  (30 per 15 minutes). The request's forwarded-address headers are not trusted. Development profile is the only mode
+  that logs sign-in links; all other profiles send mail through configurable SMTP. Starting production with the console
+  enabled but SMTP missing fails with a clear error. Expired tokens and old rate-limit rows are deleted hourly.
+- The initial dashboard shows the signed-in email, plan and usage using the same usage service as `/api/v1/usage`, and a
+  CSRF-protected sign-out action. No listing editing, marketplace writes, or additional workspace pages are included.
+- Migration V21 adds `account`, `login_token` and the hashed login-rate-limit table. Tests use a fake mail sender; no
+  external email service or network is needed.
+
+### Remaining listing workspace pages (planned: GĐ4 B3/B4)
 
 - **The trademark result is always shown next to the score**, in the same place and with the same prominence: its
   risk level, or one of "not checked", "not configured" or "incomplete" when there is none. A score of 100 never stands

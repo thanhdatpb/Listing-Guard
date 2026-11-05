@@ -12,6 +12,14 @@ listing-guard:
     max-body-bytes: 262144
     # Development only: serves Swagger UI and opens it and /v3/api-docs without an API key.
     swagger-ui-enabled: ${LISTING_GUARD_SWAGGER_UI:false}
+  console:
+    enabled: ${LISTING_GUARD_CONSOLE_ENABLED:false}
+    base-url: ${LISTING_GUARD_CONSOLE_BASE_URL:}
+    cookie-secure: ${LISTING_GUARD_CONSOLE_COOKIE_SECURE:true}
+    mail-from: ${LISTING_GUARD_CONSOLE_MAIL_FROM:}
+    email-limit: 5
+    ip-limit: 30
+    rate-window: 15m
   rate-limit:
     enabled: true
     requests-per-minute: 60
@@ -108,6 +116,20 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+
+server:
+  tomcat:
+    accesslog:
+      # Use the path-only token, never the request line (`%r` includes query parameters such as magic-link tokens).
+      pattern: '%h %l %u %t "%m %U %H" %s %b'
+  servlet:
+    session:
+      timeout: 8h
+      cookie:
+        name: LISTINGGUARDSESSION
+        http-only: true
+        secure: ${listing-guard.console.cookie-secure:true}
+        same-site: lax
 
 springdoc:
   api-docs:

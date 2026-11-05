@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard - Listing Guard</title>
+</head>
+<body>
+<main>
+    <h1>Dashboard</h1>
+    <p>Signed in as <span th:text="${email}"></span></p>
+    <h2>Plan and usage</h2>
+    <p>Plan: <span th:text="${usage.plan}"></span></p>
+    <p>Usage this month: <span th:text="${usage.used}"></span></p>
+    <p th:if="${usage.enforced and usage.monthlyQuota != null}">
+        Monthly quota: <span th:text="${usage.monthlyQuota}"></span>;
+        remaining: <span th:text="${usage.remaining}"></span>
+    </p>
+    <p th:if="${usage.enforced and usage.monthlyQuota == null}">Monthly quota: unlimited</p>
+    <p th:unless="${usage.enforced}">Plan limits are not enforced in this deployment.</p>
+    <p>Period resets: <time th:text="${usage.resetAt}"></time></p>
+    <form method="post" th:action="@{/logout}">
+        <button type="submit">Sign out</button>
+    </form>
+</main>
+</body>
+</html>

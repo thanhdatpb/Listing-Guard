@@ -3,16 +3,25 @@ package com.thanhdatpb.listingguard.api.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thanhdatpb.listingguard.api.client.ApiKeyRepository;
 import com.thanhdatpb.listingguard.api.client.ClientProvisioning;
+import com.thanhdatpb.listingguard.api.console.ConsoleProperties;
 import com.thanhdatpb.listingguard.api.web.BodyLimitFilter;
 import com.thanhdatpb.listingguard.api.web.RequestIdFilter;
 import jakarta.servlet.Filter;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.Ordered;
 import org.springframework.core.env.Environment;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 /**
  * Wires the request filters in a fixed order: request id, body size limit, API key, rate limit. Only for web
@@ -21,7 +30,7 @@ import org.springframework.core.env.Environment;
  */
 @Configuration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-@EnableConfigurationProperties({SecurityProperties.class, ApiProperties.class, RateLimitProperties.class})
+@EnableConfigurationProperties({SecurityProperties.class, ApiProperties.class, RateLimitProperties.class, ConsoleProperties.class})
 public class ApiSecurityConfig {
 
     @Bean
@@ -34,6 +43,11 @@ public class ApiSecurityConfig {
     public StartupSafetyCheck startupSafetyCheck(SecurityProperties security, ApiProperties properties, Environment environment) {
         boolean devKeyConfigured = security.devApiKey() != null && !security.devApiKey().isBlank();
         return new StartupSafetyCheck(devKeyConfigured, properties.swaggerUiEnabled(), environment);
+    }
+
+    @Bean
+    public ConsoleStartupSafetyCheck consoleStartupSafetyCheck(ConsoleProperties console, Environment environment) {
+        return new ConsoleStartupSafetyCheck(console, environment.getProperty("spring.mail.host"), environment);
     }
 
     /** Registers the development key (when configured) and warns when no key can authenticate. */
@@ -60,8 +74,9 @@ public class ApiSecurityConfig {
 
     @Bean
     public FilterRegistrationBean<ApiKeyFilter> apiKeyFilter(ClientAuthenticator authenticator, ApiProperties properties,
-                                                             ObjectMapper mapper) {
-        return register(new ApiKeyFilter(authenticator, properties.swaggerUiEnabled(), mapper), Ordered.HIGHEST_PRECEDENCE + 20);
+                                                             ConsoleProperties console, ObjectMapper mapper) {
+        return register(new ApiKeyFilter(authenticator, properties.swaggerUiEnabled(), console.enabled(), mapper),
+                Ordered.HIGHEST_PRECEDENCE + 20);
     }
 
     @Bean
@@ -70,6 +85,38 @@ public class ApiSecurityConfig {
         FilterRegistrationBean<RateLimitFilter> registration = register(new RateLimitFilter(limiter, mapper), Ordered.HIGHEST_PRECEDENCE + 30);
         registration.setEnabled(properties.enabled());
         return registration;
+    }
+
+    @Bean
+    @Order(1)
+    @ConditionalOnProperty(prefix = "listing-guard.console", name = "enabled", havingValue = "true")
+    public SecurityFilterChain consoleSecurityFilterChain(HttpSecurity http) throws Exception {
+        http.securityMatcher("/login", "/login/**", "/console", "/console/**", "/logout")
+                .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers("/login", "/login/**").permitAll()
+                        .anyRequest().authenticated())
+                .csrf(Customizer.withDefaults())
+                .sessionManagement(session -> session.sessionFixation(fixation -> fixation.changeSessionId()))
+                .exceptionHandling(exception -> exception.authenticationEntryPoint(
+                        (request, response, authException) -> response.sendRedirect("/login")))
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/login?logout")
+                        .invalidateHttpSession(true)
+                        .deleteCookies("LISTINGGUARDSESSION"))
+                .headers(headers -> headers.referrerPolicy(referrer -> referrer
+                        .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)));
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
+    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
+        http.securityMatcher("/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
+        return http.build();
     }
 
     private static <T extends Filter> FilterRegistrationBean<T> register(T filter, int order) {
