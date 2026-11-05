@@ -43,6 +43,13 @@ Working end to end:
   over the limit the API answers `429 quota-exceeded` (a pack outside the plan: `403 plan-not-allowed`). The packs
   `policy-analyzer` and `sheet-connector` are reserved in the plans and not enforced yet. There is no billing or payment;
   see [deployment](docs/deployment.md#client-plans-and-the-monthly-quota-adr-013).
+- Fix suggestions and a publish readiness score ([ADR-014](docs/adr/ADR-014-listing-workspace.md), part A), **in the
+  libraries only**. `RuleEngine.runDetailed` returns, for a title or a tag that is too long and for a repeated tag, a
+  proposed value (a cut at a word boundary, or the tag to remove) that has been checked against the whole ruleset, and
+  `ReadinessScorer` turns a rule run into a score (a listing with an ERROR never scores above 59; a run in which a rule
+  failed has no score). Nothing applies a suggestion, no suggestion replaces words, and a trademark finding never has
+  one. The API, the batch reports and `docs/api/openapi.json` do not show either yet, and the interface (part B) is
+  planned.
 
 Before you rely on it:
 
@@ -403,7 +410,9 @@ Done: pack identity (PR 0a, migration V7, and PR 0b, migrations V8-V14; composit
 (endpoint), the multi-file and streaming catalog import of A2b (V18), the USPTO daily XML converter of A2b (written from
 the public DTD V2.0 and **unverified against real data**), the `batch-check` job, and client plans with a monthly quota
 (V19, [ADR-013](docs/adr/ADR-013-client-plans-and-monthly-quota.md); off by default; billing, `sheet-connector` and the
-enforcement of `policy-analyzer` are not part of it). What follows, in this order, is **not built yet**:
+enforcement of `policy-analyzer` are not part of it), and the library part of the Listing Workspace (fix suggestions and
+the publish readiness score, [ADR-014](docs/adr/ADR-014-listing-workspace.md) part A; the API does not expose them yet).
+What follows, in this order, is **not built yet**:
 
 1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
    on a real USPTO file, PR A2c (the latest transaction of a serial number wins, which a catalog made of daily files
@@ -414,6 +423,10 @@ enforcement of `policy-analyzer` are not part of it). What follows, in this orde
    exist today (the `LlmProvider` contract, a scripted test provider and the citation verifier); there is no call to a
    real model and no endpoint. The analyzer is designed to be off by default and enabled by configuring an LLM.
 4. Add Amazon product-type overrides only when their limits and sources have been verified.
+5. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)), what remains: exposing fix suggestions and the
+   score through the API (response, storage or recomputation, `docs/api/openapi.json`); the interface (part B), which
+   must always show the trademark result next to the score; and the Etsy rule `tag_count_underused`, which comes with
+   the next Etsy ruleset update so that the `analysisVersion` changes once.
 
 ## Documentation
 
@@ -435,6 +448,7 @@ enforcement of `policy-analyzer` are not part of it). What follows, in this orde
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
 - [ADR-013: Client plans and monthly quota](docs/adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
+- [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Proposed; part A is implemented in `core` and `rule-engine`, the API does not expose it yet; part B, the interface, is planned)
 
 ## License
 MIT © 2026 Thanh Dat Tran. See [LICENSE](LICENSE).

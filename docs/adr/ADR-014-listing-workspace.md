@@ -73,7 +73,9 @@ choice), the other Amazon rules, `banned_words` and every trademark finding.
 
 ### A4. A suggestion is verified before it leaves the engine
 
-A rule called alone only produces a candidate. `RuleEngine` is what verifies it, for every finding that carries one:
+A rule called alone only produces a candidate. `RuleEngine.runDetailed` is what verifies it, for every finding that
+carries one. `RuleEngine.run` is unchanged: it returns the findings with `fix = null` and computes and checks no fix, so
+everything that calls it (`/checks`, the batch job) sees exactly what it saw before and pays nothing. Verification:
 
 1. Apply the fix to a copy of the listing. A fix that cannot be applied (unknown field, index out of range, the stored
    value no longer matches the finding's `value`) is dropped.
@@ -96,10 +98,13 @@ can produce the same tag), so a client applies one at a time and checks again; p
 
 Fixes are computed from settings the rules already read. No ruleset file changes (`etsy-2026-11` and `amazon-2026-11`
 keep their hash), no finding appears or disappears, and the `analysisVersion` of ADR-010 does not change. What changes
-is how much a result carries. Exposing `fix` and the score through the API needs its own PR after this one: the DTO,
-`docs/api/openapi.json`, whether the fix is stored with the finding or recomputed on read (a cached result is read from
-stored findings), and the integration guide. That PR also decides if a stored result made before it must be
-recomputed. Part A does not touch `api`.
+is how much a result carries, and only for a caller of `runDetailed`. The API calls `run`, which never returns a fix, and
+it builds its answer from stored `finding` rows copied field by field, so no fix reaches a response, the database, a
+cached result, the batch reports or `docs/api/openapi.json`, and results stored before this change read as they did.
+Exposing `fix` and the score through the API needs its own PR after this one: the DTO, `docs/api/openapi.json`, calling
+`runDetailed`, whether the fix is stored with the finding or recomputed on read (a cached result is read from stored
+findings), and the integration guide. That PR also decides if a stored result made before it must be recomputed. Part A
+does not touch `api`.
 
 ### A6. Publish readiness score
 
@@ -167,10 +172,11 @@ No decision is taken for part B except these constraints, which hold for any int
 
 - Sellers get a concrete value for the three cases where one is certain, and nothing for the rest; a missing
   suggestion never means "no problem", only "no certain fix".
-- Verification costs one extra rule run per candidate fix, and `RuleEngine.run` (so `/checks`) pays it. Measured with
-  `RulePerformanceTest` (16 candidate fixes and an 18 KB description, the worst listing in the repository), the average
-  went from about 2 ms to about 24 ms per listing against its 50 ms budget; a typical listing has a few candidates and
-  costs a few extra runs. If that margin becomes a problem, the next step is to re-run only the rules that read the
+- Verification costs one extra rule run per candidate fix, and only `RuleEngine.runDetailed` pays it; `run` (so
+  `/checks` and the batch job) is as fast as before. Measured with `RulePerformanceTest` (16 candidate fixes and an
+  18 KB description, the worst listing in the repository), the average per listing is about 1-2 ms for `run` and about
+  24 ms for `runDetailed`, against a 50 ms budget that the test checks for both; a typical listing has a few candidates
+  and costs a few extra runs. If that margin becomes a problem, the next step is to re-run only the rules that read the
   changed field, which needs rules to declare what they read; it is not done here because it would also change what
   "run the whole ruleset" guarantees.
 - `Finding` grows by a nullable component; code that compares findings with `equals` now also compares the fix.
