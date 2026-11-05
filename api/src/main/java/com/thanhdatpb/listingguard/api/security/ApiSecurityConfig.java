@@ -7,6 +7,7 @@ import com.thanhdatpb.listingguard.api.console.ConsoleProperties;
 import com.thanhdatpb.listingguard.api.web.BodyLimitFilter;
 import com.thanhdatpb.listingguard.api.web.RequestIdFilter;
 import jakarta.servlet.Filter;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -112,10 +113,21 @@ public class ApiSecurityConfig {
     @Order(2)
     public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
         http.securityMatcher("/**")
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
+                .csrf(csrf -> csrf.ignoringRequestMatchers(ApiSecurityConfig::authenticatedByApiKey))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
         return http.build();
+    }
+
+    /**
+     * CSRF forges a request that the browser authenticates by itself, with a cookie. This chain has no cookie and no
+     * session: a request is authenticated only by the {@code X-API-Key} header, which {@link ApiKeyFilter} has already
+     * checked (it runs before Spring Security and marks the request), and a page on another site cannot add that header.
+     * So a request that carries a valid key is exempt, and every other request that reaches this chain (the health probe,
+     * the development docs) keeps the default CSRF protection. The console chain above keeps it for its cookie session.
+     */
+    private static boolean authenticatedByApiKey(HttpServletRequest request) {
+        return request.getAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) != null;
     }
 
     private static <T extends Filter> FilterRegistrationBean<T> register(T filter, int order) {
