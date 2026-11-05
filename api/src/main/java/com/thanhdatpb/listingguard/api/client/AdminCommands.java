@@ -1,6 +1,8 @@
 package com.thanhdatpb.listingguard.api.client;
 
+import com.thanhdatpb.listingguard.api.plan.PlanCode;
 import java.io.PrintStream;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.boot.ApplicationArguments;
 
@@ -12,6 +14,7 @@ import org.springframework.boot.ApplicationArguments;
  * client create &lt;name&gt;           client list
  * client activate &lt;name&gt;         client deactivate &lt;name&gt;
  * key create &lt;client&gt; [--label=&lt;text&gt;]     key list &lt;client&gt;     key revoke &lt;keyId&gt;
+ * plan set &lt;client&gt; &lt;plan&gt;      (ADR-013: FREE, SELLER or PRO)
  * </pre>
  */
 public final class AdminCommands {
@@ -24,7 +27,8 @@ public final class AdminCommands {
               client deactivate <name>
               key create <client> [--label=<text>]
               key list <client>
-              key revoke <keyId>""";
+              key revoke <keyId>
+              plan set <client> <plan>   (plan: FREE, SELLER or PRO)""";
 
     private final ClientProvisioning provisioning;
     private final PrintStream out;
@@ -62,6 +66,7 @@ public final class AdminCommands {
                 ApiKey key = provisioning.revokeKey(argument(args, 2, "a key id"));
                 out.println("Key " + key.getKeyId() + " is revoked; it stops working within the cache time.");
             }
+            case "plan set" -> setPlan(argument(args, 2, "a client name"), argument(args, 3, "a plan"));
             default -> throw usage("Unknown command '" + group + " " + command + "'.");
         }
     }
@@ -80,8 +85,21 @@ public final class AdminCommands {
             out.println("No clients.");
             return;
         }
-        out.println(String.format("%-32s %-8s %s", "NAME", "ACTIVE", "CREATED"));
-        clients.forEach(client -> out.println(String.format("%-32s %-8s %s", client.getName(), client.isActive(), client.getCreatedAt())));
+        out.println(String.format("%-32s %-8s %-8s %s", "NAME", "ACTIVE", "PLAN", "CREATED"));
+        clients.forEach(client -> out.println(String.format("%-32s %-8s %-8s %s", client.getName(), client.isActive(),
+                client.getPlanCode(), client.getCreatedAt())));
+    }
+
+    private void setPlan(String clientName, String planArgument) {
+        PlanCode plan = PlanCode.parse(planArgument).orElseThrow(() -> usage("Unknown plan '" + planArgument
+                + "'. The plans are " + Arrays.toString(PlanCode.values()) + "."));
+        String previous = provisioning.setPlan(clientName, plan);
+        if (previous.equals(plan.name())) {
+            out.println("Client '" + clientName + "' is already on the " + plan + " plan; nothing changed.");
+        } else {
+            out.println("Client '" + clientName + "' moved from the " + previous + " plan to the " + plan
+                    + " plan. It takes effect at once; the quota is only applied where listing-guard.plans.enabled is true.");
+        }
     }
 
     private void listKeys(String clientName) {

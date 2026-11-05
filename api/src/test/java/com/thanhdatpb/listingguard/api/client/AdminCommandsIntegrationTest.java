@@ -153,6 +153,47 @@ class AdminCommandsIntegrationTest {
         assertThatThrownBy(() -> run("key", "create", newName())).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("No client named");
     }
 
+    private String planOf(String name) {
+        return provisioning.clients().stream().filter(client -> client.getName().equals(name)).findFirst().orElseThrow().getPlanCode();
+    }
+
+    @Test
+    void planSetChangesThePlanAtOnceAndAuditsThePreviousAndTheNewPlan() {
+        String name = newName();
+        run("client", "create", name);
+        assertThat(planOf(name)).as("a new client is FREE").isEqualTo("FREE");
+        audit.list.clear();
+
+        assertThat(run("plan", "set", name, "seller")).contains("moved from the FREE plan to the SELLER plan");
+
+        assertThat(planOf(name)).isEqualTo("SELLER");
+        assertThat(run("client", "list")).containsPattern(name + "\\s+true\\s+SELLER\\s");
+        List<String> lines = audit.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+        assertThat(lines).hasSize(1);
+        assertThat(lines.get(0)).contains("action=plan.set").contains("client=" + name).contains("plan=FREE->SELLER")
+                .containsPattern(" at=\\d{4}-\\d{2}-\\d{2}T");
+
+        assertThat(run("plan", "set", name, "SELLER")).contains("already on the SELLER plan");
+        assertThat(audit.list).as("setting the plan it already has changes and logs nothing").hasSize(1);
+        assertThat(run("plan", "set", name, "Pro")).contains("moved from the SELLER plan to the PRO plan");
+        assertThat(audit.list.get(1).getFormattedMessage()).contains("plan=SELLER->PRO");
+    }
+
+    @Test
+    void planSetRefusesAnUnknownPlanAnUnknownClientAndMissingArguments() {
+        String name = newName();
+        run("client", "create", name);
+
+        assertThatThrownBy(() -> run("plan", "set", name, "GOLD")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown plan 'GOLD'").hasMessageContaining("[FREE, SELLER, PRO]").hasMessageContaining("Usage:");
+        assertThatThrownBy(() -> run("plan", "set", newName(), "PRO")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No client named");
+        assertThatThrownBy(() -> run("plan", "set")).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Missing a client name");
+        assertThatThrownBy(() -> run("plan", "set", name)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Missing a plan");
+        assertThatThrownBy(() -> run("plan", "frobnicate", name)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Unknown command");
+        assertThat(planOf(name)).isEqualTo("FREE");
+    }
+
     @Test
     void theAdminProfileRunsOneCommandWithoutAWebServerAndEnds() {
         String name = newName();
