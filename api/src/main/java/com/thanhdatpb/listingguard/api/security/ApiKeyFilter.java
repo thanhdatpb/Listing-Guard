@@ -33,11 +33,17 @@ public final class ApiKeyFilter extends OncePerRequestFilter {
 
     private final ClientAuthenticator authenticator;
     private final boolean docsPublic;
+    private final boolean consoleEnabled;
     private final ObjectMapper mapper;
 
     public ApiKeyFilter(ClientAuthenticator authenticator, boolean docsPublic, ObjectMapper mapper) {
+        this(authenticator, docsPublic, false, mapper);
+    }
+
+    public ApiKeyFilter(ClientAuthenticator authenticator, boolean docsPublic, boolean consoleEnabled, ObjectMapper mapper) {
         this.authenticator = authenticator;
         this.docsPublic = docsPublic;
+        this.consoleEnabled = consoleEnabled;
         this.mapper = mapper;
     }
 
@@ -45,6 +51,10 @@ public final class ApiKeyFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         if (path.equals("/health")) {
+            return true;
+        }
+        if (consoleEnabled && (path.equals("/login") || path.startsWith("/login/")
+                || path.equals("/console") || path.startsWith("/console/") || path.equals("/logout"))) {
             return true;
         }
         return docsPublic && (path.equals("/swagger-ui.html") || path.startsWith("/swagger-ui/") || path.startsWith("/v3/api-docs"));

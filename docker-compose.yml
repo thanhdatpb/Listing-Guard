@@ -51,6 +51,15 @@ services:
       # Client plans and the monthly quota (ADR-013): off by default, so nothing about a plan is read or enforced.
       # Give every client its plan first: docker compose run --rm admin plan set <client> <FREE|SELLER|PRO>
       LISTING_GUARD_PLANS_ENABLED: ${PLANS_ENABLED:-false}
+      # Web console (ADR-014 B2): off by default. In dev, magic links are logged instead of emailed.
+      LISTING_GUARD_CONSOLE_ENABLED: ${LISTING_GUARD_CONSOLE_ENABLED:-false}
+      LISTING_GUARD_CONSOLE_BASE_URL: ${LISTING_GUARD_CONSOLE_BASE_URL:-http://localhost:${API_PORT:-8080}}
+      LISTING_GUARD_CONSOLE_COOKIE_SECURE: ${LISTING_GUARD_CONSOLE_COOKIE_SECURE:-true}
+      LISTING_GUARD_CONSOLE_MAIL_FROM: ${LISTING_GUARD_CONSOLE_MAIL_FROM:-}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-25}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
       # Debug endpoint GET /policies/search; off by default in the application, on here for development.
       LISTING_GUARD_POLICIES_SEARCHENDPOINT_ENABLED: ${POLICY_SEARCH_ENABLED:-true}
       # Profile `dev` is what allows the public development key below (it is refused unless `dev` is active, and

@@ -66,6 +66,35 @@ administration.
    A healthy response is `200 {"status":"UP"}`. This endpoint checks PostgreSQL and needs no API key.
    Confirm the same endpoint through the HTTPS reverse proxy before handing out the client key.
 
+## Optional web console (ADR-014 B2)
+
+The Thymeleaf console is disabled by default. It adds email magic-link registration and sign-in, a FREE client for a
+new account, and a plan/usage dashboard; it does not change API-key authentication. Migration V21 is applied automatically
+at API startup.
+
+To enable it, set these values in the production `.env` before starting the API:
+
+| Variable | Required value |
+| --- | --- |
+| `LISTING_GUARD_CONSOLE_ENABLED` | `true` |
+| `LISTING_GUARD_CONSOLE_BASE_URL` | The fixed public HTTPS origin of the API, for example `https://console.example.com`; links never use the request `Host` header. |
+| `LISTING_GUARD_CONSOLE_MAIL_FROM` | The sender address configured at the SMTP provider. |
+| `SPRING_MAIL_HOST` | SMTP server hostname. |
+| `SPRING_MAIL_PORT` | SMTP port (587 by default in production Compose). |
+| `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` | Credentials when the SMTP provider requires authentication; keep them only in the protected environment file or secret store. |
+| `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` | SMTP authentication setting (production Compose defaults to `true`). |
+| `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` | STARTTLS setting (production Compose defaults to `true`). |
+
+Production refuses to start if the console is enabled without an SMTP host/from address, an HTTPS base URL, or Secure
+cookies. The session cookie is HttpOnly and SameSite=Lax. The `dev` profile is the only profile allowed to log magic
+links; never use it in a production deployment. Login requests are limited to 5 per normalized email and 30 per remote IP
+per 15 minutes. Forwarded-IP headers are not trusted for the limit.
+
+Email scanners may prefetch the link with GET; this displays a confirmation page without consuming the token. The user
+must press **Sign in**, which sends a CSRF-protected POST and consumes the token. Tokens expire after 15 minutes and are
+stored only as hashes; expired tokens and old rate-limit rows are deleted hourly. After enabling, restart the API and
+open the configured base URL. Console sign-in does not replace API keys for service clients.
+
 ## Database backup and restore
 
 Back up the PostgreSQL database regularly and store the backup off the server with access controls. This

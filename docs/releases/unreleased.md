@@ -1,10 +1,10 @@
 # Unreleased changes
 
 Changes on `main` that no release has shipped yet. This file lists the USPTO converter (ADR-009, PR A2b), client plans
-with a monthly quota (ADR-013) and the Listing Workspace API/batch integration (ADR-014); when the next version is cut, move
-its content into `docs/releases/v<version>.md` with the other changes of that version and delete this file. Nothing here
-changes cache identities, hashes or results of trademark checks. With `listing-guard.fixes.enabled=false` (the default),
-the `/checks` response and batch reports keep their current shape.
+with a monthly quota (ADR-013), the Listing Workspace API/batch integration and optional web console (ADR-014); when the
+next version is cut, move its content into `docs/releases/v<version>.md` with the other changes of that version and delete
+this file. Nothing here changes cache identities, hashes or results of trademark checks. With
+`listing-guard.fixes.enabled=false` (the default), the `/checks` response and batch reports keep their current shape.
 
 ## What is new
 
@@ -106,6 +106,23 @@ Migration V20 is additive. There is no ruleset change (`etsy-2026-11` and `amazo
 `analysisVersion` changes), and no new endpoint. See [ADR-014](../adr/ADR-014-listing-workspace.md) and the
 [integration guide](../integration-guide.md#optional-fixes-and-readiness-adr-014).
 
+### Magic-link web console (ADR-014 part B)
+
+The optional Thymeleaf console is disabled by default (`listing-guard.console.enabled=false`). When enabled, a single
+email form registers or signs in an account, and a first successful sign-in provisions a FREE client. The initial
+dashboard shows the account email, plan and usage. This does not change API-key authentication or the API contract.
+
+- `GET /login/verify` only displays a confirmation page, so email security scanners do not consume links. A CSRF-protected
+  `POST /login/verify` consumes the single-use token, valid for 15 minutes; the database stores only its SHA-256 hash.
+- The fixed link origin is `LISTING_GUARD_CONSOLE_BASE_URL`; spoofed request `Host` headers are ignored. Verify pages set
+  `Referrer-Policy: no-referrer`, Tomcat access logs omit query strings, and successful sign-in rotates the session id.
+  Session cookies are HttpOnly, SameSite=Lax and Secure by default.
+- Login requests are limited to 5 per normalized email and 30 per remote IP per 15 minutes. Only the `dev` profile logs
+  magic links. An enabled production console requires an HTTPS base URL and configured SMTP; see
+  [deployment](../deployment.md#optional-web-console-adr-014-b2).
+- Migration V21 adds `account`, `login_token` and shared hashed rate-limit state. Tests use a fake `JavaMailSender`; no
+  real email service or network is needed. There is no new API endpoint and no OpenAPI change.
+
 ## Breaking changes
 
 No breaking HTTP change: fixes are off by default and response additions are additive. For code that uses the libraries:
@@ -115,8 +132,9 @@ and `BatchCheckJob` takes a `PlanService` (internal, for code that builds the jo
 
 ## Upgrade notes
 
-V19 and V20 apply on their own at start-up and are additive. **Before you turn plans on**, give each client its plan with
+V19, V20 and V21 apply on their own at start-up and are additive. **Before you turn plans on**, give each client its plan with
 `admin plan set`: every existing client is `FREE` after V19, which has 20 units a month and no trademark, batch or sheet
 pack. Then set `LISTING_GUARD_PLANS_ENABLED=true` (`PLANS_ENABLED=true` in the development compose file) for the API and for
 `batch-check`. Usage is counted only while plans are on. Fixes/readiness remain off until enabled; no other setup is
-needed for them.
+needed for them. The console remains off unless `LISTING_GUARD_CONSOLE_ENABLED=true`; enabling it in production also
+requires the HTTPS base URL and SMTP environment values described above.

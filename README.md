@@ -47,7 +47,11 @@ Working end to end:
   (`listing-guard.fixes.enabled=false`). When enabled, `/checks` returns verified fix proposals and a readiness score;
   batch reports add the score and readiness flag. A listing with an ERROR never scores above 59, and a run in which a
   rule failed has no score. Fixes are advice only, never applied; the score covers listing-rules only, so clients must
-  show the separate trademark result alongside it. The interface (part B) is still planned.
+  show the separate trademark result alongside it.
+- The optional web console ([ADR-014](docs/adr/ADR-014-listing-workspace.md), part B), **off by default**
+  (`listing-guard.console.enabled=false`): email magic-link registration/sign-in, a FREE client, and a simple dashboard
+  for plan and usage. Production requires HTTPS and SMTP; development can log links. Listing workspace pages remain
+  planned.
 
 Before you rely on it:
 
@@ -122,7 +126,7 @@ Modules:
 | `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
 | `trademark-scanner/` | Trademark risk scanner core (ADR-009): versioned ruleset, canonical input hash, normalization with offsets, the `TrademarkCatalog` port with an in-memory catalog, exact/phrase/fuzzy matching, color and place context rules, risk aggregation, the pack fingerprint, and the catalog manifest and data file reader. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, hashing for tests), `PolicyRetriever`, retrieval metrics, and the `LlmProvider` contract with a scripted test provider and a `CitationVerifier` (no call to a real model is implemented). No Spring. |
-| `api/` | Spring Boot REST app, Flyway migrations, Etsy/Amazon normalizers, client authentication and isolation, ruleset registration, the `/checks` and `/trademark-checks` endpoints with the trademark retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and the `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
+| `api/` | Spring Boot REST app and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks` and `/trademark-checks` endpoints with trademark retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
 | `batch/` | `mappings/` (example column mappings, committed); `input/` and `out/` (your exports and the reports, git-ignored) |
@@ -421,16 +425,17 @@ What follows, in this order, is **not built yet**:
    exist today (the `LlmProvider` contract, a scripted test provider and the citation verifier); there is no call to a
    real model and no endpoint. The analyzer is designed to be off by default and enabled by configuring an LLM.
 4. Add Amazon product-type overrides only when their limits and sources have been verified.
-5. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)), what remains: the interface (part B), which
-   must always show the trademark result next to the score; and the Etsy rule `tag_count_underused`, which comes with
-   the next Etsy ruleset update so that the `analysisVersion` changes once.
+5. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)): the optional magic-link console and dashboard
+   are implemented (part B, V21; off by default). Future listing workspace pages must always show trademark results
+   alongside readiness. The Etsy rule `tag_count_underused` remains planned for the next Etsy ruleset update so that
+   `analysisVersion` changes once.
 
 ## Documentation
 
 - [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, plans and quota, and client isolation.
 - [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields.
 - [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
-- [Deployment](docs/deployment.md): production setup, backup, upgrades, the migration notes and the trademark catalog import.
+- [Deployment](docs/deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
 - [Release notes](docs/releases/v0.4.0.md): what changed in each version and what to do when upgrading.
 - [ADR-001: Rule configuration](docs/adr/ADR-001-rule-config.md)
 - [ADR-002: Ruleset versioning](docs/adr/ADR-002-ruleset-versioning.md)
