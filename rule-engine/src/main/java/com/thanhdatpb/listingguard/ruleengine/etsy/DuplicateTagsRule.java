@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.ruleengine.etsy;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.Fixes;
 import com.thanhdatpb.listingguard.ruleengine.Rule;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.ArrayList;
@@ -38,7 +39,8 @@ public final class DuplicateTagsRule implements Rule {
             if (first != null) {
                 findings.add(finding(config, "tags[" + i + "]", tag,
                         "Tag " + Texts.quote(tag) + " trùng với tag ở vị trí " + (first + 1) + ".",
-                        "Xoá tag trùng hoặc thay bằng một tag khác để tận dụng đủ chỗ."));
+                        "Xoá tag trùng hoặc thay bằng một tag khác để tận dụng đủ chỗ.",
+                        Fixes.removeRepeat("tag", tag, first + 1)));
             }
         }
         return findings;

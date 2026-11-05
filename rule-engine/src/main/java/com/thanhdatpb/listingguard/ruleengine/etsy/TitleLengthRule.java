@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.ruleengine.etsy;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.Fixes;
 import com.thanhdatpb.listingguard.ruleengine.Rule;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.List;
@@ -33,6 +34,7 @@ public final class TitleLengthRule implements Rule {
         }
         return List.of(finding(config, "title", listing.title(),
                 "Tiêu đề dài " + length + " ký tự, tối đa " + max + ".",
-                "Rút ngắn tiêu đề ít nhất " + (length - max) + " ký tự."));
+                "Rút ngắn tiêu đề ít nhất " + (length - max) + " ký tự.",
+                Fixes.shorten("tiêu đề", listing.title(), max).orElse(null)));
     }
 }

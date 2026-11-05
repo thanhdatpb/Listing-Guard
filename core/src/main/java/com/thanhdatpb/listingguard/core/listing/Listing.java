@@ -41,4 +41,16 @@ public record Listing(
         this(title, description, tags, price, category, materials, images, quantity, whoMade, whenMade,
                 null, List.of(), null, null);
     }
+
+    /** A copy with another title; every other component is kept (used to check a proposed fix, ADR-014). */
+    public Listing withTitle(String newTitle) {
+        return new Listing(newTitle, description, tags, price, category, materials, images, quantity, whoMade, whenMade,
+                brand, bulletPoints, searchTerms, productType);
+    }
+
+    /** A copy with other tags; every other component is kept (used to check a proposed fix, ADR-014). */
+    public Listing withTags(List<String> newTags) {
+        return new Listing(title, description, newTags, price, category, materials, images, quantity, whoMade, whenMade,
+                brand, bulletPoints, searchTerms, productType);
+    }
 }

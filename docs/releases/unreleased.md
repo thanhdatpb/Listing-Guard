@@ -1,10 +1,10 @@
 # Unreleased changes
 
-Changes on `main` that no release has shipped yet. This file lists the USPTO converter (ADR-009, PR A2b) and client plans
-with a monthly quota (ADR-013); when the next version is cut, move its content into `docs/releases/v<version>.md` with the
-other changes of that version and delete this file. Nothing here changes the requests, responses, cache identities, hashes
-or results of `POST /api/v1/checks` or `POST /api/v1/trademark-checks`; while plans are off (the default) nothing here
-changes what an API call does.
+Changes on `main` that no release has shipped yet. This file lists the USPTO converter (ADR-009, PR A2b), client plans
+with a monthly quota (ADR-013) and the library part of the Listing Workspace (ADR-014); when the next version is cut, move
+its content into `docs/releases/v<version>.md` with the other changes of that version and delete this file. Nothing here
+changes the requests, responses, cache identities, hashes or results of `POST /api/v1/checks` or
+`POST /api/v1/trademark-checks`; while plans are off (the default) nothing here changes what an API call does.
 
 ## What is new
 
@@ -68,9 +68,35 @@ Migration V19 adds `plan`, `plan_pack`, `client_usage` and `client.plan_code` (d
 [docs/deployment.md](../deployment.md#client-plans-and-the-monthly-quota-adr-013) and the
 [integration guide](../integration-guide.md#plans-and-monthly-quota).
 
+### Fix suggestions and a publish readiness score (ADR-014, part A)
+
+This is a change to the libraries (`core`, `rule-engine`). **The API, the batch reports and `docs/api/openapi.json` do not
+show it yet**; it is the base for an API change and for the interface (part B), both planned.
+
+- **Fix suggestions.** `Finding` has a new nullable component `fix` (a `FixSuggestion`: an action, a Vietnamese description
+  that cites the numbers, and for a replacement the proposed value). Three rules propose one: `title_length` (Etsy and
+  Amazon) and `tag_length` propose the value cut at a word boundary within the limit of the ruleset, and `duplicate_tags`
+  proposes removing the repeat. Every other rule has none: there is no replacement of words, and a trademark finding never
+  gets a suggestion. A suggestion is never applied by Listing Guard.
+- **Checked before it is offered.** `RuleEngine.runDetailed` applies each suggestion alone to a copy of the listing and runs
+  the whole ruleset again; it drops the suggestion when the problem remains, when a rule fails that did not before, or when
+  the copy has more ERROR or WARNING findings (cutting a tag into a tag that already exists would create a duplicate). It
+  also returns the ids of the rules that failed. `RuleEngine.run` is unchanged and returns no suggestion, so nothing that
+  calls it, the API and `batch-check` included, changes or gets slower.
+- **Publish readiness score.** `ReadinessScorer` computes `max(0, 100 - 20 per ERROR - 5 per WARNING - 1 per INFO)` from the
+  versioned file `readiness/readiness-2026-11.yaml`. A listing with an ERROR is not ready and never scores above 59; a run
+  in which a rule failed has no score. It counts rule findings only and says nothing about trademark risk. The weights are
+  the maintainer's choice and are marked `unverified`.
+- **Cost.** Verifying suggestions costs one extra rule run per suggestion, paid only by `runDetailed`. On the largest
+  listing of the performance test (16 suggestions, an 18 KB description) the average is about 24 ms against a 50 ms budget.
+
+No migration, no ruleset change (`etsy-2026-11` and `amazon-2026-11` keep their hash, so no `analysisVersion` changes), no
+new endpoint, no change to `docs/api/openapi.json`. See [ADR-014](../adr/ADR-014-listing-workspace.md).
+
 ## Breaking changes
 
-None for a deployment that leaves plans off. Two things an operator may notice: `admin client list` has a new PLAN column
+None for a deployment that leaves plans off. For code that uses the libraries: `Finding` has an eighth component (the
+seven-argument constructor is kept). Two things an operator may notice: `admin client list` has a new PLAN column
 before CREATED (a script that cuts the columns by position needs updating), and `BatchCheckJob` takes a `PlanService`
 (internal, for code that builds the job by hand).
 

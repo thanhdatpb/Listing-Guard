@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.ruleengine;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
+import com.thanhdatpb.listingguard.core.finding.FixSuggestion;
 import com.thanhdatpb.listingguard.core.finding.Severity;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
@@ -44,6 +45,21 @@ public interface Rule {
     /** A finding rated by the given settings, for rules whose settings depend on the listing's category. */
     default Finding finding(RulesetConfig config, RuleSettings settings, String field, String value, String message,
                             String suggestion) {
-        return new Finding(id(), settings.severity(), field, value, message, suggestion, config.version());
+        return finding(config, settings, field, value, message, suggestion, null);
+    }
+
+    /**
+     * A finding with a candidate fix (ADR-014); {@code fix} is null when no fix is certain. The fix is only a
+     * candidate until {@link RuleEngine} verifies it against the whole ruleset.
+     */
+    default Finding finding(RulesetConfig config, String field, String value, String message, String suggestion,
+                            FixSuggestion fix) {
+        return finding(config, config.rule(id()), field, value, message, suggestion, fix);
+    }
+
+    /** As above, rated by the given settings. */
+    default Finding finding(RulesetConfig config, RuleSettings settings, String field, String value, String message,
+                            String suggestion, FixSuggestion fix) {
+        return new Finding(id(), settings.severity(), field, value, message, suggestion, config.version(), fix);
     }
 }

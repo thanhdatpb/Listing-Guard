@@ -7,7 +7,12 @@ It never edits a listing, never publishes, and does no SEO.
 
 - **Rule Engine** (`rule-engine/`): deterministic rules (title length/characters/repeated special
   characters, tag count/length/characters/duplicates, required fields, positive price and quantity,
-  banned words), configured per marketplace in versioned YAML. Current ruleset: `etsy-2026-11`.
+  banned words), configured per marketplace in versioned YAML. Current ruleset: `etsy-2026-11`. **Fix suggestions and
+  readiness (ADR-014, part A, done)**: `RuleEngine.runDetailed` returns the findings with a verified `FixSuggestion` (cut a
+  long title or tag at a word boundary, remove a repeated tag; `Fixes`, `FixApplier`) and the ids of the rules that
+  failed (`RuleRun`), and `ReadinessScorer` (`readiness/readiness-2026-11.yaml`, `listing-rules` pack only) scores a run.
+  `RuleEngine.run`, so the API, the batch job and `docs/api/openapi.json`, is unchanged and carries no fix; exposing them
+  is a later API PR and the interface (part B) is planned.
 - **RAG Analyzer** (`rag-analyzer/`): public marketplace policies in pgvector, plus an LLM step with
   code-verified citations. Built so far: policy manifest, HTML/PDF parsers, structural chunker,
   `EmbeddingProvider` (none by default), `PolicyRetriever`, retrieval metrics,
@@ -36,7 +41,7 @@ It never edits a listing, never publishes, and does no SEO.
   `uspto-status-map-2026-11.yaml` has `source.status: unverified`. **The converter is unverified against real data**: it
   follows the public DTD and documentation named in ADR-009 and has never read a real file. The next steps are PR A2c
   (the latest transaction of a serial number wins) and A4 (evaluation).
-- **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
+- **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`, `FixSuggestion`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Contract: `docs/api/openapi.json`,
@@ -65,8 +70,8 @@ It never edits a listing, never publishes, and does no SEO.
   quota runs out midway. `plan set <client> <plan>` (admin job) changes a plan at once. The packs `policy-analyzer` and
   `sheet-connector` are reserved and not enforced yet: ADR-011 PR 5 and phase 4b (GĐ4b) will call `PlanService.requirePack` for them.
 - Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, the trademark
-  scanner core with its endpoint, the `batch-check` job, and policy ingest + retrieval (no LLM call, no structured output,
-  no citation verification yet).
+  scanner core with its endpoint, the `batch-check` job, fix suggestions and a readiness score in the libraries (not in
+  the API yet), and policy ingest + retrieval (no LLM call, no structured output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
@@ -93,6 +98,10 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
    gets its own part in the job and its own columns in the reports, never a change to the existing ones.
 6. Client plans and monthly quota (done, ADR-013, V19; off by default). Next for it: ADR-011 PR 5 and the sheet connector
    (phase 4b) call `requirePack` for their packs. Billing, payment and a self-service upgrade are not planned here.
+7. Listing Workspace (ADR-014, Proposed). Part A is done in `core` and `rule-engine`: fix suggestions and the publish
+   readiness score. Next: an API PR that calls `runDetailed` and exposes `fix` and the score (DTO, storage or
+   recomputation, `docs/api/openapi.json`, integration guide), then part B, the interface. `tag_count_underused` is
+   deferred to the next Etsy ruleset update.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
@@ -158,6 +167,21 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   an applied one. Hibernate runs with `ddl-auto=validate`.
 - Enums stored as strings with `CHECK` constraints in SQL; keep the Java enum and the constraint in sync.
 - A failing rule is logged and skipped by `RuleEngine`; it must not break the other rules.
+- **Fix suggestions** (ADR-014): a suggestion is advice and is never applied. Nothing writes a proposed value back to a
+  listing; `FixApplier` is package-private and works on a throwaway copy to verify a candidate. A fix only shortens a value
+  at a word boundary or removes a repeated one; **no rule proposes replacement words**, and trademark findings
+  (`TrademarkFinding`), `banned_words` and `prohibited_content` never have a fix (`FixCoverageTest` holds the list of rules
+  that may). A rule proposes a candidate with `Rule.finding(..., fix)` using the limit it read from the ruleset (no limit in
+  Java); only `RuleEngine.runDetailed` verifies it (applied alone to a copy, the whole ruleset run again, dropped when the
+  problem remains, a rule fails that did not, or an ERROR or WARNING appears). `RuleEngine.run` returns `fix = null`: the API
+  and the batch job call `run` and must not show a fix until an API PR decides how it is stored and exposed. Keep
+  `Finding`'s seven-argument constructor; `FindingEntity.fromRule` copies fields one by one, so a new `Finding` component
+  never reaches the database or a response by itself.
+- **Publish readiness** (ADR-014): the formula and its weights live in `readiness/<version>.yaml` (strict loader, content
+  hash pinned by a test, immutable: a change is a new file and a new version, like a ruleset). A listing with an ERROR is not
+  ready and never scores above `not_ready_max_score` (59); a run in which a rule failed has no score (`INCOMPLETE`), never
+  a clean 100. The score counts the `listing-rules` pack only and is no trademark verdict: an interface must show the
+  trademark result next to it.
 - **Policy text is copyrighted**: `policies/raw/` is git-ignored, only `policies/manifest.yaml` is
   committed. Tests and CI use small self-written HTML, never the real corpus. Never fetch policy pages
   around a 403, CAPTCHA or block (no curl tricks, proxies or mirrors): list the URLs and let the maintainer
