@@ -11,8 +11,9 @@ It never edits a listing, never publishes, and does no SEO.
   readiness (ADR-014, part A, done)**: `RuleEngine.runDetailed` returns the findings with a verified `FixSuggestion` (cut a
   long title or tag at a word boundary, remove a repeated tag; `Fixes`, `FixApplier`) and the ids of the rules that
   failed (`RuleRun`), and `ReadinessScorer` (`readiness/readiness-2026-11.yaml`, `listing-rules` pack only) scores a run.
-  `RuleEngine.run`, so the API, the batch job and `docs/api/openapi.json`, is unchanged and carries no fix; exposing them
-  is a later API PR and the interface (part B) is planned.
+  `RuleEngine.run` remains unchanged. The API and batch job use it with the default-off
+  `listing-guard.fixes.enabled` flag; when enabled, they use `runDetailed` and expose the persisted fixes and
+  listing-rules readiness through the API and batch reports. The interface (part B) is planned.
 - **RAG Analyzer** (`rag-analyzer/`): public marketplace policies in pgvector, plus an LLM step with
   code-verified citations. Built so far: policy manifest, HTML/PDF parsers, structural chunker,
   `EmbeddingProvider` (none by default), `PolicyRetriever`, retrieval metrics,

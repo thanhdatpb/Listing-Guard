@@ -81,8 +81,8 @@ The library implementation is in `core` and `rule-engine`. The opt-in API and ba
 - **Checked before it is offered.** `RuleEngine.runDetailed` applies each suggestion alone to a copy of the listing and runs
   the whole ruleset again; it drops the suggestion when the problem remains, when a rule fails that did not before, or when
   the copy has more ERROR or WARNING findings (cutting a tag into a tag that already exists would create a duplicate). It
-  also returns the ids of the rules that failed. `RuleEngine.run` is unchanged and returns no suggestion, so nothing that
-  calls it, the API and `batch-check` included, changes or gets slower.
+  also returns the ids of the rules that failed. `RuleEngine.run` is unchanged; `/checks` and `batch-check` use it
+  when the flag is off and call `runDetailed` only when the flag is enabled.
 - **Publish readiness score.** `ReadinessScorer` computes `max(0, 100 - 20 per ERROR - 5 per WARNING - 1 per INFO)` from the
   versioned file `readiness/readiness-2026-11.yaml`. A listing with an ERROR is not ready and never scores above 59; a run
   in which a rule failed has no score. It counts rule findings only and says nothing about trademark risk. The weights are

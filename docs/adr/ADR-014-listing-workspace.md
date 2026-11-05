@@ -74,8 +74,9 @@ choice), the other Amazon rules, `banned_words` and every trademark finding.
 ### A4. A suggestion is verified before it leaves the engine
 
 A rule called alone only produces a candidate. `RuleEngine.runDetailed` is what verifies it, for every finding that
-carries one. `RuleEngine.run` is unchanged: it returns the findings with `fix = null` and computes and checks no fix, so
-everything that calls it (`/checks`, the batch job) sees exactly what it saw before and pays nothing. Verification:
+carries one. `RuleEngine.run` is unchanged: it returns the findings with `fix = null` and computes and checks no fix.
+With the default-off feature flag, `/checks` and the batch job continue to call `run`; with the flag enabled, they use
+`runDetailed`. Verification:
 
 1. Apply the fix to a copy of the listing. A fix that cannot be applied (unknown field, index out of range, the stored
    value no longer matches the finding's `value`) is dropped.
@@ -98,10 +99,9 @@ can produce the same tag), so a client applies one at a time and checks again; p
 
 Fixes are computed from settings the rules already read. No ruleset file changes (`etsy-2026-11` and `amazon-2026-11`
 keep their hash), no finding appears or disappears, and the `analysisVersion` of ADR-010 does not change. What changes
-is how much a result carries, and only for a caller of `runDetailed`. The API calls `run`, which never returns a fix, and
-it builds its answer from stored `finding` rows copied field by field. Part A therefore did not expose a fix or score
-through the API, persist either, change batch reports or change `docs/api/openapi.json`. The API extension is specified
-in A9 below; it keeps `run()` and the old response/report shape when its feature flag is off.
+is how much a result carries, and only for a caller of `runDetailed`. The original library-only part A did not expose
+or persist fixes or scores through the API, change batch reports or change `docs/api/openapi.json`. The API extension
+in A9 below keeps `run()` and the old response/report shape when its feature flag is off.
 
 ### A6. Publish readiness score
 
