@@ -102,7 +102,9 @@ public class ConsoleEditorController {
         model.addAttribute("marketplace", marketplace);
         model.addAttribute("marketplaces", EditorMarketplace.values());
         model.addAttribute("form", form);
-        model.addAttribute("limits", EditorLimits.of(config, marketplace, form.productType()));
+        EditorLimits limits = EditorLimits.of(config, marketplace, form.productType());
+        model.addAttribute("limits", limits);
+        model.addAttribute("preview", EditorPreview.of(form, limits.titleMax()));
         model.addAttribute("cost", EditorCost.of(plans.usage(user.clientId())));
         model.addAttribute("fieldErrors", errors);
         // collapsed by default; open when a field could not be read, or when it already holds what the seller typed

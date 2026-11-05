@@ -150,6 +150,51 @@ button.link { border: 0; background: none; color: var(--accent); padding: 0; tex
 .group p { margin: 0.25rem 0; }
 .msg { font-weight: 600; }
 .ev mark { background: var(--mark); color: inherit; padding: 0 0.1em; border-radius: 2px; }
+/* The simulation: plain boxes in the console's own colors. No logo, no image, no color or font taken from any marketplace. */
+.preview { margin-top: 2rem; }
+.badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid var(--muted);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.sim-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1.25rem; align-items: start; }
+.sim-card { margin: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overflow: hidden; }
+.sim-card.tile { max-width: 16rem; }
+.sim-card.tile figcaption { padding: 0.6rem 0.75rem; }
+.sim-card.row { display: flex; gap: 0.75rem; padding: 0.75rem; align-items: flex-start; }
+.sim-card figcaption { min-width: 0; }
+.sim-photo { background: var(--line); }
+.sim-card.tile .sim-photo { width: 100%; aspect-ratio: 4 / 3; }
+.sim-card.row .sim-photo { flex: 0 0 5.5rem; height: 5.5rem; border-radius: 6px; }
+/* the search result is cut by style: two lines and an ellipsis; no character count is assumed */
+.sim-title {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+.sim-title.placeholder, .sim-page-title.placeholder { color: var(--muted); font-weight: 400; }
+.sim-brand, .sim-price { margin: 0 0 0.25rem; font-size: 0.875rem; color: var(--muted); }
+.sim-page { padding: 0.75rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.sim-page-title { margin: 0 0 0.5rem; font-size: 1.1rem; line-height: 1.35; overflow-wrap: anywhere; }
+.sim-bullets { margin: 0.5rem 0; padding-left: 1.25rem; font-size: 0.9rem; }
+.sim-description { margin-top: 0.5rem; max-height: 12rem; overflow: auto; font-size: 0.9rem; white-space: pre-line; overflow-wrap: anywhere; }
+/* the part past the limit is set apart by background and underline, not by color alone */
+mark.beyond { background: var(--mark); color: inherit; text-decoration: underline wavy var(--error); text-underline-offset: 3px; }
+
 .notice { margin: 0 0 1rem; padding: 0.75rem 1rem; border: 1px solid var(--line); border-left-width: 6px; border-radius: 8px; background: var(--card); }
 .notice p { margin: 0; }
 .notice.applied { border-left-color: var(--ok); }

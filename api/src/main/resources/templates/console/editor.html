@@ -233,6 +233,48 @@
                 </div>
             </section>
         </th:block>
+
+        <section class="preview" id="preview" aria-labelledby="preview-heading">
+            <h2 id="preview-heading">Preview <span class="badge">Simulation</span></h2>
+            <p class="muted small">
+                A rough picture of the text as it stands in the form after the last check or suggestion. It is not a real page
+                and it copies no marketplace's design, so real pages cut titles differently and change over time.
+            </p>
+            <div class="sim-grid">
+                <div>
+                    <h3>As a search result</h3>
+                    <figure class="sim-card" th:classappend="${marketplace.amazon} ? 'row' : 'tile'">
+                        <div class="sim-photo" aria-hidden="true"></div>
+                        <figcaption>
+                            <p class="sim-title" th:classappend="${!preview.hasTitle()} ? 'placeholder'"
+                               th:text="${preview.hasTitle()} ? ${preview.title()} : 'Your title appears here'"></p>
+                            <p class="sim-brand" th:if="${marketplace.amazon and !preview.brand().isEmpty()}"
+                               th:text="${preview.brand()}"></p>
+                            <p class="sim-price" th:text="${preview.price().isEmpty()} ? 'Price not set' : ${preview.price()}"></p>
+                        </figcaption>
+                    </figure>
+                    <p class="small muted">The title is cut by the style sheet after two lines. Real pages cut differently.</p>
+                </div>
+                <div>
+                    <h3>As a product page</h3>
+                    <div class="sim-page">
+                        <article>
+                            <h4 class="sim-page-title" th:classappend="${!preview.hasTitle()} ? 'placeholder'"><span th:if="${!preview.hasTitle()}">Your title appears here</span><span th:text="${preview.titleWithin()}"></span><mark class="beyond" th:if="${preview.overTheLimit()}" th:text="${preview.titleBeyond()}"></mark></h4>
+                            <p class="sim-brand" th:if="${marketplace.amazon and !preview.brand().isEmpty()}"
+                               th:text="'Brand: ' + ${preview.brand()}"></p>
+                            <p class="sim-price" th:text="${preview.price().isEmpty()} ? 'Price not set' : ${preview.price()}"></p>
+                            <ul class="sim-bullets" th:if="${marketplace.amazon and !preview.bullets().isEmpty()}">
+                                <li th:each="bullet : ${preview.bullets()}" th:text="${bullet}"></li>
+                            </ul>
+                            <div class="sim-description" th:if="${!preview.description().isEmpty()}"
+                                 th:text="${preview.description()}"></div>
+                        </article>
+                    </div>
+                    <p class="small muted" th:if="${preview.overTheLimit()}"
+                       th:text="'The highlighted part is beyond the title limit of ' + ${limits.titleMax} + ' characters in the ruleset.'"></p>
+                </div>
+            </div>
+        </section>
     </aside>
 </main>
 </body>

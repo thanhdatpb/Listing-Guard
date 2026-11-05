@@ -164,6 +164,10 @@ class ConsoleEditorApplyIntegrationTest {
         String after = applied(seller, form, page, id);
 
         assertThat(inputValue(after, "title")).isEqualTo(proposed);
+        // the simulation already shows the applied title, although nothing was checked
+        Matcher card = Pattern.compile("<p class=\"sim-title\">(.*?)</p>", Pattern.DOTALL).matcher(after);
+        assertThat(card.find()).isTrue();
+        assertThat(HtmlUtils.htmlUnescape(card.group(1))).isEqualTo(proposed);
         assertThat(codePoints(proposed)).isLessThanOrEqualTo(rulesets.get("ETSY").config().rule("title_length").intParam("max_length"));
         assertThat(after).contains("Replaced the title with the suggested value").contains("press Check");
         // nothing was checked, stored or counted, and the old result is not shown beside the changed text
