@@ -80,10 +80,21 @@ It never edits a listing, never publishes, and does no SEO.
   session id. Build links only from `listing-guard.console.base-url`, never request headers. Only `dev` may log links;
   enabled production console requires SMTP and HTTPS. Login limiting is shared PostgreSQL state: 5 per normalized email
   and 30 per remote IP per 15 minutes. The first successful login provisions an account and a FREE client.
+  **Editor (B3)** (`api/.../console/editor/`, `templates/console/editor*.html`, `static/console/editor.{css,js}`): `GET|POST
+  /console/check` and `POST /console/check/apply`. It always calls `CheckService.checkDetailed` (verified fixes and readiness)
+  and `TrademarkCheckService`, whatever `listing-guard.fixes.enabled` says; `check()` and `get()` keep following the flag and
+  hide fixes of a result that was stored with them, so the API and batch shape do not change (a test holds it). The typed
+  listing is never stored. The readiness and trademark panels are always both rendered, same size, with the trademark
+  disclaimer; each of plan, quota, DISABLED/REFUSED catalog and INCOMPLETE says so in its own panel, and an incomplete run has
+  no score. "Apply suggestion" only fills the title or a tag (by value, refusing a field that changed) and never checks again.
+  Counter limits come from the active ruleset as `data-*` attributes; `editor.js` only counts and holds no number. The preview
+  is labelled "Simulation", cuts the search result by CSS and holds no character count, logo, image, brand color or domain.
+  Rendered values always go through `th:text`.
 - Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
   endpoint, the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
-  dashboard (no listing workspace pages yet; no LLM call, no structured output, no citation verification yet).
+  dashboard and the Check listing editor (no saved listings or history yet; no LLM call, no structured output, no citation
+  verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
@@ -111,8 +122,9 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
 6. Client plans and monthly quota (done, ADR-013, V19; off by default). Next for it: ADR-011 PR 5 and the sheet connector
    (phase 4b) call `requirePack` for their packs. Billing, payment and a self-service upgrade are not planned here.
 7. Listing Workspace (ADR-014, Accepted). Part A, the optional API/batch integration and part B authentication/dashboard
-   are implemented; fixes and console default off, V20/V21 store their respective data. Next: workspace pages and
-   `tag_count_underused` in the next Etsy ruleset update.
+   and the Check listing editor (B3) are implemented; fixes and console default off, V20/V21 store their respective data
+   (the editor adds no migration). Next: saved listings/history (not designed) and `tag_count_underused` in the next Etsy
+   ruleset update.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
@@ -201,7 +213,11 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `PolicyChunker.VERSION`/limits or `EmbeddingProvider.modelId()` changes. Bump `PolicyChunker.VERSION` when
   the chunking rules change. The manifest `version` must equal the page's "Last updated" date.
 - **Trademark catalogs** (ADR-009): `catalogs/raw/` is git-ignored (third-party data, own terms; the operator checks
-  them), only `catalogs/manifest.yaml` is committed, tests use synthetic files only. A catalog version is append-only
+  them), only `catalogs/manifest.yaml` is committed, tests use synthetic files only. The one committed data file is the
+  **DEMO catalog** in `catalogs/demo/` (its own `manifest.yaml` and `raw/DEMO-fictional-marks.jsonl`: invented words, for local
+  tests and demonstration videos, never used by default; imported only with `CATALOGS_DIR=/catalogs/demo`). Never put a real
+  mark in it; its `.jsonl` stays LF (`.gitattributes`) because the manifest checks its sha256, and `DemoCatalogTest` holds its
+  labels and the results `catalogs/demo/README.md` promises. A catalog version is append-only
   (DB trigger) and its stored name is the manifest label plus a digest of the import; never edit one, import again. The
   active catalog is named exactly in `listing-guard.trademark.catalog-version` (never "latest") and is refused when its
   normalization identity (pack, normalizer version, hash of the parsed `normalization` section) differs from the active
@@ -258,7 +274,8 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   uses `RuleEngine.run()` and its response and batch report keep their current shape. On, API/batch use `runDetailed()`
   and readiness covers only `listing-rules`; clients must show trademark results separately. V20 persists fix/readiness
   data. A POST cache hit enriches legacy rows idempotently under a row lock without quota or `analysisVersion` changes;
-  legacy GET returns null fixes/false `fixesComputed`/null readiness. Fixes target normalized values (`finding.value`);
+  legacy GET returns null fixes/false `fixesComputed`/null readiness. The console editor is the one caller that ignores the
+  flag (`CheckService.checkDetailed`); never make `check()` or `get()` read a stored fix while the flag is off. Fixes target normalized values (`finding.value`);
   tag descriptions name the tag value, and list indexes count the cleaned list (trimmed, blank entries dropped). Never
   store the submitted listing or apply a fix.
 - **External models** (ADR-011, ADR-012): configure every embedding or LLM model as a specific version, with its date

@@ -3,7 +3,8 @@
 - Status: Accepted
 - Date: 2026-11-05
 - Applies to: `core`, `rule-engine` (part A); `api` and the optional web console (part B)
-- Acceptance: Part A has merged. Part B decisions are recorded as the console is implemented.
+- Acceptance: Part A, the API/batch integration (B1) and the console sign-in and dashboard (B2) have merged. The editor (B3)
+  is recorded below. Later part B decisions are recorded as they are implemented.
 
 ## Context
 
@@ -11,11 +12,11 @@ Listing Guard checks and suggests. It never edits a listing, never publishes, an
 carries a Vietnamese `suggestion` sentence ("Rút ngắn tiêu đề ít nhất 12 ký tự"), but a seller still has to work out
 the new value alone, and nothing says how close a listing is to being publishable. The Listing Workspace is the next
 stage: a place where a seller sees the findings of a listing, a concrete value for the fixes that can be known for
-sure, and one number that says how ready the listing is. Part B starts with a web console sign-in and dashboard; listing
-workspace pages remain subsequent work.
+sure, and one number that says how ready the listing is. Part B is the web console: sign-in and a dashboard (B2), then the
+"Check listing" editor (B3); saved listings and history remain subsequent work.
 
 It is built in two parts. **Part A** is the data and logic, in `core` and `rule-engine`: fix suggestions and the publish
-readiness score. **Part B** is the optional Spring MVC console, starting with authentication and a dashboard.
+readiness score. **Part B** is the optional Spring MVC console: authentication and a dashboard, then the editor.
 
 ## Decision: part A
 
@@ -191,14 +192,93 @@ unchanged hashes of the published rulesets.
 - Migration V21 adds `account`, `login_token` and the hashed login-rate-limit table. Tests use a fake mail sender; no
   external email service or network is needed.
 
-### Remaining listing workspace pages (planned: GĐ4 B3/B4)
+### Check listing editor (GĐ4 B3)
 
-- **The trademark result is always shown next to the score**, in the same place and with the same prominence: its
-  risk level, or one of "not checked", "not configured" or "incomplete" when there is none. A score of 100 never stands
-  alone and never hides a trademark risk (A7).
-- A suggestion is shown as a proposal the seller accepts or ignores. Accepting one means the seller edits the listing
-  where it lives, then the listing is checked again (A4: one fix at a time).
-- An incomplete run shows "not scored", not a number.
+The editor is a server-rendered Thymeleaf page of the console: `GET /console/check?marketplace=ETSY|AMAZON` (the form),
+`POST /console/check` (one press of "Check") and `POST /console/check/apply` (one "Apply suggestion"). It sits in the console's
+session and CSRF chain; a visitor who is not signed in is sent to `/login`, and an unknown marketplace is a 400, never a
+default. It checks and suggests only: nothing is published, nothing is written to a marketplace, and **the listing the seller
+types is never stored** (it lives in the request and in the page that comes back). Only what `/checks` and `/trademark-checks`
+already store is stored, by the same services. No migration, no new API endpoint and no change to `docs/api/openapi.json`.
+
+**The editor always uses the detailed path, whatever `listing-guard.fixes.enabled` says.** `CheckService.checkDetailed` runs
+`runDetailed` (verified fixes and readiness) for the editor; `check` keeps following the flag, so the API and the batch job
+keep their shape and `/checks` is as it was while the flag is off. Three details keep that true:
+
+- A result that is already stored without fixes (`fixes_computed = false`) is enriched by `checkDetailed` the way a cache hit
+  of the API is: same id, same hash, same `analysisVersion`, no quota, under the row lock. That includes the row that
+  an identical request stored a moment earlier.
+- A result stored with fixes is shown **without** them to a caller that does not see them: while the flag is off,
+  `check` and `get` return `fix = null`, `fixesComputed = null` and `readiness = null` for it. A test posts a listing in the
+  editor, then sends the same listing to `/api/v1/checks` and reads the old shape from the same cached row.
+- Console on does not imply fixes on; the two flags are independent.
+
+**The form.** Etsy has title, tags (one per line: `tag_characters` forbids the comma, so splitting on commas would hide a
+finding), description. Amazon has title, bullet points (one per line), description. A collapsed "Other listing fields"
+section holds the fields the rules require, named as in `docs/input-schema.md`: Etsy `price`, `quantity`, `category`,
+`who_made`, `when_made`; Amazon `brand`, `search_terms`, `product_type`, `price`, `quantity`. `who_made` and `when_made` are
+free text with a hint (the examples of the input schema); no list of codes is kept, because none is verified. The section opens
+when a `required_fields` finding exists, when a field in it could not be read, and when it already holds text the seller typed
+(so a re-render never hides it). A price that is not a decimal number or a quantity that is not a whole number is sent back to
+its field with a message and nothing is checked or counted (silently dropping it would be reported as "missing"). The form is
+mapped to the standard listing JSON of `docs/input-schema.md` and goes through the same normalizer as an API request.
+
+**Counters.** The limits come from the active ruleset (title length, Etsy tag count and tag length, Amazon bullet count, search
+term bytes), are written into the page as `data-*` attributes, and `static/console/editor.js` only counts: code points, UTF-8 bytes
+for search terms, entries and longest entry for a list. It has no number and sends nothing. A rule that is switched off has no
+counter (`bullet_length` in `amazon-2026-11`, whose sources disagree). An Amazon product-type override applies to a counter when
+the page is rendered with that product type. Without JavaScript the counter keeps its static "Limit: ..." text.
+
+**Cost.** The text beside the Check button comes from the client's plan: one unit (listing rules), two with the `trademark-risk`
+pack, "up to" because a listing already checked is free, with the remaining quota and the reset date; with plans off it says
+nothing is counted.
+
+**Results.** Two panels, always both, side by side with the same size and the readiness panel first: the readiness score and
+its status, and the trademark result. The trademark panel carries the disclaimer of the trademark ruleset in every state, and an
+interface may not show a score without it (A7). Both checks run independently; one that cannot run says why in its own panel
+and the other result is still shown:
+
+| State | Readiness panel | Trademark panel |
+|---|---|---|
+| Complete | score, Ready or Not ready | risk level (LOW, MEDIUM or HIGH) |
+| A rule failed | "Not scored", no number | risk level established so far, or "Unknown" (never LOW), "incomplete" |
+| Catalog DISABLED or REFUSED (503) | unaffected | "Trademark check unavailable" |
+| Plan without the pack | "Not scored" with the plan | "Trademark not checked", the plans that include it (read from `plan_pack`) |
+| Quota used up | "Not scored", the reset date | "Trademark not checked", the reset date |
+
+A listing already checked is answered from the cache even when the quota is used up. Findings are grouped by severity (errors,
+warnings, information; trademark findings by risk), each with its evidence marked: a rule finding marks the value it is about, a
+trademark finding cuts its span out of the field text after trimming and NFC (UTF-16 offsets, a little context on each side) and
+falls back to the finding's snippet if the span does not fit. Everything is printed with `th:text`, so typed text is never markup.
+
+**Apply suggestion** only fills the form field with the proposed value of one verified fix: the title, or a tag (found by its
+value; the finding's index counts the cleaned list and is tried first; a repeated tag is removed and the first occurrence stays).
+It never runs a check, so it costs nothing, and the old result is hidden beside the changed text with a note to press Check: a fix
+is verified alone against the listing it was computed from (A4), so the seller applies one and checks again. Like the engine's own
+applier it refuses when the field no longer holds the value the finding was about. The button belongs to the editor form (the HTML
+`form` attribute), so the text typed since the check is what comes back; each fix is described by hidden values named
+`fix.<id>.field|value|action|proposed`. No other field is ever filled and no replacement word is ever proposed (A2).
+
+**Preview.** A panel labelled "Simulation" draws the text as a search result (a tile for Etsy, a row for Amazon, cut by the style
+sheet after two lines with an ellipsis) and as a product page that shows the whole title with the part beyond the ruleset's title
+limit highlighted. Nothing is known about how a real site truncates, so no character count appears in the code or the page; the
+page says real pages cut differently. It uses no logo, image, brand color, font or domain of any marketplace. It shows the form as
+of the last check or suggestion; it is not updated while typing (JavaScript is limited to counters).
+
+**Tests** use synthetic listings and the synthetic trademark catalog, read the limits from the ruleset and the quotas from the
+`plan` table, and cover: each state of the table above, the readiness panel next to the trademark panel for a listing that scores
+well and has a HIGH trademark risk, the cost of a press, `required_fields` opening the section, an unreadable price, escaping,
+CSRF, apply (title, tag by value, repeated tag, stale field, nothing checked or stored), the preview, and the unchanged API shape.
+
+Not included: saving a listing or its history, a live preview while typing, applying several fixes at once, editing anything in
+a marketplace.
+
+### Remaining listing workspace pages (planned: GĐ4 B4)
+
+- A listing workspace beyond one check (saved listings, history) is not designed yet. Whatever it adds must keep these
+  rules: **the trademark result is always shown next to the score**, in the same place and with the same prominence (a risk
+  level, or "not checked", "unavailable" or "incomplete" when there is none); a suggestion is a proposal the seller accepts or
+  ignores, one at a time (A4); an incomplete run shows "not scored", not a number.
 
 ## Deferred
 

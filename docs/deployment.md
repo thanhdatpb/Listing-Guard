@@ -95,6 +95,25 @@ must press **Sign in**, which sends a CSRF-protected POST and consumes the token
 stored only as hashes; expired tokens and old rate-limit rows are deleted hourly. After enabling, restart the API and
 open the configured base URL. Console sign-in does not replace API keys for service clients.
 
+### Check listing page (ADR-014 B3)
+
+A signed-in user can open **Check listing** (`/console/check`) from the dashboard. It needs no further setting and no
+migration, and it does not need `listing-guard.fixes.enabled`: the page always shows verified fixes and the readiness score,
+while `/api/v1/checks` and `batch-check` keep following that flag. What it uses and what you may notice:
+
+- It calls the same services as the API, for the user's own client: a press of **Check** costs up to one unit of the monthly
+  quota (two when the plan has `trademark-risk`), a listing already checked is free, and the plan, quota and cache rules are
+  the API's. With plans off nothing is counted.
+- The trademark panel needs a loaded catalog (`listing-guard.trademark.catalog-version`); without one it says "Trademark check
+  unavailable" and the rule results are still shown. The disclaimer comes from the trademark ruleset.
+- The listing a user types is not stored. Only the results `/checks` and `/trademark-checks` already store are stored, with
+  their usual retention.
+- To try it locally with fictional marks, import the DEMO catalog and follow [catalogs/demo/README.md](../catalogs/demo/README.md).
+  Never serve the DEMO catalog in a deployment other people use.
+- The page serves two static files, `/console/editor.css` and `/console/editor.js`, behind the console sign-in. The console
+  pages are sent with `Cache-Control: no-store`; if a reverse proxy adds its own caching, keep `/console/check` out of it,
+  because that page carries what the user typed.
+
 ## Database backup and restore
 
 Back up the PostgreSQL database regularly and store the backup off the server with access controls. This

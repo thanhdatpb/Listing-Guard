@@ -1,0 +1,25 @@
+# DEMO trademark catalog (ADR-009). FICTIONAL DATA FOR LOCAL TESTS AND DEMONSTRATIONS ONLY.
+#
+# Every mark in raw/DEMO-fictional-marks.jsonl is an invented word. None is a real trademark, none comes from a register,
+# and an accidental resemblance to a real mark is possible, so never present this data as real. Nothing uses this directory
+# by default: the application's catalogs-dir is `catalogs/` (not `catalogs/demo/`), `catalogs/manifest.yaml` does not list
+# it, and trademark checks stay off until listing-guard.trademark.catalog-version names an imported catalog.
+#
+# To load it, point the import job at this directory and name the entry (see catalogs/demo/README.md):
+#   docker compose run --rm -e CATALOGS_DIR=/catalogs/demo trademark-import --catalog=demo-fictional-2026-11
+#
+# The version label must be lowercase (the manifest format allows only [a-z0-9._-]), so "demo" is lowercase here; the data
+# file name keeps DEMO in capitals. The data file is read as UTF-8 with LF line endings (.gitattributes keeps them): a changed
+# byte changes the sha256 below and the whole catalog is refused.
+catalogs:
+  - version: demo-fictional-2026-11
+    file: DEMO-fictional-marks.jsonl
+    format_version: jsonl-1
+    source_name: DEMO catalog - fictional marks invented for this repository, not a trademark register
+    url: not applicable - written by hand in this repository (catalogs/demo/raw/DEMO-fictional-marks.jsonl)
+    license: DEMO data with no third-party source; for local tests and demonstrations only, never as real trademark data
+    source_date: 2026-11-05
+    sha256: da75ea0cc6ac6cd83778cd325476c154df54b7da275661d9cb5440a2844ba994
+    filters:
+      include_classes: [25, 35]
+      include_status: [REGISTERED, PENDING]

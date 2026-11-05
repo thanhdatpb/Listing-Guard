@@ -1,7 +1,8 @@
 # Unreleased changes
 
 Changes on `main` that no release has shipped yet. This file lists the USPTO converter (ADR-009, PR A2b), client plans
-with a monthly quota (ADR-013), the Listing Workspace API/batch integration and optional web console (ADR-014); when the
+with a monthly quota (ADR-013), the Listing Workspace API/batch integration and optional web console with its Check listing
+editor (ADR-014); when the
 next version is cut, move its content into `docs/releases/v<version>.md` with the other changes of that version and delete
 this file. Nothing here changes cache identities, hashes or results of trademark checks. With
 `listing-guard.fixes.enabled=false` (the default), the `/checks` response and batch reports keep their current shape.
@@ -122,6 +123,42 @@ dashboard shows the account email, plan and usage. This does not change API-key 
   [deployment](../deployment.md#optional-web-console-adr-014-b2).
 - Migration V21 adds `account`, `login_token` and shared hashed rate-limit state. Tests use a fake `JavaMailSender`; no
   real email service or network is needed. There is no new API endpoint and no OpenAPI change.
+
+### Check listing editor in the console (ADR-014 part B3)
+
+A signed-in console user can now type an Etsy or Amazon listing at `/console/check` and check it. It is part of the optional
+console: with `listing-guard.console.enabled=false` (the default) none of it exists. It checks and suggests only; nothing is
+published, and **the listing you type is never stored**.
+
+- **What you see.** Findings grouped by severity (errors, warnings, information) with the evidence marked; a verified value for
+  each fix that has one; the readiness score and the trademark result **side by side, always both**, with the trademark
+  disclaimer; and a preview labelled "Simulation". A listing can score well and still be a trademark risk, and the page never
+  shows the score alone.
+- **Whatever the flag says.** The editor always shows fixes and readiness, even with `listing-guard.fixes.enabled=false`. The
+  flag keeps deciding what `/api/v1/checks` and `batch-check` compute and show: turning the console on does not change the API
+  response or the batch reports (a test posts a listing in the editor and reads the old shape from the API for the same result).
+- **States.** A trademark catalog that is not loaded shows "Trademark check unavailable" and the rule results stay; a plan
+  without the `trademark-risk` pack shows a note and the plans that include it; a used-up quota shows the reset date and, as in
+  the API, a listing you already checked is still answered; a rule that failed means "Not scored", never a number.
+- **Cost.** The text beside the Check button says up to one unit (listing rules) or two (with the `trademark-risk` pack) of the
+  monthly quota; a listing already checked is free, and with plans off nothing is counted.
+- **Fields.** Title, tags (one per line) and description for Etsy; title, bullet points and description for Amazon; and a
+  collapsed "Other listing fields" section with the fields the rules require (it opens when a required field is missing).
+  `who_made` and `when_made` are free text; no list of codes is kept. Counters show the limits of the active ruleset.
+- **Apply suggestion** only fills the title or a tag with the proposed value; it never checks again, so it costs nothing, and
+  you press Check to see the effect. It refuses a field you changed after the check.
+- **Preview.** The search result is cut by the style sheet (no character count is assumed) and the product page marks the part
+  of the title beyond the ruleset limit. It uses no logo, image, brand color or domain of any marketplace and is not updated
+  while you type.
+- **Not included.** Saved listings or history, a live preview, applying several fixes at once.
+
+- **A DEMO trademark catalog.** `catalogs/demo/` holds ten invented marks (nothing real) so the trademark panel can be tried
+  locally and shown in demonstrations. It is never used by default: you import it on purpose, with its own manifest, and
+  point `TRADEMARK_CATALOG_VERSION` at the version the job prints. See [catalogs/demo/README.md](../../catalogs/demo/README.md).
+
+No migration, no new API endpoint and no change to `docs/api/openapi.json`. The page uses two static files,
+`/console/editor.css` and `/console/editor.js`, served behind the console sign-in; there is no build step and no Node. See
+[ADR-014](../adr/ADR-014-listing-workspace.md) and [deployment](../deployment.md#optional-web-console-adr-014-b2).
 
 ## Breaking changes
 
