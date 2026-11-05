@@ -269,6 +269,30 @@ A finding:
 Order of `findings` is stable for a stored check. Do not rely on `message` text to decide anything: use
 `ruleId`, `field`, `value` and `severity`.
 
+### Optional fixes and readiness (ADR-014)
+
+This feature is off by default. An operator can enable it with
+`listing-guard.fixes.enabled=true` (`LISTING_GUARD_FIXES_ENABLED=true`). When it is off, `/checks` returns the existing
+response shape and calls the existing `RuleEngine.run()` path. When it is on, each finding adds `fix` (a verified
+`{action, description, proposedValue}` object or `null`), and the response adds `fixesComputed` and `readiness`.
+`REPLACE` carries a `proposedValue`; `REMOVE` has `proposedValue: null`. A suggestion is advice only: Listing Guard
+never edits or applies it.
+
+`readiness` is `{score, ready, status, version}` for the `listing-rules` pack only. A complete run has status `SCORED`;
+when a rule fails, status is `INCOMPLETE`, `score` is `null`, and `ready` is false. The score is a maintainer-defined
+measure, not a probability or a marketplace acceptance guarantee. **It excludes trademark findings.** Clients must
+show the separate trademark result alongside readiness and must not treat a high score as a clean trademark result.
+
+Fixes target the normalized `finding.value`, not the original JSON string byte-for-byte. The normalizer trims text and
+trims/drops blank list entries; it preserves case and internal spacing. Thus `tags[i]` and `bullet_points[i]` refer to
+the cleaned lists. A tag fix description names the tag value; clients should match a tag finding by `value`, or submit
+the cleaned list before using its index. Re-check after the seller accepts a proposal, and apply one fix at a time.
+
+For checks created before this feature, a `GET` with fixes enabled returns `fixesComputed: false`, `readiness: null`,
+and `fix: null` for each finding because the submitted listing and rule failures were not stored. A later `POST` of the
+same listing has the original listing available and enriches the cached result; it remains a cache hit, does not charge
+quota again, and does not change `analysisVersion`. New feature-enabled results store their fix and readiness data.
+
 ## Field paths
 
 `field` uses the **normalized listing's** names, not the Etsy payload's in every case:
@@ -280,10 +304,11 @@ Order of `findings` is stable for a stored check. Do not rely on `message` text 
 | `tags[i]` | The tag at zero-based position `i`. |
 | `who_made`, `when_made`, ... | A missing required field, named as in the Etsy payload. `value` is `null`. |
 
-Limitation: blank tags are dropped during normalization, so `tags[i]` counts positions in the cleaned list. If
-your list contains blank or whitespace-only tags, the index can differ from your own. **Match a tag finding by
-`value`** (the tag text) and use `tags[i]` only as a hint. Findings about a repeated tag report the later
-occurrences and name the first position in `message`.
+Limitation: tags and Amazon bullet points are trimmed and blank entries are dropped during normalization, so
+`tags[i]` and `bullet_points[i]` count positions in the cleaned list. If your list contains blank or whitespace-only
+entries, an index can differ from the raw payload. **Match a tag finding/fix by `value`** (the tag text), or send the
+cleaned list before using the index. Findings about a repeated tag report the later occurrences and name the first
+position in `message`.
 
 Etsy finding rules and what they report: `required_fields`, `title_length`, `title_characters`,
 `title_repeated_special_chars`, `tag_count`, `tag_length`, `tag_characters`, `duplicate_tags`,

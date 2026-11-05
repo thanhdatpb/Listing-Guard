@@ -5,6 +5,7 @@ import com.thanhdatpb.listingguard.api.batch.ListingOutcome.Part;
 import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.CheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
+import com.thanhdatpb.listingguard.api.check.FixesProperties;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.client.Client;
 import com.thanhdatpb.listingguard.api.client.ClientRepository;
@@ -57,12 +58,21 @@ public final class BatchCheckJob {
     private final TrademarkCatalogRuntime trademark;
     private final TrademarkRulesets trademarkRulesets;
     private final PlanService plans;
+    private final FixesProperties fixes;
     private final PrintStream out;
     private final Clock clock;
 
     public BatchCheckJob(ClientRepository clients, NormalizerRegistry normalizers, CheckService checks,
                          TrademarkCheckService trademarkChecks, TrademarkCatalogRuntime trademark,
                          TrademarkRulesets trademarkRulesets, PlanService plans, PrintStream out, Clock clock) {
+        this(clients, normalizers, checks, trademarkChecks, trademark, trademarkRulesets, plans,
+                new FixesProperties(false), out, clock);
+    }
+
+    public BatchCheckJob(ClientRepository clients, NormalizerRegistry normalizers, CheckService checks,
+                         TrademarkCheckService trademarkChecks, TrademarkCatalogRuntime trademark,
+                         TrademarkRulesets trademarkRulesets, PlanService plans, FixesProperties fixes,
+                         PrintStream out, Clock clock) {
         this.clients = clients;
         this.normalizers = normalizers;
         this.checks = checks;
@@ -70,6 +80,7 @@ public final class BatchCheckJob {
         this.trademark = trademark;
         this.trademarkRulesets = trademarkRulesets;
         this.plans = plans;
+        this.fixes = fixes;
         this.out = out;
         this.clock = clock;
     }
@@ -98,7 +109,7 @@ public final class BatchCheckJob {
             String notReady = status.state() != TrademarkCatalogRuntime.State.READY
                     ? status.state() + ": " + status.detail() : planNote;
 
-            try (BatchReport report = new BatchReport(options.out())) {
+            try (BatchReport report = new BatchReport(options.out(), fixes.enabled())) {
                 int rows = 0;
                 boolean stoppedAtMaxRows = false;
                 String abortReason = null;
@@ -124,7 +135,7 @@ public final class BatchCheckJob {
                         client.getName(), marketplace, options.input().getFileName().toString(),
                         options.mapping().getFileName().toString(), options.labelColumn(), options.maxRows(),
                         stoppedAtMaxRows, abortReason, trademarkReady, notReady,
-                        trademarkRulesets.ruleset().disclaimer());
+                        trademarkRulesets.ruleset().disclaimer(), fixes.enabled());
                 report.finish(info);
                 BatchReport.Totals totals = report.totals(info);
                 out.println("Batch check " + (abortReason == null ? "finished" : "STOPPED (" + abortReason + ")") + ": "

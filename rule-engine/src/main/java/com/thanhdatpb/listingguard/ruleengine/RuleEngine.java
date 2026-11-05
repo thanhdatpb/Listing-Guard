@@ -31,9 +31,9 @@ public final class RuleEngine {
      * A rule switched off with {@code enabled: false} (for the listing's product type) does not run.
      * Findings keep rule registration order.
      *
-     * <p>The result is what it was before ADR-014: no finding carries a {@code fix} and no fix is computed or checked,
-     * so a caller of this method (the API, the batch job) sees nothing new and pays nothing for it. Use
-     * {@link #runDetailed} to get verified fixes.
+     * <p>The result is what it was before ADR-014: no finding carries a {@code fix} and no fix is computed or checked.
+     * The API and batch job use this method while their fixes feature flag is off. Use {@link #runDetailed} to get
+     * verified fixes.
      */
     public List<Finding> run(Listing listing, RulesetConfig config) {
         return evaluate(listing, config).findings().stream().map(Finding::withoutFix).toList();

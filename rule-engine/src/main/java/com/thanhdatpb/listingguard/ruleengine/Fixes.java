@@ -27,14 +27,18 @@ public final class Fixes {
         return cutAtWordBoundary(text, max).map(cut -> {
             String tail = text.substring(cut.length()).strip();
             int kept = cut.codePointCount(0, cut.length());
-            return FixSuggestion.replace("Cắt " + noun + " tại ranh giới từ còn " + kept + " ký tự (tối đa " + max
-                    + "); phần cuối bị bỏ: " + quote(tail) + ".", cut);
+            String description = noun.equals("tag")
+                    ? "Tag " + quoteExact(text) + ": cắt tại ranh giới từ còn " + kept + " ký tự (tối đa " + max
+                            + "); phần cuối bị bỏ: " + quote(tail) + "."
+                    : "Cắt " + noun + " tại ranh giới từ còn " + kept + " ký tự (tối đa " + max
+                            + "); phần cuối bị bỏ: " + quote(tail) + ".";
+            return FixSuggestion.replace(description, cut);
         });
     }
 
     /** Drops a repeated value; {@code firstPosition} is where the first occurrence is, counted from 1. */
     public static FixSuggestion removeRepeat(String noun, String value, int firstPosition) {
-        return FixSuggestion.remove("Xoá " + noun + " " + quote(value) + " lặp lại; bản đầu tiên đã có ở vị trí "
+        return FixSuggestion.remove("Xoá " + noun + " " + quoteExact(value) + " lặp lại; bản đầu tiên đã có ở vị trí "
                 + firstPosition + ".");
     }
 
@@ -103,5 +107,9 @@ public final class Fixes {
             return "'" + text + "'";
         }
         return "'" + text.substring(0, text.offsetByCodePoints(0, PREVIEW_LENGTH)) + "...'";
+    }
+
+    private static String quoteExact(String text) {
+        return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'";
     }
 }

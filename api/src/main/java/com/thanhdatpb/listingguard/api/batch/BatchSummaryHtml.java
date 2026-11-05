@@ -58,6 +58,9 @@ final class BatchSummaryHtml {
         overview(html, t);
         trademark(html, t);
         rules(html, t);
+        if (info.readinessEnabled()) {
+            readiness(html, t);
+        }
         topTable(html, "Mark bị khớp nhiều nhất", "Mark", t.topMarks(), t.distinctMarks(), "Mức cao nhất",
                 "Không có mark nào bị khớp.");
         topTable(html, "Rule bị vi phạm nhiều nhất", "Rule", t.topRules(), t.distinctRules(), "Mức cao nhất",
@@ -130,6 +133,18 @@ final class BatchSummaryHtml {
         row(html, "Tổng số WARNING", t.ruleWarnings());
         row(html, "Tổng số INFO", t.ruleInfos());
         html.append("</table>\n");
+    }
+
+    private static void readiness(StringBuilder html, Totals t) {
+        String average = t.readinessScored() == 0 ? "—"
+                : String.format(Locale.ROOT, "%.1f", (double) t.readinessScoreTotal() / t.readinessScored());
+        html.append("<h2>Điểm sẵn sàng (chỉ listing-rules)</h2>\n<table>\n");
+        row(html, "Listing sẵn sàng", t.readinessReady());
+        row(html, "Listing có điểm", t.readinessScored());
+        row(html, "Listing INCOMPLETE (không có điểm)", t.readinessIncomplete());
+        textRow(html, "Điểm trung bình (chỉ listing có điểm)", average);
+        html.append("</table>\n<p class=\"note\">Điểm chỉ tính kết quả listing-rules, không bao gồm trademark. "
+                + "Xem trademark riêng ở phần trên.</p>\n");
     }
 
     private static void topTable(StringBuilder html, String title, String nameHeader, List<Ranked> ranked, int distinct,
@@ -221,6 +236,11 @@ final class BatchSummaryHtml {
 
     private static void row(StringBuilder html, String label, int value) {
         html.append("<tr><td>").append(esc(label)).append("</td><td class=\"n\">").append(value).append("</td></tr>\n");
+    }
+
+    private static void textRow(StringBuilder html, String label, String value) {
+        html.append("<tr><td>").append(esc(label)).append("</td><td class=\"n\">").append(esc(value))
+                .append("</td></tr>\n");
     }
 
     private static void share(StringBuilder html, String label, int count, int total) {

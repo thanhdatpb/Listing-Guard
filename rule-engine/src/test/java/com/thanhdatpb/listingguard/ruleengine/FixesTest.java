@@ -94,7 +94,8 @@ class FixesTest {
         assertThat(fix.action()).isEqualTo(FixAction.REPLACE);
         assertThat(fix.proposedValue()).isEqualTo("alpha beta");
         assertThat(fix.description()).isEqualTo(
-                "Cắt tag tại ranh giới từ còn 10 ký tự (tối đa 12); phần cuối bị bỏ: 'gamma delta'.");
+                "Tag 'alpha beta gamma delta': cắt tại ranh giới từ còn 10 ký tự (tối đa 12); "
+                        + "phần cuối bị bỏ: 'gamma delta'.");
     }
 
     @Test

@@ -49,10 +49,22 @@
             },
             "type" : "array"
           },
+          "fixesComputed" : {
+            "description" : "Whether verified fixes were computed for this result.",
+            "type" : [ "boolean", "null" ]
+          },
           "marketplace" : {
             "description" : "Marketplace code, upper case.",
             "example" : "ETSY",
             "type" : "string"
+          },
+          "readiness" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/ReadinessView"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "Readiness from the listing-rules pack only; null when this legacy result has not been enriched."
           },
           "rulesetVersion" : {
             "description" : "Version of the ruleset that produced the findings. Null for checks stored before versions were recorded.",
@@ -75,6 +87,14 @@
             "description" : "Field path, see the integration guide.",
             "example" : "tags[1]",
             "type" : "string"
+          },
+          "fix" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/FixView"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "A verified suggestion for this finding; null when no certain fix exists."
           },
           "message" : {
             "example" : "Tag 'a tag that is far too long...' dài 38 ký tự, tối đa 20.",
@@ -104,6 +124,22 @@
         },
         "type" : "object"
       },
+      "FixView" : {
+        "properties" : {
+          "action" : {
+            "enum" : [ "REPLACE", "REMOVE" ],
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "proposedValue" : {
+            "description" : "Proposed replacement; null for REMOVE.",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
       "JsonNode" : { },
       "ProblemDetail" : {
         "properties" : {
@@ -127,6 +163,25 @@
           },
           "type" : {
             "format" : "uri",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ReadinessView" : {
+        "properties" : {
+          "ready" : {
+            "type" : "boolean"
+          },
+          "score" : {
+            "description" : "Null when status is INCOMPLETE.",
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "version" : {
             "type" : "string"
           }
         },

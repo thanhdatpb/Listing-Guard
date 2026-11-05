@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.api.batch;
 
 import com.thanhdatpb.listingguard.api.check.CheckService;
+import com.thanhdatpb.listingguard.api.check.FixesProperties;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.client.ClientRepository;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
@@ -34,10 +35,11 @@ public class BatchCheckRunner implements ApplicationRunner {
     private final TrademarkCatalogRuntime trademark;
     private final TrademarkRulesets trademarkRulesets;
     private final PlanService plans;
+    private final FixesProperties fixes;
 
     public BatchCheckRunner(BatchProperties properties, ClientRepository clients, NormalizerRegistry normalizers,
                             CheckService checks, TrademarkCheckService trademarkChecks, TrademarkCatalogRuntime trademark,
-                            TrademarkRulesets trademarkRulesets, PlanService plans) {
+                            TrademarkRulesets trademarkRulesets, PlanService plans, FixesProperties fixes) {
         this.properties = properties;
         this.clients = clients;
         this.normalizers = normalizers;
@@ -46,12 +48,13 @@ public class BatchCheckRunner implements ApplicationRunner {
         this.trademark = trademark;
         this.trademarkRulesets = trademarkRulesets;
         this.plans = plans;
+        this.fixes = fixes;
     }
 
     @Override
     public void run(ApplicationArguments args) {
         BatchOptions options = BatchOptions.parse(args, properties.defaultOut());
-        new BatchCheckJob(clients, normalizers, checks, trademarkChecks, trademark, trademarkRulesets, plans, System.out,
-                Clock.systemUTC()).run(options);
+        new BatchCheckJob(clients, normalizers, checks, trademarkChecks, trademark, trademarkRulesets, plans, fixes,
+                System.out, Clock.systemUTC()).run(options);
     }
 }

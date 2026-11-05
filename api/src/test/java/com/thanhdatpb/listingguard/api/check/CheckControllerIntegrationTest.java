@@ -3,6 +3,9 @@ package com.thanhdatpb.listingguard.api.check;
 import static com.thanhdatpb.listingguard.api.ApiTestKeys.HEADER;
 import static com.thanhdatpb.listingguard.api.ApiTestKeys.KEY_1;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -15,6 +18,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
 import com.thanhdatpb.listingguard.core.finding.Severity;
+import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -29,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -58,6 +63,9 @@ class CheckControllerIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @SpyBean
+    RuleEngine ruleEngine;
 
     /** A listing that satisfies every Etsy rule; the title makes it unique so tests never share a cached result. */
     private String validBody() {
@@ -104,6 +112,8 @@ class CheckControllerIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         JsonNode json = mapper.readTree(response);
+        assertThat(json.has("fixesComputed")).isFalse();
+        assertThat(json.has("readiness")).isFalse();
         UUID checkId = UUID.fromString(json.get("checkId").asText());
         assertThat(json.get("contentHash").asText()).matches("[0-9a-f]{64}");
         ListingCheck saved = checks.findById(checkId).orElseThrow();
@@ -116,6 +126,15 @@ class CheckControllerIntegrationTest {
     }
 
     @Test
+    void fixesDisabledDoesNotCallRunDetailed() throws Exception {
+        JsonNode response = postOk(validBody());
+
+        assertThat(response.has("fixesComputed")).isFalse();
+        assertThat(response.has("readiness")).isFalse();
+        verify(ruleEngine, never()).runDetailed(any(), any());
+    }
+
+    @Test
     void violatingListingReturnsFindingsWithSourceValueAndSummary() throws Exception {
         JsonNode json = postOk(violatingBody());
 
@@ -124,6 +143,7 @@ class CheckControllerIntegrationTest {
         List<String> ruleIds = new ArrayList<>();
         json.get("findings").forEach(finding -> {
             ruleIds.add(finding.get("ruleId").asText());
+            assertThat(finding.has("fix")).isFalse();
             assertThat(finding.get("source").asText()).isEqualTo("RULE");
             assertThat(finding.get("message").asText()).isNotBlank();
             assertThat(finding.get("suggestion").asText()).isNotBlank();

@@ -40,8 +40,9 @@ import java.util.stream.Stream;
  * LOW/MEDIUM/HIGH for trademark), field, snippet, mark, sourceIds, message, suggestion}.<br>
  * {@code listings.csv}: {@code id, line, status (OK|INPUT_ERROR|CHECK_ERROR|QUOTA_EXCEEDED), label, trademarkRisk (the
  * highest level, or NOT_CONFIGURED|ERROR|QUOTA_EXCEEDED), completeness, ruleErrors, ruleWarnings, rulesCheckId,
- * trademarkCheckId, error}. {@code QUOTA_EXCEEDED} (ADR-013) marks a row where a check was not run because the client's
- * monthly quota ran out; a row with a failed check is {@code CHECK_ERROR} whatever else happened to it.
+ * trademarkCheckId, error}, followed by {@code readiness_score, ready} when fixes are enabled.
+ * {@code QUOTA_EXCEEDED} (ADR-013) marks a row where a check was not run because the client's monthly quota ran out; a
+ * row with a failed check is {@code CHECK_ERROR} whatever else happened to it.
  */
 final class BatchReport implements AutoCloseable {
 
@@ -63,7 +64,14 @@ final class BatchReport implements AutoCloseable {
     /** Run-wide facts the summary shows next to the counts. */
     record RunInfo(Instant runAt, String client, String marketplace, String inputName, String mappingName,
                    String labelColumn, Integer maxRows, boolean stoppedAtMaxRows, String abortReason,
-                   boolean trademarkReady, String trademarkDetail, String disclaimerFallback) {
+                   boolean trademarkReady, String trademarkDetail, String disclaimerFallback,
+                   boolean readinessEnabled) {
+        RunInfo(Instant runAt, String client, String marketplace, String inputName, String mappingName,
+                String labelColumn, Integer maxRows, boolean stoppedAtMaxRows, String abortReason,
+                boolean trademarkReady, String trademarkDetail, String disclaimerFallback) {
+            this(runAt, client, marketplace, inputName, mappingName, labelColumn, maxRows, stoppedAtMaxRows, abortReason,
+                    trademarkReady, trademarkDetail, disclaimerFallback, false);
+        }
     }
 
     /** A mark or a rule with how many listings and findings it touches. */
@@ -81,7 +89,8 @@ final class BatchReport implements AutoCloseable {
                   int ruleInfos, int distinctRules, int distinctMarks, List<Ranked> topRules, List<Ranked> topMarks,
                   Set<String> rulesetVersions, Set<String> ruleAnalysisVersions, Set<String> trademarkRulesetVersions,
                   Set<String> catalogVersions, Set<String> trademarkAnalysisVersions, String disclaimer,
-                  Measurement measurement, List<ErrorRow> errorRows, int errorRowsTotal) {
+                  Measurement measurement, List<ErrorRow> errorRows, int errorRowsTotal, int readinessReady,
+                  int readinessScored, int readinessIncomplete, long readinessScoreTotal) {
     }
 
     private static final class Stat {
@@ -102,6 +111,7 @@ final class BatchReport implements AutoCloseable {
     private final Path dir;
     private final BufferedWriter findings;
     private final BufferedWriter listings;
+    private final boolean readinessEnabled;
     private boolean writersClosed;
 
     private int rows;
@@ -116,6 +126,10 @@ final class BatchReport implements AutoCloseable {
     private int ruleErrors;
     private int ruleWarnings;
     private int ruleInfos;
+    private int readinessReady;
+    private int readinessScored;
+    private int readinessIncomplete;
+    private long readinessScoreTotal;
     private final Map<String, Stat> ruleStats = new TreeMap<>();
     private final Map<String, Stat> markStats = new TreeMap<>();
     private final Set<String> rulesetVersions = new TreeSet<>();
@@ -133,14 +147,19 @@ final class BatchReport implements AutoCloseable {
      * directory never mixes two runs: {@code summary.html} is written last, and a directory without it did not finish.
      */
     BatchReport(Path dir) {
+        this(dir, false);
+    }
+
+    BatchReport(Path dir, boolean readinessEnabled) {
         this.dir = dir;
+        this.readinessEnabled = readinessEnabled;
         try {
             Files.createDirectories(dir);
             for (String name : List.of(FINDINGS_FILE, LISTINGS_FILE, SUMMARY_FILE)) {
                 Files.deleteIfExists(dir.resolve(name));
             }
             this.findings = open(FINDINGS_FILE, FINDINGS_HEADER);
-            this.listings = open(LISTINGS_FILE, LISTINGS_HEADER);
+            this.listings = open(LISTINGS_FILE, readinessEnabled ? LISTINGS_HEADER + ",readiness_score,ready" : LISTINGS_HEADER);
         } catch (IOException e) {
             throw new BatchConfigException("Cannot write the reports to " + dir + ": " + e.getMessage(), e);
         }
@@ -161,7 +180,7 @@ final class BatchReport implements AutoCloseable {
             trademarkRisk.merge(Risk.NOT_CHECKED, 1, Integer::sum);
             measurement.addNotChecked();
             noteProblem(outcome.line(), outcome.id(), outcome.inputError());
-            writeListing(outcome, "INPUT_ERROR", "", "", "", "", "", "", outcome.inputError());
+            writeListing(outcome, "INPUT_ERROR", "", "", "", "", "", "", outcome.inputError(), "", "");
             return;
         }
         Part<CheckResult> rules = outcome.rules();
@@ -204,8 +223,15 @@ final class BatchReport implements AutoCloseable {
             trademarkRisk.merge(riskCell(trademark), 1, Integer::sum);
         }
         String status = checkFailed ? "CHECK_ERROR" : quotaExceeded ? "QUOTA_EXCEEDED" : "OK";
+        String readinessScore = "";
+        String ready = "";
+        if (rules.isDone() && rules.result().readiness() != null) {
+            CheckResult.ReadinessView readiness = rules.result().readiness();
+            readinessScore = readiness.score() == null ? "" : readiness.score().toString();
+            ready = Boolean.toString(readiness.ready());
+        }
         writeListing(outcome, status, risk, completeness, ruleErrorsCell, ruleWarningsCell,
-                rulesCheckId, trademarkCheckId, problem == null ? "" : problem);
+                rulesCheckId, trademarkCheckId, problem == null ? "" : problem, readinessScore, ready);
     }
 
     /** What went wrong with one check of a row, for the error column; null when it ran or cannot run on this deployment. */
@@ -256,6 +282,17 @@ final class BatchReport implements AutoCloseable {
         }
         if (result.summary().warnings() > 0) {
             listingsWithRuleWarnings++;
+        }
+        if (readinessEnabled && result.readiness() != null) {
+            if ("INCOMPLETE".equals(result.readiness().status())) {
+                readinessIncomplete++;
+            } else {
+                readinessScored++;
+                readinessScoreTotal += result.readiness().score();
+                if (result.readiness().ready()) {
+                    readinessReady++;
+                }
+            }
         }
         Set<String> seen = new TreeSet<>();
         for (CheckResult.FindingView finding : result.findings()) {
@@ -312,10 +349,19 @@ final class BatchReport implements AutoCloseable {
     // ---- CSV
 
     private void writeListing(ListingOutcome outcome, String status, String risk, String completeness, String ruleErrorsCell,
-                              String ruleWarningsCell, String rulesCheckId, String trademarkCheckId, String error) {
-        write(listings, outcome.id(), Integer.toString(outcome.line()), status,
+                              String ruleWarningsCell, String rulesCheckId, String trademarkCheckId, String error,
+                              String readinessScore, String ready) {
+        String[] base = {outcome.id(), Integer.toString(outcome.line()), status,
                 outcome.label() == null ? "" : outcome.label().toString(), risk, completeness, ruleErrorsCell,
-                ruleWarningsCell, rulesCheckId, trademarkCheckId, error);
+                ruleWarningsCell, rulesCheckId, trademarkCheckId, error};
+        if (readinessEnabled) {
+            String[] extended = java.util.Arrays.copyOf(base, base.length + 2);
+            extended[base.length] = readinessScore;
+            extended[base.length + 1] = ready;
+            write(listings, extended);
+        } else {
+            write(listings, base);
+        }
     }
 
     private void writeFinding(ListingOutcome outcome, String check, String ruleId, String level, String field,
@@ -391,7 +437,7 @@ final class BatchReport implements AutoCloseable {
                 top(ruleStats), top(markStats), Set.copyOf(rulesetVersions), Set.copyOf(ruleAnalysisVersions),
                 Set.copyOf(trademarkRulesetVersions), Set.copyOf(catalogVersions), Set.copyOf(trademarkAnalysisVersions),
                 disclaimer != null ? disclaimer : info.disclaimerFallback(), measurement, List.copyOf(errorRows),
-                errorRowsTotal);
+                errorRowsTotal, readinessReady, readinessScored, readinessIncomplete, readinessScoreTotal);
     }
 
     private static List<Ranked> top(Map<String, Stat> stats) {

@@ -1,6 +1,8 @@
 package com.thanhdatpb.listingguard.api.check;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
+import com.thanhdatpb.listingguard.core.finding.FixAction;
+import com.thanhdatpb.listingguard.core.finding.FixSuggestion;
 import com.thanhdatpb.listingguard.core.finding.Severity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -51,6 +53,16 @@ public class FindingEntity {
     @Column(name = "rule_id")
     private String ruleId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fix_action", length = 16)
+    private FixAction fixAction;
+
+    @Column(name = "fix_description")
+    private String fixDescription;
+
+    @Column(name = "fix_proposed_value")
+    private String fixProposedValue;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -68,7 +80,14 @@ public class FindingEntity {
         entity.suggestion = finding.suggestion();
         entity.rulesetVersionId = rulesetVersionId;
         entity.ruleId = finding.ruleId();
+        entity.setFix(finding.fix());
         return entity;
+    }
+
+    public void setFix(FixSuggestion fix) {
+        fixAction = fix == null ? null : fix.action();
+        fixDescription = fix == null ? null : fix.description();
+        fixProposedValue = fix == null ? null : fix.proposedValue();
     }
 
     public Long getId() {
@@ -109,5 +128,9 @@ public class FindingEntity {
 
     public String getRuleId() {
         return ruleId;
+    }
+
+    public FixSuggestion getFix() {
+        return fixAction == null ? null : new FixSuggestion(fixAction, fixDescription, fixProposedValue);
     }
 }

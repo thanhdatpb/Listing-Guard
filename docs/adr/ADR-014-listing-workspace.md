@@ -74,8 +74,9 @@ choice), the other Amazon rules, `banned_words` and every trademark finding.
 ### A4. A suggestion is verified before it leaves the engine
 
 A rule called alone only produces a candidate. `RuleEngine.runDetailed` is what verifies it, for every finding that
-carries one. `RuleEngine.run` is unchanged: it returns the findings with `fix = null` and computes and checks no fix, so
-everything that calls it (`/checks`, the batch job) sees exactly what it saw before and pays nothing. Verification:
+carries one. `RuleEngine.run` is unchanged: it returns the findings with `fix = null` and computes and checks no fix.
+With the default-off feature flag, `/checks` and the batch job continue to call `run`; with the flag enabled, they use
+`runDetailed`. Verification:
 
 1. Apply the fix to a copy of the listing. A fix that cannot be applied (unknown field, index out of range, the stored
    value no longer matches the finding's `value`) is dropped.
@@ -98,13 +99,9 @@ can produce the same tag), so a client applies one at a time and checks again; p
 
 Fixes are computed from settings the rules already read. No ruleset file changes (`etsy-2026-11` and `amazon-2026-11`
 keep their hash), no finding appears or disappears, and the `analysisVersion` of ADR-010 does not change. What changes
-is how much a result carries, and only for a caller of `runDetailed`. The API calls `run`, which never returns a fix, and
-it builds its answer from stored `finding` rows copied field by field, so no fix reaches a response, the database, a
-cached result, the batch reports or `docs/api/openapi.json`, and results stored before this change read as they did.
-Exposing `fix` and the score through the API needs its own PR after this one: the DTO, `docs/api/openapi.json`, calling
-`runDetailed`, whether the fix is stored with the finding or recomputed on read (a cached result is read from stored
-findings), and the integration guide. That PR also decides if a stored result made before it must be recomputed. Part A
-does not touch `api`.
+is how much a result carries, and only for a caller of `runDetailed`. The original library-only part A did not expose
+or persist fixes or scores through the API, change batch reports or change `docs/api/openapi.json`. The API extension
+in A9 below keeps `run()` and the old response/report shape when its feature flag is off.
 
 ### A6. Publish readiness score
 
@@ -147,6 +144,27 @@ fix that creates a duplicate or a new ERROR, the engine keeping the findings of 
 formula, the cap of 59, the incomplete case, the strict YAML loader, the pinned hash of the readiness file, and the
 unchanged hashes of the published rulesets.
 
+### A9. API, cache and batch (GĐ4 B1)
+
+- `listing-guard.fixes.enabled` defaults to `false`. With it off, `/checks` continues to call `RuleEngine.run()`, returns
+  the old JSON shape, and does not compute fixes/readiness. The batch job also keeps its current CSV headers and HTML
+  summary. With it on, `/checks` calls `runDetailed()` and adds `fixesComputed`, nullable `readiness`, and nullable
+  `fix` on each finding. A finding without a certain fix has `fix: null`; `readiness` contains `score`, `ready`, `status`
+  and `version`. An incomplete run is `INCOMPLETE`, has a null score and is not ready.
+- Migration V20 adds nullable fix columns to `finding` and readiness columns plus `fixes_computed` to `listing_check`.
+  New detailed results store both in the same transaction as the result and its findings. No listing payload is stored.
+- A legacy result read by GET has no listing or rule-failure ids from which to rebuild detail. With the feature enabled it
+  returns `fixesComputed: false`, `readiness: null`, and `fix: null` for every finding. A POST cache hit has the normalized
+  listing in its request: it recomputes `runDetailed()` and enriches the existing result only while
+  `fixes_computed = false`, under a row lock. Concurrent enrichments are idempotent. This is a cache hit: it does not
+  require or charge quota again and does not change `checkId`, `createdAt`, content hash or `analysisVersion`.
+- The batch report, only when the flag is on, adds `readiness_score` and `ready` to `listings.csv`; `summary.html` shows
+  ready, scored and INCOMPLETE counts and an average over scored listings only. The score is listing-rules only.
+  Trademark remains a separate result and must be shown separately.
+- Fixes use normalized `finding.value`. Normalizers trim text and trim/drop blank list items without changing case or
+  internal spacing; list indexes count the cleaned list. Tag fix descriptions name the tag value, and clients should
+  match by value or submit the cleaned list before using an index. Listing Guard never edits or applies a proposal.
+
 ## Part B: the interface (Planned, not designed here)
 
 No decision is taken for part B except these constraints, which hold for any interface built on part A:
@@ -165,15 +183,15 @@ No decision is taken for part B except these constraints, which hold for any int
   next planned Etsy ruleset update, so that `analysisVersion` changes once. It adds `FixAction.ADD` when it arrives.
 - Fixes for Amazon `bullet_length`, `search_terms_length` and the other Amazon rules (search terms are measured in
   bytes, bullets have no certain cut).
-- Exposing `fix` and the score through the API (A5).
 - One score across packs (A7), and verifying several fixes applied together (A4).
 
 ## Consequences
 
 - Sellers get a concrete value for the three cases where one is certain, and nothing for the rest; a missing
   suggestion never means "no problem", only "no certain fix".
-- Verification costs one extra rule run per candidate fix, and only `RuleEngine.runDetailed` pays it; `run` (so
-  `/checks` and the batch job) is as fast as before. Measured with `RulePerformanceTest` (16 candidate fixes and an
+- Verification costs one extra rule run per candidate fix, and only `RuleEngine.runDetailed` pays it; with
+  `listing-guard.fixes.enabled=false`, `/checks` and the batch job still use `run()` and are as fast as before.
+  Measured with `RulePerformanceTest` (16 candidate fixes and an
   18 KB description, the worst listing in the repository), the average per listing is about 1-2 ms for `run` and about
   24 ms for `runDetailed`, against a 50 ms budget that the test checks for both; a typical listing has a few candidates
   and costs a few extra runs. If that margin becomes a problem, the next step is to re-run only the rules that read the

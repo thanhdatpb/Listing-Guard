@@ -6,12 +6,17 @@ import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetVersion;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetVersionRepository;
-import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.core.finding.Finding;
+import com.thanhdatpb.listingguard.core.finding.FixSuggestion;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.RuleRun;
+import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
+import com.thanhdatpb.listingguard.ruleengine.readiness.ReadinessScore;
+import com.thanhdatpb.listingguard.ruleengine.readiness.ReadinessScorer;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -44,10 +49,13 @@ public class CheckService {
     private final RulesetVersionRepository rulesetVersions;
     private final TransactionTemplate transactions;
     private final PlanService plans;
+    private final FixesProperties fixes;
+    private final ReadinessScorer readinessScorer;
 
     public CheckService(NormalizerRegistry normalizers, ContentHasher hasher, RuleEngine ruleEngine,
                         ActiveRulesets rulesets, ListingCheckRepository checks, FindingRepository findings,
-                        RulesetVersionRepository rulesetVersions, TransactionTemplate transactions, PlanService plans) {
+                        RulesetVersionRepository rulesetVersions, TransactionTemplate transactions, PlanService plans,
+                        FixesProperties fixes, ReadinessScorer readinessScorer) {
         this.normalizers = normalizers;
         this.hasher = hasher;
         this.ruleEngine = ruleEngine;
@@ -57,6 +65,8 @@ public class CheckService {
         this.rulesetVersions = rulesetVersions;
         this.transactions = transactions;
         this.plans = plans;
+        this.fixes = fixes;
+        this.readinessScorer = readinessScorer;
     }
 
     /**
@@ -77,15 +87,29 @@ public class CheckService {
         Optional<CheckResult> cached = findCached(clientId, marketplace, packId, contentHash, rulesetVersionId,
                 analysisVersion);
         if (cached.isPresent()) {
+            if (fixes.enabled() && !Boolean.TRUE.equals(cached.get().fixesComputed())) {
+                enrichCached(cached.get().checkId(), listing, ruleset.config());
+                return findCached(clientId, marketplace, packId, contentHash, rulesetVersionId, analysisVersion)
+                        .orElseThrow();
+            }
             return cached.get();
         }
 
         // a cached answer costs nothing and was returned above; from here a new result is stored, and counted (ADR-013)
         plans.requireQuota(admission);
-        List<Finding> found = ruleEngine.run(listing, ruleset.config());
+        ReadinessScore readiness = null;
+        List<Finding> found;
+        if (fixes.enabled()) {
+            RuleRun run = ruleEngine.runDetailed(listing, ruleset.config());
+            found = run.findings();
+            readiness = readinessScorer.score(run);
+        } else {
+            found = ruleEngine.run(listing, ruleset.config());
+        }
+        ReadinessScore storedReadiness = readiness;
         try {
             UUID id = transactions.execute(status -> persist(admission, packId, marketplace, contentHash,
-                    rulesetVersionId, analysisVersion, found));
+                    rulesetVersionId, analysisVersion, found, storedReadiness));
             return toResult(checks.findById(id).orElseThrow(), false);
         } catch (DataIntegrityViolationException e) {
             // another request of this client stored the same listing between our lookup and our insert: answer from its row
@@ -115,24 +139,74 @@ public class CheckService {
      * and rolls back, so does the charge.
      */
     private UUID persist(PlanService.Admission admission, String packId, String marketplace, String contentHash,
-                         long rulesetVersionId, String analysisVersion, List<Finding> found) {
+                         long rulesetVersionId, String analysisVersion, List<Finding> found, ReadinessScore readiness) {
         UUID clientId = admission.clientId();
         plans.charge(admission);
         ListingCheck saved = checks.saveAndFlush(new ListingCheck(clientId, packId, contentHash, marketplace,
                 CheckStatus.COMPLETED, rulesetVersionId, analysisVersion));
+        if (readiness != null) {
+            saved.setDetailedAnalysis(readiness.status().name(), readiness.score(), readiness.ready(), readiness.version());
+        }
         findings.saveAll(found.stream().map(finding -> FindingEntity.fromRule(saved.getId(), finding, rulesetVersionId)).toList());
         return saved.getId();
+    }
+
+    private void enrichCached(UUID checkId, Listing listing, RulesetConfig config) {
+        RuleRun run = ruleEngine.runDetailed(listing, config);
+        ReadinessScore readiness = readinessScorer.score(run);
+        transactions.executeWithoutResult(status -> {
+            ListingCheck stored = checks.findByIdForUpdate(checkId).orElseThrow(() -> new CheckNotFoundException(checkId));
+            if (stored.isFixesComputed()) {
+                return;
+            }
+            stored.setDetailedAnalysis(readiness.status().name(), readiness.score(), readiness.ready(), readiness.version());
+            List<FindingEntity> storedFindings = findings.findByCheckIdOrderByIdAsc(checkId);
+            if (storedFindings.size() != run.findings().size()) {
+                throw new IllegalStateException("Cannot enrich cached check " + checkId
+                        + ": stored and recomputed finding counts differ");
+            }
+            for (int i = 0; i < storedFindings.size(); i++) {
+                FindingEntity entity = storedFindings.get(i);
+                Finding computed = run.findings().get(i);
+                if (!Objects.equals(entity.getRuleId(), computed.ruleId())
+                        || !Objects.equals(entity.getField(), computed.field())
+                        || !Objects.equals(entity.getValue(), computed.value())
+                        || entity.getSeverity() != computed.severity()
+                        || !Objects.equals(entity.getMessage(), computed.message())
+                        || !Objects.equals(entity.getSuggestion(), computed.suggestion())) {
+                    throw new IllegalStateException("Cannot enrich cached check " + checkId
+                            + ": stored finding order or content differs from the recomputed result");
+                }
+                entity.setFix(computed.fix());
+            }
+            checks.save(stored);
+            findings.saveAll(storedFindings);
+        });
     }
 
     private CheckResult toResult(ListingCheck check, boolean cached) {
         List<CheckResult.FindingView> views = findings.findByCheckIdOrderByIdAsc(check.getId()).stream()
                 .map(entity -> new CheckResult.FindingView(entity.getRuleId(), entity.getSource(), entity.getSeverity(),
-                        entity.getField(), entity.getValue(), entity.getMessage(), entity.getSuggestion()))
+                        entity.getField(), entity.getValue(), entity.getMessage(), entity.getSuggestion(),
+                        fixView(entity.getFix())))
                 .toList();
         String rulesetVersion = rulesetVersions.findById(check.getRulesetVersionId()).map(RulesetVersion::getVersion)
                 .orElse(null);
         return new CheckResult(check.getId(), check.getStatus(), check.getMarketplaceCode(), rulesetVersion,
                 check.getAnalysisVersion(), check.getContentHash(), cached, check.getCreatedAt(),
-                CheckResult.Summary.of(views), views);
+                CheckResult.Summary.of(views), views, fixes.enabled() ? check.isFixesComputed() : null,
+                fixes.enabled() ? readinessView(check) : null);
+    }
+
+    private static CheckResult.FixView fixView(FixSuggestion fix) {
+        return fix == null ? null : new CheckResult.FixView(fix.action(), fix.description(), fix.proposedValue());
+    }
+
+    private static CheckResult.ReadinessView readinessView(ListingCheck check) {
+        if (check.getReadinessStatus() == null) {
+            return null;
+        }
+        return new CheckResult.ReadinessView(check.getReadinessScore(), Boolean.TRUE.equals(check.getReadinessReady()),
+                check.getReadinessStatus(), check.getReadinessVersion());
     }
 }

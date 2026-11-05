@@ -20,6 +20,9 @@ listing-guard:
     # On the roadmap, not supported yet: a check request for one of these gets 422, not the 400 for unknown codes.
     # None today: Amazon is supported.
     planned: []
+  fixes:
+    # Verified fix suggestions and listing-rules readiness (ADR-014); opt in because runDetailed reruns rules per fix.
+    enabled: ${LISTING_GUARD_FIXES_ENABLED:false}
   rulesets:
     locations:
       - classpath:rulesets/etsy-2026-11.yaml

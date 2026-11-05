@@ -11,8 +11,9 @@ It never edits a listing, never publishes, and does no SEO.
   readiness (ADR-014, part A, done)**: `RuleEngine.runDetailed` returns the findings with a verified `FixSuggestion` (cut a
   long title or tag at a word boundary, remove a repeated tag; `Fixes`, `FixApplier`) and the ids of the rules that
   failed (`RuleRun`), and `ReadinessScorer` (`readiness/readiness-2026-11.yaml`, `listing-rules` pack only) scores a run.
-  `RuleEngine.run`, so the API, the batch job and `docs/api/openapi.json`, is unchanged and carries no fix; exposing them
-  is a later API PR and the interface (part B) is planned.
+  `RuleEngine.run` remains unchanged. The API and batch job use it with the default-off
+  `listing-guard.fixes.enabled` flag; when enabled, they use `runDetailed` and expose the persisted fixes and
+  listing-rules readiness through the API and batch reports. The interface (part B) is planned.
 - **RAG Analyzer** (`rag-analyzer/`): public marketplace policies in pgvector, plus an LLM step with
   code-verified citations. Built so far: policy manifest, HTML/PDF parsers, structural chunker,
   `EmbeddingProvider` (none by default), `PolicyRetriever`, retrieval metrics,
@@ -44,7 +45,9 @@ It never edits a listing, never publishes, and does no SEO.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`, `FixSuggestion`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
-  `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Contract: `docs/api/openapi.json`,
+  `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Optional ADR-014 fix/readiness output is behind
+  `listing-guard.fixes.enabled=false` by default; V20 stores fixes and readiness without changing `analysisVersion`.
+  Contract: `docs/api/openapi.json`,
   `docs/integration-guide.md`, `docs/input-schema.md`, ADR-005, ADR-007.
 - **Batch check** (`api/.../batch/`, `docs/batch-check.md`): the one-shot job `batch-check` (Spring profile and compose
   service of that name; no network, no HTTP, no new endpoint, no migration). It reads a listing CSV as a stream, maps the
@@ -54,8 +57,10 @@ It never edits a listing, never publishes, and does no SEO.
   writes `findings.csv`, `listings.csv` and `summary.html` to `--out` (default `batch/out`; `batch/input/` and
   `batch/out/` are git-ignored). A row that cannot be read or whose check fails is reported with its line and the batch
   goes on; a catalog that is DISABLED or REFUSED leaves the rules running and the report says so; a damaged file
-  completes the reports as unfinished and fails. `--label-column` adds a small-set measurement (flagged = MEDIUM or HIGH),
-  never "accuracy". The example mappings carry column names nobody has verified, so each says `# unverified`.
+  completes the reports as unfinished and fails. When `listing-guard.fixes.enabled=true`, `listings.csv` adds readiness
+  columns and `summary.html` adds listing-rules-only readiness metrics; otherwise both retain their existing shape.
+  `--label-column` adds a small-set measurement (flagged = MEDIUM or HIGH), never "accuracy". The example mappings
+  carry column names nobody has verified, so each says `# unverified`.
 - Listing Guard is an independent product that many clients call over the API (ADR-007). There is no code or data
   for any single company in this repo; a client's own listing format is mapped to the standard input
   (`docs/input-schema.md`) on the client's side.
@@ -69,9 +74,10 @@ It never edits a listing, never publishes, and does no SEO.
   needs the `batch` pack, stops at once with `quota-exceeded` when no unit is left, and marks rows `QUOTA_EXCEEDED` when the
   quota runs out midway. `plan set <client> <plan>` (admin job) changes a plan at once. The packs `policy-analyzer` and
   `sheet-connector` are reserved and not enforced yet: ADR-011 PR 5 and phase 4b (GĐ4b) will call `PlanService.requirePack` for them.
-- Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, the trademark
-  scanner core with its endpoint, the `batch-check` job, fix suggestions and a readiness score in the libraries (not in
-  the API yet), and policy ingest + retrieval (no LLM call, no structured output, no citation verification yet).
+- Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, optional
+  fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
+  endpoint, the `batch-check` job, and policy ingest + retrieval (no LLM call, no structured output, no citation
+  verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
@@ -98,10 +104,9 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
    gets its own part in the job and its own columns in the reports, never a change to the existing ones.
 6. Client plans and monthly quota (done, ADR-013, V19; off by default). Next for it: ADR-011 PR 5 and the sheet connector
    (phase 4b) call `requirePack` for their packs. Billing, payment and a self-service upgrade are not planned here.
-7. Listing Workspace (ADR-014, Proposed). Part A is done in `core` and `rule-engine`: fix suggestions and the publish
-   readiness score. Next: an API PR that calls `runDetailed` and exposes `fix` and the score (DTO, storage or
-   recomputation, `docs/api/openapi.json`, integration guide), then part B, the interface. `tag_count_underused` is
-   deferred to the next Etsy ruleset update.
+7. Listing Workspace (ADR-014, Proposed). Part A and the optional API/batch integration are implemented; the feature
+   defaults off and V20 stores details. Next: part B, the interface, and `tag_count_underused` in the next Etsy ruleset
+   update.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
@@ -243,6 +248,13 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   falsely clean result; a risk that cannot be determined is `UNKNOWN`, never `LOW`. The existing `RuleEngine` still
   logs and skips a failing rule. Trademark seed, test and eval data use synthetic names only: never commit a real
   trademark, a real catalog or any company's data.
+- **Fix suggestions and readiness** (ADR-014): `listing-guard.fixes.enabled` defaults to false. Off means `/checks`
+  uses `RuleEngine.run()` and its response and batch report keep their current shape. On, API/batch use `runDetailed()`
+  and readiness covers only `listing-rules`; clients must show trademark results separately. V20 persists fix/readiness
+  data. A POST cache hit enriches legacy rows idempotently under a row lock without quota or `analysisVersion` changes;
+  legacy GET returns null fixes/false `fixesComputed`/null readiness. Fixes target normalized values (`finding.value`);
+  tag descriptions name the tag value, and list indexes count the cleaned list (trimmed, blank entries dropped). Never
+  store the submitted listing or apply a fix.
 - **External models** (ADR-011, ADR-012): configure every embedding or LLM model as a specific version, with its date
   when the vendor gives one. Never use an alias that points at the latest model: the alias changes the model while
   `modelId()` stays the same, so the cache would be wrong. Keys come only from their own environment variables,
