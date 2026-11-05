@@ -49,9 +49,13 @@ public record EditorResult(Readiness readiness, Trademark trademark, List<Group<
     public record Fix(String action, String description, String proposedValue) {
     }
 
-    /** One finding of the listing rules; {@code value} is the value it is about (null when no single value applies). */
+    /**
+     * One finding of the listing rules; {@code value} is the value it is about (null when no single value applies).
+     * {@code fixId} numbers the findings that carry a fix, in the order the page shows them (null when there is none); the
+     * page uses it to name the form values of the "Apply suggestion" button.
+     */
     public record RuleItem(String ruleId, String field, String message, String suggestion, String value, Evidence evidence,
-                           Fix fix) {
+                           Fix fix, Integer fixId) {
     }
 
     public record TrademarkItem(String ruleId, String risk, String field, String matchType, String mark, String message,

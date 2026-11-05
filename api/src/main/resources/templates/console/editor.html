@@ -157,6 +157,10 @@
     </section>
 
     <aside class="results" id="results" aria-live="polite" aria-label="Results">
+        <div class="notice" id="notice" th:if="${notice != null}" th:classappend="${noticeApplied} ? 'applied' : 'refused'"
+             th:attr="role=${noticeApplied} ? 'status' : 'alert'">
+            <p th:text="${notice}"></p>
+        </div>
         <th:block th:if="${result != null}">
             <div class="verdicts">
                 <section class="verdict" id="readiness-panel" aria-labelledby="readiness-heading"
@@ -194,6 +198,17 @@
                                 <p class="small"><strong>Suggested fix:</strong> <span th:text="${f.fix.description}"></span></p>
                                 <p class="small" th:if="${f.fix.proposedValue != null}">Proposed value:
                                     <code th:text="${f.fix.proposedValue}"></code></p>
+                                <p class="small" th:if="${f.fix.proposedValue == null}">Proposed: remove this value.</p>
+                                <!-- The button and its hidden values belong to the editor form (form attribute), so the page sends
+                                     what is typed in the fields now. Pressing it only fills the field; it never checks again. -->
+                                <input type="hidden" form="editor-form" th:name="'fix.' + ${f.fixId} + '.field'" th:value="${f.field}">
+                                <input type="hidden" form="editor-form" th:name="'fix.' + ${f.fixId} + '.value'" th:value="${f.value}">
+                                <input type="hidden" form="editor-form" th:name="'fix.' + ${f.fixId} + '.action'" th:value="${f.fix.action}">
+                                <input type="hidden" form="editor-form" th:name="'fix.' + ${f.fixId} + '.proposed'"
+                                       th:value="${f.fix.proposedValue}" th:if="${f.fix.proposedValue != null}">
+                                <button type="submit" form="editor-form" name="apply" class="apply"
+                                        th:value="${f.fixId}" th:formaction="@{/console/check/apply}"
+                                        th:attr="aria-label='Apply suggestion to ' + ${f.field}">Apply suggestion</button>
                             </div>
                         </li>
                     </ul>

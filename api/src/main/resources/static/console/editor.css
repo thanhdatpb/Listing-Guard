@@ -150,4 +150,9 @@ button.link { border: 0; background: none; color: var(--accent); padding: 0; tex
 .group p { margin: 0.25rem 0; }
 .msg { font-weight: 600; }
 .ev mark { background: var(--mark); color: inherit; padding: 0 0.1em; border-radius: 2px; }
+.notice { margin: 0 0 1rem; padding: 0.75rem 1rem; border: 1px solid var(--line); border-left-width: 6px; border-radius: 8px; background: var(--card); }
+.notice p { margin: 0; }
+.notice.applied { border-left-color: var(--ok); }
+.notice.refused { border-left-color: var(--error); }
+button.apply { padding: 0.3rem 0.9rem; font-size: 0.875rem; margin-top: 0.25rem; }
 .fix { margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: var(--card); border: 1px dashed var(--line); border-radius: 6px; }

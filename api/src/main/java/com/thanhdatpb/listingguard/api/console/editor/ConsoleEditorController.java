@@ -4,7 +4,9 @@ import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,6 +30,8 @@ import org.springframework.web.server.ResponseStatusException;
 public class ConsoleEditorController {
 
     static final String VIEW = "console/editor";
+
+    private static final Pattern FIX_ID = Pattern.compile("\\d{1,4}");
 
     private final PlanService plans;
     private final ActiveRulesets rulesets;
@@ -63,7 +67,31 @@ public class ConsoleEditorController {
         EditorResult result = checks.check(user.clientId(), selected, mapped.listing());
         populate(model, user, selected, form, Map.of());
         model.addAttribute("result", result);
-        model.addAttribute("otherOpen", result.requiredFieldsFinding());
+        model.addAttribute("otherOpen", result.requiredFieldsFinding() || form.hasOtherFields());
+        return VIEW;
+    }
+
+    /**
+     * "Apply suggestion": puts the proposed value of one fix into the form and shows the form again. It never runs a check, so
+     * it costs nothing and the old result is not shown beside the changed text; the seller presses "Check" when ready. The
+     * button belongs to the editor form (HTML {@code form} attribute), so what the seller has typed since the check is what
+     * comes back, and the fix is described by hidden values named {@code fix.<id>.field|value|action|proposed}.
+     */
+    @PostMapping("/console/check/apply")
+    public String apply(@ModelAttribute("form") EditorForm form, @RequestParam(name = "apply", defaultValue = "") String fixId,
+                        HttpServletRequest request, @AuthenticationPrincipal ConsoleUser user, Model model) {
+        EditorMarketplace selected = marketplace(form.marketplace());
+        EditorFixApplier.Outcome outcome;
+        if (FIX_ID.matcher(fixId).matches()) {
+            String prefix = "fix." + fixId + ".";
+            outcome = EditorFixApplier.apply(form, request.getParameter(prefix + "field"), request.getParameter(prefix + "value"),
+                    request.getParameter(prefix + "action"), request.getParameter(prefix + "proposed"));
+        } else {
+            outcome = EditorFixApplier.apply(form, null, null, null, null);
+        }
+        populate(model, user, selected, outcome.form(), Map.of());
+        model.addAttribute("notice", outcome.message());
+        model.addAttribute("noticeApplied", outcome.applied());
         return VIEW;
     }
 
@@ -77,7 +105,8 @@ public class ConsoleEditorController {
         model.addAttribute("limits", EditorLimits.of(config, marketplace, form.productType()));
         model.addAttribute("cost", EditorCost.of(plans.usage(user.clientId())));
         model.addAttribute("fieldErrors", errors);
-        model.addAttribute("otherOpen", !errors.isEmpty());
+        // collapsed by default; open when a field could not be read, or when it already holds what the seller typed
+        model.addAttribute("otherOpen", !errors.isEmpty() || form.hasOtherFields());
     }
 
     static EditorMarketplace marketplace(String code) {

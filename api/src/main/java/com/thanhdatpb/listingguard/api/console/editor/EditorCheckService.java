@@ -113,9 +113,14 @@ public class EditorCheckService {
 
     private static List<EditorResult.Group<EditorResult.RuleItem>> ruleGroups(CheckResult result) {
         List<EditorResult.Group<EditorResult.RuleItem>> groups = new ArrayList<>();
+        int nextFixId = 0;
         for (Severity severity : SEVERITY_ORDER) {
-            List<EditorResult.RuleItem> items = result.findings().stream()
-                    .filter(finding -> finding.severity() == severity).map(EditorCheckService::ruleItem).toList();
+            List<EditorResult.RuleItem> items = new ArrayList<>();
+            for (CheckResult.FindingView finding : result.findings()) {
+                if (finding.severity() == severity) {
+                    items.add(ruleItem(finding, finding.fix() == null ? null : nextFixId++));
+                }
+            }
             if (!items.isEmpty()) {
                 groups.add(new EditorResult.Group<>(label(severity), severity.name().toLowerCase(Locale.ROOT), items));
             }
@@ -131,11 +136,11 @@ public class EditorCheckService {
         };
     }
 
-    private static EditorResult.RuleItem ruleItem(CheckResult.FindingView finding) {
+    private static EditorResult.RuleItem ruleItem(CheckResult.FindingView finding, Integer fixId) {
         CheckResult.FixView fix = finding.fix();
         return new EditorResult.RuleItem(finding.ruleId(), finding.field(), finding.message(), finding.suggestion(),
                 finding.value(), EditorEvidence.ofValue(finding.value()),
-                fix == null ? null : new EditorResult.Fix(fix.action().name(), fix.description(), fix.proposedValue()));
+                fix == null ? null : new EditorResult.Fix(fix.action().name(), fix.description(), fix.proposedValue()), fixId);
     }
 
     private EditorResult.Trademark trademark(UUID clientId, CheckRequest request, Listing listing) {
