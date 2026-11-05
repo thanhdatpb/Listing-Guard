@@ -23,7 +23,9 @@ record ListingOutcome(int line, String id, Boolean label, String inputError, Par
             /** the check cannot run on this deployment (a trademark catalog that is not served) */
             NOT_CONFIGURED,
             /** the check threw; the message says what */
-            FAILED
+            FAILED,
+            /** the client's monthly quota ran out, so the check was not run (ADR-013); a stored result is still answered */
+            QUOTA_EXCEEDED
         }
 
         static <T> Part<T> done(T result) {
@@ -36,6 +38,10 @@ record ListingOutcome(int line, String id, Boolean label, String inputError, Par
 
         static <T> Part<T> failed(String message) {
             return new Part<>(State.FAILED, null, message);
+        }
+
+        static <T> Part<T> quotaExceeded(String message) {
+            return new Part<>(State.QUOTA_EXCEEDED, null, message);
         }
 
         boolean isDone() {

@@ -8,6 +8,10 @@ import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.client.Client;
 import com.thanhdatpb.listingguard.api.client.ClientRepository;
+import com.thanhdatpb.listingguard.api.plan.Pack;
+import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
+import com.thanhdatpb.listingguard.api.plan.PlanService;
+import com.thanhdatpb.listingguard.api.plan.QuotaExceededException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCatalogRuntime;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckResult;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckService;
@@ -42,7 +46,8 @@ public final class BatchCheckJob {
     private static final int MESSAGE_MAX_CHARS = 300;
 
     /** What a finished run reports to its caller. */
-    public record Result(int rows, int unreadableRows, int failedRows, boolean stoppedAtMaxRows, Path reportDir) {
+    public record Result(int rows, int unreadableRows, int failedRows, int quotaSkippedRows, boolean stoppedAtMaxRows,
+                         Path reportDir) {
     }
 
     private final ClientRepository clients;
@@ -51,18 +56,20 @@ public final class BatchCheckJob {
     private final TrademarkCheckService trademarkChecks;
     private final TrademarkCatalogRuntime trademark;
     private final TrademarkRulesets trademarkRulesets;
+    private final PlanService plans;
     private final PrintStream out;
     private final Clock clock;
 
     public BatchCheckJob(ClientRepository clients, NormalizerRegistry normalizers, CheckService checks,
                          TrademarkCheckService trademarkChecks, TrademarkCatalogRuntime trademark,
-                         TrademarkRulesets trademarkRulesets, PrintStream out, Clock clock) {
+                         TrademarkRulesets trademarkRulesets, PlanService plans, PrintStream out, Clock clock) {
         this.clients = clients;
         this.normalizers = normalizers;
         this.checks = checks;
         this.trademarkChecks = trademarkChecks;
         this.trademark = trademark;
         this.trademarkRulesets = trademarkRulesets;
+        this.plans = plans;
         this.out = out;
         this.clock = clock;
     }
@@ -70,10 +77,15 @@ public final class BatchCheckJob {
     /**
      * @throws BatchConfigException  before any listing is checked, if the client, the options, the mapping or the input
      *                               file cannot be used
+     * @throws PlanNotAllowedException before any listing is checked, if the client's plan lacks the {@code batch} or the
+     *                               {@code listing-rules} pack (only where plans are on, ADR-013)
+     * @throws QuotaExceededException before any listing is checked and before any report is written, if no unit of the
+     *                               month's quota is left
      * @throws IllegalStateException after the reports are completed, if the input file turned out to be damaged
      */
     public Result run(BatchOptions options) {
         Client client = requireActiveClient(options.client());
+        String planNote = requirePlan(client);
         String marketplace = normalizers.get(options.marketplace()).marketplace();
         BatchMapping mapping = BatchMapping.load(options.mapping(), marketplace);
         if (!Files.isRegularFile(options.input())) {
@@ -82,8 +94,9 @@ public final class BatchCheckJob {
         try (BatchCsvReader reader = BatchCsvReader.open(options.input(), mapping.csv())) {
             BatchMapping.Bound bound = bind(options, mapping, reader);
             TrademarkCatalogRuntime.Status status = trademark.status();
-            boolean trademarkReady = status.state() == TrademarkCatalogRuntime.State.READY;
-            String notReady = trademarkReady ? null : status.state() + ": " + status.detail();
+            boolean trademarkReady = status.state() == TrademarkCatalogRuntime.State.READY && planNote == null;
+            String notReady = status.state() != TrademarkCatalogRuntime.State.READY
+                    ? status.state() + ": " + status.detail() : planNote;
 
             try (BatchReport report = new BatchReport(options.out())) {
                 int rows = 0;
@@ -117,6 +130,11 @@ public final class BatchCheckJob {
                 out.println("Batch check " + (abortReason == null ? "finished" : "STOPPED (" + abortReason + ")") + ": "
                         + totals.rows() + " rows, " + totals.unreadable() + " unreadable, " + totals.failed()
                         + " with a failed check. Reports in " + options.out().toAbsolutePath() + ".");
+                if (totals.quotaSkipped() > 0) {
+                    out.println(totals.quotaSkipped() + " row(s) were left out because the monthly quota is used up ("
+                            + QuotaExceededException.CODE + "; status QUOTA_EXCEEDED in listings.csv). Results already stored "
+                            + "were still answered. Run the batch again after the quota resets or the plan changes.");
+                }
                 if (!trademarkReady) {
                     out.println("Trademark checks were not run (" + notReady + "); the rule checks were.");
                 }
@@ -124,7 +142,8 @@ public final class BatchCheckJob {
                     throw new IllegalStateException("The batch stopped after line " + abortedAfterLine + ": " + abortReason
                             + ". The reports in " + options.out() + " cover the rows before it and say so.");
                 }
-                return new Result(totals.rows(), totals.unreadable(), totals.failed(), stoppedAtMaxRows, options.out());
+                return new Result(totals.rows(), totals.unreadable(), totals.failed(), totals.quotaSkipped(), stoppedAtMaxRows,
+                        options.out());
             }
         }
     }
@@ -137,6 +156,34 @@ public final class BatchCheckJob {
                     + "docker compose run --rm admin client activate " + name);
         }
         return client;
+    }
+
+    /**
+     * What the client's plan allows, checked before the input is read (ADR-013); nothing here costs a unit. A plan without
+     * {@code batch} or {@code listing-rules} stops the job, and so does a month with no unit left, so that the operator
+     * does not get a report made of failures. A plan without {@code trademark-risk} only turns the trademark part off.
+     * Does nothing where plans are off.
+     *
+     * @return why the trademark part will not run for this plan, or null when the plan allows it
+     */
+    private String requirePlan(Client client) {
+        try {
+            plans.requirePack(client.getId(), Pack.BATCH);
+            PlanService.Admission admission = plans.requirePack(client.getId(), Pack.LISTING_RULES);
+            plans.requireQuota(admission);
+        } catch (PlanNotAllowedException e) {
+            out.println("Batch check stopped: " + PlanNotAllowedException.CODE + ". " + e.getMessage());
+            throw e;
+        } catch (QuotaExceededException e) {
+            out.println("Batch check stopped: " + QuotaExceededException.CODE + ". " + e.getMessage());
+            throw e;
+        }
+        try {
+            plans.requirePack(client.getId(), Pack.TRADEMARK_RISK);
+            return null;
+        } catch (PlanNotAllowedException e) {
+            return PlanNotAllowedException.CODE + ": " + e.getMessage();
+        }
     }
 
     private static BatchMapping.Bound bind(BatchOptions options, BatchMapping mapping, BatchCsvReader reader) {
@@ -174,6 +221,9 @@ public final class BatchCheckJob {
     private Part<CheckResult> rules(BatchCsvReader.Row row, UUID clientId, String marketplace, ObjectNode listing) {
         try {
             return Part.done(checks.check(clientId, new CheckRequest(marketplace, listing)));
+        } catch (QuotaExceededException e) {
+            // a stored result is still answered; only a row that needs a new result is left out (ADR-013)
+            return Part.quotaExceeded(QuotaExceededException.CODE);
         } catch (RuntimeException e) {
             log.warn("Batch check: the rule check of line {} failed: {}", row.line(), e.toString());
             return Part.failed(describe(e));
@@ -187,6 +237,8 @@ public final class BatchCheckJob {
         } catch (TrademarkUnavailableException e) {
             // the catalog was switched off or refused after the batch began
             return Part.notConfigured(e.getMessage());
+        } catch (QuotaExceededException e) {
+            return Part.quotaExceeded(QuotaExceededException.CODE);
         } catch (RuntimeException e) {
             log.warn("Batch check: the trademark check of line {} failed: {}", row.line(), e.toString());
             return Part.failed(describe(e));
