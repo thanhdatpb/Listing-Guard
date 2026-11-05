@@ -76,7 +76,8 @@ public final class CatalogImport {
     private static final int MAX_REFERENCE_CHARS = 500;
     private static final int MAX_LICENSE_CHARS = 200;
     private static final Set<String> RECORD_KEYS = Set.of("mark", "status", "nice_classes", "source_id", "common_word");
-    private static final int MAX_MARK_CHARS = 300;
+    /** The longest mark (display or normalized form) a record may have; the USPTO converter drops a longer one. */
+    public static final int MAX_MARK_CHARS = 300;
     private static final int MAX_SOURCE_ID_CHARS = 100;
     /** A valid line is far shorter; the limit keeps a file without line breaks from filling the memory. */
     private static final int MAX_LINE_CHARS = 100_000;
