@@ -5,6 +5,6 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @EnableConfigurationProperties({TrademarkProperties.class, TrademarkRetentionProperties.class,
-        TrademarkImportProperties.class})
+        TrademarkImportProperties.class, UsptoConvertProperties.class})
 public class TrademarkConfig {
 }
