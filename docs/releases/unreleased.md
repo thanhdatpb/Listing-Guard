@@ -1,10 +1,10 @@
 # Unreleased changes
 
 Changes on `main` that no release has shipped yet. This file lists the USPTO converter (ADR-009, PR A2b), client plans
-with a monthly quota (ADR-013) and the library part of the Listing Workspace (ADR-014); when the next version is cut, move
+with a monthly quota (ADR-013) and the Listing Workspace API/batch integration (ADR-014); when the next version is cut, move
 its content into `docs/releases/v<version>.md` with the other changes of that version and delete this file. Nothing here
-changes the requests, responses, cache identities, hashes or results of `POST /api/v1/checks` or
-`POST /api/v1/trademark-checks`; while plans are off (the default) nothing here changes what an API call does.
+changes cache identities, hashes or results of trademark checks. With `listing-guard.fixes.enabled=false` (the default),
+the `/checks` response and batch reports keep their current shape.
 
 ## What is new
 
@@ -68,10 +68,10 @@ Migration V19 adds `plan`, `plan_pack`, `client_usage` and `client.plan_code` (d
 [docs/deployment.md](../deployment.md#client-plans-and-the-monthly-quota-adr-013) and the
 [integration guide](../integration-guide.md#plans-and-monthly-quota).
 
-### Fix suggestions and a publish readiness score (ADR-014, part A)
+### Fix suggestions and a publish readiness score (ADR-014, part A and API)
 
-This is a change to the libraries (`core`, `rule-engine`). **The API, the batch reports and `docs/api/openapi.json` do not
-show it yet**; it is the base for an API change and for the interface (part B), both planned.
+The library implementation is in `core` and `rule-engine`. The opt-in API and batch integration is now available with
+`listing-guard.fixes.enabled=true` (`LISTING_GUARD_FIXES_ENABLED=true`).
 
 - **Fix suggestions.** `Finding` has a new nullable component `fix` (a `FixSuggestion`: an action, a Vietnamese description
   that cites the numbers, and for a replacement the proposed value). Three rules propose one: `title_length` (Etsy and
@@ -89,21 +89,34 @@ show it yet**; it is the base for an API change and for the interface (part B), 
   the maintainer's choice and are marked `unverified`.
 - **Cost.** Verifying suggestions costs one extra rule run per suggestion, paid only by `runDetailed`. On the largest
   listing of the performance test (16 suggestions, an 18 KB description) the average is about 24 ms against a 50 ms budget.
+- **API response.** With the flag on, each finding adds `fix` (verified suggestion or `null`); the response adds
+  `fixesComputed` and `readiness: {score, ready, status, version}`. With the flag off, it continues to call `run()` and
+  emits no new fields. Fixes replace the normalized `finding.value`; tag descriptions name the tag. List indexes count
+  the normalized list (trimmed items, blank entries dropped).
+- **Stored and cached results.** V20 adds fix columns to `finding` and readiness columns plus `fixes_computed` to
+  `listing_check`. No submitted listing is stored, and ruleset hashes and `analysisVersion` are unchanged. A feature-on
+  GET of a legacy result returns `fixesComputed: false`, `readiness: null`, and null fixes. A POST cache hit has the
+  original request listing and enriches that result only when `fixes_computed=false`; concurrent enrichment is
+  idempotent and costs no quota.
+- **Batch.** When enabled, `listings.csv` adds `readiness_score` and `ready`; `summary.html` shows ready, scored and
+  INCOMPLETE counts and an average over scored listings only. The score counts listing-rules only; clients must display
+  trademark risk separately. The API contract is in `docs/api/openapi.json`.
 
-No migration, no ruleset change (`etsy-2026-11` and `amazon-2026-11` keep their hash, so no `analysisVersion` changes), no
-new endpoint, no change to `docs/api/openapi.json`. See [ADR-014](../adr/ADR-014-listing-workspace.md).
+Migration V20 is additive. There is no ruleset change (`etsy-2026-11` and `amazon-2026-11` keep their hash, so no
+`analysisVersion` changes), and no new endpoint. See [ADR-014](../adr/ADR-014-listing-workspace.md) and the
+[integration guide](../integration-guide.md#optional-fixes-and-readiness-adr-014).
 
 ## Breaking changes
 
-None for a deployment that leaves plans off. For code that uses the libraries: `Finding` has an eighth component (the
-seven-argument constructor is kept). Two things an operator may notice: `admin client list` has a new PLAN column
-before CREATED (a script that cuts the columns by position needs updating), and `BatchCheckJob` takes a `PlanService`
-(internal, for code that builds the job by hand).
+No breaking HTTP change: fixes are off by default and response additions are additive. For code that uses the libraries:
+`Finding` has an eighth component (the seven-argument constructor is kept). Two things an operator may notice:
+`admin client list` has a new PLAN column before CREATED (a script that cuts the columns by position needs updating),
+and `BatchCheckJob` takes a `PlanService` (internal, for code that builds the job by hand).
 
 ## Upgrade notes
 
-V19 applies on its own at start-up and is additive. **Before you turn plans on**, give each client its plan with
+V19 and V20 apply on their own at start-up and are additive. **Before you turn plans on**, give each client its plan with
 `admin plan set`: every existing client is `FREE` after V19, which has 20 units a month and no trademark, batch or sheet
 pack. Then set `LISTING_GUARD_PLANS_ENABLED=true` (`PLANS_ENABLED=true` in the development compose file) for the API and for
-`batch-check`. Usage is counted only while plans are on. Nothing needs to be configured to use the USPTO converter beyond
-what its section says.
+`batch-check`. Usage is counted only while plans are on. Fixes/readiness remain off until enabled; no other setup is
+needed for them.

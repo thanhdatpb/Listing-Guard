@@ -104,6 +104,8 @@ class CheckControllerIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         JsonNode json = mapper.readTree(response);
+        assertThat(json.has("fixesComputed")).isFalse();
+        assertThat(json.has("readiness")).isFalse();
         UUID checkId = UUID.fromString(json.get("checkId").asText());
         assertThat(json.get("contentHash").asText()).matches("[0-9a-f]{64}");
         ListingCheck saved = checks.findById(checkId).orElseThrow();
@@ -124,6 +126,7 @@ class CheckControllerIntegrationTest {
         List<String> ruleIds = new ArrayList<>();
         json.get("findings").forEach(finding -> {
             ruleIds.add(finding.get("ruleId").asText());
+            assertThat(finding.has("fix")).isFalse();
             assertThat(finding.get("source").asText()).isEqualTo("RULE");
             assertThat(finding.get("message").asText()).isNotBlank();
             assertThat(finding.get("suggestion").asText()).isNotBlank();

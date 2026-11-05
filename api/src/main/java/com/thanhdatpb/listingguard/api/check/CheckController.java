@@ -26,6 +26,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springframework.http.converter.json.MappingJacksonValue;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,9 +44,11 @@ public class CheckController {
     private static final String PROBLEM = "application/problem+json";
 
     private final CheckService service;
+    private final FixesProperties fixes;
 
-    public CheckController(CheckService service) {
+    public CheckController(CheckService service, FixesProperties fixes) {
         this.service = service;
+        this.fixes = fixes;
     }
 
     @PostMapping
@@ -95,9 +98,9 @@ public class CheckController {
                                     examples = {
                                             @ExampleObject(name = "rate-limited", value = PROBLEM_RATE_LIMITED),
                                             @ExampleObject(name = "quota-exceeded", value = PROBLEM_QUOTA_EXCEEDED)}))})
-    public CheckResult check(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
-                             @Valid @RequestBody CheckRequest request) {
-        return service.check(client.id(), request);
+    public MappingJacksonValue check(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
+                                     @Valid @RequestBody CheckRequest request) {
+        return response(service.check(client.id(), request));
     }
 
     @GetMapping("/{id}")
@@ -119,8 +122,14 @@ public class CheckController {
                     @ApiResponse(responseCode = "429", description = "Rate limit exceeded for the calling client.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_RATE_LIMITED)))})
-    public CheckResult get(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
-                           @Parameter(description = "checkId returned by POST /api/v1/checks") @PathVariable UUID id) {
-        return service.get(client.id(), id);
+    public MappingJacksonValue get(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
+                                   @Parameter(description = "checkId returned by POST /api/v1/checks") @PathVariable UUID id) {
+        return response(service.get(client.id(), id));
+    }
+
+    private MappingJacksonValue response(CheckResult result) {
+        MappingJacksonValue response = new MappingJacksonValue(result);
+        response.setSerializationView(fixes.enabled() ? CheckResult.DetailedView.class : CheckResult.LegacyView.class);
+        return response;
     }
 }

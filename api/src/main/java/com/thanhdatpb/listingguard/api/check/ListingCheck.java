@@ -43,6 +43,21 @@ public class ListingCheck {
     @Column(name = "analysis_version", nullable = false, length = 128)
     private String analysisVersion;
 
+    @Column(name = "fixes_computed", nullable = false)
+    private boolean fixesComputed;
+
+    @Column(name = "readiness_score")
+    private Integer readinessScore;
+
+    @Column(name = "readiness_ready")
+    private Boolean readinessReady;
+
+    @Column(name = "readiness_status", length = 16)
+    private String readinessStatus;
+
+    @Column(name = "readiness_version", length = 64)
+    private String readinessVersion;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -94,5 +109,33 @@ public class ListingCheck {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public boolean isFixesComputed() {
+        return fixesComputed;
+    }
+
+    public Integer getReadinessScore() {
+        return readinessScore;
+    }
+
+    public Boolean getReadinessReady() {
+        return readinessReady;
+    }
+
+    public String getReadinessStatus() {
+        return readinessStatus;
+    }
+
+    public String getReadinessVersion() {
+        return readinessVersion;
+    }
+
+    public void setDetailedAnalysis(String status, Integer score, boolean ready, String version) {
+        fixesComputed = true;
+        readinessStatus = status;
+        readinessScore = score;
+        readinessReady = ready;
+        readinessVersion = version;
     }
 }

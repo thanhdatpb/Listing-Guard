@@ -43,6 +43,11 @@ class BatchReportTest {
                 new CheckResult.Summary(errors, warnings, 0), List.of(findings));
     }
 
+    private static CheckResult rulesWithReadiness(UUID id, CheckResult.ReadinessView readiness) {
+        return new CheckResult(id, CheckStatus.COMPLETED, "ETSY", "etsy-test", "etsy-test", "hash", false, RUN_1,
+                new CheckResult.Summary(0, 0, 0), List.of(), true, readiness);
+    }
+
     private static CheckResult.FindingView ruleFinding(String ruleId, Severity severity, String field, String value) {
         return new CheckResult.FindingView(ruleId, FindingSource.RULE, severity, field, value, "Thông báo " + ruleId,
                 "Gợi ý " + ruleId);
@@ -67,6 +72,13 @@ class BatchReportTest {
     private BatchReport.RunInfo info(Instant at, String labelColumn, boolean trademarkReady, String abortReason) {
         return new BatchReport.RunInfo(at, "client-x", "ETSY", "export.csv", "mapping.yaml", labelColumn, null, false,
                 abortReason, trademarkReady, trademarkReady ? null : "DISABLED: no catalog version is configured", DISCLAIMER);
+    }
+
+    private BatchReport.RunInfo info(Instant at, String labelColumn, boolean trademarkReady, String abortReason,
+                                     boolean readinessEnabled) {
+        return new BatchReport.RunInfo(at, "client-x", "ETSY", "export.csv", "mapping.yaml", labelColumn, null, false,
+                abortReason, trademarkReady, trademarkReady ? null : "DISABLED: no catalog version is configured",
+                DISCLAIMER, readinessEnabled);
     }
 
     private static List<Map<String, String>> csv(Path file) throws IOException {
@@ -161,6 +173,9 @@ class BatchReportTest {
                 .containsEntry("mark", "Zorvex").containsEntry("sourceIds", "S-001|S-002");
 
         List<Map<String, String>> listings = csv(dir.resolve("listings.csv"));
+        assertThat(Files.readString(dir.resolve("listings.csv"), StandardCharsets.UTF_8))
+                .startsWith("﻿id,line,status,label,trademarkRisk,completeness,ruleErrors,ruleWarnings,"
+                        + "rulesCheckId,trademarkCheckId,error\n");
         assertThat(listings).extracting(row -> row.get("id")).containsExactly("L-1", "L-2", "L-3", "L-4", "L-5");
         assertThat(listings.get(0)).containsEntry("line", "2").containsEntry("status", "OK").containsEntry("label", "true")
                 .containsEntry("trademarkRisk", "HIGH").containsEntry("completeness", "COMPLETE")
@@ -174,6 +189,42 @@ class BatchReportTest {
                 .containsEntry("ruleErrors", "").containsEntry("label", "")
                 .containsEntry("error", "rules: DataAccessResourceFailureException: database is down");
         assertThat(listings.get(4)).containsEntry("trademarkRisk", "UNKNOWN").containsEntry("completeness", "INCOMPLETE");
+        assertThat(listings).allSatisfy(row -> assertThat(row).doesNotContainKey("readiness_score").doesNotContainKey("ready"));
+        assertThat(Files.readString(dir.resolve("summary.html"), StandardCharsets.UTF_8)).doesNotContain("Điểm sẵn sàng");
+    }
+
+    @Test
+    void readinessColumnsAndSummaryAreIncludedOnlyWhenEnabled() throws IOException {
+        CheckResult ready = rulesWithReadiness(UUID.randomUUID(), new CheckResult.ReadinessView(80, true, "SCORED",
+                "readiness-2026-11"));
+        CheckResult notReady = rulesWithReadiness(UUID.randomUUID(), new CheckResult.ReadinessView(40, false, "SCORED",
+                "readiness-2026-11"));
+        CheckResult incomplete = rulesWithReadiness(UUID.randomUUID(), new CheckResult.ReadinessView(null, false, "INCOMPLETE",
+                "readiness-2026-11"));
+
+        try (BatchReport report = new BatchReport(dir, true)) {
+            report.add(outcome(2, "ready", null, ready, trademark(UUID.randomUUID(), RiskLevel.LOW, Completeness.COMPLETE)));
+            report.add(outcome(3, "not-ready", null, notReady,
+                    trademark(UUID.randomUUID(), RiskLevel.HIGH, Completeness.COMPLETE)));
+            report.add(outcome(4, "incomplete", null, incomplete,
+                    trademark(UUID.randomUUID(), RiskLevel.UNKNOWN, Completeness.INCOMPLETE)));
+            report.finish(info(RUN_1, null, true, null, true));
+        }
+
+        String reportCsv = Files.readString(dir.resolve("listings.csv"), StandardCharsets.UTF_8);
+        assertThat(reportCsv).startsWith("﻿id,line,status,label,trademarkRisk,completeness,ruleErrors,ruleWarnings,"
+                + "rulesCheckId,trademarkCheckId,error,readiness_score,ready\n");
+        List<Map<String, String>> rows = csv(dir.resolve("listings.csv"));
+        assertThat(rows).extracting(row -> row.get("readiness_score")).containsExactly("80", "40", "");
+        assertThat(rows).extracting(row -> row.get("ready")).containsExactly("true", "false", "false");
+
+        String html = Files.readString(dir.resolve("summary.html"), StandardCharsets.UTF_8);
+        assertThat(html).contains("<h2>Điểm sẵn sàng (chỉ listing-rules)</h2>")
+                .contains("<td>Listing sẵn sàng</td><td class=\"n\">1</td>")
+                .contains("<td>Listing có điểm</td><td class=\"n\">2</td>")
+                .contains("<td>Listing INCOMPLETE (không có điểm)</td><td class=\"n\">1</td>")
+                .contains("<td>Điểm trung bình (chỉ listing có điểm)</td><td class=\"n\">60.0</td>")
+                .contains("không bao gồm trademark");
     }
 
     @Test

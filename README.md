@@ -43,13 +43,11 @@ Working end to end:
   over the limit the API answers `429 quota-exceeded` (a pack outside the plan: `403 plan-not-allowed`). The packs
   `policy-analyzer` and `sheet-connector` are reserved in the plans and not enforced yet. There is no billing or payment;
   see [deployment](docs/deployment.md#client-plans-and-the-monthly-quota-adr-013).
-- Fix suggestions and a publish readiness score ([ADR-014](docs/adr/ADR-014-listing-workspace.md), part A), **in the
-  libraries only**. `RuleEngine.runDetailed` returns, for a title or a tag that is too long and for a repeated tag, a
-  proposed value (a cut at a word boundary, or the tag to remove) that has been checked against the whole ruleset, and
-  `ReadinessScorer` turns a rule run into a score (a listing with an ERROR never scores above 59; a run in which a rule
-  failed has no score). Nothing applies a suggestion, no suggestion replaces words, and a trademark finding never has
-  one. The API, the batch reports and `docs/api/openapi.json` do not show either yet, and the interface (part B) is
-  planned.
+- Fix suggestions and a publish readiness score ([ADR-014](docs/adr/ADR-014-listing-workspace.md)), **off by default**
+  (`listing-guard.fixes.enabled=false`). When enabled, `/checks` returns verified fix proposals and a readiness score;
+  batch reports add the score and readiness flag. A listing with an ERROR never scores above 59, and a run in which a
+  rule failed has no score. Fixes are advice only, never applied; the score covers listing-rules only, so clients must
+  show the separate trademark result alongside it. The interface (part B) is still planned.
 
 Before you rely on it:
 
@@ -410,8 +408,8 @@ Done: pack identity (PR 0a, migration V7, and PR 0b, migrations V8-V14; composit
 (endpoint), the multi-file and streaming catalog import of A2b (V18), the USPTO daily XML converter of A2b (written from
 the public DTD V2.0 and **unverified against real data**), the `batch-check` job, and client plans with a monthly quota
 (V19, [ADR-013](docs/adr/ADR-013-client-plans-and-monthly-quota.md); off by default; billing, `sheet-connector` and the
-enforcement of `policy-analyzer` are not part of it), and the library part of the Listing Workspace (fix suggestions and
-the publish readiness score, [ADR-014](docs/adr/ADR-014-listing-workspace.md) part A; the API does not expose them yet).
+enforcement of `policy-analyzer` are not part of it), and the Listing Workspace API and batch integration
+([ADR-014](docs/adr/ADR-014-listing-workspace.md); off by default, V20).
 What follows, in this order, is **not built yet**:
 
 1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
@@ -423,8 +421,7 @@ What follows, in this order, is **not built yet**:
    exist today (the `LlmProvider` contract, a scripted test provider and the citation verifier); there is no call to a
    real model and no endpoint. The analyzer is designed to be off by default and enabled by configuring an LLM.
 4. Add Amazon product-type overrides only when their limits and sources have been verified.
-5. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)), what remains: exposing fix suggestions and the
-   score through the API (response, storage or recomputation, `docs/api/openapi.json`); the interface (part B), which
+5. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)), what remains: the interface (part B), which
    must always show the trademark result next to the score; and the Etsy rule `tag_count_underused`, which comes with
    the next Etsy ruleset update so that the `analysisVersion` changes once.
 

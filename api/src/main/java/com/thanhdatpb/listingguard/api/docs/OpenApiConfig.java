@@ -3,8 +3,10 @@ package com.thanhdatpb.listingguard.api.docs;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -33,5 +35,29 @@ public class OpenApiConfig {
                         .description("Service-to-service API key issued to a client. A client can hold several keys at once to allow rotation; "
                                 + "checks, cached results and the rate limit belong to the client, not to the key.")))
                 .addSecurityItem(new SecurityRequirement().addList(API_KEY_SCHEME));
+    }
+
+    @Bean
+    public OpenApiCustomizer nullableCheckObjects() {
+        return openApi -> {
+            makeReferenceNullable(openApi, "CheckResult", "readiness");
+            makeReferenceNullable(openApi, "FindingView", "fix");
+        };
+    }
+
+    private static void makeReferenceNullable(OpenAPI openApi, String schemaName, String propertyName) {
+        Schema<?> parent = openApi.getComponents().getSchemas().get(schemaName);
+        Schema<?> property = parent.getProperties().get(propertyName);
+        if (property.get$ref() == null) {
+            throw new IllegalStateException("Expected " + schemaName + "." + propertyName + " to reference a schema");
+        }
+
+        Schema<?> nullable = new Schema<>();
+        nullable.setDescription(property.getDescription());
+        nullable.addAnyOfItem(new Schema<>().$ref(property.get$ref()));
+        Schema<?> nullSchema = new Schema<>();
+        nullSchema.addType("null");
+        nullable.addAnyOfItem(nullSchema);
+        parent.addProperty(propertyName, nullable);
     }
 }

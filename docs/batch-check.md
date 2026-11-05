@@ -167,14 +167,22 @@ spreadsheet would otherwise run it as a formula.
 | `ruleErrors`, `ruleWarnings` | the numbers of ERROR and WARNING findings of the rule check |
 | `rulesCheckId`, `trademarkCheckId` | the ids of the stored checks: `GET /api/v1/checks/{id}` and `GET /api/v1/trademark-checks/{id}` read them with a key of the same client |
 | `error` | what is wrong with the row, in Vietnamese, with the line in `line` |
+| `readiness_score`, `ready` | present only when `listing-guard.fixes.enabled=true`; the listing-rules score (blank for `INCOMPLETE`) and whether that pack found no ERROR |
 
 **`summary.html`** is one file with its style inline, no script and no link, in Vietnamese, for a manager: the numbers of
 listings and of rows with a problem, the distribution of trademark `riskLevel`, the rules' totals, the ten marks matched
 by most listings and the ten rules broken in most listings, the measurement (section 5), the first 50 rows with a
 problem, the versions that produced the results (rule ruleset and `analysisVersion`, trademark ruleset, catalog and
 `analysisVersion`), the run time, and the trademark disclaimer: the result is a reference warning, not a legal
-conclusion. Nothing in any file is a key or a setting; they do contain listing text, so keep them out of the repository
-and share them as you would the export itself.
+conclusion. When fixes are enabled it also shows the number ready, scored and INCOMPLETE, and the average score over
+scored listings only. Readiness covers listing-rules only; show the trademark result separately. Nothing in any file is
+a key or a setting; they do contain listing text, so keep them out of the repository and share them as you would the
+export itself.
+
+Fix suggestions and readiness are opt-in with `listing-guard.fixes.enabled=true` (or
+`LISTING_GUARD_FIXES_ENABLED=true`) for the batch-check process. When disabled, the report header and summary stay in
+their existing shape. Finding field paths use the normalized listing: list items are trimmed and blank items dropped.
+For tags, match by the tag `value` (the fix description names it), or send the cleaned list before using `tags[i]`.
 
 ### Plans and quota
 

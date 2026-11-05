@@ -90,6 +90,14 @@ class OpenApiIntegrationTest {
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1trademark-checks~1{id}/get/responses"))).contains("200", "404", "429");
         assertThat(spec.at("/paths/~1api~1v1~1trademark-checks/post/requestBody/content/application~1json/schema/$ref").asText())
                 .as("the same request schema as /checks").isEqualTo(spec.at("/paths/~1api~1v1~1checks/post/requestBody/content/application~1json/schema/$ref").asText());
+        assertThat(spec.at("/components/schemas/CheckResult/properties/readiness/anyOf/0/$ref").asText())
+                .isEqualTo("#/components/schemas/ReadinessView");
+        assertThat(spec.at("/components/schemas/CheckResult/properties/readiness/anyOf/1/type").asText())
+                .isEqualTo("null");
+        assertThat(spec.at("/components/schemas/FindingView/properties/fix/anyOf/0/$ref").asText())
+                .isEqualTo("#/components/schemas/FixView");
+        assertThat(spec.at("/components/schemas/FindingView/properties/fix/anyOf/1/type").asText())
+                .isEqualTo("null");
     }
 
     @Test
