@@ -1,0 +1,29 @@
+# Publish readiness settings (ADR-014, part A). Not a ruleset: it holds no marketplace limits, only how the findings
+# of one rule run are turned into a number. It is immutable once published, like a ruleset (ADR-002): change it by
+# copying it to a new file with a new `version`. A test pins this file's content hash.
+#
+# Formula (readiness-2026-11), for a complete run of the pack named in `pack_id`:
+#   raw   = max(0, base_score - penalties.ERROR * errors - penalties.WARNING * warnings - penalties.INFO * infos)
+#   ready = errors == 0
+#   score = raw                                  when ready
+#   score = min(raw, not_ready_max_score)        when not ready (at least one ERROR)
+# A run in which a rule failed is incomplete: it has no score and is not ready (a result that cannot be determined
+# is never shown as a clean 100).
+#
+# Only the findings of `pack_id` count. Trademark findings (ADR-009) are not included; a listing can score 100 and
+# still be a trademark risk, so an interface must always show the trademark result next to this score.
+version: readiness-2026-11
+checked_at: 2026-11-05
+pack_id: listing-rules
+
+base_score: 100
+penalties:
+  ERROR: 20
+  WARNING: 5
+  INFO: 1
+# A listing that is not ready never scores above this.
+not_ready_max_score: 59
+
+source:
+  status: unverified
+  note: The maintainer's choice of weights. Not derived from any marketplace and not calibrated against real publish outcomes; do not read the score as a probability.
