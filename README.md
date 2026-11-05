@@ -49,9 +49,13 @@ Working end to end:
   rule failed has no score. Fixes are advice only, never applied; the score covers listing-rules only, so clients must
   show the separate trademark result alongside it.
 - The optional web console ([ADR-014](docs/adr/ADR-014-listing-workspace.md), part B), **off by default**
-  (`listing-guard.console.enabled=false`): email magic-link registration/sign-in, a FREE client, and a simple dashboard
-  for plan and usage. Production requires HTTPS and SMTP; development can log links. Listing workspace pages remain
-  planned.
+  (`listing-guard.console.enabled=false`): email magic-link registration/sign-in, a FREE client, a dashboard for plan and
+  usage, and the **Check listing** page: type an Etsy or Amazon listing, see the findings by severity with the evidence
+  marked, a verified value for the fixes that have one, the readiness score **always next to** the trademark result and its
+  disclaimer, and a simulated preview. "Apply suggestion" only fills a form field and never checks again; the listing you
+  type is never stored. The editor shows fixes and readiness whatever `listing-guard.fixes.enabled` says; the API and batch
+  report keep following that flag. Production requires HTTPS and SMTP; development can log links. Saved listings and
+  history remain planned.
 
 Before you rely on it:
 
@@ -413,7 +417,8 @@ Done: pack identity (PR 0a, migration V7, and PR 0b, migrations V8-V14; composit
 the public DTD V2.0 and **unverified against real data**), the `batch-check` job, and client plans with a monthly quota
 (V19, [ADR-013](docs/adr/ADR-013-client-plans-and-monthly-quota.md); off by default; billing, `sheet-connector` and the
 enforcement of `policy-analyzer` are not part of it), and the Listing Workspace API and batch integration
-([ADR-014](docs/adr/ADR-014-listing-workspace.md); off by default, V20).
+([ADR-014](docs/adr/ADR-014-listing-workspace.md); off by default, V20), and the optional console with its sign-in,
+dashboard and Check listing editor ([ADR-014](docs/adr/ADR-014-listing-workspace.md) part B, V21; off by default).
 What follows, in this order, is **not built yet**:
 
 1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
@@ -425,10 +430,10 @@ What follows, in this order, is **not built yet**:
    exist today (the `LlmProvider` contract, a scripted test provider and the citation verifier); there is no call to a
    real model and no endpoint. The analyzer is designed to be off by default and enabled by configuring an LLM.
 4. Add Amazon product-type overrides only when their limits and sources have been verified.
-5. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)): the optional magic-link console and dashboard
-   are implemented (part B, V21; off by default). Future listing workspace pages must always show trademark results
-   alongside readiness. The Etsy rule `tag_count_underused` remains planned for the next Etsy ruleset update so that
-   `analysisVersion` changes once.
+5. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)): the console, its dashboard and the Check listing
+   editor are implemented (part B, V21; off by default). What remains is saved listings and history; any page that shows
+   readiness must always show the trademark result alongside it. The Etsy rule `tag_count_underused` remains planned for the
+   next Etsy ruleset update so that `analysisVersion` changes once.
 
 ## Documentation
 
@@ -450,7 +455,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
 - [ADR-013: Client plans and monthly quota](docs/adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
-- [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Proposed; part A is implemented in `core` and `rule-engine`, the API does not expose it yet; part B, the interface, is planned)
+- [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor are implemented, all off by default; saved listings and history are not designed yet)
 
 ## License
 MIT © 2026 Thanh Dat Tran. See [LICENSE](LICENSE).

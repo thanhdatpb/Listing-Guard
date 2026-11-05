@@ -9,6 +9,7 @@ import static com.thanhdatpb.listingguard.api.plan.PlanTestSupport.NOVEMBER;
 import static com.thanhdatpb.listingguard.api.plan.PlanTestSupport.NOVEMBER_15;
 import static com.thanhdatpb.listingguard.api.plan.PlanTestSupport.unique;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -221,6 +222,19 @@ class ConsoleEditorCheckIntegrationTest {
         String html = press(user(PlanCode.FREE), form);
 
         assertThat(html).doesNotContain("<script>alert").contains("&lt;script&gt;alert");
+    }
+
+    @Test
+    void thePagesThatCarryWhatWasTypedAreNeverCached() throws Exception {
+        ConsoleUser free = user(PlanCode.FREE);
+
+        String checked = mvc.perform(checkPost(free, etsyForm("Header mug " + unique()))).andExpect(status().isOk())
+                .andReturn().getResponse().getHeader("Cache-Control");
+        String form = mvc.perform(get("/console/check").with(signedIn(free))).andExpect(status().isOk())
+                .andReturn().getResponse().getHeader("Cache-Control");
+
+        assertThat(checked).contains("no-store");
+        assertThat(form).contains("no-store");
     }
 
     @Test
