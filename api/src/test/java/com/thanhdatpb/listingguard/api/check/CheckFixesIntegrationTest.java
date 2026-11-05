@@ -3,6 +3,8 @@ package com.thanhdatpb.listingguard.api.check;
 import static com.thanhdatpb.listingguard.api.ApiTestKeys.HEADER;
 import static com.thanhdatpb.listingguard.api.ApiTestKeys.KEY_1;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,6 +13,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thanhdatpb.listingguard.api.ApiTestKeys;
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
+import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
+import com.thanhdatpb.listingguard.ruleengine.RuleRun;
+import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -26,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -46,6 +53,9 @@ class CheckFixesIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @SpyBean
+    RuleEngine ruleEngine;
 
     @Test
     void returnsAndStoresVerifiedFixesAndReadinessForCleanedTagIndexes() throws Exception {
@@ -170,6 +180,20 @@ class CheckFixesIntegrationTest {
             assertThat(finding.has("fix")).isTrue();
             assertThat(finding.get("fix").isNull()).isTrue();
         }
+    }
+
+    @Test
+    void incompleteRuleRunReturnsNullScoreAndNotReady() throws Exception {
+        doReturn(new RuleRun("listing-rules", List.of(), List.of("synthetic_rule")))
+                .when(ruleEngine).runDetailed(any(Listing.class), any(RulesetConfig.class));
+
+        JsonNode result = postOk(bodyWithBlankAndRepeatedTags());
+        JsonNode readiness = result.get("readiness");
+
+        assertThat(readiness.get("status").asText()).isEqualTo("INCOMPLETE");
+        assertThat(readiness.has("score")).isTrue();
+        assertThat(readiness.get("score").isNull()).isTrue();
+        assertThat(readiness.get("ready").asBoolean()).isFalse();
     }
 
     private JsonNode postOk(String body) throws Exception {

@@ -3,6 +3,9 @@ package com.thanhdatpb.listingguard.api.check;
 import static com.thanhdatpb.listingguard.api.ApiTestKeys.HEADER;
 import static com.thanhdatpb.listingguard.api.ApiTestKeys.KEY_1;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -15,6 +18,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
 import com.thanhdatpb.listingguard.core.finding.Severity;
+import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -29,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -58,6 +63,9 @@ class CheckControllerIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @SpyBean
+    RuleEngine ruleEngine;
 
     /** A listing that satisfies every Etsy rule; the title makes it unique so tests never share a cached result. */
     private String validBody() {
@@ -115,6 +123,15 @@ class CheckControllerIntegrationTest {
         assertThat(saved.getRulesetVersionId()).isEqualTo(rulesets.get("ETSY").rulesetVersionId());
         assertThat(saved.getAnalysisVersion()).isEqualTo("etsy-2026-11");
         assertThat(findings.findByCheckId(checkId)).isEmpty();
+    }
+
+    @Test
+    void fixesDisabledDoesNotCallRunDetailed() throws Exception {
+        JsonNode response = postOk(validBody());
+
+        assertThat(response.has("fixesComputed")).isFalse();
+        assertThat(response.has("readiness")).isFalse();
+        verify(ruleEngine, never()).runDetailed(any(), any());
     }
 
     @Test
