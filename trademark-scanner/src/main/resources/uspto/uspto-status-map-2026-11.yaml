@@ -1,0 +1,173 @@
+# Map from the status codes of the USPTO Trademark Applications Daily XML (TDXF, DTD V2.0) to the status of a catalog
+# record (ADR-009, PR A2b). A published version is immutable (ADR-002): change a code, a status or a basis in a new
+# file with a new `version`.
+#
+# The codes and their meaning are Table 1 "Trademark Status Codes" of the "Trademark Applications Daily XML DTD Element
+# Documentation (V2.0)", table updated 06/24/2005:
+#   https://www.uspto.gov/sites/default/files/products/applications-documentation.pdf
+# This file is the maintainer's reading of that table. It is not a USPTO statement and not a legal conclusion, and its
+# source status is `unverified`.
+#
+# status  REGISTERED | PENDING | EXPIRED | CANCELLED are the catalog statuses. DROP is not one: the converter leaves the
+#         record out and counts it by code (the code carries no status of the mark itself).
+# basis   table       the wording of Table 1 says it
+#         maintainer  the table does not settle it; the maintainer chose by one rule: the tool warns, and a warning too
+#                     many is better than a risk missed. A code that may still be alive is PENDING, one that is
+#                     certainly dead is CANCELLED, one that has no status of the mark at all is DROP.
+#                     The registration number is not used to decide (ADR-009).
+version: uspto-status-map-2026-11
+format: trademark-applications-daily V2.0
+checked_at: 2026-11-05
+source:
+  status: unverified
+  note: The maintainer's reading of Table 1 of the public V2.0 element documentation; not checked against a real file.
+codes:
+  "000": {status: DROP, basis: maintainer, meaning: "UNKNOWN"}
+  "400": {status: PENDING, basis: maintainer, meaning: "IR CANCELLED; APPLICATION PENDING TRANSFORMATION"}
+  "401": {status: CANCELLED, basis: maintainer, meaning: "IR CANCELLED - NO TRANSFORMATION FILED"}
+  "402": {status: CANCELLED, basis: maintainer, meaning: "IR CANCELLED--CASE ABANDONED/CANCELLED"}
+  "403": {status: PENDING, basis: maintainer, meaning: "IR CANCELLED; REGISTRATION PENDING TRANSFORMATION"}
+  "600": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED - INCOMPLETE RESPONSE"}
+  "601": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED - EXPRESS"}
+  "602": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED-FAILURE TO RESPOND OR LATE RESPONSE"}
+  "603": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED - AFTER EX PARTE APPEAL"}
+  "604": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED - AFTER INTER-PARTES DECISION"}
+  "605": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED - AFTER PUBLICATION"}
+  "606": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED - NO STATEMENT OF USE FILED"}
+  "607": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED - DEFECTIVE STATEMENT OF USE"}
+  "608": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED - AFTER PETITION DECISION"}
+  "609": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED - DEFECTIVE DIVIDED APPLICATION"}
+  "612": {status: PENDING, basis: maintainer, meaning: "PETITION TO REVIVE-RECEIVED"}
+  "614": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED PETITION TO REVIVE-DENIED"}
+  "616": {status: PENDING, basis: table, meaning: "REVIVED - AWAITING FURTHER ACTION"}
+  "618": {status: CANCELLED, basis: maintainer, meaning: "ABANDONED FILE - BACKFILE"}
+  "620": {status: PENDING, basis: maintainer, meaning: "BACKFILE APPLICATION ADDED TO DATA BASE - STATUS NOT RECORDED"}
+  "622": {status: DROP, basis: maintainer, meaning: "MISASSIGNED SERIAL NUMBER"}
+  "624": {status: REGISTERED, basis: table, meaning: "REGISTERED - BACKFILE"}
+  "625": {status: PENDING, basis: maintainer, meaning: "REGISTRATION ADDED TO THE DATA BASE-STATUS UNCLEAR"}
+  "626": {status: CANCELLED, basis: maintainer, meaning: "REGISTERED - BACKFILE CANCELLED OR EXPIRED"}
+  "630": {status: PENDING, basis: table, meaning: "NEW APPLICATION - RECORD INITIALIZED NOT ASSIGNED TO EXAMINER"}
+  "631": {status: PENDING, basis: table, meaning: "NEW APPLICATION - DIVIDED - INITIAL PROCESSING"}
+  "632": {status: DROP, basis: maintainer, meaning: "INFORMAL APPLICATION"}
+  "638": {status: PENDING, basis: table, meaning: "NEW APPLICATION - ASSIGNED TO EXAMINER"}
+  "640": {status: PENDING, basis: table, meaning: "NON-FINAL ACTION COUNTED - NOT MAILED"}
+  "641": {status: PENDING, basis: table, meaning: "NON-FINAL ACTION - MAILED"}
+  "642": {status: PENDING, basis: table, meaning: "INVENTORIED AS REJECTED"}
+  "643": {status: PENDING, basis: table, meaning: "PREVIOUS ACTION/ALLOWANCE COUNT WITHDRAWN"}
+  "644": {status: PENDING, basis: table, meaning: "FINAL REFUSAL COUNTED - NOT MAILED"}
+  "645": {status: PENDING, basis: table, meaning: "FINAL REFUSAL - MAILED"}
+  "646": {status: PENDING, basis: table, meaning: "EXAMINERS AMENDMENT COUNTED - NOT MAILED"}
+  "647": {status: PENDING, basis: table, meaning: "EXAMINERS AMENDMENT - MAILED"}
+  "648": {status: PENDING, basis: table, meaning: "ACTION CONTINUING FINAL COUNTED - NOT MAILED"}
+  "649": {status: PENDING, basis: table, meaning: "ACTION CONTINUING FINAL - MAILED"}
+  "650": {status: PENDING, basis: table, meaning: "SUSPENSION INQUIRY COUNTED - NOT MAILED"}
+  "651": {status: PENDING, basis: table, meaning: "SUSPENSION INQUIRY - MAILED"}
+  "652": {status: PENDING, basis: table, meaning: "SUSPENSION LETTER COUNTED - NOT MAILED"}
+  "653": {status: PENDING, basis: table, meaning: "SUSPENSION LETTER - MAILED"}
+  "654": {status: PENDING, basis: table, meaning: "REPORT COMPLETED SUSPENSION CHECK - CASE STILL SUSPENDED"}
+  "655": {status: PENDING, basis: table, meaning: "EXAMINER'S AMENDMENT/PRIORITY ACTION COUNTED NOT MAILED"}
+  "656": {status: PENDING, basis: table, meaning: "EXAMINER'S AMENDMENT/PRIORITY ACTION MAILED"}
+  "657": {status: PENDING, basis: table, meaning: "PRIORITY ACTION COUNTED NOT MAILED"}
+  "658": {status: PENDING, basis: table, meaning: "PRIORITY ACTION MAILED"}
+  "659": {status: PENDING, basis: table, meaning: "SUBSEQUENT FINAL REFUSAL COUNTED NOT MAILED"}
+  "660": {status: PENDING, basis: table, meaning: "SUBSEQUENT FINAL MAILED"}
+  "661": {status: PENDING, basis: table, meaning: "RESPONSE AFTER NON-FINAL ACTION - ENTERED"}
+  "663": {status: PENDING, basis: table, meaning: "RESPONSE AFTER FINAL REJECTION - ENTERED"}
+  "664": {status: PENDING, basis: table, meaning: "INVENTORIED AS AMENDED"}
+  "665": {status: PENDING, basis: table, meaning: "NOTICE OF UNRESPONSIVE AMENDMENT - COUNTED"}
+  "666": {status: PENDING, basis: table, meaning: "NOTICE OF UNRESPONSIVE AMENDMENT - MAILED"}
+  "667": {status: PENDING, basis: table, meaning: "REFUSAL WITHDRAWL LETTER - COUNTED"}
+  "668": {status: PENDING, basis: table, meaning: "REFUSAL WITHDRAWL LETTER - MAILED"}
+  "672": {status: PENDING, basis: table, meaning: "REINSTATED - AWAITING FURTHER ACTION"}
+  "673": {status: PENDING, basis: table, meaning: "PETITION GRANTED- AWAITING FURTHER ACTION"}
+  "680": {status: PENDING, basis: table, meaning: "APPROVED FOR PUBLICATION"}
+  "681": {status: PENDING, basis: table, meaning: "PUBLICATION/ISSUE REVIEW COMPLETE"}
+  "682": {status: PENDING, basis: table, meaning: "ON HOLD - ADDITIONAL PUB REVIEW REQUIRED"}
+  "686": {status: PENDING, basis: table, meaning: "PUBLISHED FOR OPPOSITION"}
+  "688": {status: PENDING, basis: table, meaning: "NOTICE OF ALLOWANCE - ISSUED"}
+  "689": {status: PENDING, basis: table, meaning: "NOTICE OF ALLOWANCE - WITHDRAWN"}
+  "690": {status: PENDING, basis: maintainer, meaning: "NOTICE OF ALLOWANCE - CANCELLED"}
+  "692": {status: PENDING, basis: maintainer, meaning: "WITHDRAWN BEFORE PUBLICATION"}
+  "693": {status: PENDING, basis: maintainer, meaning: "WITHDRAWN FROM ISSUE-JURISDICTION RESTORED"}
+  "694": {status: PENDING, basis: maintainer, meaning: "WITHDRAWN BEFORE ISSUE"}
+  "700": {status: REGISTERED, basis: table, meaning: "REGISTERED"}
+  "701": {status: REGISTERED, basis: table, meaning: "SECTION 8-ACCEPTED"}
+  "702": {status: REGISTERED, basis: table, meaning: "SECTION 8 & 15-ACCEPTED AND ACKNOWLEDGED"}
+  "703": {status: REGISTERED, basis: table, meaning: "SECTION 15-ACKNOWLEDGED"}
+  "704": {status: REGISTERED, basis: table, meaning: "PARTIAL SECTION 8 ACCEPTED"}
+  "705": {status: REGISTERED, basis: table, meaning: "PARTIAL SECTION 8 & 15 ACCEPTED AND ACKNOWLEDGED"}
+  "710": {status: CANCELLED, basis: table, meaning: "CANCELLED - SECTION 8"}
+  "711": {status: CANCELLED, basis: table, meaning: "CANCELLED - SECTION 7"}
+  "712": {status: CANCELLED, basis: table, meaning: "CANCELLED BY COURT ORDER (SECTION 37)"}
+  "713": {status: CANCELLED, basis: table, meaning: "CANCELLED - SECTION 18"}
+  "714": {status: CANCELLED, basis: table, meaning: "CANCELLED - SECTION 24"}
+  "715": {status: PENDING, basis: maintainer, meaning: "CANCELLED - RESTORED TO PENDENCY"}
+  "716": {status: CANCELLED, basis: table, meaning: "INADVERTENTLY ISSUED REGISTRATION NUMBER CANCELLED"}
+  "717": {status: REGISTERED, basis: table, meaning: "REGISTERED - AWAITING DIVISIONAL FEE"}
+  "718": {status: PENDING, basis: table, meaning: "REQUEST FOR FIRST EXTENSION - FILED"}
+  "719": {status: PENDING, basis: table, meaning: "REQUEST FOR SECOND EXTENSION - FILED"}
+  "720": {status: PENDING, basis: table, meaning: "REQUEST FOR THIRD EXTENSION - FILED"}
+  "721": {status: PENDING, basis: table, meaning: "REQUEST FOR FOURTH EXTENSION - FILED"}
+  "722": {status: PENDING, basis: table, meaning: "REQUEST FOR FIFTH EXTENSION - FILED"}
+  "724": {status: PENDING, basis: table, meaning: "EXTENSION REQUEST REFUSAL - COUNTED"}
+  "725": {status: PENDING, basis: table, meaning: "EXTENSION REQUEST REFUSAL - MAILED"}
+  "730": {status: PENDING, basis: table, meaning: "FIRST EXTENSION - GRANTED"}
+  "731": {status: PENDING, basis: table, meaning: "SECOND EXTENSION - GRANTED"}
+  "732": {status: PENDING, basis: table, meaning: "THIRD EXTENSION - GRANTED"}
+  "733": {status: PENDING, basis: table, meaning: "FOURTH EXTENSION - GRANTED"}
+  "734": {status: PENDING, basis: table, meaning: "FIFTH EXTENSION - GRANTED"}
+  "740": {status: PENDING, basis: maintainer, meaning: "POST REGISTRATION PAPER FILED - ASSIGNED TO PARA-LEGAL"}
+  "744": {status: PENDING, basis: table, meaning: "STATEMENT OF USE - FILED"}
+  "745": {status: PENDING, basis: table, meaning: "STATEMENT OF USE - INFORMAL-LETTER MAILED"}
+  "746": {status: PENDING, basis: table, meaning: "STATEMENT OF USE - INFORMAL-RESPONSE ENTERED"}
+  "748": {status: PENDING, basis: table, meaning: "STATEMENT OF USE - TO EXAMINER"}
+  "752": {status: PENDING, basis: table, meaning: "SU - EXAMINER STATEMENT COUNTED - NOT MAILED"}
+  "753": {status: PENDING, basis: table, meaning: "SU - EXAMINER STATEMENT - MAILED"}
+  "756": {status: PENDING, basis: table, meaning: "EXAMINER STATEMENT COUNTED - NOT MAILED"}
+  "757": {status: PENDING, basis: table, meaning: "EXAMINER STATEMENT - MAILED"}
+  "760": {status: PENDING, basis: table, meaning: "EX PARTE APPEAL PENDING"}
+  "762": {status: PENDING, basis: maintainer, meaning: "EX PARTE APPEAL TERMINATED"}
+  "763": {status: PENDING, basis: maintainer, meaning: "EX PARTE APPEAL-REFUSAL AFFIRMED"}
+  "764": {status: PENDING, basis: maintainer, meaning: "EX PARTE APPEAL DISMISSED AS MOOT"}
+  "765": {status: PENDING, basis: maintainer, meaning: "CONCURRENT USE PROCEEDING TERMINATED-GRANTED"}
+  "766": {status: PENDING, basis: maintainer, meaning: "CONCURRENT USE PROCEEDING TERMINATED-DENIED"}
+  "771": {status: PENDING, basis: maintainer, meaning: "CONCURRENT USE PROCEEDING PENDING"}
+  "772": {status: PENDING, basis: maintainer, meaning: "INTERFERENCE PROCEEDING PENDING"}
+  "773": {status: PENDING, basis: table, meaning: "EXTENSION OF TIME TO OPPOSE PROCESS - TERMINATED"}
+  "774": {status: PENDING, basis: table, meaning: "OPPOSITION PENDING"}
+  "775": {status: PENDING, basis: maintainer, meaning: "OPPOSITION DISMISSED"}
+  "777": {status: PENDING, basis: maintainer, meaning: "OPPOSITION TERMINATED-SEE TTAB RECORDS"}
+  "778": {status: PENDING, basis: maintainer, meaning: "CANCELLATION DISMISSED"}
+  "779": {status: PENDING, basis: maintainer, meaning: "OPPOSITION SUSTAINED"}
+  "780": {status: PENDING, basis: maintainer, meaning: "CANCELLATION TERMINATED - SEE TTAB RECORDS"}
+  "790": {status: PENDING, basis: maintainer, meaning: "CANCELLATION PENDING"}
+  "794": {status: PENDING, basis: maintainer, meaning: "JURISDICTION RESTORED TO EXAMINING ATTORNEY"}
+  "800": {status: REGISTERED, basis: table, meaning: "REGISTERED AND RENEWED"}
+  "801": {status: PENDING, basis: table, meaning: "OPPOSITION PAPERS FILED"}
+  "802": {status: PENDING, basis: table, meaning: "REQUEST FOR EXTENSION OF TIME TO FILE OPPOSITION"}
+  "803": {status: PENDING, basis: table, meaning: "AMENDMENT AFTER PUBLICATION"}
+  "804": {status: PENDING, basis: table, meaning: "APPEAL RECEIVED AT TTAB"}
+  "806": {status: PENDING, basis: table, meaning: "SU - NON-FINAL ACTION COUNTED - NOT MAILED"}
+  "807": {status: PENDING, basis: table, meaning: "SU - NON-FINAL ACTION - MAILED"}
+  "808": {status: PENDING, basis: table, meaning: "SU - FINAL REFUSAL COUNTED - NOT MAILED"}
+  "809": {status: PENDING, basis: table, meaning: "SU - FINAL REFUSAL - MAILED"}
+  "810": {status: PENDING, basis: table, meaning: "SU - EXAMINER'S AMENDMENT COUNTED - NOT MAILED"}
+  "811": {status: PENDING, basis: table, meaning: "SU - EXAMINER'S AMENDMENT - MAILED"}
+  "812": {status: PENDING, basis: table, meaning: "SU - ACTION CONTINUING FINAL COUNTED - NOT MAILED"}
+  "813": {status: PENDING, basis: table, meaning: "SU - ACTION CONTINUING FINAL - MAILED"}
+  "814": {status: PENDING, basis: table, meaning: "SU - RESPONSE AFTER NON-FINAL ACTION - ENTERED"}
+  "815": {status: PENDING, basis: table, meaning: "SU - RESPONSE AFTER FINAL REJECTION - ENTERED"}
+  "816": {status: PENDING, basis: table, meaning: "SU - NOTICE OF UNRESPONSIVE AMENDMENT - COUNTED"}
+  "817": {status: PENDING, basis: table, meaning: "SU - NOTICE OF UNRESPONSIVE AMENDMENT - MAILED"}
+  "818": {status: PENDING, basis: table, meaning: "SU - STATEMENT OF USE ACCEPTED - APPROVED FOR REGISTRATION"}
+  "819": {status: PENDING, basis: table, meaning: "SU - REGISTRATION REVIEW COMPLETE"}
+  "820": {status: PENDING, basis: table, meaning: "SU-EXAMINER'S AMENDMENT/PRIORITY ACTION COUNTED NOT MAILED"}
+  "821": {status: PENDING, basis: table, meaning: "SU - EXAMINER'S AMENDMENT/PRIORITY ACTION MAILED"}
+  "822": {status: PENDING, basis: table, meaning: "SU - PRIORITY ACTION COUNTED NOT MAILED"}
+  "823": {status: PENDING, basis: table, meaning: "SU - PRIORITY ACTION MAILED"}
+  "824": {status: PENDING, basis: table, meaning: "SU - SUBSEQUENT FINAL REFUSAL WRITTEN"}
+  "825": {status: PENDING, basis: table, meaning: "SU - SUBSEQUENT FINAL MAILED"}
+  "900": {status: EXPIRED, basis: table, meaning: "EXPIRED"}
+  "969": {status: DROP, basis: maintainer, meaning: "NON REGISTRATION DATA"}
+  "970": {status: DROP, basis: maintainer, meaning: "RECORD CREATED DUE TO ASSIGNMENT REQUEST"}
+  "973": {status: DROP, basis: maintainer, meaning: "PENDING PETITION/COURT DECISION"}
