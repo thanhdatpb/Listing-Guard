@@ -1,6 +1,8 @@
 package com.thanhdatpb.listingguard.api.trademark;
 
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_INVALID_REQUEST;
+import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_PLAN_NOT_ALLOWED;
+import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_QUOTA_EXCEEDED;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_RATE_LIMITED;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_TOO_LARGE;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_TRADEMARK_NOT_CONFIGURED;
@@ -56,7 +58,8 @@ public class TrademarkCheckController {
                     result is a reference warning, not a legal conclusion; show the `disclaimer` with it. If the same client \
                     already sent the same listing text with the same analysisVersion and the stored result is complete and \
                     still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so \
-                    its id can be read again, and is never reused for another request. Results are kept for a limited time \
+                    its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's \
+                    monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time \
                     (`expiresAt`); only the listing's hash and the result are stored, not the listing text.""",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
@@ -76,6 +79,9 @@ public class TrademarkCheckController {
                     @ApiResponse(responseCode = "401", description = "Missing or invalid API key.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_UNAUTHORIZED))),
+                    @ApiResponse(responseCode = "403", description = "The client's plan does not include this pack (code `plan-not-allowed`; only where plans are on). Retrying does not help.",
+                            content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
+                                    examples = @ExampleObject(value = PROBLEM_PLAN_NOT_ALLOWED))),
                     @ApiResponse(responseCode = "413", description = "The request body is over the size limit (256 KB).",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_TOO_LARGE))),
@@ -83,9 +89,11 @@ public class TrademarkCheckController {
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class))),
                     @ApiResponse(responseCode = "422", description = "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`).",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class))),
-                    @ApiResponse(responseCode = "429", description = "Rate limit exceeded for the calling client (the same limit as the other endpoints); see the Retry-After header.",
+                    @ApiResponse(responseCode = "429", description = "Two different answers, told apart by `code`. `rate-limited`: too many requests for the calling client (the same limit as the other endpoints); retry after the Retry-After header. `quota-exceeded` (only where plans are on): the month's quota of the client's plan is used up; there is no Retry-After, and retrying before `resetAt` does not help. A result already stored is still answered.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
-                                    examples = @ExampleObject(value = PROBLEM_RATE_LIMITED))),
+                                    examples = {
+                                            @ExampleObject(name = "rate-limited", value = PROBLEM_RATE_LIMITED),
+                                            @ExampleObject(name = "quota-exceeded", value = PROBLEM_QUOTA_EXCEEDED)})),
                     @ApiResponse(responseCode = "503", description = "Trademark checks are not available on this server: no catalog is configured or the configured one is refused (code `trademark-not-configured`). `POST /api/v1/checks` is not affected. Retrying does not help; an operator must configure a catalog.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_TRADEMARK_NOT_CONFIGURED)))})

@@ -3,6 +3,8 @@ package com.thanhdatpb.listingguard.api.web;
 import com.thanhdatpb.listingguard.api.check.CheckNotFoundException;
 import com.thanhdatpb.listingguard.api.check.MarketplaceNotYetSupportedException;
 import com.thanhdatpb.listingguard.api.check.UnknownMarketplaceException;
+import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
+import com.thanhdatpb.listingguard.api.plan.QuotaExceededException;
 import com.thanhdatpb.listingguard.api.policy.CorpusModelMismatchException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
@@ -62,6 +64,29 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(TrademarkUnavailableException.class)
     public ProblemDetail trademarkNotConfigured(TrademarkUnavailableException e) {
         return Problems.of(HttpStatus.SERVICE_UNAVAILABLE, "trademark-not-configured", e.getMessage());
+    }
+
+    /** The client's plan does not include the pack of the endpoint (ADR-013). Retrying does not help. */
+    @ExceptionHandler(PlanNotAllowedException.class)
+    public ProblemDetail planNotAllowed(PlanNotAllowedException e) {
+        ProblemDetail problem = Problems.of(HttpStatus.FORBIDDEN, PlanNotAllowedException.CODE, e.getMessage());
+        problem.setProperty("plan", e.plan());
+        problem.setProperty("pack", e.pack().id());
+        return problem;
+    }
+
+    /**
+     * The monthly quota is used up (ADR-013). There is deliberately no {@code Retry-After}: it would tell a client that
+     * retries 429 after that header to wait for days. {@code rate-limited}, which has one, is the retryable 429.
+     */
+    @ExceptionHandler(QuotaExceededException.class)
+    public ProblemDetail quotaExceeded(QuotaExceededException e) {
+        ProblemDetail problem = Problems.of(HttpStatus.TOO_MANY_REQUESTS, QuotaExceededException.CODE, e.getMessage());
+        problem.setProperty("plan", e.plan());
+        problem.setProperty("quota", e.quota());
+        problem.setProperty("used", e.used());
+        problem.setProperty("resetAt", e.resetAt().toString());
+        return problem;
     }
 
     /** Input that a lower layer rejected, such as a listing that is not a JSON object. */

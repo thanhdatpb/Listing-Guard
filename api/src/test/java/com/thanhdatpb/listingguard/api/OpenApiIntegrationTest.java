@@ -75,15 +75,18 @@ class OpenApiIntegrationTest {
         JsonNode spec = mapper.readTree(generatedSpec());
 
         assertThat(fieldNames(spec.at("/paths"))).containsExactlyInAnyOrder("/api/v1/checks", "/api/v1/checks/{id}",
-                "/api/v1/trademark-checks", "/api/v1/trademark-checks/{id}", "/health");
+                "/api/v1/trademark-checks", "/api/v1/trademark-checks/{id}", "/api/v1/usage", "/health");
         assertThat(spec.at("/components/securitySchemes/ApiKeyAuth/name").asText()).isEqualTo("X-API-Key");
         assertThat(spec.at("/security/0/ApiKeyAuth").isArray()).isTrue();
         assertThat(spec.at("/paths/~1health/get/security").isEmpty()).as("/health needs no key").isTrue();
         assertThat(spec.at("/paths/~1api~1v1~1checks/post/requestBody/content/application~1json/examples/etsy-listing").isMissingNode())
                 .isFalse();
-        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1checks/post/responses"))).contains("200", "400", "401", "413", "422", "429");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1checks/post/responses"))).contains("200", "400", "401", "403", "413", "422", "429");
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1trademark-checks/post/responses")))
-                .contains("200", "400", "401", "413", "422", "429", "503");
+                .contains("200", "400", "401", "403", "413", "422", "429", "503");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1usage/get/responses"))).containsExactlyInAnyOrder("200", "401", "429");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1checks/post/responses/429/content/application~1problem+json/examples")))
+                .as("both 429 answers are documented").containsExactlyInAnyOrder("rate-limited", "quota-exceeded");
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1trademark-checks~1{id}/get/responses"))).contains("200", "404", "429");
         assertThat(spec.at("/paths/~1api~1v1~1trademark-checks/post/requestBody/content/application~1json/schema/$ref").asText())
                 .as("the same request schema as /checks").isEqualTo(spec.at("/paths/~1api~1v1~1checks/post/requestBody/content/application~1json/schema/$ref").asText());

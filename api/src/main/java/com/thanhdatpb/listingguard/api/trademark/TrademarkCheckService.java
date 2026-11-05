@@ -3,6 +3,8 @@ package com.thanhdatpb.listingguard.api.trademark;
 import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.listing.Normalizer;
+import com.thanhdatpb.listingguard.api.plan.Pack;
+import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.trademark.CanonicalInput;
 import com.thanhdatpb.listingguard.trademark.Completeness;
@@ -42,20 +44,26 @@ public class TrademarkCheckService {
     private final TrademarkRulesets rulesets;
     private final TrademarkCheckStore store;
     private final TransactionTemplate transactions;
+    private final PlanService plans;
 
     public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
-                                 TrademarkRulesets rulesets, TrademarkCheckStore store, TransactionTemplate transactions) {
+                                 TrademarkRulesets rulesets, TrademarkCheckStore store, TransactionTemplate transactions,
+                                 PlanService plans) {
         this.normalizers = normalizers;
         this.runtime = runtime;
         this.rulesets = rulesets;
         this.store = store;
         this.transactions = transactions;
+        this.plans = plans;
     }
 
     /**
      * @throws TrademarkUnavailableException if no catalog is served (DISABLED or REFUSED)
+     * @throws com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException if the client's plan has no {@code trademark-risk} pack
+     * @throws com.thanhdatpb.listingguard.api.plan.QuotaExceededException  if the answer is not stored yet and the month's quota is used up
      */
     public TrademarkCheckResult check(UUID clientId, CheckRequest request) {
+        PlanService.Admission admission = plans.requirePack(clientId, Pack.TRADEMARK_RISK);
         Normalizer normalizer = normalizers.get(request.marketplace());
         Listing listing = normalizer.normalize(request.listing());
         String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
@@ -71,9 +79,15 @@ public class TrademarkCheckService {
             return cached.get();
         }
 
+        // a cached answer costs nothing and was returned above; a new result is stored, and a complete one is counted
+        // (ADR-013). An INCOMPLETE result is stored for GET and never reused, so the client is not charged for it.
+        plans.requireQuota(admission);
         TrademarkResult result = serving.scanner().scan(input);
         try {
             return transactions.execute(status -> {
+                if (result.completeness() == Completeness.COMPLETE) {
+                    plans.charge(admission);
+                }
                 UUID id = store.insert(identity, serving.catalogVersionId(), result);
                 return store.find(clientId, id).orElseThrow();
             });

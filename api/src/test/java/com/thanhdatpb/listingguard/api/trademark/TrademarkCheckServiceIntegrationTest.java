@@ -9,6 +9,7 @@ import com.thanhdatpb.listingguard.api.ApiTestKeys;
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
+import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetVersionRepository;
 import com.thanhdatpb.listingguard.trademark.CanonicalInput;
 import com.thanhdatpb.listingguard.trademark.TrademarkScanner;
@@ -82,6 +83,9 @@ class TrademarkCheckServiceIntegrationTest {
 
     @Autowired
     TransactionTemplate transactions;
+
+    @Autowired
+    PlanService plans;
 
     @Autowired
     ObjectMapper mapper;
@@ -173,7 +177,7 @@ class TrademarkCheckServiceIntegrationTest {
     }
 
     private TrademarkCheckService serviceOver(TrademarkCatalogRuntime runtime, TrademarkRulesets rulesetsToUse) {
-        return new TrademarkCheckService(normalizers, runtime, rulesetsToUse, store, transactions);
+        return new TrademarkCheckService(normalizers, runtime, rulesetsToUse, store, transactions, plans);
     }
 
     /** A runtime that serves the same catalog and fingerprint but scans over a different catalog implementation. */

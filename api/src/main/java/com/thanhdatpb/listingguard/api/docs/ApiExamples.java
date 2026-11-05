@@ -423,6 +423,49 @@ public final class ApiExamples {
             }
             """;
 
+    public static final String USAGE_RESULT = """
+            {
+              "enforced": true,
+              "plan": "SELLER",
+              "monthlyQuota": 1000,
+              "used": 42,
+              "remaining": 958,
+              "periodStart": "2026-11-01",
+              "resetAt": "2026-12-01T00:00:00Z",
+              "packs": ["batch", "listing-rules", "sheet-connector", "trademark-risk"]
+            }
+            """;
+
+    public static final String PROBLEM_PLAN_NOT_ALLOWED = """
+            {
+              "type": "urn:listing-guard:problem:plan-not-allowed",
+              "title": "Forbidden",
+              "status": 403,
+              "detail": "The FREE plan does not include trademark-risk. Ask the operator for a plan that does.",
+              "instance": "/api/v1/trademark-checks",
+              "code": "plan-not-allowed",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+              "plan": "FREE",
+              "pack": "trademark-risk"
+            }
+            """;
+
+    public static final String PROBLEM_QUOTA_EXCEEDED = """
+            {
+              "type": "urn:listing-guard:problem:quota-exceeded",
+              "title": "Too Many Requests",
+              "status": 429,
+              "detail": "The monthly quota of the FREE plan is used up (20 of 20). It resets at 2026-12-01T00:00:00Z. Results already stored are still answered from the cache.",
+              "instance": "/api/v1/checks",
+              "code": "quota-exceeded",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+              "plan": "FREE",
+              "quota": 20,
+              "used": 20,
+              "resetAt": "2026-12-01T00:00:00Z"
+            }
+            """;
+
     public static final String PROBLEM_TOO_LARGE = """
             {
               "type": "urn:listing-guard:problem:payload-too-large",
