@@ -6,3 +6,5 @@ mvnw text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 Dockerfile text eol=lf
+# The DEMO trademark data is checked against a sha256 in its manifest; keep it LF on every checkout (CRLF changes the hash)
+catalogs/demo/raw/*.jsonl text eol=lf
