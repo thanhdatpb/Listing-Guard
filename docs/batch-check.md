@@ -160,9 +160,9 @@ spreadsheet would otherwise run it as a formula.
 | Column | Meaning |
 |---|---|
 | `id`, `line` | as above; `id` is empty when the row had none |
-| `status` | `OK`; `INPUT_ERROR` (the row's data could not be read, it was not checked); `CHECK_ERROR` (a check threw, the other may still have a result) |
+| `status` | `OK`; `INPUT_ERROR` (the row's data could not be read, it was not checked); `CHECK_ERROR` (a check threw, the other may still have a result); `QUOTA_EXCEEDED` (a check was not run because the client's monthly quota ran out, see "Plans and quota"; a row with a failed check is `CHECK_ERROR` first) |
 | `label` | `true` or `false` when there is a label column and the cell is filled |
-| `trademarkRisk` | the trademark `riskLevel` (the highest level; `UNKNOWN` means it could not be determined, not that it is clean), or `NOT_CONFIGURED`, or `ERROR`; empty for an `INPUT_ERROR` row |
+| `trademarkRisk` | the trademark `riskLevel` (the highest level; `UNKNOWN` means it could not be determined, not that it is clean), or `NOT_CONFIGURED`, `ERROR`, or `QUOTA_EXCEEDED`; empty for an `INPUT_ERROR` row |
 | `completeness` | `COMPLETE` or `INCOMPLETE` |
 | `ruleErrors`, `ruleWarnings` | the numbers of ERROR and WARNING findings of the rule check |
 | `rulesCheckId`, `trademarkCheckId` | the ids of the stored checks: `GET /api/v1/checks/{id}` and `GET /api/v1/trademark-checks/{id}` read them with a key of the same client |
@@ -175,6 +175,27 @@ problem, the versions that produced the results (rule ruleset and `analysisVersi
 `analysisVersion`), the run time, and the trademark disclaimer: the result is a reference warning, not a legal
 conclusion. Nothing in any file is a key or a setting; they do contain listing text, so keep them out of the repository
 and share them as you would the export itself.
+
+### Plans and quota
+
+Where the deployment has plans on (`listing-guard.plans.enabled`, [ADR-013](adr/ADR-013-client-plans-and-monthly-quota.md);
+off by default, and then none of this applies), the batch is charged exactly like the API, because it calls the same
+services: **a result already stored for the client costs nothing, a new one costs one unit of the month's quota**, so a full
+check of one listing is two units. Before it reads the input the job checks the client's plan:
+
+- no `batch` pack (or no `listing-rules` pack) in the plan: the job stops with `plan-not-allowed` and writes no report;
+- no unit left this month: the job stops **at once** with `quota-exceeded` and writes no report (not a report made of
+  failures). Check `GET /api/v1/usage` first, or ask the operator to change the plan (`plan set`);
+- no `trademark-risk` pack in the plan: the rules run and the report says `NOT_CONFIGURED` with `plan-not-allowed` as the
+  reason, as for a catalog that is not served.
+
+If the quota runs out **in the middle** of the file, the batch goes on. A row whose results are already stored is still
+answered (a cache hit costs nothing); a row that needs a new result the client can no longer pay for is marked
+`QUOTA_EXCEEDED` in `listings.csv` (with `rules: quota-exceeded` and/or `trademark: quota-exceeded` in `error`), is **not**
+counted as a failed check, and its trademark column says `QUOTA_EXCEEDED`. `summary.html` has a row "Dòng bị bỏ qua vì hết
+quota tháng" with the number and a yellow banner, and the console prints it too. Run the batch again after the quota resets
+(`resetAt` of `GET /api/v1/usage`) or after the plan changes: the rows already stored are answered from the cache and only
+the rest are checked.
 
 ### Rows that cannot be read
 

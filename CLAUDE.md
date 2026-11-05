@@ -54,8 +54,19 @@ It never edits a listing, never publishes, and does no SEO.
 - Listing Guard is an independent product that many clients call over the API (ADR-007). There is no code or data
   for any single company in this repo; a client's own listing format is mapped to the standard input
   (`docs/input-schema.md`) on the client's side.
-- Current scope: Etsy and Amazon rule engines, the multi-client API, the trademark scanner core with its endpoint, the
-  `batch-check` job, and policy ingest + retrieval (no LLM call, no structured output, no citation verification yet).
+- **Plans and monthly quota** (`api/.../plan/`, ADR-013, V19): each client has a plan (`FREE`, `SELLER`, `PRO`; rows of
+  `plan`, with their packs in `plan_pack` and the monthly quota, NULL = unlimited, seeded in V19) and `client_usage` counts
+  results per client and UTC month. **Off by default** (`listing-guard.plans.enabled=false`): `PlanService` then returns at
+  once without a query, so a self-hosted deployment is unchanged. One unit is one new result that is stored, per endpoint
+  (a full check of one listing is two); cached results, `GET`s, `GET /api/v1/usage` and `INCOMPLETE` trademark results cost
+  nothing. Order in `CheckService` and `TrademarkCheckService`: `requirePack` the pack (403 `plan-not-allowed`), cache, `requireQuota`
+  (429 `quota-exceeded`, no `Retry-After`), analysis, `charge` inside the transaction that stores the result. `batch-check`
+  needs the `batch` pack, stops at once with `quota-exceeded` when no unit is left, and marks rows `QUOTA_EXCEEDED` when the
+  quota runs out midway. `plan set <client> <plan>` (admin job) changes a plan at once. The packs `policy-analyzer` and
+  `sheet-connector` are reserved and not enforced yet: ADR-011 PR 5 and phase 4b (GĐ4b) will call `PlanService.requirePack` for them.
+- Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, the trademark
+  scanner core with its endpoint, the `batch-check` job, and policy ingest + retrieval (no LLM call, no structured output,
+  no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
@@ -80,6 +91,8 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
 5. `batch-check` (done, `docs/batch-check.md`): an operator tool, independent of the packs above. It uses the services
    of `/checks` and `/trademark-checks` as they are and changes neither; a new pack that should take part in the batch
    gets its own part in the job and its own columns in the reports, never a change to the existing ones.
+6. Client plans and monthly quota (done, ADR-013, V19; off by default). Next for it: ADR-011 PR 5 and the sheet connector
+   (phase 4b) call `requirePack` for their packs. Billing, payment and a self-service upgrade are not planned here.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
@@ -186,6 +199,12 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   (`docker compose run --rm admin ...`) which audit-logs client, key id and time and never a secret. Everything a
   client creates carries its `client_id`; any query for client data must filter by it, and another client's check is
   a 404, never a 403. Rate limit is per client. The web app starts with no key (WARN).
+- **Plans and quota** (ADR-013): a new endpoint or capability that belongs to a plan calls `PlanService.requirePack(clientId,
+  Pack)` first, and one that stores a result also `requireQuota` before the analysis and `charge` inside the storing
+  transaction (never outside it: a rollback must take the charge back); a cached answer is returned before any quota check.
+  The plan is read from the database at each use, never cached. While plans are off no plan code may query or write.
+  `Pack` and `PlanCode` equal the `CHECK` constraints of V19 (a test holds them): a new pack or plan is a migration, never
+  an edit of V19. The tests read quotas from the `plan` table instead of repeating the numbers.
 - **API contract** (ADR-005, ADR-007): Errors are RFC 7807 problems with a
   stable `code` and `requestId`; never return a bare error body or a stack trace. Cache identity is
   `(client, marketplace, contentHash, analysisVersion)`; a change to anything that decides findings must change

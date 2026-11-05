@@ -36,8 +36,8 @@ cannot be read again, because only its hash is stored. A client can hold several
 rotated without downtime: the operator creates a new key, you switch over, the old key is revoked. A revoked key
 or a deactivated client stops working within about 30 seconds. Never log or echo the key.
 
-What belongs to the client, not to the key: the checks you create, the cached results you get back, and the rate
-limit. Another client can neither read your checks nor be answered from them.
+What belongs to the client, not to the key: the checks you create, the cached results you get back, the rate
+limit, and the plan and monthly quota (see "Plans and monthly quota"). Another client can neither read your checks nor be answered from them.
 
 ## Request id
 
@@ -50,6 +50,59 @@ not valid the server generates one. The id comes back in the `X-Request-Id` resp
 Each client gets 60 requests per minute with a burst of 20 (configurable per deployment), shared by all of its
 keys. The limit is counted in memory per instance. Over the limit you get `429` (`rate-limited`) with
 `Retry-After: <seconds>`; wait that long and retry. `GET /health` is not limited.
+
+## Plans and monthly quota
+
+A deployment can give each client a plan (`FREE`, `SELLER` or `PRO`) that sets which packs the client may use and how many
+results it may store per month. It is **off by default**: a deployment that does not turn it on (`listing-guard.plans.enabled`)
+never answers `403 plan-not-allowed` or `429 quota-exceeded`, and `GET /api/v1/usage` says `"enforced": false`. Ask the
+operator of the deployment you call whether plans are on. The operator sets your plan with the admin job
+(`plan set <client> <plan>`) and it takes effect at once; there is no endpoint to change it.
+
+What counts: **one unit is one new result that is stored, per endpoint.** A full check of one listing, that is
+`POST /api/v1/checks` and `POST /api/v1/trademark-checks` for the same listing, is two units. What does not count:
+
+- a result answered from the cache (`"cached": true`), also when you are at the limit;
+- `GET /api/v1/checks/{id}`, `GET /api/v1/trademark-checks/{id}` and `GET /api/v1/usage`;
+- a trademark result that is `INCOMPLETE` (it is stored for `GET` and never reused);
+- a request that is refused or fails (`400`, `401`, `403`, `413`, `429`, `503`).
+
+Repeating a request is therefore safe for your quota: the second identical request is answered from the cache and costs
+nothing. Two identical requests sent at the same time cost one unit.
+
+The month is the calendar month in UTC; the counter resets at 00:00 UTC on the first day (`resetAt` in the usage answer).
+
+### `GET /api/v1/usage`
+
+```json
+{
+  "enforced": true,
+  "plan": "SELLER",
+  "monthlyQuota": 1000,
+  "used": 42,
+  "remaining": 958,
+  "periodStart": "2026-11-01",
+  "resetAt": "2026-12-01T00:00:00Z",
+  "packs": ["batch", "listing-rules", "sheet-connector", "trademark-risk"]
+}
+```
+
+`monthlyQuota` and `remaining` are `null` when the plan has no limit, or when `enforced` is false (then `packs` lists
+every pack, because nothing is restricted). Reading it is never refused for plan or quota, costs no unit and shows only your
+own client. Poll it before a large run, not before every call.
+
+### The two refusals
+
+- `403` `plan-not-allowed`: your plan does not include the pack of the endpoint (`plan` and `pack` say which). Retrying
+  does not help; ask the operator for a plan that includes it.
+- `429` `quota-exceeded`: your plan's quota for this month is used up (`plan`, `quota`, `used` and `resetAt` say where you
+  are). **It has no `Retry-After` header and must not be retried in a loop:** until `resetAt` (or a plan change) a new
+  result is refused, while a listing you already checked is still answered from the cache. Both a quota refusal and a
+  rate-limit refusal are `429`, so branch on `code`, not on the status: `rate-limited` is retried after `Retry-After`,
+  `quota-exceeded` is not.
+
+The pack is checked first, then the cache, then the quota, so a client at its limit still gets every answer it has already
+paid for.
 
 ## Create a check
 
@@ -441,6 +494,7 @@ validation. Branch on `code`, not on `detail`.
 | 400 | `invalid-request` | Body missing, not JSON, or `marketplace` / `listing` missing; `listing` not an object. | Fix the request. Do not retry unchanged. |
 | 400 | `unknown-marketplace` | The marketplace code is not known. | Fix the code. `detail` lists the supported ones. |
 | 401 | `unauthorized` | Missing or invalid `X-API-Key`. | Check the key. Do not retry in a loop. |
+| 403 | `plan-not-allowed` | Only where plans are on (see "Plans and monthly quota"). Your client's plan does not include the pack of the endpoint; `plan` and `pack` say which. | Do not retry. Ask the operator for a plan that includes the pack. |
 | 404 | `check-not-found` | No check with that id for your client. A check of another client gives this same answer. | The id is wrong, or it is not yours. |
 | 404 | `trademark-check-not-found` | `GET /api/v1/trademark-checks/{id}`: no retained trademark check with that id for your client. A check of another client, an id that never existed and an expired check give this same answer. | The id is wrong, not yours, or past its retention: send the listing again. |
 | 404 | `not-found` | Unknown route. | Check the URL. |
@@ -449,6 +503,7 @@ validation. Branch on `code`, not on `detail`.
 | 415 | `unsupported-media-type` | Not `application/json`. | |
 | 422 | `marketplace-not-yet-supported` | A marketplace that is planned but not supported yet. None is planned today, so you will not see it now. | Skip the check for it. |
 | 429 | `rate-limited` | Over the per-client limit. | Wait `Retry-After` seconds, then retry. |
+| 429 | `quota-exceeded` | Only where plans are on. The month's quota of your plan is used up; `plan`, `quota`, `used` and `resetAt` say where you are. **No `Retry-After`.** | Do not retry before `resetAt` or a plan change. Results you already have are still answered from the cache. |
 | 500 | `internal-error` | Unexpected failure. No details are exposed. | Retry later with backoff; report the `requestId`. |
 | 503 | `embedding-not-configured` | Only on routes that need embeddings (the policy search debug view). The deployment runs without an embedding provider, which is the default. Not `POST /api/v1/checks`. | An operator must choose a provider; retrying does not help. |
 | 503 | `embedding-unavailable` | Only on routes that need the embedding backend. Not `POST /api/v1/checks`. | |
@@ -458,7 +513,8 @@ validation. Branch on `code`, not on `detail`.
 
 Retrying `POST /api/v1/checks` is always safe: it has no side effect other than storing the result, and an
 identical listing returns the stored one. Suggested client behavior: timeout of a few seconds, retry `429`
-after `Retry-After`, retry `5xx` up to twice with backoff, never retry other `4xx`. If Listing Guard is down
+after `Retry-After` (only the `rate-limited` one, never `quota-exceeded`), retry `5xx` up to twice with backoff, never
+retry other `4xx`. If Listing Guard is down
 the listing should still be publishable: a check is advice, not a gate.
 
 ## Health

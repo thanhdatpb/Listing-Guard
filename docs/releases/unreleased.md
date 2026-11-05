@@ -1,9 +1,10 @@
 # Unreleased changes
 
-Changes on `main` that no release has shipped yet. This file lists the USPTO converter (ADR-009, PR A2b); when the next
-version is cut, move its content into `docs/releases/v<version>.md` with the other changes of that version and delete
-this file. Nothing here changes the rule checks (`POST /api/v1/checks`) or `POST /api/v1/trademark-checks`: their requests,
-responses, cache identities and results stay as they are.
+Changes on `main` that no release has shipped yet. This file lists the USPTO converter (ADR-009, PR A2b) and client plans
+with a monthly quota (ADR-013); when the next version is cut, move its content into `docs/releases/v<version>.md` with the
+other changes of that version and delete this file. Nothing here changes the requests, responses, cache identities, hashes
+or results of `POST /api/v1/checks` or `POST /api/v1/trademark-checks`; while plans are off (the default) nothing here
+changes what an API call does.
 
 ## What is new
 
@@ -37,10 +38,46 @@ docker compose run --rm uspto-convert --input=uspto/<file.xml> [--output=<name>.
 No migration, no new endpoint and no change to `docs/api/openapi.json`. The compose service `uspto-convert` is in the
 `tools` profile and starts only when you run it. See [docs/deployment.md](../deployment.md#trademark-catalog-adr-009-pr-a2).
 
+### Client plans and a monthly quota (ADR-013)
+
+Each client now has a plan (`FREE`, `SELLER` or `PRO`) that decides which packs it may use and how many results it may
+store per UTC month. **It is off by default** (`listing-guard.plans.enabled=false`); with the default, nothing about a plan
+is read, written or enforced and the API behaves as before.
+
+- **Unit.** One unit is one new result that is stored, per endpoint. A result answered from the cache (`cached: true`), a
+  `GET`, an `INCOMPLETE` trademark result and a refused request cost nothing. A full check of one listing, `/checks` plus
+  `/trademark-checks`, is two units. Seed (V19): `FREE` 20 units and `listing-rules`; `SELLER` 1000 units and
+  `listing-rules`, `trademark-risk`, `batch`, `sheet-connector`; `PRO` 6000 units and all five packs. The numbers are rows
+  of the table `plan`, so an operator can change them with an `UPDATE`.
+- **Order.** The pack is checked first (`403 plan-not-allowed`), then the cache, then the quota (`429 quota-exceeded`, with
+  `plan`, `quota`, `used`, `resetAt` and **no `Retry-After`**), then the analysis; the unit is counted in the transaction
+  that stores the result, so concurrent requests cannot take a client past its quota and two identical requests cost one.
+- **`GET /api/v1/usage`** returns `enforced`, `plan`, `monthlyQuota`, `used`, `remaining`, `periodStart`, `resetAt` and
+  `packs`. It is never refused for plan or quota and costs no unit. `docs/api/openapi.json` has it and the new `403` and
+  `429` answers.
+- **Admin.** `docker compose run --rm admin plan set <client> <FREE|SELLER|PRO>` (audit-logged with the previous and the new
+  plan, effective at once); `client list` shows a PLAN column.
+- **`batch-check`.** With plans on it is charged like the API. It needs the `batch` pack, stops **at once** with
+  `quota-exceeded` (and no report) when no unit is left, and when the quota runs out in the middle marks the rows it could
+  not check `QUOTA_EXCEEDED` in `listings.csv` and says how many in `summary.html` and on the console. Rows whose results are
+  stored are still answered.
+- **Reserved.** `policy-analyzer` (ADR-011 PR 5) and `sheet-connector` (phase 4b) are in the plans and are not enforced yet.
+- **Not included.** Billing, payment, a self-service upgrade, a per-pack quota.
+
+Migration V19 adds `plan`, `plan_pack`, `client_usage` and `client.plan_code` (default `FREE`). See
+[docs/deployment.md](../deployment.md#client-plans-and-the-monthly-quota-adr-013) and the
+[integration guide](../integration-guide.md#plans-and-monthly-quota).
+
 ## Breaking changes
 
-None.
+None for a deployment that leaves plans off. Two things an operator may notice: `admin client list` has a new PLAN column
+before CREATED (a script that cuts the columns by position needs updating), and `BatchCheckJob` takes a `PlanService`
+(internal, for code that builds the job by hand).
 
 ## Upgrade notes
 
-None. Nothing needs to be configured unless you want to use the converter.
+V19 applies on its own at start-up and is additive. **Before you turn plans on**, give each client its plan with
+`admin plan set`: every existing client is `FREE` after V19, which has 20 units a month and no trademark, batch or sheet
+pack. Then set `LISTING_GUARD_PLANS_ENABLED=true` (`PLANS_ENABLED=true` in the development compose file) for the API and for
+`batch-check`. Usage is counted only while plans are on. Nothing needs to be configured to use the USPTO converter beyond
+what its section says.
