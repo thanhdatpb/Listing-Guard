@@ -157,6 +157,67 @@
     </section>
 
     <aside class="results" id="results" aria-live="polite" aria-label="Results">
+        <th:block th:if="${result != null}">
+            <div class="verdicts">
+                <section class="verdict" id="readiness-panel" aria-labelledby="readiness-heading"
+                         th:classappend="${result.readiness.kind.css()}">
+                    <h2 id="readiness-heading">Publish readiness</h2>
+                    <p class="big" th:text="${result.readiness.big}"></p>
+                    <p class="headline" th:text="${result.readiness.headline}"></p>
+                    <p class="muted small" th:text="${result.readiness.detail}"></p>
+                </section>
+                <section class="verdict" id="trademark-panel" aria-labelledby="trademark-heading"
+                         th:classappend="${result.trademark.kind.css()}">
+                    <h2 id="trademark-heading">Trademark risk</h2>
+                    <p class="big" th:text="${result.trademark.big}"></p>
+                    <p class="headline" th:text="${result.trademark.headline}"></p>
+                    <p class="muted small" th:text="${result.trademark.detail}"></p>
+                    <p class="hint-upgrade small" th:if="${result.trademark.hint != null}" th:text="${result.trademark.hint}"></p>
+                    <p class="muted small disclaimer" th:text="${result.trademark.disclaimer}"></p>
+                </section>
+            </div>
+
+            <section class="findings" id="rule-findings" th:if="${result.rulesRan}" aria-labelledby="findings-heading">
+                <h2 id="findings-heading">Findings</h2>
+                <p th:if="${result.ruleGroups.isEmpty()}">The listing rules found nothing to report.</p>
+                <div class="group" th:each="group : ${result.ruleGroups}" th:classappend="${group.css}">
+                    <h3><span th:text="${group.label}"></span> (<span th:text="${group.items.size()}"></span>)</h3>
+                    <ul>
+                        <li th:each="f : ${group.items}">
+                            <p class="msg" th:text="${f.message}"></p>
+                            <p class="meta small muted"><code th:text="${f.ruleId}"></code>
+                                <th:block th:if="${f.field != null}"> on <code th:text="${f.field}"></code></th:block></p>
+                            <p class="evidence small" th:if="${f.evidence != null}">Evidence:
+                                <th:block th:replace="~{console/editor-fragments :: evidence(${f.evidence})}"></th:block></p>
+                            <p class="small" th:if="${f.suggestion != null}" th:text="${f.suggestion}"></p>
+                            <div class="fix" th:if="${f.fix != null}">
+                                <p class="small"><strong>Suggested fix:</strong> <span th:text="${f.fix.description}"></span></p>
+                                <p class="small" th:if="${f.fix.proposedValue != null}">Proposed value:
+                                    <code th:text="${f.fix.proposedValue}"></code></p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="findings" id="trademark-findings" th:if="${!result.trademark.groups.isEmpty()}"
+                     aria-labelledby="trademark-findings-heading">
+                <h2 id="trademark-findings-heading">Trademark findings</h2>
+                <div class="group" th:each="group : ${result.trademark.groups}" th:classappend="${group.css}">
+                    <h3><span th:text="${group.label}"></span> (<span th:text="${group.items.size()}"></span>)</h3>
+                    <ul>
+                        <li th:each="f : ${group.items}">
+                            <p class="msg" th:text="${f.message}"></p>
+                            <p class="meta small muted"><code th:text="${f.ruleId}"></code> on <code th:text="${f.field}"></code>
+                                <th:block th:if="${f.mark != null}"> matching <code th:text="${f.mark}"></code></th:block></p>
+                            <p class="evidence small" th:if="${f.evidence != null}">Evidence:
+                                <th:block th:replace="~{console/editor-fragments :: evidence(${f.evidence})}"></th:block></p>
+                            <p class="small" th:if="${f.suggestion != null}" th:text="${f.suggestion}"></p>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+        </th:block>
     </aside>
 </main>
 </body>

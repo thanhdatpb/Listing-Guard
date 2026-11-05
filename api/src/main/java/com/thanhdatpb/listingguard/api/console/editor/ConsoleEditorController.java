@@ -11,6 +11,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -29,10 +31,12 @@ public class ConsoleEditorController {
 
     private final PlanService plans;
     private final ActiveRulesets rulesets;
+    private final EditorCheckService checks;
 
-    public ConsoleEditorController(PlanService plans, ActiveRulesets rulesets) {
+    public ConsoleEditorController(PlanService plans, ActiveRulesets rulesets, EditorCheckService checks) {
         this.plans = plans;
         this.rulesets = rulesets;
+        this.checks = checks;
     }
 
     @GetMapping("/console/check")
@@ -40,6 +44,26 @@ public class ConsoleEditorController {
                        @AuthenticationPrincipal ConsoleUser user, Model model) {
         EditorMarketplace selected = marketplace(marketplace);
         populate(model, user, selected, EditorForm.empty(selected), Map.of());
+        return VIEW;
+    }
+
+    /**
+     * One press of "Check". A price or quantity that cannot be read is sent back to its field and nothing is checked (and
+     * nothing is counted). Otherwise both checks run through {@link EditorCheckService}; the form comes back as it was
+     * typed, next to the result.
+     */
+    @PostMapping("/console/check")
+    public String check(@ModelAttribute("form") EditorForm form, @AuthenticationPrincipal ConsoleUser user, Model model) {
+        EditorMarketplace selected = marketplace(form.marketplace());
+        EditorListingMapper.Mapped mapped = EditorListingMapper.map(selected, form);
+        if (!mapped.valid()) {
+            populate(model, user, selected, form, mapped.errors());
+            return VIEW;
+        }
+        EditorResult result = checks.check(user.clientId(), selected, mapped.listing());
+        populate(model, user, selected, form, Map.of());
+        model.addAttribute("result", result);
+        model.addAttribute("otherOpen", result.requiredFieldsFinding());
         return VIEW;
     }
 
