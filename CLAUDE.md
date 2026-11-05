@@ -213,7 +213,11 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `PolicyChunker.VERSION`/limits or `EmbeddingProvider.modelId()` changes. Bump `PolicyChunker.VERSION` when
   the chunking rules change. The manifest `version` must equal the page's "Last updated" date.
 - **Trademark catalogs** (ADR-009): `catalogs/raw/` is git-ignored (third-party data, own terms; the operator checks
-  them), only `catalogs/manifest.yaml` is committed, tests use synthetic files only. A catalog version is append-only
+  them), only `catalogs/manifest.yaml` is committed, tests use synthetic files only. The one committed data file is the
+  **DEMO catalog** in `catalogs/demo/` (its own `manifest.yaml` and `raw/DEMO-fictional-marks.jsonl`: invented words, for local
+  tests and demonstration videos, never used by default; imported only with `CATALOGS_DIR=/catalogs/demo`). Never put a real
+  mark in it; its `.jsonl` stays LF (`.gitattributes`) because the manifest checks its sha256, and `DemoCatalogTest` holds its
+  labels and the results `catalogs/demo/README.md` promises. A catalog version is append-only
   (DB trigger) and its stored name is the manifest label plus a digest of the import; never edit one, import again. The
   active catalog is named exactly in `listing-guard.trademark.catalog-version` (never "latest") and is refused when its
   normalization identity (pack, normalizer version, hash of the parsed `normalization` section) differs from the active

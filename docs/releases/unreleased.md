@@ -152,6 +152,10 @@ published, and **the listing you type is never stored**.
   while you type.
 - **Not included.** Saved listings or history, a live preview, applying several fixes at once.
 
+- **A DEMO trademark catalog.** `catalogs/demo/` holds ten invented marks (nothing real) so the trademark panel can be tried
+  locally and shown in demonstrations. It is never used by default: you import it on purpose, with its own manifest, and
+  point `TRADEMARK_CATALOG_VERSION` at the version the job prints. See [catalogs/demo/README.md](../../catalogs/demo/README.md).
+
 No migration, no new API endpoint and no change to `docs/api/openapi.json`. The page uses two static files,
 `/console/editor.css` and `/console/editor.js`, served behind the console sign-in; there is no build step and no Node. See
 [ADR-014](../adr/ADR-014-listing-workspace.md) and [deployment](../deployment.md#optional-web-console-adr-014-b2).
