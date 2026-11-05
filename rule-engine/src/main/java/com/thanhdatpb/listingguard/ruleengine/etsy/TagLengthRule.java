@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.ruleengine.etsy;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.Fixes;
 import com.thanhdatpb.listingguard.ruleengine.Rule;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.ArrayList;
@@ -33,7 +34,8 @@ public final class TagLengthRule implements Rule {
             if (length > max) {
                 findings.add(finding(config, "tags[" + i + "]", tag,
                         "Tag " + Texts.quote(tag) + " dài " + length + " ký tự, tối đa " + max + ".",
-                        "Rút ngắn tag này ít nhất " + (length - max) + " ký tự."));
+                        "Rút ngắn tag này ít nhất " + (length - max) + " ký tự.",
+                        Fixes.shorten("tag", tag, max).orElse(null)));
             }
         }
         return findings;
