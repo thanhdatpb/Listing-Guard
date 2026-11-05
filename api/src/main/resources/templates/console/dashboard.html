@@ -9,6 +9,7 @@
 <main>
     <h1>Dashboard</h1>
     <p>Signed in as <span th:text="${email}"></span></p>
+    <p><a th:href="@{/console/check}">Check listing</a></p>
     <h2>Plan and usage</h2>
     <p>Plan: <span th:text="${usage.plan}"></span></p>
     <p>Usage this month: <span th:text="${usage.used}"></span></p>

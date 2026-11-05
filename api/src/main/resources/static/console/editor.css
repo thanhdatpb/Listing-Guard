@@ -1,0 +1,126 @@
+/* Console editor styles. Plain CSS, no build step. Colors are tokens; the dark scheme follows the system setting. */
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1b1f23;
+  --muted: #5b6670;
+  --line: #d3d9df;
+  --card: #f5f7f9;
+  --accent: #1f5fbf;
+  --accent-fg: #ffffff;
+  --error: #b3261e;
+  --warning: #8a5a00;
+  --info: #1f5fbf;
+  --ok: #17692f;
+  --mark: #fde68a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c;
+    --fg: #e8ecef;
+    --muted: #9aa6b1;
+    --line: #2f3942;
+    --card: #1c2228;
+    --accent: #6aa5ff;
+    --accent-fg: #0b1a2e;
+    --error: #ff8a80;
+    --warning: #f2c26b;
+    --info: #8ab4ff;
+    --ok: #6fd48c;
+    --mark: #6b5200;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+a { color: var(--accent); }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.bar nav { display: flex; gap: 1.25rem; }
+.bar a[aria-current="page"] { color: var(--fg); font-weight: 600; text-decoration: none; }
+
+.layout {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+@media (min-width: 62rem) {
+  .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+}
+
+h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+h3 { font-size: 1rem; margin: 0 0 0.5rem; }
+
+.muted { color: var(--muted); }
+.small { font-size: 0.875rem; }
+
+.tabs { display: flex; gap: 0.5rem; margin: 1rem 0 0.25rem; }
+.tabs a {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--fg);
+}
+.tabs a.active { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+
+.field { margin: 1rem 0; }
+.field label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+.field label .muted { font-weight: 400; }
+input[type="text"], textarea {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+textarea { resize: vertical; }
+input:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+input[aria-invalid="true"] { border-color: var(--error); }
+
+.counter, .hint { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--muted); }
+.counter.over { color: var(--error); font-weight: 600; }
+.error { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--error); font-weight: 600; }
+
+details.other { margin: 1rem 0; padding: 0.5rem 0.75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+details.other summary { cursor: pointer; font-weight: 600; padding: 0.25rem 0; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: center; margin-top: 1rem; }
+.cost { margin: 0; flex: 1 1 18rem; font-size: 0.875rem; color: var(--muted); }
+
+button {
+  font: inherit;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
+button.link { border: 0; background: none; color: var(--accent); padding: 0; text-decoration: underline; }
