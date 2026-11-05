@@ -221,9 +221,8 @@ TRADEMARK_CATALOG_VERSION=<label>-<digest>      # in .env, then recreate the api
 
 1. Get the public data from its official source yourself and check its terms of use. The importer never downloads
    anything. Put the file in `catalogs/raw/` (git-ignored).
-2. Convert it to `jsonl-1`. The `uspto-convert` job for the USPTO bulk XML is not part of this branch yet: it waits for the
-   official USPTO documentation (ADR-009, "USPTO conversion and multi-source catalogs"). Any other source can be
-   converted by your own script into UTF-8 JSON Lines, one record per line:
+2. Convert it to `jsonl-1`. For a USPTO Trademark Daily XML applications file use the `uspto-convert` job (below). Any
+   other source can be converted by your own script into UTF-8 JSON Lines, one record per line:
    `{"mark":"...","status":"REGISTERED","nice_classes":[25],"source_id":"...","common_word":false}`.
 3. Write your own list in the same format, for example the marks seen in your IP cases, with `"common_word": true` on
    a mark that is an everyday word (it can be a mark that also appears in the public file: the records merge). Use only
@@ -235,6 +234,42 @@ TRADEMARK_CATALOG_VERSION=<label>-<digest>      # in .env, then recreate the api
    list. Keep the statuses you want to warn about, usually `REGISTERED` and `PENDING`.
 5. Run `docker compose run --rm trademark-import --catalog=<version label>`, then set `TRADEMARK_CATALOG_VERSION` to the
    printed version and recreate the api.
+
+**The USPTO converter (ADR-009, PR A2b).** The one-shot job `uspto-convert` converts one USPTO Trademark Applications
+Daily XML file (TDXF, DTD V2.0) to `jsonl-1`. **It is unverified against real data**: it follows the public DTD V2.0 and its
+element documentation, and its tests use synthetic XML (ADR-009 names the two documents and the element of each datum).
+
+```bash
+# you download the file yourself and check its terms; the job never downloads anything
+docker compose run --rm uspto-convert --input=uspto/<file.xml> [--output=<name>.jsonl] [--overwrite]
+# logs the counts and: To import it, list <name>.jsonl in catalogs/manifest.yaml with sha256: <hash>
+```
+
+- **Files.** The input is a file inside `catalogs/raw/` (the compose service mounts only that folder, writable). The job
+  writes `<name>.jsonl` (the input name with `.jsonl` unless `--output` says another plain file name) and
+  `<name>.jsonl.report.json` next to it, through a `.part` file that is renamed when the conversion succeeded. An existing
+  output is refused unless `--overwrite` is given (a manifest that names it then needs the new `sha256`). Declare the output
+  as one source of a manifest entry with a `source_key` (`catalogs/manifest.yaml` has a commented example), with the
+  `sha256` the job printed and the license and url of the data you downloaded.
+- **Stream.** The XML is read with StAX and each record is written as soon as it is read, so the memory of the job does not
+  depend on the size of the file (a test converts a file larger than a 32 MB heap). The DTD is never loaded and no external
+  entity is resolved. The job makes no network call and imports no catalog; the application context it starts still applies
+  pending migrations and registers the trademark ruleset, like the other jobs, so the database must be running.
+- **Version.** It reads `version/version-no` and `version-date` and stops on a `version-no` other than `2.0`, naming what it
+  found. `USPTO_ALLOW_OTHER_VERSION=true` (`listing-guard.trademark.uspto.allow-other-version`) reads it anyway; the output
+  is then unchecked against that version.
+- **What is kept.** One record per `case-file`: the serial number is the `source_id`, `mark-identification` the mark, the
+  header `status-code` is mapped through `uspto-status-map-2026-11.yaml` (the 149 codes of Table 1 of the documentation,
+  `source.status: unverified`), and the `international-code` values from 1 to 45 are the classes. A record is dropped, and
+  counted once in the report under the first reason that applies, when it has no or an invalid serial number, a logo-only
+  or no-drawing mark (`logo_only`, `no_drawing`) or no drawing code, no mark text, a mark longer than the import accepts or
+  one that is empty or too long after normalization (the import would refuse the whole catalog), a status that carries no
+  status of the mark (`status_dropped:<code>`) or is not listed (`status_unmapped:<code>`), or no class from 1 to 45.
+- **Limits.** A daily file holds changes, not the register, and a serial number can come several times with different
+  statuses: every record is written, and when a catalog is imported the status declared first wins (`REGISTERED` before
+  `PENDING`), so an old record can hide a newer one. "The latest transaction wins" is PR A2c. The status of each class is
+  ignored, and the codes `A`, `B` and `200` (certification and collective membership marks) are not classes and are left
+  out. Run the job on a real file and read its report before you rely on a catalog made from it.
 
 Stored source ids are `<source_key>:<source_id>` for this form. One file whose hash differs from the manifest refuses the
 whole catalog; changing any file, term, date, filter or the list of sources is another version (the old one stays).

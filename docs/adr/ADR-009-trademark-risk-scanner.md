@@ -371,29 +371,124 @@ ruleset: a catalog is still the same entries, now built from more than one file,
 is V18 (the table of sources). The parts, in the order they were built: the streaming import, the table of sources, the
 multi-source manifest and the USPTO converter.
 
-**Status.** The streaming import, V18 and the multi-source manifest are done. The USPTO converter is **not started**: it
-must read the structure of the bulk files from the official USPTO documentation (the DTD or the data dictionary of the
-trademark application files) and a sample file, saved by the maintainer in `catalogs/raw/uspto/`, and no element name
-may be guessed. Those files were not in the working copy when the converter was to be written (`catalogs/raw/` did not
-exist, and no DTD, data dictionary or sample XML was found in the repository), and the converter downloads nothing, so
-that part waits. The candidates, found by a web search and **not opened** (the maintainer confirms which one matches the
-files that will be converted):
+**Status.** The streaming import, V18, the multi-source manifest and the USPTO converter are written. The converter is
+**unverified against real data**: the maintainer has no account at the USPTO Open Data Portal (ODP) and could not download
+a daily file, so it was written from the public DTD and element documentation below and tested with small synthetic XML
+that follows that DTD. It has never read a real file. The first run on a real file is the check (see "Known limits").
 
-- Trademark application XML, USPTO bulk data: <https://data.uspto.gov/bulkdata/datasets> (the product page for
-  "Trademark Application XML (1884 - Present)", with the files and the DTD they cite).
-- Trademark Daily XML (TDXF) applications, the product description: <https://developer.uspto.gov/node/124>, and the
-  annual file set: <https://developer.uspto.gov/node/125>.
-- Field documentation of the daily application XML:
-  <https://www.uspto.gov/sites/default/files/products/tmdailyapp-documentation.pdf> (an older document, to be checked
-  against the DTD named in the files).
-- The case-file variable tables, which map each field to its XML element and describe the status codes:
-  <https://www.uspto.gov/sites/default/files/documents/casefiles_vartable_2023_final.pdf> and the dataset page
-  <https://www.uspto.gov/ip-policy/economic-research/research-datasets/trademark-case-files-dataset>.
+**Documents used.** Only these two, saved at the maintainer's request in `catalogs/raw/uspto/` (git-ignored) and
+recorded with their size and SHA-256 in `catalogs/raw/uspto/SOURCES.md`. No sample XML was taken from any source.
 
-Once they are read, this section records: the title, version, date and URL of each document used; the element that holds
-the mark text, the Nice classes, the status code and the serial number; and the meaning of every status code. The
-converter's table from USPTO status code to `REGISTERED | PENDING | EXPIRED | CANCELLED` is then a versioned YAML file
-whose `source.status` stays `unverified` until the maintainer checks it, like the trademark ruleset.
+| Document | Version and date | URL | SHA-256 |
+|---|---|---|---|
+| Trademark Applications Document Type Definition (DTD) | V 2.0, public identifier `-//USPTO//DTD TRADEMARK-APPLICATIONS-DAILY V2.0 2004-11-08//EN` | <https://www.uspto.gov/sites/default/files/products/application-dtd110804.pdf> | `5a1fabe8153e03fb165010c0a7d68e3ca31cf69b4e717c6f377452e042570df2` |
+| Trademark Applications Daily XML DTD Element Documentation | V2.0 (Table 1, status codes, "updated 06/24/2005"), 95 pages | <https://www.uspto.gov/sites/default/files/products/applications-documentation.pdf> | `c242d54d2833d4bd9eddb0607f7d13737568983bdf3cf8e1ce53e672b08b54ae` |
+
+Both were downloaded on 2026-11-05. The ODP also publishes a data dictionary, v2.3 (2024-10-18); it needs an account and
+was **not** used. The other pages listed in an earlier draft of this section (the bulk-data product page, the developer
+pages and the case-file variable tables) were not opened and are not used. The converter reads only the daily
+applications format (TDXF, `trademark-applications-daily`); another format is another converter.
+
+**What the converter reads.** Each record is a `case-file` element under
+`/trademark-applications-daily/application-information/file-segments/action-keys/`. Paths are relative to `case-file`.
+
+| Data | Element | Format (from the documentation) |
+|---|---|---|
+| Serial number (`source_id`) | `serial-number` | 8 digits; the stored id is this text as it is |
+| Mark text (`mark`) | `case-file-header/mark-identification` | "MARK-1-LIN", the characters of the mark |
+| Mark drawing code | `case-file-header/mark-drawing-code` | 4 characters; the first one is the physical appearance |
+| Status code | `case-file-header/status-code` | 3 digits, Table 1 |
+| Nice classes (`nice_classes`) | `classifications/classification/international-code` | repeated; several `classification` elements may each hold several |
+| Registration number | `registration-number` | 7 digits, zeros when none (**not read**: `jsonl-1` has no place for it) |
+| Filing and registration date | `case-file-header/filing-date`, `registration-date` | `YYYYMMDD`, zeros when none (**not read**, same reason) |
+| Version | `/trademark-applications-daily/version/version-no` and `version-date` | `version-date` is `YYYYMMDD` |
+
+The documentation does not give the literal `version-no` of a V2.0 file (it only says the first production version "will
+be 1.0"). The converter expects `2.0` and stops with an error that names the `version-no` and `version-date` it found
+when they differ, unless `listing-guard.trademark.uspto.allow-other-version` is true (default false). The date is
+reported and not checked. A file whose `application-information` holds `data-available-code` `N` has no data and gives an
+empty output with a report that says so. The XML is read with StAX as a stream; the DTD is never loaded and no external
+entity is resolved, so reading a file never touches the network.
+
+**Logo-only marks (mark drawing code).** Only the first character is read. Its meaning is the same before and after
+2003-11-02 for the values that matter here (the two eras differ on `1` and `4`, which are both lettering):
+
+| First character | Documentation | Converter |
+|---|---|---|
+| `1` | typeset words, letters or numbers (before 2003-11-02; "no longer used" after) | keep if `mark-identification` is not blank |
+| `2` | drawing or design without any word, letter or number | drop, reason `logo_only` |
+| `3` | design that also includes words, letters or numbers | keep if `mark-identification` is not blank (maintainer decision; the documentation does not say that the element then holds the words) |
+| `4` | block form (before 2003-11-02) or standard character mark | keep if not blank |
+| `5` | stylized words, letters or numbers | keep if not blank |
+| `6` | no drawing possible (for example a sound) | drop, reason `no_drawing` |
+| missing, or another character | | drop, reason `missing_drawing_code` or `unknown_drawing_code` |
+
+**Nice classes.** An `international-code` is kept when it is an integer from 1 to 45 (leading zeros allowed: `025` is 25).
+The documentation also lists the letters `A` and `B` (certification marks) and `200` (collective membership marks); they are
+not Nice classes of `jsonl-1` and are dropped from the record. The documentation's "001 through 0034" for goods is read as
+001 to 034 (services are 035 to 042). A record left with no class is dropped, reason `no_valid_nice_class`.
+
+**Other drop reasons**, all counted: `missing_serial`, `blank_mark`, `mark_too_long` (the display form is longer than the
+import accepts, 300 characters), `mark_empty_after_normalization` and `mark_too_long_after_normalization` (the import
+refuses a whole catalog for such a record, so the converter drops it instead and the report counts it) and
+`status_dropped:<code>` or `status_unmapped:<code>` (see below). The converter reports each reason with its count, and
+the codes of the two status reasons one by one. A record is counted once, under the first check it fails, in this order:
+serial number, drawing code, blank mark, mark too long, status, classes, then the two checks after normalization. A report
+holds counts only, never a mark or a serial number.
+
+**The job.** The profile `uspto-convert` (compose service of that name) runs `UsptoDailyConverter` over one file:
+`--input=<file inside catalogs/raw>`, optional `--output=<plain file name>` and `--overwrite`. It writes `<name>.jsonl` and
+`<name>.jsonl.report.json` next to each other in `catalogs/raw/` through a `.part` file that is renamed on success, refuses
+an existing output without `--overwrite`, makes no network call and imports no catalog. The report carries the version of the
+file, the version and hash of the status map, the counts by reason and the SHA-256 of the input and of the output (the value
+for `sha256` in the manifest). The application context it starts still applies pending migrations and registers the
+trademark ruleset, like the other jobs. An end-to-end test converts a synthetic file, imports it and checks a listing over HTTP.
+
+**Status codes.** The map from the 149 codes of Table 1 to `REGISTERED | PENDING | EXPIRED | CANCELLED | DROP` is a
+versioned YAML file (`uspto-status-map-2026-11.yaml`, with `source.status: unverified`; a code that is not in the file is
+`status_unmapped`). It is the maintainer's reading of Table 1 and not a USPTO statement, and it is not a legal conclusion.
+`DROP` is not a catalog status: the record is left out and counted by code.
+
+The principle is the same as for the rest of the pack: the tool warns, and a warning too many is better than a risk missed.
+A code that may still be alive therefore maps to `PENDING`, a code that is certainly dead maps to `CANCELLED`, and only a
+code that carries no status of the mark at all is `DROP`.
+
+| Result | Count | Codes | Why |
+|---|---|---|---|
+| `REGISTERED` | 9 | 624, 700, 701, 702, 703, 704, 705, 717, 800 | the mark is registered (registered, section 8 and 15 accepted or acknowledged, renewed, awaiting divisional fee, registered backfile) |
+| `EXPIRED` | 1 | 900 | expired |
+| `CANCELLED` | 6 | 710, 711, 712, 713, 714, 716 | cancelled under a section, by court order, or an inadvertently issued registration number cancelled |
+| `PENDING` | 87 | 616, 630, 631, 638, 640 to 661, 663 to 668, 672, 673, 680, 681, 682, 686, 688, 689, 718 to 722, 724, 725, 730 to 734, 744 to 746, 748, 752, 753, 756, 757, 760, 773, 774, 801 to 804, 806 to 825 | the application has not registered: examination, publication, notice of allowance, extensions, statement of use, appeal, opposition |
+| `CANCELLED` (not clear, chosen) | 15 | 600 to 609, 614, 618 | `ABANDONED`: the application is dead and `MarkStatus` has no abandoned value; `CANCELLED` is the nearest "no longer in force" status |
+| | | 401, 402 | international registration cancelled with no transformation filed, or case abandoned or cancelled: certainly dead |
+| | | 626 | "registered - backfile cancelled or expired": no longer in force either way, and the table does not say which, so `CANCELLED` (the same warning as `EXPIRED`) |
+| `PENDING` (not clear, chosen) | 25 | 400, 403 | international registration cancelled but pending transformation into a national application or registration: can come back |
+| | | 612, 690, 692, 693, 694 | petition to revive received, notice of allowance cancelled, withdrawn before publication or issue: the file may still be alive |
+| | | 715 | cancelled, restored to pendency |
+| | | 620, 625 | backfile added with the status not recorded, or registration added with the status unclear: cannot be ruled out |
+| | | 740, 762 to 766, 771, 772, 775, 777 to 780, 790, 794 | proceedings and post-registration papers (appeal, concurrent use, interference, opposition, cancellation, jurisdiction restored): the table does not say whether the mark is registered, so it is kept as possibly alive. The registration number is not used to decide: the documentation says it holds zeros when absent, and does not say it may stand for the status |
+| `DROP` | 6 | 000, 622, 632, 969, 970, 973 | unknown, misassigned serial number, informal application (no filing date), non-registration data, record created by an assignment request, pending petition or court decision: no status of the mark |
+
+The totals are `REGISTERED` 9, `EXPIRED` 1, `CANCELLED` 21, `PENDING` 112 and `DROP` 6, which is 149. A test checks
+that the table covers exactly the 149 codes of Table 1, each once, `DROP` included, and that `source.status` is
+`unverified`.
+
+**Known limits** (what the converter does not do, on purpose, in this PR):
+
+- **A daily file holds changes, not the register.** The `TRMK` file segment "contains new trademark data and
+  modifications made to existing Trademark data". A complete catalog needs the annual or backfile sets, which need an ODP
+  account.
+- **No "latest transaction wins".** The same serial number can appear on several days with different statuses, and the
+  converter writes every record it reads. The import then merges records of the same mark and keeps the status declared
+  first in `MarkStatus` (`REGISTERED` before `PENDING`), so an old record can hide a newer one. Fixing it needs either the
+  `status-date` or `transaction-date` in the catalog format or an upsert by `source_id` at import. **PR A2c**, to be done
+  before the catalog for a deployment is built (the maintainer's stage GĐ7). `jsonl-1` does not change in this PR.
+- **The status of each class is ignored.** Only the status of the header is read. A class cancelled in a multi-class
+  registration (`classification/status-code`, values `A` to `E` and `1` to `5`) keeps the status of the whole file. This can
+  only add warnings; it is accepted for now.
+- **Unchecked against a real file**: the literal `version-no`, the content of `mark-identification` for drawing code `3`,
+  and whether the real elements match the DTD.
+- Registration number and dates are not carried to the catalog.
 
 **Multi-source manifest.** An entry has one of two shapes (the header of `catalogs/manifest.yaml` shows both):
 
@@ -544,7 +639,8 @@ ruleset that an earlier PR did not already contain.
 |---|---|---|
 | A1 | `trademark-scanner` core: ruleset `trademark-risk-*` and its loader, canonical input and hash, normalization with offsets, tokens and n-grams, the `TrademarkCatalog` port with an in-memory implementation, exact/phrase/fuzzy matching with the Java final score, the three context rules, risk aggregation, `INCOMPLETE`/`UNKNOWN`, evidence, and the pack fingerprint with room for the catalog/database components. No Spring, no database, no HTTP. | PR 0b (done) |
 | A2 | Catalog: `pg_trgm` migration, catalog tables, offline importer, the PostgreSQL adapter (transaction-local candidate threshold), and the PostgreSQL major version / `pg_trgm` `extversion` / catalog components of the fingerprint. | A1 |
-| A2b | Real catalog for a deployment: a streaming import, V18 (one source row per data file), a catalog from several files (all done) and a converter from the USPTO bulk XML to `jsonl-1` (waits for the official documentation); see "USPTO conversion and multi-source catalogs (PR A2b)". | A2 |
+| A2b | Real catalog for a deployment: a streaming import, V18 (one source row per data file), a catalog from several files (all done) and a converter from the USPTO daily applications XML to `jsonl-1` (written from the public V2.0 DTD, unverified against a real file); see "USPTO conversion and multi-source catalogs (PR A2b)". | A2 |
+| A2c | The latest transaction of a serial number wins: the catalog needs the status date or transaction date of a record (or an upsert by `source_id` at import), so that a daily file's older record does not hide a newer one; see "Known limits" of PR A2b. `jsonl-1` does not change in A2b. | A2b |
 | A3 | `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}`, result tables, cache identity, retention and cleanup, OpenAPI and integration guide (done; see "Endpoint (PR A3)"). | A2 |
 | A4 | Synthetic tuning and held-out datasets, the evaluation run and its gate. | A2 (may run in parallel with A3) |
 

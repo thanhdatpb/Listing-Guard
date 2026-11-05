@@ -1,0 +1,4 @@
+# Profile for the one-shot USPTO conversion (ADR-009, PR A2b): no web server, the process ends when the job ends.
+spring:
+  main:
+    web-application-type: none

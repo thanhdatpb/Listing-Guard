@@ -39,9 +39,10 @@ Before you rely on it:
 
 - **The trademark catalog is yours to load.** No trademark data is shipped or downloaded. You prepare the data, check
   that the terms of its source allow this storage and use, and import it (see [Trademark catalog](#trademark-catalog)).
-  Without a catalog the trademark check answers `503` and the rule checks are not affected. There is no importer for an
-  official register yet: the USPTO converter waits for the official documentation, so you convert your data to the
-  `jsonl-1` format yourself.
+  Without a catalog the trademark check answers `503` and the rule checks are not affected. The `uspto-convert` job
+  converts a USPTO Trademark Daily XML applications file you downloaded yourself to the `jsonl-1` format, but it is
+  **unverified against real data**: it was written from the public DTD V2.0 and tested with synthetic XML only, and a daily
+  file holds changes, not the whole register. For any other source you convert your data to `jsonl-1` yourself.
 - **No accuracy has been measured on real data.** The evaluation of the trademark check (ADR-009, PR A4) has not been
   run, and every threshold and word list of the trademark ruleset is marked `unverified`. `batch-check` can count how
   often listings you labelled were flagged (`--label-column`); that is a measurement on a small set, not an accuracy.
@@ -308,14 +309,19 @@ hash of every ingested file. Nothing in it is estimated: it only exists after a 
 Trademark checks (ADR-009) match a listing against a catalog of marks that you load yourself. The catalog is optional:
 without it the application and `/checks` run as before and trademark checks are off. No trademark data is committed
 and the import never calls the network. **You are responsible for checking that the terms of your data source allow
-this storage and use.** No accuracy of this check has been measured on real data (see Status), and there is no converter
-for an official register yet: the USPTO converter waits for the official documentation, so you convert your data to
-`jsonl-1` yourself.
+this storage and use.** No accuracy of this check has been measured on real data (see Status). The `uspto-convert` job
+(below) converts a USPTO daily applications XML file, **unverified against real data**; for any other source you convert
+your data to `jsonl-1` yourself.
 
 1. **Prepare the file.** UTF-8 JSON Lines in `catalogs/raw/` (git-ignored), one record per line:
    `{"mark": "Zorvex", "status": "REGISTERED", "nice_classes": [25], "source_id": "123", "common_word": false}`
    (`status` is `REGISTERED`, `PENDING`, `EXPIRED` or `CANCELLED`; `nice_classes` are 1 to 45; `common_word` is
-   optional).
+   optional). For a USPTO Trademark Daily XML applications file (DTD V2.0) that you downloaded yourself, put it in
+   `catalogs/raw/uspto/` and run `docker compose run --rm uspto-convert --input=uspto/<file.xml>`: it writes this format
+   into `catalogs/raw/`, a `.report.json` with the counts of the records written and dropped (and why), and prints the
+   `sha256` for the manifest. It reads the XML as a stream and stops on a `version-no` other than 2.0. It is unverified
+   against real data, a daily file holds changes only, and the same serial number can appear more than once
+   ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md), PR A2c).
 2. **Describe it in `catalogs/manifest.yaml`:** a `version` label, `file`, `format_version: jsonl-1`, `source_name`,
    `url`, `license`, `source_date`, the file's `sha256` (`sha256sum`) and the `filters` (`include_classes`,
    `include_status`). A missing license or date, or a hash that differs from the file, is refused. To join several
@@ -385,11 +391,13 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 
 Done: pack identity (PR 0a, migration V7, and PR 0b, migrations V8-V14; composite analysis versions,
 [ADR-010](docs/adr/ADR-010-pack-identity-and-analysis-version.md)), the trademark scanner A1 (core), A2 (catalog) and A3
-(endpoint), the multi-file and streaming catalog import of A2b (V18), and the `batch-check` job. What follows, in this order,
-is **not built yet**:
+(endpoint), the multi-file and streaming catalog import of A2b (V18), the USPTO daily XML converter of A2b (written from
+the public DTD V2.0 and **unverified against real data**), and the `batch-check` job. What follows, in this order, is
+**not built yet**:
 
-1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: the USPTO converter (it waits
-   for the official documentation) and A4, the evaluation that would give the first measured numbers.
+1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
+   on a real USPTO file, PR A2c (the latest transaction of a serial number wins, which a catalog made of daily files
+   needs), and A4, the evaluation that would give the first measured numbers.
 2. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)). Deferred; nothing is implemented.
 3. After step 1: run the retrieval evaluation and record the measured results (this needs an embedding provider: an API
    key or Ollama), then build the policy analyzer ([ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md)). Only parts
@@ -413,7 +421,7 @@ is **not built yet**:
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
 - [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Deferred: PR B after ADR-009)
-- [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3 and part of A2b are implemented)
+- [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3 and A2b are implemented; the USPTO converter is unverified against real data)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
 

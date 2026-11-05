@@ -27,12 +27,15 @@ It never edits a listing, never publishes, and does no SEO.
   (the `/checks` envelope and `Normalizer`, own DTO) and `GET /api/v1/trademark-checks/{id}`; V17 `trademark_check` +
   `trademark_check_finding`, only the canonical input hash and bounded evidence are stored, 30-day retention enforced on
   read and by a scheduled cleanup under the advisory lock `(1279746628, 1380271182)`, which is reserved for it; a catalog
-  that is DISABLED or REFUSED answers `503 trademark-not-configured` and `/checks` is unaffected. **A2b (in progress)**: an
+  that is DISABLED or REFUSED answers `503 trademark-not-configured` and `/checks` is unaffected. **A2b (done)**: an
   entry of `catalogs/manifest.yaml` may list `sources:` (each with a `source_key`; stored source ids are `<key>:<id>`),
   the import reads files as a stream through a temporary staging table merged by SQL (`listing-guard.trademark.import.batch-size`),
-  and V18 `trademark_catalog_source` has one row per data file: all done. The `uspto-convert` job waits for the official
-  USPTO documentation in `catalogs/raw/uspto/` (ADR-009, never guess an element name). The next steps are the rest of
-  A2b and A4 (evaluation).
+  and V18 `trademark_catalog_source` has one row per data file. The `uspto-convert` job (profile and compose service;
+  `UsptoDailyConverter`, StAX, in `trademark-scanner`) converts a USPTO Trademark Daily XML applications file (DTD V2.0)
+  in `catalogs/raw/` to `jsonl-1` and writes a `.report.json` of the counts; the status map
+  `uspto-status-map-2026-11.yaml` has `source.status: unverified`. **The converter is unverified against real data**: it
+  follows the public DTD and documentation named in ADR-009 and has never read a real file. The next steps are PR A2c
+  (the latest transaction of a serial number wins) and A4 (evaluation).
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`). No Spring.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
@@ -65,8 +68,9 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
 
 1. PR 0a (done, V7) and PR 0b (done, V8-V14) (ADR-010).
 2. PR A: trademark scanner (ADR-009), delivered as A1 core (done), A2 catalog (done, V15-V16) and A3 endpoint (done,
-   V17). Next are A2b (streaming import, V18 and multi-source manifest done, USPTO converter waits for the official documentation)
-   and A4 evaluation.
+   V17) and A2b (done: streaming import, V18, multi-source manifest and the USPTO converter, which is unverified against
+   real data). Next are PR A2c (the latest transaction of a serial number wins, needed before a catalog made of daily
+   files is trusted; `jsonl-1` is not changed by A2b) and A4 evaluation.
    ADR-009 "Pull requests" and "USPTO conversion and multi-source catalogs (PR A2b)" have the detail.
 3. PR B: image checker (ADR-008, currently Deferred).
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
@@ -100,6 +104,7 @@ Policy corpus (see README "Policy corpus and retrieval"):
 ```bash
 # optional: needs a provider, default is `none` and then both jobs fail at once (ADR-012).
 # EMBEDDING_PROVIDER=api + LISTING_GUARD_EMBEDDING_API_KEY in .env (Google Gemini), or EMBEDDING_PROVIDER=ollama
+docker compose run --rm uspto-convert --input=uspto/<file.xml>        # catalogs/raw/uspto/ XML -> catalogs/raw/<name>.jsonl + report (profile `uspto-convert`; no network, no model)
 docker compose run --rm trademark-import --catalog=<label>           # catalogs/ -> trademark_entry (profile `trademark-import`; no network, no model)
 docker compose run --rm ingest                                       # policies/ -> pgvector (profile `ingest`)
 docker compose run --rm eval-retrieval                               # writes eval/retrieval/results.md
@@ -158,6 +163,13 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   merge rule exists twice, in that SQL and in `CatalogImport.prepare` (the in-memory reference that tests compare with);
   change both together, and order by code point (`COLLATE "C"`), never by the database default. The source ids of the
   `sources:` form are `<source_key>:<id>`, added by the importer, never present in a data file.
+- **USPTO converter** (ADR-009 "USPTO conversion and multi-source catalogs"): never guess an element name; it follows the
+  public DTD V2.0 and element documentation named there and is unverified against real data, so a change to what it reads
+  needs the documentation first and a real-file check later. It reads the XML as a stream (StAX; no DTD, no external
+  entity, no network) and stops on a `version-no` other than 2.0 unless `listing-guard.trademark.uspto.allow-other-version`.
+  A record is counted once under the first drop reason that applies, in the order of `UsptoDailyConverter`. The status map is
+  a versioned YAML with `source.status: unverified` that covers the 149 codes of Table 1, `DROP` included (a test checks
+  it); a published version is immutable, so a change is a new file and a new version. `jsonl-1` is not changed by it.
 - **Trademark results** (ADR-009 "Endpoint (PR A3)"): never store the submitted listing, only the canonical input hash and
   bounded evidence. Expiry (`expires_at`, 30 days) is decided on read by GET and the cache lookup, never by the cleanup job
   alone. Only a `COMPLETE` result is cached (partial unique index); an `INCOMPLETE` one is stored for GET and never

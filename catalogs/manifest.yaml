@@ -63,4 +63,22 @@
 #     filters:
 #       include_classes: [25, 35]
 #       include_status: [REGISTERED, PENDING]
+#
+#   A USPTO file converted by the uspto-convert job (ADR-009, PR A2b). The job prints the sha256 and writes
+#   <file>.report.json next to the output. The converter is unverified against real data, and a daily file holds changes
+#   only (no "latest transaction wins" yet, PR A2c). Check the terms of the file you downloaded before you list it:
+#
+#   - version: uspto-2026-11
+#     format_version: jsonl-1
+#     sources:
+#       - source_key: uspto
+#         file: daily-20241101.jsonl
+#         source_name: USPTO Trademark Daily XML, applications (converted by uspto-convert)
+#         url: where you downloaded the daily file
+#         license: the terms of the USPTO data product you downloaded, checked by you
+#         source_date: 2026-11-01
+#         sha256: 0000000000000000000000000000000000000000000000000000000000000000
+#     filters:
+#       include_classes: [25, 35]
+#       include_status: [REGISTERED, PENDING]
 catalogs: []
