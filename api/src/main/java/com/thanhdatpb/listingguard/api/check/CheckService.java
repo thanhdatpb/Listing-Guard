@@ -74,6 +74,23 @@ public class CheckService {
      * @throws com.thanhdatpb.listingguard.api.plan.QuotaExceededException  if the answer is not stored yet and the month's quota is used up
      */
     public CheckResult check(UUID clientId, CheckRequest request) {
+        return check(clientId, request, fixes.enabled());
+    }
+
+    /**
+     * Like {@link #check}, but always verifies fixes and scores readiness, whatever {@code listing-guard.fixes.enabled}
+     * says (ADR-014, part B3: the console editor). The flag keeps deciding what the API and the batch job compute and
+     * expose; this method changes neither. A stored result that has no fixes yet is enriched the way a cache hit of the
+     * API is (no quota, same id, same hash).
+     *
+     * @throws com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException if the client's plan has no {@code listing-rules} pack
+     * @throws com.thanhdatpb.listingguard.api.plan.QuotaExceededException  if the answer is not stored yet and the month's quota is used up
+     */
+    public CheckResult checkDetailed(UUID clientId, CheckRequest request) {
+        return check(clientId, request, true);
+    }
+
+    private CheckResult check(UUID clientId, CheckRequest request, boolean detailed) {
         PlanService.Admission admission = plans.requirePack(clientId, Pack.LISTING_RULES);
         Normalizer normalizer = normalizers.get(request.marketplace());
         Listing listing = normalizer.normalize(request.listing());
@@ -84,14 +101,9 @@ public class CheckService {
         String packId = ruleset.config().packId();
         String analysisVersion = ruleset.config().version();
 
-        Optional<CheckResult> cached = findCached(clientId, marketplace, packId, contentHash, rulesetVersionId,
-                analysisVersion);
+        Optional<CheckResult> cached = findCachedFor(clientId, marketplace, packId, contentHash, rulesetVersionId,
+                analysisVersion, detailed, listing, ruleset.config());
         if (cached.isPresent()) {
-            if (fixes.enabled() && !Boolean.TRUE.equals(cached.get().fixesComputed())) {
-                enrichCached(cached.get().checkId(), listing, ruleset.config());
-                return findCached(clientId, marketplace, packId, contentHash, rulesetVersionId, analysisVersion)
-                        .orElseThrow();
-            }
             return cached.get();
         }
 
@@ -99,7 +111,7 @@ public class CheckService {
         plans.requireQuota(admission);
         ReadinessScore readiness = null;
         List<Finding> found;
-        if (fixes.enabled()) {
+        if (detailed) {
             RuleRun run = ruleEngine.runDetailed(listing, ruleset.config());
             found = run.findings();
             readiness = readinessScorer.score(run);
@@ -110,12 +122,12 @@ public class CheckService {
         try {
             UUID id = transactions.execute(status -> persist(admission, packId, marketplace, contentHash,
                     rulesetVersionId, analysisVersion, found, storedReadiness));
-            return toResult(checks.findById(id).orElseThrow(), false);
+            return toResult(checks.findById(id).orElseThrow(), false, detailed);
         } catch (DataIntegrityViolationException e) {
             // another request of this client stored the same listing between our lookup and our insert: answer from its row
             log.debug("Concurrent identical check for {} {}; answering from the stored result", marketplace, contentHash);
-            return findCached(clientId, marketplace, packId, contentHash, rulesetVersionId, analysisVersion)
-                    .orElseThrow(() -> e);
+            return findCachedFor(clientId, marketplace, packId, contentHash, rulesetVersionId, analysisVersion, detailed,
+                    listing, ruleset.config()).orElseThrow(() -> e);
         }
     }
 
@@ -124,14 +136,28 @@ public class CheckService {
      * so the answer does not reveal which ids are in use.
      */
     public CheckResult get(UUID clientId, UUID id) {
-        return toResult(checks.findByIdAndClientId(id, clientId).orElseThrow(() -> new CheckNotFoundException(id)), false);
+        return toResult(checks.findByIdAndClientId(id, clientId).orElseThrow(() -> new CheckNotFoundException(id)), false,
+                fixes.enabled());
+    }
+
+    /** The stored answer for this listing; when {@code detailed} and it has no fixes yet, it is enriched first. */
+    private Optional<CheckResult> findCachedFor(UUID clientId, String marketplace, String packId, String contentHash,
+                                                long rulesetVersionId, String analysisVersion, boolean detailed,
+                                                Listing listing, RulesetConfig config) {
+        Optional<CheckResult> cached = findCached(clientId, marketplace, packId, contentHash, rulesetVersionId,
+                analysisVersion, detailed);
+        if (cached.isPresent() && detailed && !Boolean.TRUE.equals(cached.get().fixesComputed())) {
+            enrichCached(cached.get().checkId(), listing, config);
+            return findCached(clientId, marketplace, packId, contentHash, rulesetVersionId, analysisVersion, true);
+        }
+        return cached;
     }
 
     private Optional<CheckResult> findCached(UUID clientId, String marketplace, String packId, String contentHash,
-                                             long rulesetVersionId, String analysisVersion) {
+                                             long rulesetVersionId, String analysisVersion, boolean detailed) {
         return checks.findFirstByClientIdAndMarketplaceCodeAndPackIdAndContentHashAndRulesetVersionIdAndAnalysisVersionAndStatus(
                 clientId, marketplace, packId, contentHash, rulesetVersionId, analysisVersion, CheckStatus.COMPLETED)
-                .map(check -> toResult(check, true));
+                .map(check -> toResult(check, true, detailed));
     }
 
     /**
@@ -184,18 +210,22 @@ public class CheckService {
         });
     }
 
-    private CheckResult toResult(ListingCheck check, boolean cached) {
+    /**
+     * {@code detailed} says whether this caller sees fixes and readiness. A result that was stored with them is shown
+     * without them to a caller that does not (the API and the batch job while the flag is off).
+     */
+    private CheckResult toResult(ListingCheck check, boolean cached, boolean detailed) {
         List<CheckResult.FindingView> views = findings.findByCheckIdOrderByIdAsc(check.getId()).stream()
                 .map(entity -> new CheckResult.FindingView(entity.getRuleId(), entity.getSource(), entity.getSeverity(),
                         entity.getField(), entity.getValue(), entity.getMessage(), entity.getSuggestion(),
-                        fixView(entity.getFix())))
+                        detailed ? fixView(entity.getFix()) : null))
                 .toList();
         String rulesetVersion = rulesetVersions.findById(check.getRulesetVersionId()).map(RulesetVersion::getVersion)
                 .orElse(null);
         return new CheckResult(check.getId(), check.getStatus(), check.getMarketplaceCode(), rulesetVersion,
                 check.getAnalysisVersion(), check.getContentHash(), cached, check.getCreatedAt(),
-                CheckResult.Summary.of(views), views, fixes.enabled() ? check.isFixesComputed() : null,
-                fixes.enabled() ? readinessView(check) : null);
+                CheckResult.Summary.of(views), views, detailed ? check.isFixesComputed() : null,
+                detailed ? readinessView(check) : null);
     }
 
     private static CheckResult.FixView fixView(FixSuggestion fix) {
