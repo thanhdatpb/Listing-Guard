@@ -8,6 +8,8 @@ import static com.thanhdatpb.listingguard.api.docs.ApiExamples.ETSY_RESULT_CACHE
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_INVALID_REQUEST;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_NOT_FOUND;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_NOT_YET_SUPPORTED;
+import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_PLAN_NOT_ALLOWED;
+import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_QUOTA_EXCEEDED;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_RATE_LIMITED;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_TOO_LARGE;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_UNAUTHORIZED;
@@ -52,7 +54,7 @@ public class CheckController {
             description = """
                     Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content \
                     was already checked by the calling client with the same analysisVersion, the stored result is returned \
-                    instead and `cached` is true (no new check is created); results are never shared between clients. The listing is the marketplace's own format; for Etsy it is the \
+                    instead and `cached` is true (no new check is created); results are never shared between clients. A new result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached one costs nothing. The listing is the marketplace's own format; for Etsy it is the \
                     Open API v3 style JSON with snake_case fields, for Amazon the simple format with title, brand, \
                     bullet_points, description, search_terms, product_type, price, quantity and images.""",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -77,6 +79,9 @@ public class CheckController {
                     @ApiResponse(responseCode = "401", description = "Missing or invalid API key.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_UNAUTHORIZED))),
+                    @ApiResponse(responseCode = "403", description = "The client's plan does not include this pack (code `plan-not-allowed`; only where plans are on). Retrying does not help.",
+                            content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
+                                    examples = @ExampleObject(value = PROBLEM_PLAN_NOT_ALLOWED))),
                     @ApiResponse(responseCode = "413", description = "The request body is over the size limit (256 KB).",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_TOO_LARGE))),
@@ -85,9 +90,11 @@ public class CheckController {
                     @ApiResponse(responseCode = "422", description = "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`). No marketplace is planned today.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_NOT_YET_SUPPORTED))),
-                    @ApiResponse(responseCode = "429", description = "Rate limit exceeded for the calling client; see the Retry-After header.",
+                    @ApiResponse(responseCode = "429", description = "Two different answers, told apart by `code`. `rate-limited`: too many requests for the calling client; retry after the Retry-After header. `quota-exceeded` (only where plans are on): the month's quota of the client's plan is used up; there is no Retry-After, and retrying before `resetAt` does not help. A result already stored is still answered.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
-                                    examples = @ExampleObject(value = PROBLEM_RATE_LIMITED)))})
+                                    examples = {
+                                            @ExampleObject(name = "rate-limited", value = PROBLEM_RATE_LIMITED),
+                                            @ExampleObject(name = "quota-exceeded", value = PROBLEM_QUOTA_EXCEEDED)}))})
     public CheckResult check(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
                              @Valid @RequestBody CheckRequest request) {
         return service.check(client.id(), request);

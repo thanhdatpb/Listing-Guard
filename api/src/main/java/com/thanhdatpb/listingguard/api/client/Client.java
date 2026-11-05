@@ -27,6 +27,10 @@ public class Client {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    /** The plan code (ADR-013), a row of {@code plan}. A new client is FREE. */
+    @Column(name = "plan_code", nullable = false)
+    private String planCode = "FREE";
+
     protected Client() {
     }
 
@@ -52,5 +56,13 @@ public class Client {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getPlanCode() {
+        return planCode;
+    }
+
+    public void setPlanCode(String planCode) {
+        this.planCode = planCode;
     }
 }

@@ -11,6 +11,7 @@ import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.client.ClientRepository;
+import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCatalogRuntime;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckService;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkRulesets;
@@ -51,6 +52,9 @@ class BatchCheckTrademarkRefusedIntegrationTest {
     TrademarkCheckService trademarkChecks;
 
     @Autowired
+    PlanService plans;
+
+    @Autowired
     TrademarkCatalogRuntime runtime;
 
     @Autowired
@@ -66,7 +70,7 @@ class BatchCheckTrademarkRefusedIntegrationTest {
                 + "R-1," + unique() + ",d,mug,5,9.99,i_did,made_to_order,\n", StandardCharsets.UTF_8);
         Path mapping = Files.writeString(dir.resolve("map.yaml"), ETSY_MAPPING, StandardCharsets.UTF_8);
         ByteArrayOutputStream console = new ByteArrayOutputStream();
-        BatchCheckJob job = new BatchCheckJob(clients, normalizers, checks, trademarkChecks, runtime, rulesets,
+        BatchCheckJob job = new BatchCheckJob(clients, normalizers, checks, trademarkChecks, runtime, rulesets, plans,
                 new PrintStream(console, true, StandardCharsets.UTF_8), Clock.fixed(Instant.parse("2026-10-30T09:15:30Z"), ZoneOffset.UTC));
 
         BatchCheckJob.Result result = job.run(new BatchOptions(input, mapping, CLIENT_1, "ETSY", dir.resolve("out"), null, null));

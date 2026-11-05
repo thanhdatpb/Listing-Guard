@@ -1,6 +1,8 @@
 package com.thanhdatpb.listingguard.api.check;
 
 import com.thanhdatpb.listingguard.api.listing.Normalizer;
+import com.thanhdatpb.listingguard.api.plan.Pack;
+import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetVersion;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetVersionRepository;
@@ -41,10 +43,11 @@ public class CheckService {
     private final FindingRepository findings;
     private final RulesetVersionRepository rulesetVersions;
     private final TransactionTemplate transactions;
+    private final PlanService plans;
 
     public CheckService(NormalizerRegistry normalizers, ContentHasher hasher, RuleEngine ruleEngine,
                         ActiveRulesets rulesets, ListingCheckRepository checks, FindingRepository findings,
-                        RulesetVersionRepository rulesetVersions, TransactionTemplate transactions) {
+                        RulesetVersionRepository rulesetVersions, TransactionTemplate transactions, PlanService plans) {
         this.normalizers = normalizers;
         this.hasher = hasher;
         this.ruleEngine = ruleEngine;
@@ -53,9 +56,15 @@ public class CheckService {
         this.findings = findings;
         this.rulesetVersions = rulesetVersions;
         this.transactions = transactions;
+        this.plans = plans;
     }
 
+    /**
+     * @throws com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException if the client's plan has no {@code listing-rules} pack
+     * @throws com.thanhdatpb.listingguard.api.plan.QuotaExceededException  if the answer is not stored yet and the month's quota is used up
+     */
     public CheckResult check(UUID clientId, CheckRequest request) {
+        PlanService.Admission admission = plans.requirePack(clientId, Pack.LISTING_RULES);
         Normalizer normalizer = normalizers.get(request.marketplace());
         Listing listing = normalizer.normalize(request.listing());
         String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
@@ -71,9 +80,11 @@ public class CheckService {
             return cached.get();
         }
 
+        // a cached answer costs nothing and was returned above; from here a new result is stored, and counted (ADR-013)
+        plans.requireQuota(admission);
         List<Finding> found = ruleEngine.run(listing, ruleset.config());
         try {
-            UUID id = transactions.execute(status -> persist(clientId, packId, marketplace, contentHash,
+            UUID id = transactions.execute(status -> persist(admission, packId, marketplace, contentHash,
                     rulesetVersionId, analysisVersion, found));
             return toResult(checks.findById(id).orElseThrow(), false);
         } catch (DataIntegrityViolationException e) {
@@ -99,8 +110,14 @@ public class CheckService {
                 .map(check -> toResult(check, true));
     }
 
-    private UUID persist(UUID clientId, String packId, String marketplace, String contentHash, long rulesetVersionId,
-                         String analysisVersion, List<Finding> found) {
+    /**
+     * Counts the result and stores it in one transaction (ADR-013): if the insert loses the race to an identical request
+     * and rolls back, so does the charge.
+     */
+    private UUID persist(PlanService.Admission admission, String packId, String marketplace, String contentHash,
+                         long rulesetVersionId, String analysisVersion, List<Finding> found) {
+        UUID clientId = admission.clientId();
+        plans.charge(admission);
         ListingCheck saved = checks.saveAndFlush(new ListingCheck(clientId, packId, contentHash, marketplace,
                 CheckStatus.COMPLETED, rulesetVersionId, analysisVersion));
         findings.saveAll(found.stream().map(finding -> FindingEntity.fromRule(saved.getId(), finding, rulesetVersionId)).toList());

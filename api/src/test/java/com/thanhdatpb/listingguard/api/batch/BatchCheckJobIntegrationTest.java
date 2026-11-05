@@ -22,6 +22,7 @@ import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.client.ClientProvisioning;
 import com.thanhdatpb.listingguard.api.client.ClientRepository;
+import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCatalogRuntime;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckService;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkReadyTestConfig;
@@ -118,6 +119,9 @@ class BatchCheckJobIntegrationTest {
     @Autowired
     ClientProvisioning provisioning;
 
+    @Autowired
+    PlanService plans;
+
     @TempDir
     Path dir;
 
@@ -139,7 +143,7 @@ class BatchCheckJobIntegrationTest {
     }
 
     BatchCheckJob job(ByteArrayOutputStream console, Instant at) {
-        return new BatchCheckJob(clients, normalizers, checks, trademarkChecks, runtime, rulesets,
+        return new BatchCheckJob(clients, normalizers, checks, trademarkChecks, runtime, rulesets, plans,
                 new PrintStream(console, true, StandardCharsets.UTF_8), Clock.fixed(at, ZoneOffset.UTC));
     }
 

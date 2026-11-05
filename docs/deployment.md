@@ -326,3 +326,45 @@ rows in the table.
 `DELETE FROM trademark_catalog_version` (the way out of a refused V16, above, or a clean-up of an old catalog) fails
 while a retained result uses that version. Wait for the retention period, or delete those results first
 (`DELETE FROM trademark_check WHERE catalog_version_id = <id>`; their findings go with them).
+
+## Client plans and the monthly quota (ADR-013)
+
+Migration V19 creates `plan`, `plan_pack` and `client_usage` and adds `client.plan_code` (`NOT NULL DEFAULT 'FREE'`, a
+foreign key to `plan`). It applies on any database and touches no existing row but giving every client the default plan.
+**Nothing changes for anyone until you turn plans on**, so a deployment that hosts the code for itself can ignore this
+section: with `listing-guard.plans.enabled=false` (the default) the application does not read the plan, does not count
+usage and never answers `403 plan-not-allowed` or `429 quota-exceeded`.
+
+**Turning plans on.** Set `LISTING_GUARD_PLANS_ENABLED=true` in `.env` (`PLANS_ENABLED=true` for the development compose
+file; both are `listing-guard.plans.enabled`) and restart the API; set it for `batch-check` too, which reads the same
+setting. Do this in order:
+
+1. Every existing client is `FREE` after V19, and `FREE` has 20 results a month and no trademark, batch or sheet pack.
+   List the plans (`docker compose run --rm admin client list` shows a PLAN column) and give each client its plan **before**
+   you turn plans on: `docker compose run --rm admin plan set <client> <FREE|SELLER|PRO>`. It is audit-logged with the
+   previous and the new plan and takes effect at once; there is no HTTP endpoint for it.
+2. Turn plans on. Usage is counted from then on: a deployment that had plans off has no usage for the earlier months.
+3. Clients read their plan and use with `GET /api/v1/usage`.
+
+**The numbers are rows.** V19 seeds the plans of ADR-013 (`FREE` 20, `SELLER` 1000, `PRO` 6000 results a month; one unit is
+one new result that is stored, per endpoint, so a full check of one listing is two units). They are data you own:
+
+```sql
+SELECT p.code, p.monthly_quota, string_agg(pp.pack_id, ', ' ORDER BY pp.pack_id) AS packs
+FROM plan p LEFT JOIN plan_pack pp ON pp.plan_code = p.code GROUP BY p.code, p.monthly_quota ORDER BY p.monthly_quota;
+UPDATE plan SET monthly_quota = 2000 WHERE code = 'SELLER';      -- NULL means unlimited
+```
+
+A change applies at once to every client on that plan and keeps this month's `used`. The codes (`FREE`, `SELLER`, `PRO`
+and the five pack ids) are fixed by `CHECK` constraints and the Java enums, so a new plan or pack needs a migration.
+`policy-analyzer` and `sheet-connector` are in the seed but **nothing enforces them yet** (ADR-011 PR 5 and phase 4b).
+
+**Usage.** `client_usage` has one row per client and calendar month (UTC), counted in the transaction that stores a result.
+To see the month: `SELECT c.name, u.used FROM client_usage u JOIN client c ON c.id = u.client_id WHERE u.period_start =
+date_trunc('month', now() AT TIME ZONE 'utc')::date ORDER BY u.used DESC`. To give a client a fresh month by hand, set its
+row's `used` (this is an operator decision, not something the application does). The counter is in PostgreSQL, so it is
+correct with several API instances; the in-memory rate limit is still per instance.
+
+**Rolling back.** Turn plans off (the setting) and the application ignores all of it. The migration can be undone with
+`DROP TABLE client_usage, plan_pack; ALTER TABLE client DROP COLUMN plan_code; DROP TABLE plan;` only after every instance
+runs a version without the `plan_code` mapping.

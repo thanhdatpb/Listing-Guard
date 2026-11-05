@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.client;
 
+import com.thanhdatpb.listingguard.api.plan.PlanCode;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
@@ -67,6 +68,30 @@ public class ClientProvisioning {
         });
         audit(active ? "client.activate" : "client.deactivate", name, null);
         return changed;
+    }
+
+    /**
+     * Gives the client a plan (ADR-013). The change is read from the database at each use, so it takes effect at once; the
+     * audit line carries the previous and the new plan. Setting the plan the client already has changes nothing and logs
+     * nothing.
+     *
+     * @return the previous plan code
+     * @throws IllegalArgumentException if there is no such client
+     */
+    public String setPlan(String name, PlanCode plan) {
+        String previous = transactions.execute(status -> {
+            Client client = requireClient(name);
+            String before = client.getPlanCode();
+            if (!before.equals(plan.name())) {
+                client.setPlanCode(plan.name());
+                clients.save(client);
+            }
+            return before;
+        });
+        if (!previous.equals(plan.name())) {
+            audit("plan.set", name, null, "plan=" + previous + "->" + plan.name());
+        }
+        return previous;
     }
 
     /** Issues a new random key for the client. The secret in the result is shown once and cannot be read again. */
@@ -173,5 +198,11 @@ public class ClientProvisioning {
 
     private static void audit(String action, String client, String keyId) {
         audit.info("audit action={} client={} keyId={} at={}", action, client, keyId == null ? "-" : keyId, Instant.now());
+    }
+
+    /** An audit line with one more fact, such as the plan change. Never a secret. */
+    private static void audit(String action, String client, String keyId, String detail) {
+        audit.info("audit action={} client={} keyId={} at={} {}", action, client, keyId == null ? "-" : keyId, Instant.now(),
+                detail);
     }
 }

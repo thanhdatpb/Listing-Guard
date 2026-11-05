@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.batch;
 import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.client.ClientRepository;
+import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCatalogRuntime;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckService;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkRulesets;
@@ -32,10 +33,11 @@ public class BatchCheckRunner implements ApplicationRunner {
     private final TrademarkCheckService trademarkChecks;
     private final TrademarkCatalogRuntime trademark;
     private final TrademarkRulesets trademarkRulesets;
+    private final PlanService plans;
 
     public BatchCheckRunner(BatchProperties properties, ClientRepository clients, NormalizerRegistry normalizers,
                             CheckService checks, TrademarkCheckService trademarkChecks, TrademarkCatalogRuntime trademark,
-                            TrademarkRulesets trademarkRulesets) {
+                            TrademarkRulesets trademarkRulesets, PlanService plans) {
         this.properties = properties;
         this.clients = clients;
         this.normalizers = normalizers;
@@ -43,12 +45,13 @@ public class BatchCheckRunner implements ApplicationRunner {
         this.trademarkChecks = trademarkChecks;
         this.trademark = trademark;
         this.trademarkRulesets = trademarkRulesets;
+        this.plans = plans;
     }
 
     @Override
     public void run(ApplicationArguments args) {
         BatchOptions options = BatchOptions.parse(args, properties.defaultOut());
-        new BatchCheckJob(clients, normalizers, checks, trademarkChecks, trademark, trademarkRulesets, System.out,
+        new BatchCheckJob(clients, normalizers, checks, trademarkChecks, trademark, trademarkRulesets, plans, System.out,
                 Clock.systemUTC()).run(options);
     }
 }

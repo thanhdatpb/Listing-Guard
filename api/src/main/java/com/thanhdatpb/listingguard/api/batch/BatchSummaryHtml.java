@@ -85,6 +85,12 @@ final class BatchSummaryHtml {
             html.append("<div class=\"banner warn\"><b>Trademark chưa cấu hình</b>: ").append(esc(info.trademarkDetail()))
                     .append(". Phần rule vẫn được chạy; mọi kết quả trademark bên dưới là trống.</div>\n");
         }
+        if (t.quotaSkipped() > 0) {
+            html.append("<div class=\"banner warn\"><b>Hết quota tháng</b>: <b>").append(t.quotaSkipped())
+                    .append("</b> dòng không được kiểm tra đầy đủ vì quota tháng của gói đã dùng hết (status "
+                            + "<code>QUOTA_EXCEEDED</code> trong <code>listings.csv</code>). Kết quả đã lưu vẫn được dùng lại và "
+                            + "không tốn quota. Chạy lại sau ngày reset quota hoặc sau khi đổi gói để hoàn tất các dòng này.</div>\n");
+        }
     }
 
     private static void overview(StringBuilder html, Totals t) {
@@ -93,6 +99,7 @@ final class BatchSummaryHtml {
         row(html, "Kiểm tra được", t.rows() - t.unreadable());
         row(html, "Dòng lỗi dữ liệu (không kiểm tra được, xem cuối trang)", t.unreadable());
         row(html, "Dòng có một check bị lỗi", t.failed());
+        row(html, "Dòng bị bỏ qua vì hết quota tháng (status QUOTA_EXCEEDED trong listings.csv)", t.quotaSkipped());
         html.append("</table>\n");
     }
 
@@ -103,7 +110,8 @@ final class BatchSummaryHtml {
         for (String level : List.of("HIGH", "MEDIUM", "LOW", "UNKNOWN")) {
             share(html, levelLabel(level), distribution.getOrDefault(level, 0), t.rows());
         }
-        for (String other : List.of(BatchReport.Risk.NOT_CONFIGURED, BatchReport.Risk.FAILED, BatchReport.Risk.NOT_CHECKED)) {
+        for (String other : List.of(BatchReport.Risk.NOT_CONFIGURED, BatchReport.Risk.FAILED, BatchReport.Risk.QUOTA_EXCEEDED,
+                BatchReport.Risk.NOT_CHECKED)) {
             int count = distribution.getOrDefault(other, 0);
             if (count > 0) {
                 share(html, levelLabel(other), count, t.rows());
@@ -234,6 +242,7 @@ final class BatchSummaryHtml {
             case "UNKNOWN" -> "UNKNOWN (chưa xác định, không phải sạch)";
             case BatchReport.Risk.NOT_CONFIGURED -> "Trademark chưa cấu hình";
             case BatchReport.Risk.FAILED -> "Check trademark bị lỗi";
+            case BatchReport.Risk.QUOTA_EXCEEDED -> "Chưa kiểm tra trademark vì hết quota tháng";
             default -> "Không kiểm tra (dòng lỗi dữ liệu)";
         };
     }

@@ -18,6 +18,9 @@ edit or publish anything, and it does not do SEO.
 - **Batch check** (the `batch-check` job): checks a whole export file (an Etsy CSV, an Amazon flat file) with both
   checks and writes CSV and HTML reports, without an integration.
 - **Multi-client REST API**: every API key belongs to a client; results, cache and rate limit are per client.
+- **Plans and a monthly quota** (optional, off by default): each client has a plan (`FREE`, `SELLER` or `PRO`) that sets
+  the packs it may use and how many new results it may store per month; `GET /api/v1/usage` shows it. Hosting the code
+  for yourself needs none of it.
 - **Policy retrieval** (optional): marketplace policy documents can be ingested and retrieved from pgvector. It needs an
   embedding provider and is off by default.
 
@@ -34,6 +37,12 @@ Working end to end:
 - The `batch-check` job, which calls the same services as the two endpoints.
 - Client API keys, per-client rate limits and per-client isolation; see the
   [integration guide](docs/integration-guide.md).
+- Client plans and a monthly quota ([ADR-013](docs/adr/ADR-013-client-plans-and-monthly-quota.md)), **off by default**
+  (`listing-guard.plans.enabled=false`): the operator sets a client's plan with `admin plan set <client> <plan>`, a new
+  stored result counts one unit per endpoint (a cached one costs nothing, so a full check of one listing is two units), and
+  over the limit the API answers `429 quota-exceeded` (a pack outside the plan: `403 plan-not-allowed`). The packs
+  `policy-analyzer` and `sheet-connector` are reserved in the plans and not enforced yet. There is no billing or payment;
+  see [deployment](docs/deployment.md#client-plans-and-the-monthly-quota-adr-013).
 
 Before you rely on it:
 
@@ -392,8 +401,9 @@ Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `appli
 Done: pack identity (PR 0a, migration V7, and PR 0b, migrations V8-V14; composite analysis versions,
 [ADR-010](docs/adr/ADR-010-pack-identity-and-analysis-version.md)), the trademark scanner A1 (core), A2 (catalog) and A3
 (endpoint), the multi-file and streaming catalog import of A2b (V18), the USPTO daily XML converter of A2b (written from
-the public DTD V2.0 and **unverified against real data**), and the `batch-check` job. What follows, in this order, is
-**not built yet**:
+the public DTD V2.0 and **unverified against real data**), the `batch-check` job, and client plans with a monthly quota
+(V19, [ADR-013](docs/adr/ADR-013-client-plans-and-monthly-quota.md); off by default; billing, `sheet-connector` and the
+enforcement of `policy-analyzer` are not part of it). What follows, in this order, is **not built yet**:
 
 1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
    on a real USPTO file, PR A2c (the latest transaction of a serial number wins, which a catalog made of daily files
@@ -407,7 +417,7 @@ the public DTD V2.0 and **unverified against real data**), and the `batch-check`
 
 ## Documentation
 
-- [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, and client isolation.
+- [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, plans and quota, and client isolation.
 - [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields.
 - [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
 - [Deployment](docs/deployment.md): production setup, backup, upgrades, the migration notes and the trademark catalog import.
@@ -423,6 +433,7 @@ the public DTD V2.0 and **unverified against real data**), and the `batch-check`
 - [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Deferred: PR B after ADR-009)
 - [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3 and A2b are implemented; the USPTO converter is unverified against real data)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
+- [ADR-013: Client plans and monthly quota](docs/adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
 
 ## License

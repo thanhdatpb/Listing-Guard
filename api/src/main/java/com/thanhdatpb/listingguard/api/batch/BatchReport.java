@@ -17,10 +17,12 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Writes the reports of a batch while it runs, so memory stays flat however many listings there are:
@@ -36,8 +38,10 @@ import java.util.stream.Collectors;
  *
  * <p>{@code findings.csv}: {@code id, line, check (rules|trademark), ruleId, severityRisk (ERROR/WARNING/INFO for rules,
  * LOW/MEDIUM/HIGH for trademark), field, snippet, mark, sourceIds, message, suggestion}.<br>
- * {@code listings.csv}: {@code id, line, status (OK|INPUT_ERROR|CHECK_ERROR), label, trademarkRisk (the highest level, or
- * NOT_CONFIGURED|ERROR), completeness, ruleErrors, ruleWarnings, rulesCheckId, trademarkCheckId, error}.
+ * {@code listings.csv}: {@code id, line, status (OK|INPUT_ERROR|CHECK_ERROR|QUOTA_EXCEEDED), label, trademarkRisk (the
+ * highest level, or NOT_CONFIGURED|ERROR|QUOTA_EXCEEDED), completeness, ruleErrors, ruleWarnings, rulesCheckId,
+ * trademarkCheckId, error}. {@code QUOTA_EXCEEDED} (ADR-013) marks a row where a check was not run because the client's
+ * monthly quota ran out; a row with a failed check is {@code CHECK_ERROR} whatever else happened to it.
  */
 final class BatchReport implements AutoCloseable {
 
@@ -71,7 +75,8 @@ final class BatchReport implements AutoCloseable {
     }
 
     /** Everything the summary page shows. */
-    record Totals(int rows, int unreadable, int failed, Map<String, Integer> trademarkRisk, int complete, int incomplete,
+    record Totals(int rows, int unreadable, int failed, int quotaSkipped, Map<String, Integer> trademarkRisk, int complete,
+                  int incomplete,
                   int listingsWithRuleErrors, int listingsWithRuleWarnings, int ruleErrors, int ruleWarnings,
                   int ruleInfos, int distinctRules, int distinctMarks, List<Ranked> topRules, List<Ranked> topMarks,
                   Set<String> rulesetVersions, Set<String> ruleAnalysisVersions, Set<String> trademarkRulesetVersions,
@@ -102,6 +107,7 @@ final class BatchReport implements AutoCloseable {
     private int rows;
     private int unreadable;
     private int failed;
+    private int quotaSkipped;
     private final Map<String, Integer> trademarkRisk = new TreeMap<>();
     private int complete;
     private int incomplete;
@@ -161,12 +167,17 @@ final class BatchReport implements AutoCloseable {
         Part<CheckResult> rules = outcome.rules();
         Part<TrademarkCheckResult> trademark = outcome.trademark();
         boolean checkFailed = rules.state() == Part.State.FAILED || trademark.state() == Part.State.FAILED;
+        boolean quotaExceeded = rules.state() == Part.State.QUOTA_EXCEEDED || trademark.state() == Part.State.QUOTA_EXCEEDED;
         String problem = null;
-        if (checkFailed) {
-            failed++;
-            problem = (rules.state() == Part.State.FAILED ? "rules: " + rules.message() : "")
-                    + (rules.state() == Part.State.FAILED && trademark.state() == Part.State.FAILED ? "; " : "")
-                    + (trademark.state() == Part.State.FAILED ? "trademark: " + trademark.message() : "");
+        if (checkFailed || quotaExceeded) {
+            problem = Stream.of(problemOf("rules", rules), problemOf("trademark", trademark))
+                    .filter(Objects::nonNull).collect(Collectors.joining("; "));
+            if (checkFailed) {
+                failed++;
+            }
+            if (quotaExceeded) {
+                quotaSkipped++;
+            }
             noteProblem(outcome.line(), outcome.id(), problem);
         }
         measurement.add(outcome.label(), verdict(trademark));
@@ -190,11 +201,17 @@ final class BatchReport implements AutoCloseable {
             completeness = result.completeness().name();
             countTrademark(outcome, result);
         } else {
-            trademarkRisk.merge(trademark.state() == Part.State.NOT_CONFIGURED ? Risk.NOT_CONFIGURED : Risk.FAILED, 1,
-                    Integer::sum);
+            trademarkRisk.merge(riskCell(trademark), 1, Integer::sum);
         }
-        writeListing(outcome, checkFailed ? "CHECK_ERROR" : "OK", risk, completeness, ruleErrorsCell, ruleWarningsCell,
+        String status = checkFailed ? "CHECK_ERROR" : quotaExceeded ? "QUOTA_EXCEEDED" : "OK";
+        writeListing(outcome, status, risk, completeness, ruleErrorsCell, ruleWarningsCell,
                 rulesCheckId, trademarkCheckId, problem == null ? "" : problem);
+    }
+
+    /** What went wrong with one check of a row, for the error column; null when it ran or cannot run on this deployment. */
+    private static String problemOf(String check, Part<?> part) {
+        return part.state() == Part.State.FAILED || part.state() == Part.State.QUOTA_EXCEEDED
+                ? check + ": " + part.message() : null;
     }
 
     /** Names used for the trademark distribution besides the risk levels. */
@@ -202,6 +219,7 @@ final class BatchReport implements AutoCloseable {
         static final String NOT_CONFIGURED = "NOT_CONFIGURED";
         static final String FAILED = "ERROR";
         static final String NOT_CHECKED = "NOT_CHECKED";
+        static final String QUOTA_EXCEEDED = "QUOTA_EXCEEDED";
 
         private Risk() {
         }
@@ -212,6 +230,7 @@ final class BatchReport implements AutoCloseable {
             case DONE -> trademark.result().riskLevel().name();
             case NOT_CONFIGURED -> Risk.NOT_CONFIGURED;
             case FAILED -> Risk.FAILED;
+            case QUOTA_EXCEEDED -> Risk.QUOTA_EXCEEDED;
         };
     }
 
@@ -367,8 +386,8 @@ final class BatchReport implements AutoCloseable {
     }
 
     Totals totals(RunInfo info) {
-        return new Totals(rows, unreadable, failed, Map.copyOf(trademarkRisk), complete, incomplete, listingsWithRuleErrors,
-                listingsWithRuleWarnings, ruleErrors, ruleWarnings, ruleInfos, ruleStats.size(), markStats.size(),
+        return new Totals(rows, unreadable, failed, quotaSkipped, Map.copyOf(trademarkRisk), complete, incomplete,
+                listingsWithRuleErrors, listingsWithRuleWarnings, ruleErrors, ruleWarnings, ruleInfos, ruleStats.size(), markStats.size(),
                 top(ruleStats), top(markStats), Set.copyOf(rulesetVersions), Set.copyOf(ruleAnalysisVersions),
                 Set.copyOf(trademarkRulesetVersions), Set.copyOf(catalogVersions), Set.copyOf(trademarkAnalysisVersions),
                 disclaimer != null ? disclaimer : info.disclaimerFallback(), measurement, List.copyOf(errorRows),
