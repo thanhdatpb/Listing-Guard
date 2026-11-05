@@ -20,8 +20,9 @@ import org.springframework.stereotype.Component;
  * One-shot job: {@code --spring.profiles.active=uspto-convert --input=<file inside catalogs/raw> [--output=<name>]
  * [--overwrite]} converts one USPTO Trademark Applications Daily XML file (DTD V2.0) to {@code jsonl-1} in
  * {@code catalogs/raw/}, then the application exits (the profile turns the web server off). It reads and writes local
- * files and makes no network call; it writes nothing to the database. It prints the {@code sha256} of the output to
- * put in {@code catalogs/manifest.yaml}. A file it cannot convert makes the process exit with a non-zero code.
+ * files and makes no network call; it imports no catalog (starting the application still applies migrations and
+ * registers the trademark ruleset, like every job). It prints the {@code sha256} of the output to put in
+ * {@code catalogs/manifest.yaml}. A file it cannot convert makes the process exit with a non-zero code.
  *
  * <p>The converter is <b>unverified against real data</b> (ADR-009): it follows the public DTD and documentation.
  * A runner and not an HTTP endpoint on purpose, like {@code trademark-import}.

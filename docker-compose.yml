@@ -133,8 +133,8 @@ services:
       - ./catalogs:/catalogs:ro
 
   # Converts one USPTO Trademark Applications Daily XML file (TDXF, DTD V2.0) in catalogs/raw/ to jsonl-1 in the same
-  # folder (ADR-009, PR A2b). Local files only: no network call, no database table written (the application context still
-  # starts through the database, like the other jobs). Prints the sha256 to put in catalogs/manifest.yaml, and writes
+  # folder (ADR-009, PR A2b). Local files only: no network call, no catalog written (the application context still
+  # starts through the database, like the other jobs: it applies migrations and registers the ruleset). Prints the sha256 to put in catalogs/manifest.yaml, and writes
   # <output>.report.json with the counts of the records written and dropped. UNVERIFIED against real data.
   #   docker compose run --rm uspto-convert --input=uspto/<file.xml> [--output=<name>.jsonl] [--overwrite]
   # Another version-no than 2.0 stops it; USPTO_ALLOW_OTHER_VERSION=true reads it anyway.

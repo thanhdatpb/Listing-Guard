@@ -432,7 +432,17 @@ not Nice classes of `jsonl-1` and are dropped from the record. The documentation
 import accepts, 300 characters), `mark_empty_after_normalization` and `mark_too_long_after_normalization` (the import
 refuses a whole catalog for such a record, so the converter drops it instead and the report counts it) and
 `status_dropped:<code>` or `status_unmapped:<code>` (see below). The converter reports each reason with its count, and
-the codes of the two status reasons one by one.
+the codes of the two status reasons one by one. A record is counted once, under the first check it fails, in this order:
+serial number, drawing code, blank mark, mark too long, status, classes, then the two checks after normalization. A report
+holds counts only, never a mark or a serial number.
+
+**The job.** The profile `uspto-convert` (compose service of that name) runs `UsptoDailyConverter` over one file:
+`--input=<file inside catalogs/raw>`, optional `--output=<plain file name>` and `--overwrite`. It writes `<name>.jsonl` and
+`<name>.jsonl.report.json` next to each other in `catalogs/raw/` through a `.part` file that is renamed on success, refuses
+an existing output without `--overwrite`, makes no network call and imports no catalog. The report carries the version of the
+file, the version and hash of the status map, the counts by reason and the SHA-256 of the input and of the output (the value
+for `sha256` in the manifest). The application context it starts still applies pending migrations and registers the
+trademark ruleset, like the other jobs. An end-to-end test converts a synthetic file, imports it and checks a listing over HTTP.
 
 **Status codes.** The map from the 149 codes of Table 1 to `REGISTERED | PENDING | EXPIRED | CANCELLED | DROP` is a
 versioned YAML file (`uspto-status-map-2026-11.yaml`, with `source.status: unverified`; a code that is not in the file is
