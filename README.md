@@ -74,7 +74,7 @@ Before you rely on it:
   with an embedding provider.
 
 What is not built yet is listed in the [Roadmap](#roadmap). Changes between versions are in
-[docs/releases/](docs/releases/v0.4.0.md).
+[docs/releases/](docs/releases/v0.5.0.md).
 
 ## Architecture
 
@@ -441,20 +441,20 @@ What follows, in this order, is **not built yet**:
 - [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields.
 - [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
 - [Deployment](docs/deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
-- [Release notes](docs/releases/v0.4.0.md): what changed in each version and what to do when upgrading.
+- [Release notes](docs/releases/v0.5.0.md): what changed in each version and what to do when upgrading.
 - [ADR-001: Rule configuration](docs/adr/ADR-001-rule-config.md)
 - [ADR-002: Ruleset versioning](docs/adr/ADR-002-ruleset-versioning.md)
 - [ADR-003: Chunking strategy](docs/adr/ADR-003-chunking-strategy.md)
 - [ADR-004: Embedding provider](docs/adr/ADR-004-embedding-provider.md)
-- [ADR-012: Embeddings default to an external API](docs/adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)
 - [ADR-005: API auth, rate limit, and result cache](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md)
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
 - [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Deferred: PR B after ADR-009)
 - [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3 and A2b are implemented; the USPTO converter is unverified against real data)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
-- [ADR-013: Client plans and monthly quota](docs/adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
+- [ADR-012: Embeddings default to an external API](docs/adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)
+- [ADR-013: Client plans and monthly quota](docs/adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
 - [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor are implemented, all off by default; saved listings and history are not designed yet)
 
 ## License

@@ -416,3 +416,35 @@ correct with several API instances; the in-memory rate limit is still per instan
 **Rolling back.** Turn plans off (the setting) and the application ignores all of it. The migration can be undone with
 `DROP TABLE client_usage, plan_pack; ALTER TABLE client DROP COLUMN plan_code; DROP TABLE plan;` only after every instance
 runs a version without the `plan_code` mapping.
+
+## Fix suggestions and readiness (ADR-014)
+
+Migration V20 adds the columns that store verified fix suggestions and the readiness score. It is additive and applies on its
+own at start-up. **Nothing changes until you turn the feature on**: with `listing-guard.fixes.enabled=false` (the default),
+`POST /api/v1/checks` and the `batch-check` reports keep the shape they had before.
+
+**Turning it on.** Set `LISTING_GUARD_FIXES_ENABLED=true` in `.env` and restart the API. Both compose files pass it to the
+`api` service (`docker-compose.prod.yml` reads `LISTING_GUARD_FIXES_ENABLED`, the development `docker-compose.yml` reads
+`FIXES_ENABLED`, as it does for `PLANS_ENABLED`). `batch-check` is a separate process and reads its own setting; with the
+development compose file pass it to one run:
+
+```bash
+docker compose run --rm -e LISTING_GUARD_FIXES_ENABLED=true batch-check --input=/batch/input/<file.csv> ...
+```
+
+**What changes.** Each finding of `/checks` adds `fix` (a verified suggestion or `null`) and the response adds
+`fixesComputed` and `readiness`; `listings.csv` adds `readiness_score` and `ready`, and `summary.html` adds the readiness
+counts. Verifying suggestions costs one extra rule run per suggestion. The score counts the `listing-rules` pack only, so a
+client that shows it must show the trademark result next to it. Suggestions are advice: nothing here edits or publishes a
+listing. See the
+[integration guide](integration-guide.md#optional-fixes-and-readiness-adr-014) for the response.
+
+**Results stored earlier.** With the feature on, a `GET` of a check stored before you turned it on returns
+`fixesComputed: false`, `readiness: null` and no fixes. A `POST` that hits the cache enriches that stored result once,
+without a quota unit and without changing `analysisVersion`. No submitted listing is stored.
+
+**The console editor does not need it.** The Check listing page always shows fixes and readiness, whatever this setting says,
+and turning the console on does not change what the API or `batch-check` return.
+
+**Rolling back.** Set it to `false` and restart: `/checks`, `GET` and the batch reports go back to the shape without fixes
+and readiness. The stored columns stay in the database and are not shown.
