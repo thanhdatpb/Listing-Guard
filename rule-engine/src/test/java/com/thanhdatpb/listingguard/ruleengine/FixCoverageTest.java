@@ -52,7 +52,7 @@ class FixCoverageTest {
         Listing listing = new Listing("replica a & b & c \u0007 " + words(titleMax), null, tags,
                 new Money(BigDecimal.ZERO, "USD"), null, List.of(), List.of(), 0, null, null);
 
-        List<Finding> findings = ENGINE.run(listing, config);
+        List<Finding> findings = ENGINE.runDetailed(listing, config).findings();
 
         Set<String> allRules = RuleRegistry.withDefaults().rulesFor("ETSY").stream().map(Rule::id)
                 .collect(Collectors.toCollection(TreeSet::new));
@@ -70,7 +70,7 @@ class FixCoverageTest {
                 List.of(), List.of(), 5, null, null, "Roadster",
                 List.of("one", "two", "three", "four", "five", "six"), "term ".repeat(80), null);
 
-        List<Finding> findings = ENGINE.run(listing, config);
+        List<Finding> findings = ENGINE.runDetailed(listing, config).findings();
 
         Set<String> fired = findings.stream().map(Finding::ruleId).collect(Collectors.toSet());
         assertThat(fired).as("rules this listing breaks").contains(
@@ -87,7 +87,7 @@ class FixCoverageTest {
                 new Money(new BigDecimal("49.99"), "USD"), null, List.of(), List.of(), 5, null, null, "Roadster",
                 List.of("one"), "term", "LUGGAGE");
 
-        Finding title = ENGINE.run(listing, config).stream().filter(f -> f.ruleId().equals("title_length")).findFirst()
+        Finding title = ENGINE.runDetailed(listing, config).findings().stream().filter(f -> f.ruleId().equals("title_length")).findFirst()
                 .orElseThrow();
 
         assertThat(title.fix()).isNotNull();

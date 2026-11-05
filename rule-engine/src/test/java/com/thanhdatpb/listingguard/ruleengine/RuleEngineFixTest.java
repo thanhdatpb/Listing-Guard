@@ -27,7 +27,8 @@ class RuleEngineFixTest {
     // ---- the real Etsy ruleset -------------------------------------------------------------------------------
 
     private static final RulesetConfig ETSY = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
-    private static final RuleEngine ETSY_ENGINE = new RuleEngine(RuleRegistry.withDefaults());
+    private static final RuleEngine RAW_ENGINE = new RuleEngine(RuleRegistry.withDefaults());
+    private static final FixingEngine ETSY_ENGINE = new FixingEngine(RAW_ENGINE);
     private static final int TITLE_MAX = ETSY.rule("title_length").intParam("max_length");
     private static final int TAG_MAX = ETSY.rule("tag_length").intParam("max_length");
 
@@ -43,6 +44,17 @@ class RuleEngineFixTest {
             text.append(" alpha").append(i);
         }
         return text.toString();
+    }
+
+    /** What a caller that wants fixes uses: here {@code run} is {@code runDetailed(...).findings()}. */
+    private record FixingEngine(RuleEngine engine) {
+        List<Finding> run(Listing listing, RulesetConfig config) {
+            return engine.runDetailed(listing, config).findings();
+        }
+
+        RuleRun runDetailed(Listing listing, RulesetConfig config) {
+            return engine.runDetailed(listing, config);
+        }
     }
 
     private static Finding only(List<Finding> findings, String ruleId) {
@@ -182,12 +194,12 @@ class RuleEngineFixTest {
         return new Listing(title, null, List.of(), null, null, List.of(), List.of(), null, null, null);
     }
 
-    private static RuleEngine engine(Rule... rules) {
+    private static FixingEngine engine(Rule... rules) {
         RuleRegistry registry = new RuleRegistry();
         for (Rule rule : rules) {
             registry.register("TEST", rule);
         }
-        return new RuleEngine(registry);
+        return new FixingEngine(new RuleEngine(registry));
     }
 
     private static Finding fixerFinding(List<Finding> findings) {
@@ -196,7 +208,7 @@ class RuleEngineFixTest {
 
     @Test
     void aFixThatCreatesNothingNewIsKept() {
-        RuleEngine engine = engine(fixer("short"), guard("other"));
+        FixingEngine engine = engine(fixer("short"), guard("other"));
         RulesetConfig config = config(settings("fixer", Severity.ERROR), settings("guard", Severity.ERROR));
 
         assertThat(fixerFinding(engine.run(titled("long"), config)).fix()).isNotNull();
@@ -204,7 +216,7 @@ class RuleEngineFixTest {
 
     @Test
     void aFixThatCreatesAnErrorIsDropped() {
-        RuleEngine engine = engine(fixer("worse"), guard("worse"));
+        FixingEngine engine = engine(fixer("worse"), guard("worse"));
         RulesetConfig config = config(settings("fixer", Severity.ERROR), settings("guard", Severity.ERROR));
 
         Finding finding = fixerFinding(engine.run(titled("long"), config));
@@ -215,7 +227,7 @@ class RuleEngineFixTest {
 
     @Test
     void aFixThatCreatesAWarningIsDropped() {
-        RuleEngine engine = engine(fixer("worse"), guard("worse"));
+        FixingEngine engine = engine(fixer("worse"), guard("worse"));
         RulesetConfig config = config(settings("fixer", Severity.ERROR), settings("guard", Severity.WARNING));
 
         assertThat(fixerFinding(engine.run(titled("long"), config)).fix()).isNull();
@@ -223,7 +235,7 @@ class RuleEngineFixTest {
 
     @Test
     void aFixThatCreatesOnlyAnInfoIsKept() {
-        RuleEngine engine = engine(fixer("noted"), guard("noted"));
+        FixingEngine engine = engine(fixer("noted"), guard("noted"));
         RulesetConfig config = config(settings("fixer", Severity.ERROR), settings("guard", Severity.INFO));
 
         assertThat(fixerFinding(engine.run(titled("long"), config)).fix()).isNotNull();
@@ -233,7 +245,7 @@ class RuleEngineFixTest {
     void aFixThatLeavesItsOwnProblemIsDropped() {
         Rule stubborn = rule("fixer", (listing, config, self) -> List.of(self.finding(config, "title", listing.title(),
                 "always", "always", FixSuggestion.replace("use anything", "anything"))));
-        RuleEngine engine = engine(stubborn);
+        FixingEngine engine = engine(stubborn);
 
         assertThat(fixerFinding(engine.run(titled("long"), config(settings("fixer", Severity.ERROR)))).fix()).isNull();
     }
@@ -246,7 +258,7 @@ class RuleEngineFixTest {
             }
             return List.of();
         });
-        RuleEngine engine = engine(fixer("fragile"), fragile);
+        FixingEngine engine = engine(fixer("fragile"), fragile);
         RulesetConfig config = config(settings("fixer", Severity.ERROR), settings("guard", Severity.ERROR));
 
         assertThat(fixerFinding(engine.run(titled("long"), config)).fix()).isNull();
@@ -256,14 +268,14 @@ class RuleEngineFixTest {
     void aFixOnAFieldTheEngineCannotApplyIsDropped() {
         Rule other = rule("fixer", (listing, config, self) -> List.of(self.finding(config, "description", "x", "m", "s",
                 FixSuggestion.replace("d", "y"))));
-        RuleEngine engine = engine(other);
+        FixingEngine engine = engine(other);
 
         assertThat(fixerFinding(engine.run(titled("long"), config(settings("fixer", Severity.ERROR)))).fix()).isNull();
     }
 
     @Test
     void aRuleThatAlwaysFailsDoesNotBlockTheOtherFixes() {
-        RuleEngine engine = engine(fixer("short"), broken("broken"));
+        FixingEngine engine = engine(fixer("short"), broken("broken"));
         RulesetConfig config = config(settings("fixer", Severity.ERROR), settings("broken", Severity.ERROR));
 
         RuleRun run = engine.runDetailed(titled("long"), config);
@@ -275,7 +287,7 @@ class RuleEngineFixTest {
 
     @Test
     void aCompleteRunSaysSoAndNamesItsPack() {
-        RuleEngine engine = engine(fixer("short"));
+        FixingEngine engine = engine(fixer("short"));
 
         RuleRun run = engine.runDetailed(titled("long"), config(settings("fixer", Severity.ERROR)));
 
@@ -285,15 +297,31 @@ class RuleEngineFixTest {
     }
 
     @Test
-    void runAndRunDetailedGiveTheSameFindings() {
+    void runGivesTheFindingsWithoutAnyFixAndRunDetailedAddsTheVerifiedFixes() {
         Listing listing = etsy(words(TITLE_MAX), List.of("mug", "Mug", "gift " + "y".repeat(TAG_MAX)));
 
-        assertThat(ETSY_ENGINE.run(listing, ETSY)).isEqualTo(ETSY_ENGINE.runDetailed(listing, ETSY).findings());
+        List<Finding> plain = RAW_ENGINE.run(listing, ETSY);
+        List<Finding> detailed = RAW_ENGINE.runDetailed(listing, ETSY).findings();
+
+        assertThat(plain).isNotEmpty().allSatisfy(finding -> assertThat(finding.fix()).isNull());
+        assertThat(detailed).anySatisfy(finding -> assertThat(finding.fix()).isNotNull());
+        assertThat(detailed.stream().map(Finding::withoutFix).toList()).isEqualTo(plain);
+    }
+
+    @Test
+    void runIsTheSameAsBeforeEvenWhenARuleProposesAFix() {
+        FixingEngine verified = engine(fixer("short"));
+        RuleEngine raw = new RuleEngine(new RuleRegistry().register("TEST", fixer("short")));
+        RulesetConfig config = config(settings("fixer", Severity.ERROR));
+
+        assertThat(raw.run(titled("long"), config)).containsExactly(
+                new Finding("fixer", Severity.ERROR, "title", "long", "too long", "shorten it", "test-1"));
+        assertThat(verified.run(titled("long"), config).get(0).fix()).isNotNull();
     }
 
     @Test
     void findingsWithoutAFixAreReturnedAsTheRuleMadeThem() {
-        RuleEngine engine = engine(guard("bad"));
+        FixingEngine engine = engine(guard("bad"));
         List<Finding> expected = new ArrayList<>(List.of(
                 new Finding("guard", Severity.ERROR, "title", "bad", "guard", "guard", "test-1")));
 
