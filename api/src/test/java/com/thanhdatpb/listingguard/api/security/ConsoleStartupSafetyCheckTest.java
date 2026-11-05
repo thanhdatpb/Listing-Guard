@@ -10,7 +10,7 @@ import org.springframework.mock.env.MockEnvironment;
 class ConsoleStartupSafetyCheckTest {
 
     @Test
-    void productionConsoleRequiresSmtpConfiguration() {
+    void productionConsoleStartupFailsWhenSmtpIsMissing() {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("prod");
         ConsoleProperties properties = new ConsoleProperties(true, "https://console.example.test", true,

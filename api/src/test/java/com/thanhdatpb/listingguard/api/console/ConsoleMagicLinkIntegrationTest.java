@@ -14,6 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -40,6 +43,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.slf4j.LoggerFactory;
 
 @SpringBootTest(properties = {
         "listing-guard.console.enabled=true",
@@ -139,6 +143,10 @@ class ConsoleMagicLinkIntegrationTest {
         mvc.perform(post("/logout").session(authenticatedSession).with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location", "/login?logout"));
+        assertThat(authenticatedSession.isInvalid()).isTrue();
+        mvc.perform(get("/console"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", "/login"));
     }
 
     @Test
@@ -213,6 +221,48 @@ class ConsoleMagicLinkIntegrationTest {
                     String.class, firstUser.clientId())).isEqualTo("FREE");
         } finally {
             executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void existingAndNewEmailReceiveTheSameNeutralConfirmation() throws Exception {
+        String email = "enumeration-" + UUID.randomUUID() + "@example.test";
+        MvcResult newAddress = mvc.perform(post("/login").with(csrf()).param("email", email))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        var mailCaptor = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(mailCaptor.capture());
+        ConsoleUser user = magicLinks.consume(tokenFromMail(mailCaptor.getValue())).orElseThrow();
+        assertThat(user.email()).isEqualTo(email);
+
+        MvcResult existingAddress = mvc.perform(post("/login").with(csrf()).param("email", email))
+                .andExpect(status().isOk())
+                .andReturn();
+        String neutralMessage =
+                "If an account can be created or signed in for that address, a sign-in link will be sent.";
+        assertThat(newAddress.getResponse().getContentAsString()).contains(neutralMessage);
+        assertThat(existingAddress.getResponse().getContentAsString()).contains(neutralMessage);
+    }
+
+    @Test
+    void tokensAreNotWrittenToApplicationLogsOutsideDev() {
+        Logger root = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        root.addAppender(appender);
+        try {
+            magicLinks.requestSignIn("no-log-" + UUID.randomUUID() + "@example.test", "203.0.113.99");
+            var mailCaptor = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
+            verify(mailSender).send(mailCaptor.capture());
+            String token = tokenFromMail(mailCaptor.getValue());
+
+            assertThat(appender.list)
+                    .extracting(ILoggingEvent::getFormattedMessage)
+                    .noneMatch(message -> message.contains(token));
+        } finally {
+            root.detachAppender(appender);
+            appender.stop();
         }
     }
 

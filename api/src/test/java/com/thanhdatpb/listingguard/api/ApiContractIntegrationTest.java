@@ -67,6 +67,13 @@ class ApiContractIntegrationTest {
     }
 
     @Test
+    void consoleRoutesAreNotRegisteredByDefaultAndApiKeyAuthenticationIsUnchanged() throws Exception {
+        assertProblem(mvc.perform(get("/login")), 401, "unauthorized");
+        assertProblem(mvc.perform(get("/login").header(HEADER, KEY_1)), 404, "not-found");
+        assertProblem(mvc.perform(get(CHECKS + "/" + UUID.randomUUID())), 401, "unauthorized");
+    }
+
+    @Test
     void keysOfTwoClientsBothWork() throws Exception {
         assertProblem(mvc.perform(get(CHECKS + "/" + UUID.randomUUID()).header(HEADER, KEY_1)), 404, "check-not-found");
         assertProblem(mvc.perform(get(CHECKS + "/" + UUID.randomUUID()).header(HEADER, KEY_2)), 404, "check-not-found");
