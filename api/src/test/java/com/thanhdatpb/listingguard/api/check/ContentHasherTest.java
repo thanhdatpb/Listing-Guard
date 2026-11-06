@@ -17,7 +17,21 @@ class ContentHasherTest {
      */
     private static final String ETSY_HASH = "b4d4abfcd0822f4c115a0871e44b3bb2ad711d080756cb19ee642a6c3e8d0090";
 
+    /**
+     * SHA-256 of the canonical JSON the hasher produced for {@link #pinnedAmazon()} before {@code itemHighlights}
+     * existed, computed independently of this code (the canonical JSON written by hand and hashed with .NET; the same
+     * method reproduces {@link #ETSY_HASH}). If this fails, cached results of an Amazon listing without Item Highlights
+     * stop matching: do not "fix" the expected value, fix the hasher.
+     */
+    private static final String AMAZON_HASH = "c772302dea8c23b978f36caa2d60268e48ec6853d4b6b517485558b0f8aae889";
+
     private final ContentHasher hasher = new ContentHasher();
+
+    private static Listing pinnedAmazon() {
+        return new Listing("Hardside luggage", "A suitcase.", List.of(), new Money(new BigDecimal("49.99"), "USD"), null,
+                List.of(), List.of("https://example.com/1.jpg"), 5, null, null, "Roadster", List.of("One", "Two"),
+                "carry on", "LUGGAGE");
+    }
 
     private static Listing etsy() {
         return new Listing("Handmade ceramic mug", "A nice mug for tea.", List.of("mug", "ceramic"),
@@ -33,6 +47,26 @@ class ContentHasherTest {
     @Test
     void theHashOfAnEtsyListingIsUnchangedByTheAmazonComponents() {
         assertThat(hasher.hash(etsy())).isEqualTo(ETSY_HASH);
+    }
+
+    @Test
+    void theHashOfAnAmazonListingWithoutItemHighlightsIsUnchanged() {
+        assertThat(hasher.hash(pinnedAmazon())).isEqualTo(AMAZON_HASH);
+    }
+
+    @Test
+    void itemHighlightsAbsentBlankOrNullDoNotChangeTheHashButAValueDoes() {
+        Listing base = pinnedAmazon();
+        Listing explicitNull = new Listing(base.title(), base.description(), base.tags(), base.price(), base.category(),
+                base.materials(), base.images(), base.quantity(), base.whoMade(), base.whenMade(), base.brand(),
+                base.bulletPoints(), base.searchTerms(), base.productType(), null);
+        Listing withHighlights = new Listing(base.title(), base.description(), base.tags(), base.price(), base.category(),
+                base.materials(), base.images(), base.quantity(), base.whoMade(), base.whenMade(), base.brand(),
+                base.bulletPoints(), base.searchTerms(), base.productType(), "Hard shell");
+
+        assertThat(hasher.hash(explicitNull)).isEqualTo(AMAZON_HASH);
+        assertThat(hasher.hash(withHighlights)).isNotEqualTo(AMAZON_HASH).matches("[0-9a-f]{64}");
+        assertThat(hasher.hash(withHighlights.withTitle("Other"))).isNotEqualTo(hasher.hash(base.withTitle("Other")));
     }
 
     @Test
