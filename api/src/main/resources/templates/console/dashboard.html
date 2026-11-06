@@ -4,12 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dashboard - Listing Guard</title>
+    <link rel="stylesheet" th:href="@{/console/editor.css}">
+    <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
 <body>
-<main>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('dashboard')}"></header>
+<main class="page">
     <h1>Dashboard</h1>
     <p>Signed in as <span th:text="${email}"></span></p>
     <p><a th:href="@{/console/check}">Check listing</a></p>
+    <p><a th:href="@{/console/api-keys}">API keys</a></p>
     <h2>Plan and usage</h2>
     <p>Plan: <span th:text="${usage.plan}"></span></p>
     <p>Usage this month: <span th:text="${usage.used}"></span></p>
@@ -20,9 +25,6 @@
     <p th:if="${usage.enforced and usage.monthlyQuota == null}">Monthly quota: unlimited</p>
     <p th:unless="${usage.enforced}">Plan limits are not enforced in this deployment.</p>
     <p>Period resets: <time th:text="${usage.resetAt}"></time></p>
-    <form method="post" th:action="@{/logout}">
-        <button type="submit">Sign out</button>
-    </form>
 </main>
 </body>
 </html>

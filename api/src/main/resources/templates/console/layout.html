@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- Parts every console page shares. This file is never served on its own; the pages include the fragments below.
+     The banner styles itself inline on purpose: the sign-in pages are public and cannot load the console style sheets,
+     which sit behind the sign-in, and the banner must look the same on every page. Fixed colors with enough contrast on
+     their own, so the light and dark schemes of the other pages do not change it. -->
+
+<!-- The notice of a demonstration catalog, one text for the banner and for the trademark panel of the editor. -->
+<span th:fragment="demoText">Demo catalog: fictional marks only. Real trademark checking is not active.</span>
+
+<!-- Shown on every console page while the configured trademark catalog version starts with "demo-" (ConsoleModelAdvice). -->
+<div th:fragment="demoBanner" th:if="${demoCatalog}" id="demo-banner" role="note"
+     style="position:sticky;top:0;z-index:10;padding:0.6rem 1rem;background:#fde68a;color:#1b1f23;border-bottom:2px solid #8a5a00;font:600 0.9rem/1.4 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center">
+    <span th:replace="~{console/layout :: demoText}"></span>
+</div>
+
+<!-- The bar of a signed-in page: where to go, and sign out. "active" is dashboard, check or keys. -->
+<header class="bar" th:fragment="nav(active)">
+    <nav aria-label="Console">
+        <a th:href="@{/console}" th:aria-current="${active == 'dashboard'} ? 'page'">Dashboard</a>
+        <a th:href="@{/console/check}" th:aria-current="${active == 'check'} ? 'page'">Check listing</a>
+        <a th:href="@{/console/api-keys}" th:aria-current="${active == 'keys'} ? 'page'">API keys</a>
+    </nav>
+    <form method="post" th:action="@{/logout}">
+        <button type="submit" class="link">Sign out</button>
+    </form>
+</header>
+</body>
+</html>
