@@ -9,6 +9,7 @@ COPY rule-engine rule-engine
 COPY rag-analyzer rag-analyzer
 COPY trademark-scanner trademark-scanner
 COPY variation-checks variation-checks
+COPY personalization-screening personalization-screening
 COPY api api
 RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw -B -q -DskipTests -pl api -am package

@@ -1,0 +1,152 @@
+# Personalization screening ruleset (ADR-016). Character classes, print profiles, limits, severities and messages live
+# here; the logic lives in Java (ADR-001).
+#
+# Any change to this file changes its content hash. Bump `version` for every change: a published version is
+# immutable (ADR-002), and the analysis version of every stored result depends on this hash (ADR-010).
+#
+# Sources. EVERYTHING here is `unverified` and the loader refuses any other status: these are the maintainer's internal
+# print policy and our own heuristics, not a marketplace rule and not a legal rule, so no finding is ERROR (ADR-006's
+# principle). THE PROFILES BELOW ARE PLACEHOLDERS WITH INVENTED NUMBERS, not the real printer's profile: the character sets
+# and limits of the real workshop replace them in a new ruleset version (ADR-016, Open question 1).
+#
+# Messages and suggestions are Vietnamese and cite the real characters, positions and numbers. They report what was seen
+# and never say that a text is accepted, correct or safe. No suggestion proposes a replacement value, and the buyer's
+# text is never copied into a trademark message.
+pack_id: personalization-screening
+version: personalization-screening-2026-11
+checked_at: 2026-11-06
+
+disclaimer: Kết quả chỉ là cảnh báo tham khảo theo hồ sơ in nội bộ và danh mục nhãn hiệu tham chiếu, không phải kết luận của xưởng in, của sàn hay kết luận pháp lý. Không có cảnh báo chỉ có nghĩa là các quy tắc này không phát hiện gì.
+
+evidence:
+  # The most characters (code points) of what the buyer typed that a finding keeps in its `value`.
+  max_value_chars: 16
+
+# Named sets of code points. `chars` lists them one by one, `ranges` as U+XXXX-U+YYYY (both ends included).
+char_classes:
+  latin_letters:
+    ranges:
+      - U+0041-U+005A
+      - U+0061-U+007A
+  digits:
+    ranges:
+      - U+0030-U+0039
+  space:
+    chars: " "
+  basic_punctuation:
+    chars: "-'.&"
+  # Precomposed Latin letters with marks (Latin-1 Supplement without the multiplication and division signs, Latin
+  # Extended-A, the horn letters and Latin Extended Additional 1EA0-1EF9, which holds the Vietnamese letters).
+  latin_diacritics:
+    ranges:
+      - U+00C0-U+00D6
+      - U+00D8-U+00F6
+      - U+00F8-U+00FF
+      - U+0100-U+017F
+      - U+01A0-U+01A1
+      - U+01AF-U+01B0
+      - U+1EA0-U+1EF9
+
+print_profiles:
+  # Used when a request names no profile.
+  default_profile: latin_basic
+  profiles:
+    latin_basic:
+      # The classes whose characters the workshop can print.
+      allowed_chars:
+        - latin_letters
+        - digits
+        - space
+        - basic_punctuation
+      # The longest text, in code points after NFC, spaces included.
+      max_length: 20
+      # A label (compared ignoring case) with its own limit.
+      max_length_by_label:
+        number: 3
+      # false: the workshop prints capitals only.
+      allow_lowercase: true
+      source:
+        status: unverified
+        note: Placeholder with invented numbers; the real workshop profile is not known (ADR-016, Open question 1).
+    latin_extended:
+      allowed_chars:
+        - latin_letters
+        - latin_diacritics
+        - digits
+        - space
+        - basic_punctuation
+      max_length: 20
+      max_length_by_label:
+        number: 3
+      allow_lowercase: true
+      source:
+        status: unverified
+        note: Placeholder with invented numbers; it is latin_basic plus the precomposed Latin letters with marks.
+
+# The order here is the order the rules run in, and the order of the findings of one value.
+rules:
+  unsupported_characters:
+    source:
+      status: unverified
+      note: Internal print policy, not a marketplace rule.
+    kinds:
+      # A run of characters outside the classes of the profile.
+      character_not_allowed:
+        severity: WARNING
+        message: "{subject}: ký tự '{chars}' ({codepoints}) từ ký tự thứ {position} nằm ngoài tập ký tự của hồ sơ in '{profile}'."
+        suggestion: "Hỏi lại khách về nội dung này hoặc đối chiếu với xưởng trước khi đưa đơn vào sản xuất. Hệ thống không tự sửa nội dung."
+      # A run of lowercase letters when the profile prints capitals only.
+      lowercase_not_printed:
+        severity: INFO
+        message: "{subject}: chữ thường '{chars}' từ ký tự thứ {position}; hồ sơ in '{profile}' chỉ in chữ hoa."
+        suggestion: "Xác nhận với xưởng cách xử lý chữ thường trước khi sản xuất. Hệ thống không đổi nội dung."
+  too_long:
+    source:
+      status: unverified
+      note: Internal print policy, not a marketplace rule.
+    kinds:
+      too_long:
+        severity: WARNING
+        message: "{subject} dài {length} ký tự, vượt giới hạn {max_length} của hồ sơ in '{profile}' ({excess} ký tự cuối, từ ký tự thứ {position})."
+        suggestion: "Hỏi lại khách hoặc xưởng xem nội dung có vừa vùng in không. Hệ thống không tự rút gọn nội dung."
+  whitespace_issue:
+    source:
+      status: unverified
+      note: Internal print policy, not a marketplace rule.
+    kinds:
+      leading_space:
+        severity: INFO
+        message: "{subject} có {count} khoảng trắng ở đầu."
+        suggestion: "Chỉ để biết: khoảng trắng thừa có thể làm chữ in lệch. Hệ thống không tự xóa khoảng trắng."
+      trailing_space:
+        severity: INFO
+        message: "{subject} có {count} khoảng trắng ở cuối (từ ký tự thứ {position})."
+        suggestion: "Chỉ để biết: khoảng trắng thừa có thể làm chữ in lệch. Hệ thống không tự xóa khoảng trắng."
+      repeated_space:
+        severity: INFO
+        message: "{subject} có {count} khoảng trắng liên tiếp từ ký tự thứ {position}."
+        suggestion: "Chỉ để biết: khoảng trắng liên tiếp có thể làm chữ in lệch. Hệ thống không tự xóa khoảng trắng."
+
+# The words of the trademark findings. The scanner's own messages quote the buyer's text, so they are not used; these
+# templates name the field, the position and the catalog mark, and never the buyer's text.
+trademark:
+  source:
+    status: unverified
+    note: Internal heuristics of the trademark scanner, not a marketplace or legal rule.
+  color_phrase_note: "Kết quả này nằm trong một cụm mô tả màu; điều đó giải thích kết quả và không làm giảm mức rủi ro."
+  rules:
+    catalog_exact:
+      message: "{subject}: từ ở ký tự thứ {from} đến {to} trùng với nhãn hiệu '{mark}' trong danh mục tham chiếu."
+      suggestion: "Tạm giữ đơn và hỏi lại khách hoặc người phụ trách trước khi sản xuất. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+    catalog_phrase:
+      message: "{subject}: cụm ở ký tự thứ {from} đến {to} trùng với nhãn hiệu '{mark}' trong danh mục tham chiếu."
+      suggestion: "Tạm giữ đơn và hỏi lại khách hoặc người phụ trách trước khi sản xuất. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+    catalog_fuzzy:
+      message: "{subject}: cụm ở ký tự thứ {from} đến {to} giống nhãn hiệu '{mark}' với độ tương đồng {score}%."
+      suggestion: "Kiểm tra xem đó có phải cách viết sai hoặc biến thể của '{mark}' không. Đây chỉ là cảnh báo tham khảo."
+    geo_sport_combination:
+      message: "{subject}: có địa danh đi cùng từ thể thao (ký tự thứ {from} đến {to}); tổ hợp này có thể gợi đến một đội thể thao."
+      suggestion: "Hỏi lại khách về nội dung này trước khi sản xuất. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+    pure_color_description:
+      message: "{subject}: đoạn ở ký tự thứ {from} đến {to} chỉ gồm từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong đoạn này."
+      suggestion: "Thông tin này chỉ có ý nghĩa tham khảo cho riêng đoạn đó, không phải kết luận pháp lý."

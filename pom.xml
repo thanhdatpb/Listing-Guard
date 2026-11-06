@@ -17,6 +17,7 @@
         <module>rag-analyzer</module>
         <module>trademark-scanner</module>
         <module>variation-checks</module>
+        <module>personalization-screening</module>
         <module>api</module>
     </modules>
 
@@ -59,6 +60,11 @@
             <dependency>
                 <groupId>com.thanhdatpb.listingguard</groupId>
                 <artifactId>variation-checks</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thanhdatpb.listingguard</groupId>
+                <artifactId>personalization-screening</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
