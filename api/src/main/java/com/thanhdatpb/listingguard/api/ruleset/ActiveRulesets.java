@@ -8,6 +8,7 @@ import com.thanhdatpb.listingguard.ruleengine.config.RulesetLoader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -74,6 +75,18 @@ public class ActiveRulesets implements SmartInitializingSingleton {
             throw new IllegalStateException("No active ruleset for pack " + packId + " and marketplace " + marketplace);
         }
         return active;
+    }
+
+    /** The active ruleset of the pack for the marketplace (case-insensitive), or empty when there is none. */
+    public Optional<Active> find(String packId, String marketplace) {
+        return Optional.ofNullable(byPackAndMarketplace.get(key(packId, marketplace)));
+    }
+
+    /** The marketplaces that have an active ruleset of the pack, in upper case and sorted. */
+    public List<String> marketplaces(String packId) {
+        String pack = packId.trim().toLowerCase(Locale.ROOT);
+        return byPackAndMarketplace.keySet().stream().filter(identity -> identity.packId().equals(pack))
+                .map(Identity::marketplace).sorted().toList();
     }
 
     /**
