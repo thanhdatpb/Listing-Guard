@@ -423,13 +423,14 @@ Migration V20 adds the columns that store verified fix suggestions and the readi
 own at start-up. **Nothing changes until you turn the feature on**: with `listing-guard.fixes.enabled=false` (the default),
 `POST /api/v1/checks` and the `batch-check` reports keep the shape they had before.
 
-**Turning it on.** Set `LISTING_GUARD_FIXES_ENABLED=true` in `.env` and restart the API. Both compose files pass it to the
-`api` service (`docker-compose.prod.yml` reads `LISTING_GUARD_FIXES_ENABLED`, the development `docker-compose.yml` reads
-`FIXES_ENABLED`, as it does for `PLANS_ENABLED`). `batch-check` is a separate process and reads its own setting; with the
-development compose file pass it to one run:
+**Turning it on.** In `.env`, set `LISTING_GUARD_FIXES_ENABLED=true` for `docker-compose.prod.yml`, or `FIXES_ENABLED=true`
+for the development `docker-compose.yml` (the same naming as `PLANS_ENABLED`), and restart the API. Both files pass it to
+the `api` service. `batch-check` is a separate process that exists in the development file only, and that file passes it the
+same `FIXES_ENABLED`, so one setting turns fixes and readiness on for the API and for the batch reports. For a single batch
+run, set it on the command line:
 
 ```bash
-docker compose run --rm -e LISTING_GUARD_FIXES_ENABLED=true batch-check --input=/batch/input/<file.csv> ...
+FIXES_ENABLED=true docker compose run --rm batch-check --input=/batch/input/<file.csv> ...
 ```
 
 **What changes.** Each finding of `/checks` adds `fix` (a verified suggestion or `null`) and the response adds
