@@ -20,6 +20,8 @@ listing-guard:
     email-limit: 5
     ip-limit: 30
     rate-window: 15m
+    # The most active API keys one console account may hold (the "API keys" page). Keys made by the admin job count too.
+    max-active-keys: ${LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS:5}
   rate-limit:
     enabled: true
     requests-per-minute: 60
