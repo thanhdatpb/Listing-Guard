@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 class EditorLimitsTest {
 
     private static final RulesetConfig ETSY = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
-    private static final RulesetConfig AMAZON = RulesetLoader.loadClasspath("rulesets/amazon-2026-11.yaml");
+    private static final RulesetConfig AMAZON = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
 
     @Test
     void etsyLimitsAreTheRulesetValues() {
@@ -41,7 +41,7 @@ class EditorLimitsTest {
         assertThat(limits.titleMax()).isEqualTo(AMAZON.rule("title_length").intParam("max_length"));
         assertThat(limits.bulletCountMax()).isEqualTo(AMAZON.rule("bullet_count").intParam("max_count"));
         assertThat(limits.searchTermsMaxBytes()).isEqualTo(AMAZON.rule("search_terms_length").intParam("max_bytes"));
-        // bullet_length is enabled: false in amazon-2026-11, so no counter shows an unverified number
+        // bullet_length is enabled: false in amazon-2026-12, so no counter shows an unverified number
         assertThat(AMAZON.rule("bullet_length").enabled()).isFalse();
         assertThat(limits.bulletLengthMax()).isNull();
         assertThat(limits.tagLengthMax()).isNull();
