@@ -81,6 +81,22 @@ class AmazonLimitsTest {
     }
 
     @Test
+    void itemHighlightsAreDeclaredFromTheRulesetAndCountedInCodePoints() {
+        RuleLimit highlights = limitOf(CONFIG, null, "item_highlights_length");
+        int max = limit("item_highlights_length", "max_length");
+        String atLimit = EMOJI.repeat(max);
+
+        assertThat(highlights).isEqualTo(new RuleLimit("item_highlights", "item_highlights_length", Limit.Kind.MAX_LENGTH, max,
+                Limit.Unit.CODE_POINTS, CONFIG.rule("item_highlights_length").severity(),
+                CONFIG.rule("item_highlights_length").source().status(), true));
+        assertThat(atLimit.length()).isGreaterThan(max);
+        assertThat(run(CONFIG, AmazonTestData.withItemHighlights(atLimit))).extracting(Finding::ruleId)
+                .doesNotContain("item_highlights_length");
+        assertThat(run(CONFIG, AmazonTestData.withItemHighlights(atLimit + "a"))).extracting(Finding::ruleId)
+                .contains("item_highlights_length");
+    }
+
+    @Test
     void theTitleIsCountedInCodePointsNotInUtf16Units() {
         RuleLimit title = limitOf(CONFIG, null, "title_length");
         String atLimit = EMOJI.repeat(title.value());
