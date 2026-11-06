@@ -17,8 +17,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p><b>Advisory lock.</b> Every API instance may run the job, but only one may delete at a time. Each batch is one
  * transaction that first calls {@code pg_try_advisory_xact_lock(1279746628, 1380271182)}. If another instance holds the
  * lock the run is skipped, not waited for; the lock is released when the transaction ends. <b>The key pair
- * {@value #LOCK_KEY_1}, {@value #LOCK_KEY_2} is reserved for Listing Guard retention cleanup (ADR-010): no other job or
- * query may take it</b>, or a cleanup would silently be skipped. Both numbers fit in a PostgreSQL {@code int}.
+ * {@value #LOCK_KEY_1}, {@value #LOCK_KEY_2} is reserved for Listing Guard retention cleanup (ADR-010): only a retention
+ * cleanup may take it, and today there are two, this one and the variation checks' ({@code VariationRetentionCleanup},
+ * ADR-015), which read these constants and so share the lock</b>; any other job or query taking it would make a cleanup
+ * silently skip its run. Both numbers fit in a PostgreSQL {@code int}.
  *
  * <p><b>Batches.</b> One transaction deletes at most {@code cleanup-batch-size} check rows, oldest expiry first, so a
  * backlog never holds a long transaction or a large lock set. Rows locked by a request that is replacing them at the same

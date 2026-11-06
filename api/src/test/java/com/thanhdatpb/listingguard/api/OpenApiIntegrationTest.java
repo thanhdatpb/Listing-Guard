@@ -76,6 +76,7 @@ class OpenApiIntegrationTest {
 
         assertThat(fieldNames(spec.at("/paths"))).containsExactlyInAnyOrder("/api/v1/checks", "/api/v1/checks/{id}",
                 "/api/v1/trademark-checks", "/api/v1/trademark-checks/{id}", "/api/v1/usage",
+                "/api/v1/variation-checks", "/api/v1/variation-checks/{id}",
                 "/api/v1/rulesets/{marketplace}/limits", "/health");
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1rulesets~1{marketplace}~1limits/get/responses")))
                 .containsExactlyInAnyOrder("200", "304", "401", "404", "429");
@@ -95,6 +96,22 @@ class OpenApiIntegrationTest {
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1checks/post/responses/429/content/application~1problem+json/examples")))
                 .as("both 429 answers are documented").containsExactlyInAnyOrder("rate-limited", "quota-exceeded");
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1trademark-checks~1{id}/get/responses"))).contains("200", "404", "429");
+        // variation checks (ADR-015): their own request and result, no 503 (the pack needs no catalog), both 429 answers
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1variation-checks/post/responses")))
+                .containsExactlyInAnyOrder("200", "400", "401", "403", "413", "415", "422", "429");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1variation-checks~1{id}/get/responses")))
+                .containsExactlyInAnyOrder("200", "400", "401", "404", "429");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1variation-checks/post/responses/429/content/application~1problem+json/examples")))
+                .containsExactlyInAnyOrder("rate-limited", "quota-exceeded");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1variation-checks/post/requestBody/content/application~1json/examples")))
+                .containsExactlyInAnyOrder("amazon-family", "etsy-family");
+        assertThat(spec.at("/paths/~1api~1v1~1variation-checks/post/requestBody/content/application~1json/schema/$ref").asText())
+                .isEqualTo("#/components/schemas/VariationCheckRequest");
+        assertThat(fieldNames(spec.at("/components/schemas/VariationCheckRequest/properties")))
+                .as("not the /checks envelope").containsExactlyInAnyOrder("marketplace", "parent", "variation_properties", "children");
+        assertThat(fieldNames(spec.at("/components/schemas/VariationCheckResult/properties"))).containsExactlyInAnyOrder(
+                "checkId", "marketplace", "rulesetVersion", "analysisVersion", "cached", "completeness", "failedRuleIds",
+                "disclaimer", "createdAt", "expiresAt", "summary", "findings");
         assertThat(spec.at("/paths/~1api~1v1~1trademark-checks/post/requestBody/content/application~1json/schema/$ref").asText())
                 .as("the same request schema as /checks").isEqualTo(spec.at("/paths/~1api~1v1~1checks/post/requestBody/content/application~1json/schema/$ref").asText());
         assertThat(spec.at("/components/schemas/CheckResult/properties/readiness/anyOf/0/$ref").asText())

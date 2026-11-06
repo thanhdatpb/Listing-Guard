@@ -110,8 +110,79 @@ Fields of the Etsy format, such as `tags`, are ignored for Amazon.
 }
 ```
 
+## Variation checks
+
+The request of `POST /api/v1/variation-checks` (pack `variation-checks`, [ADR-015](adr/ADR-015-variation-checks.md)). It is
+**not** the `{"marketplace": ..., "listing": {...}}` envelope above: a parent and its children are not a listing, and the
+input of `/checks` is not changed. The fields are at the top level of the body. The rules above for every field hold here
+too: unknown fields are ignored, strings are trimmed and a blank one is absent, a number or boolean is read as its text, an
+object or array where a text is expected is absent, and a value that is not an array where an array is expected is an empty
+list. Nothing is deduplicated, shortened, corrected or reordered. A family is checked for its **structure** (which attributes
+the children fill, which parent they point at, whether combinations and SKUs repeat); what the listing says is checked by
+`/checks`, and a client that wants both sends both.
+
+| Field | Type | Notes |
+|---|---|---|
+| `marketplace` | string | `ETSY` or `AMAZON`, case-insensitive. |
+| `parent` | object | Amazon only; ignored for Etsy, where the listing is its own parent. An object with no non-blank field is absent. |
+| `variation_properties` | array of strings | Etsy only; ignored for Amazon. The names of the variation types, for example `Primary color` and `Size`. Blank entries are dropped, repeats are kept. |
+| `children` | array of objects | The children, in the order sent. An entry that is not an object, or has no non-blank `sku`, `parent_sku`, `title` or attribute, is dropped, so `children[i]` in a finding counts the cleaned list. |
+
+`parent` has these fields, all optional (a missing one is reported by a rule, not refused):
+
+| Field | Type | Notes |
+|---|---|---|
+| `sku` | string | The SKU the children point at. |
+| `product_type` | string | For example `SHIRT`. Kept as written; matched to the ruleset ignoring case. |
+| `variation_theme` | string | For example `Color-Size`. Kept as written; matched to the ruleset ignoring case. |
+| `title` | string | |
+
+Each entry of `children` has these fields, all optional:
+
+| Field | Type | Notes |
+|---|---|---|
+| `sku` | string | |
+| `parent_sku` | string | Amazon only; ignored for Etsy. Compared with the parent's `sku` exactly (after Unicode NFC), so case matters. |
+| `title` | string | Used to tell whether the children look like different products. Etsy children usually have none. |
+| `attributes` | object | Attribute name to value. A name is trimmed; an attribute whose name or value is blank, or whose value is an object or array, is dropped; if two names are equal once trimmed the first is kept. Names are matched ignoring case. |
+
+The attribute names a rule looks for come from the ruleset, not from this page. For an Amazon theme they are the
+lower-case words of the theme joined by `_`: `Color-Size` is `color` and `size`. For apparel the size attributes are
+`size_system`, `size_class`, `size`, `size_to` (with the `*_range` classes) and `body_type`. For Etsy they are the names in
+`variation_properties`. The limits and lists the checks use are in the versioned ruleset `variation-checks-2026-11`, each with
+its source (`secondary` or `unverified`, never `verified`); they are not repeated here, so none can go out of date.
+
+An Amazon family:
+
+```json variation-amazon
+{
+  "marketplace": "AMAZON",
+  "parent": {"sku": "TEE-P", "product_type": "SHIRT", "variation_theme": "Color-Size", "title": "Retro Sunset Tee"},
+  "children": [
+    {"sku": "TEE-RED-S", "parent_sku": "TEE-P", "title": "Retro Sunset Tee - Red - S",
+     "attributes": {"color": "Red", "size": "S", "size_system": "as1", "size_class": "alpha", "body_type": "regular"}},
+    {"sku": "TEE-RED-M", "parent_sku": "TEE-P", "title": "Retro Sunset Tee - Red - M",
+     "attributes": {"color": "Red", "size": "M", "size_system": "as1", "size_class": "alpha", "body_type": "regular"}}
+  ]
+}
+```
+
+An Etsy listing with two variation types:
+
+```json variation-etsy
+{
+  "marketplace": "ETSY",
+  "variation_properties": ["Primary color", "Size"],
+  "children": [
+    {"sku": "TEE-RED-S", "attributes": {"Primary color": "Red", "Size": "S"}},
+    {"sku": "TEE-RED-M", "attributes": {"Primary color": "Red", "Size": "M"}}
+  ]
+}
+```
+
 ## Checked by a test
 
-The two examples above are read out of this file by a test and run through the normalizers, so this page cannot
-drift from the code without the build failing. The machine-readable description of the request and response is
+The two listing examples above are read out of this file by a test and run through the normalizers, and so are the two
+variation examples (through the variation normalizer and the rules), so this page cannot drift from the code without the
+build failing. The machine-readable description of the request and response is
 [`docs/api/openapi.json`](api/openapi.json); how to call the API is in the [integration guide](integration-guide.md).

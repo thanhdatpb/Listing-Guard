@@ -404,6 +404,95 @@
           }
         },
         "type" : "object"
+      },
+      "VariationCheckRequest" : {
+        "properties" : {
+          "children" : {
+            "description" : "The children: objects with sku, parent_sku (Amazon only), title and attributes, a map from an attribute name to its value. Entries that are not objects or are empty are dropped.",
+            "type" : [ "string", "null" ]
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, case-insensitive. Supported: ETSY, AMAZON.",
+            "example" : "AMAZON",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "parent" : {
+            "description" : "Amazon: the parent, an object with sku, product_type, variation_theme and title (all optional). Ignored for Etsy, where the listing is its own parent.",
+            "type" : [ "string", "null" ]
+          },
+          "variation_properties" : {
+            "description" : "Etsy: the names of the variation types, for example [\"Primary color\", \"Size\"]. Ignored for Amazon.",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "marketplace" ],
+        "type" : "object"
+      },
+      "VariationCheckResult" : {
+        "properties" : {
+          "analysisVersion" : {
+            "description" : "Version of everything that decides the result (ruleset, comparison logic, input format). Opaque: compare for equality only. Two checks of one client with the same marketplace, the same family and the same analysisVersion have the same result.",
+            "example" : "5b0e3d79c1a24f6e8d7c9b0a1f2e3d4c5b6a79881726354453627180911a2b3c",
+            "type" : "string"
+          },
+          "cached" : {
+            "description" : "True when the stored result of an identical earlier check is returned instead of a new analysis. Only a COMPLETE result is ever returned from the cache.",
+            "type" : "boolean"
+          },
+          "checkId" : {
+            "description" : "Identifier of the stored check; use it with GET /api/v1/variation-checks/{id} until expiresAt.",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "completeness" : {
+            "description" : "COMPLETE when every rule ran. INCOMPLETE when a rule failed: the findings of the rules that succeeded are kept and failedRuleIds names the others. An INCOMPLETE result is never a clean result.",
+            "enum" : [ "COMPLETE", "INCOMPLETE" ],
+            "type" : "string"
+          },
+          "createdAt" : {
+            "description" : "When the check was first stored (UTC).",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "disclaimer" : {
+            "description" : "Statement that the result is a reference warning and not a statement of the marketplace. Show it with the result.",
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "description" : "When the stored result stops being readable (UTC). After this instant GET answers 404 and the same family is analysed again.",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failedRuleIds" : {
+            "description" : "Rules that failed; empty for a COMPLETE result.",
+            "example" : [ ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "findings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FindingView"
+            },
+            "type" : "array"
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, upper case.",
+            "example" : "AMAZON",
+            "type" : "string"
+          },
+          "rulesetVersion" : {
+            "description" : "Version of the variation ruleset that produced the result.",
+            "example" : "variation-checks-2026-11",
+            "type" : "string"
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/Summary"
+          }
+        },
+        "type" : "object"
       }
     },
     "securitySchemes" : {
@@ -425,7 +514,7 @@
     "/api/v1/checks" : {
       "post" : {
         "description" : "Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content was already checked by the calling client with the same analysisVersion, the stored result is returned instead and `cached` is true (no new check is created); results are never shared between clients. A new result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached one costs nothing. The listing is the marketplace's own format; for Etsy it is the Open API v3 style JSON with snake_case fields, for Amazon the simple format with title, brand, bullet_points, description, search_terms, product_type, price, quantity and images.",
-        "operationId" : "check_1",
+        "operationId" : "check_2",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -801,7 +890,7 @@
     "/api/v1/checks/{id}" : {
       "get" : {
         "description" : "Returns the stored result of an earlier check of the calling client, in the same shape as the POST response (`cached` is false).",
-        "operationId" : "get_1",
+        "operationId" : "get_2",
         "parameters" : [ {
           "description" : "checkId returned by POST /api/v1/checks",
           "in" : "path",
@@ -1107,7 +1196,7 @@
     "/api/v1/trademark-checks" : {
       "post" : {
         "description" : "Takes the same request as `POST /api/v1/checks` (`marketplace` and `listing` in the marketplace's own format), so a client can send one JSON to both endpoints. Compares the listing's text with the configured trademark catalog and returns findings with evidence: the field, the span in the text the API worked on (after trimming and Unicode NFC, UTF-16 offsets), the matched mark and how it matched. The result is a reference warning, not a legal conclusion; show the `disclaimer` with it. If the same client already sent the same listing text with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time (`expiresAt`); only the listing's hash and the result are stored, not the listing text.",
-        "operationId" : "check",
+        "operationId" : "check_1",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -1453,7 +1542,7 @@
     "/api/v1/trademark-checks/{id}" : {
       "get" : {
         "description" : "Returns the stored result of an earlier trademark check of the calling client while it is retained, in the same shape as the POST response (`cached` is false). After `expiresAt`, for an unknown id and for another client's check the answer is the same 404.",
-        "operationId" : "get",
+        "operationId" : "get_1",
         "parameters" : [ {
           "description" : "checkId returned by POST /api/v1/trademark-checks",
           "in" : "path",
@@ -1675,6 +1764,435 @@
         "tags" : [ "Usage" ]
       }
     },
+    "/api/v1/variation-checks" : {
+      "post" : {
+        "description" : "Takes a variation family: for Amazon a `parent` and its `children`, for Etsy the `variation_properties` and the `children` (see docs/input-schema.md, \"Variation checks\"). It is not the `/checks` envelope: a family is not a listing. Checks that the parent and its children are consistent (parent SKU, theme and its attributes, apparel size attributes, repeated combinations and SKUs, children that look like different products) and, for Etsy, the limits on variation types. The result is a reference warning built on secondary sources and internal heuristics, not a statement of the marketplace; show the `disclaimer` with it. It proposes no fix and no replacement value. If the same client already sent the same family with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time (`expiresAt`); only the family's hash and the result are stored, not the family itself.",
+        "operationId" : "check",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "examples" : {
+                "amazon-family" : {
+                  "description" : "amazon-family",
+                  "summary" : "An Amazon parent with two children (synthetic)",
+                  "value" : {
+                    "children" : [ {
+                      "attributes" : {
+                        "body_type" : "regular",
+                        "color" : "Red",
+                        "size" : "S",
+                        "size_class" : "alpha",
+                        "size_system" : "as1"
+                      },
+                      "parent_sku" : "TEE-P",
+                      "sku" : "TEE-RED-S",
+                      "title" : "Retro Sunset Tee - Red - S"
+                    }, {
+                      "attributes" : {
+                        "body_type" : "regular",
+                        "color" : "Red",
+                        "size" : "M",
+                        "size_class" : "alpha",
+                        "size_system" : "as1"
+                      },
+                      "parent_sku" : "TEE-X",
+                      "sku" : "TEE-RED-M",
+                      "title" : "Retro Sunset Tee - Red - M"
+                    } ],
+                    "marketplace" : "AMAZON",
+                    "parent" : {
+                      "product_type" : "SHIRT",
+                      "sku" : "TEE-P",
+                      "title" : "Retro Sunset Tee",
+                      "variation_theme" : "Color-Size"
+                    }
+                  }
+                },
+                "etsy-family" : {
+                  "description" : "etsy-family",
+                  "summary" : "An Etsy listing with three variation types (synthetic)",
+                  "value" : {
+                    "children" : [ {
+                      "attributes" : {
+                        "Holiday" : "Christmas",
+                        "Primary color" : "Red",
+                        "Size" : "S"
+                      },
+                      "sku" : "TEE-RED-S"
+                    }, {
+                      "attributes" : {
+                        "Holiday" : "Christmas",
+                        "Primary color" : "Red",
+                        "Size" : "M"
+                      },
+                      "sku" : "TEE-RED-M"
+                    } ],
+                    "marketplace" : "ETSY",
+                    "variation_properties" : [ "Primary color", "Size", "Holiday" ]
+                  }
+                }
+              },
+              "schema" : {
+                "$ref" : "#/components/schemas/VariationCheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "cached" : {
+                    "description" : "cached",
+                    "summary" : "The same family again: the stored result",
+                    "value" : {
+                      "analysisVersion" : "d1f0b7c4e9a3582b6c0e4f7a1d9b3c5e8f2a4b6d0c1e3f5a7b9d1c3e5f708192",
+                      "cached" : true,
+                      "checkId" : "3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-11-06T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo dựa trên nguồn thứ cấp và quy tắc nội bộ, không phải xác nhận hay kết luận của Amazon hoặc Etsy.",
+                      "expiresAt" : "2026-12-06T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "field" : "children[1].parent_sku",
+                        "kind" : "child_parent_sku_mismatch",
+                        "message" : "Child thứ 2 có parent_sku 'TEE-X', khác SKU của parent 'TEE-P'.",
+                        "relatedFields" : [ "parent.sku" ],
+                        "ruleId" : "parent_child_structure",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "SECONDARY",
+                        "suggestion" : "Sửa parent_sku của child này cho trùng SKU của parent 'TEE-P', hoặc đưa child sang parent đúng.",
+                        "value" : "TEE-X"
+                      } ],
+                      "marketplace" : "AMAZON",
+                      "rulesetVersion" : "variation-checks-2026-11",
+                      "summary" : {
+                        "errors" : 0,
+                        "infos" : 0,
+                        "warnings" : 1
+                      }
+                    }
+                  },
+                  "findings" : {
+                    "description" : "findings",
+                    "summary" : "A fresh check with a finding",
+                    "value" : {
+                      "analysisVersion" : "d1f0b7c4e9a3582b6c0e4f7a1d9b3c5e8f2a4b6d0c1e3f5a7b9d1c3e5f708192",
+                      "cached" : false,
+                      "checkId" : "3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-11-06T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo dựa trên nguồn thứ cấp và quy tắc nội bộ, không phải xác nhận hay kết luận của Amazon hoặc Etsy.",
+                      "expiresAt" : "2026-12-06T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "field" : "children[1].parent_sku",
+                        "kind" : "child_parent_sku_mismatch",
+                        "message" : "Child thứ 2 có parent_sku 'TEE-X', khác SKU của parent 'TEE-P'.",
+                        "relatedFields" : [ "parent.sku" ],
+                        "ruleId" : "parent_child_structure",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "SECONDARY",
+                        "suggestion" : "Sửa parent_sku của child này cho trùng SKU của parent 'TEE-P', hoặc đưa child sang parent đúng.",
+                        "value" : "TEE-X"
+                      } ],
+                      "marketplace" : "AMAZON",
+                      "rulesetVersion" : "variation-checks-2026-11",
+                      "summary" : {
+                        "errors" : 0,
+                        "infos" : 0,
+                        "warnings" : 1
+                      }
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/VariationCheckResult"
+                }
+              }
+            },
+            "description" : "The variation check result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-request" : {
+                    "description" : "invalid-request",
+                    "value" : {
+                      "code" : "invalid-request",
+                      "detail" : "The request is not valid; see errors.",
+                      "errors" : [ {
+                        "field" : "listing",
+                        "message" : "must not be null"
+                      } ],
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-request"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request (code `invalid-request`) or unknown marketplace (`unknown-marketplace`)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "plan-not-allowed",
+                  "detail" : "The FREE plan does not include trademark-risk. Ask the operator for a plan that does.",
+                  "instance" : "/api/v1/trademark-checks",
+                  "pack" : "trademark-risk",
+                  "plan" : "FREE",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 403,
+                  "title" : "Forbidden",
+                  "type" : "urn:listing-guard:problem:plan-not-allowed"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The client's plan does not include this pack (code `plan-not-allowed`; only where plans are on). Retrying does not help."
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "payload-too-large",
+                  "detail" : "The request body is larger than the limit of 262144 bytes.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 413,
+                  "title" : "Payload Too Large",
+                  "type" : "urn:listing-guard:problem:payload-too-large"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request body is over the size limit (256 KB)."
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not application/json (code `unsupported-media-type`)."
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`)."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "quota-exceeded" : {
+                    "description" : "quota-exceeded",
+                    "value" : {
+                      "code" : "quota-exceeded",
+                      "detail" : "The monthly quota of the FREE plan is used up (20 of 20). It resets at 2026-12-01T00:00:00Z. Results already stored are still answered from the cache.",
+                      "instance" : "/api/v1/checks",
+                      "plan" : "FREE",
+                      "quota" : 20,
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "resetAt" : "2026-12-01T00:00:00Z",
+                      "status" : 429,
+                      "title" : "Too Many Requests",
+                      "type" : "urn:listing-guard:problem:quota-exceeded",
+                      "used" : 20
+                    }
+                  },
+                  "rate-limited" : {
+                    "description" : "rate-limited",
+                    "value" : {
+                      "code" : "rate-limited",
+                      "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 429,
+                      "title" : "Too Many Requests",
+                      "type" : "urn:listing-guard:problem:rate-limited"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Two different answers, told apart by `code`. `rate-limited`: too many requests for the calling client (the same limit as the other endpoints); retry after the Retry-After header. `quota-exceeded` (only where plans are on): the month's quota of the client's plan is used up; there is no Retry-After, and retrying before `resetAt` does not help. A result already stored is still answered."
+          }
+        },
+        "summary" : "Check the variation structure of a listing",
+        "tags" : [ "Variation checks" ]
+      }
+    },
+    "/api/v1/variation-checks/{id}" : {
+      "get" : {
+        "description" : "Returns the stored result of an earlier variation check of the calling client while it is retained, in the same shape as the POST response (`cached` is false). After `expiresAt`, for an unknown id and for another client's check the answer is the same 404.",
+        "operationId" : "get",
+        "parameters" : [ {
+          "description" : "checkId returned by POST /api/v1/variation-checks",
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "analysisVersion" : "d1f0b7c4e9a3582b6c0e4f7a1d9b3c5e8f2a4b6d0c1e3f5a7b9d1c3e5f708192",
+                  "cached" : false,
+                  "checkId" : "3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+                  "completeness" : "COMPLETE",
+                  "createdAt" : "2026-11-06T09:15:30.123456Z",
+                  "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo dựa trên nguồn thứ cấp và quy tắc nội bộ, không phải xác nhận hay kết luận của Amazon hoặc Etsy.",
+                  "expiresAt" : "2026-12-06T09:15:30.123456Z",
+                  "failedRuleIds" : [ ],
+                  "findings" : [ {
+                    "field" : "children[1].parent_sku",
+                    "kind" : "child_parent_sku_mismatch",
+                    "message" : "Child thứ 2 có parent_sku 'TEE-X', khác SKU của parent 'TEE-P'.",
+                    "relatedFields" : [ "parent.sku" ],
+                    "ruleId" : "parent_child_structure",
+                    "severity" : "WARNING",
+                    "sourceStatus" : "SECONDARY",
+                    "suggestion" : "Sửa parent_sku của child này cho trùng SKU của parent 'TEE-P', hoặc đưa child sang parent đúng.",
+                    "value" : "TEE-X"
+                  } ],
+                  "marketplace" : "AMAZON",
+                  "rulesetVersion" : "variation-checks-2026-11",
+                  "summary" : {
+                    "errors" : 0,
+                    "infos" : 0,
+                    "warnings" : 1
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/VariationCheckResult"
+                }
+              }
+            },
+            "description" : "The stored result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The id is not a UUID."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "variation-check-not-found",
+                  "detail" : "No variation check with id 3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73 was found for this client.",
+                  "instance" : "/api/v1/variation-checks/3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 404,
+                  "title" : "Not Found",
+                  "type" : "urn:listing-guard:problem:variation-check-not-found"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No retained variation check with this id for the calling client (code `variation-check-not-found`). A check of another client, an id that never existed and an expired check give the same answer."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read a stored variation check",
+        "tags" : [ "Variation checks" ]
+      }
+    },
     "/health" : {
       "get" : {
         "description" : "200 when PostgreSQL can be queried, 503 otherwise. No API key needed.",
@@ -1705,6 +2223,9 @@
   "tags" : [ {
     "description" : "Possible trademark references in a listing's text, as a reference warning.",
     "name" : "Trademark checks"
+  }, {
+    "description" : "Structure of a listing's parent/child variations, as a reference warning.",
+    "name" : "Variation checks"
   }, {
     "description" : "Check a listing and read stored results.",
     "name" : "Checks"

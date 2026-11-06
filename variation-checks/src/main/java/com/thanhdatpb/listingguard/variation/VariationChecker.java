@@ -32,8 +32,11 @@ public final class VariationChecker {
         this(ruleset, VariationRules.create(ruleset));
     }
 
-    /** For tests that need a rule to fail. */
-    VariationChecker(VariationRuleset ruleset, List<VariationRule> rules) {
+    /**
+     * A checker that runs these rules instead of the ruleset's own, in this order. For callers that need a different set,
+     * and for tests that need a rule to fail (the checker then reports the result as {@code INCOMPLETE}).
+     */
+    public VariationChecker(VariationRuleset ruleset, List<VariationRule> rules) {
         this.ruleset = ruleset;
         this.rules = List.copyOf(rules);
     }
