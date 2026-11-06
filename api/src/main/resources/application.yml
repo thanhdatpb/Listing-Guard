@@ -82,6 +82,25 @@ listing-guard:
       cleanup-interval: 1h
       cleanup-initial-delay: 2m
       cleanup-batch-size: 500
+  personalization:
+    # The personalization ruleset (ADR-016), registered for each marketplace below as pack `personalization-screening`
+    # (ADR-010). The trademark part of a screening uses the catalog named by listing-guard.trademark.catalog-version, and
+    # runs without one (the screening is then INCOMPLETE, never charged).
+    ruleset: classpath:rulesets/personalization-screening-2026-11.yaml
+    marketplaces:
+      - ETSY
+      - AMAZON
+    retention:
+      # How long a screening result, its input hash and its evidence are kept (ADR-016). The text the buyer typed is never
+      # stored. An operational proposal, not a guarantee. GET and the cache lookup treat a row past this as absent whether or
+      # not the cleanup has run.
+      period: 30d
+      # The scheduled cleanup runs in every API instance and shares the retention advisory lock with the trademark and
+      # variation cleanups, so one batch of any of them runs at a time; a skipped run is tried again at the next interval.
+      cleanup-enabled: true
+      cleanup-interval: 1h
+      cleanup-initial-delay: 3m
+      cleanup-batch-size: 500
   batch:
     # The batch-check job (docs/batch-check.md): mappings, inputs and reports; the reports go to <dir>/out by default.
     dir: ${BATCH_DIR:batch}

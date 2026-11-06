@@ -27,6 +27,6 @@ public record Usage(
         LocalDate periodStart,
         @Schema(description = "The instant the quota resets: the start of the next UTC month.", example = "2026-12-01T00:00:00Z")
         Instant resetAt,
-        @Schema(description = "The packs the client may use.", example = "[\"batch\",\"listing-rules\",\"sheet-connector\",\"trademark-risk\",\"variation-checks\"]")
+        @Schema(description = "The packs the client may use.", example = "[\"batch\",\"listing-rules\",\"personalization-screening\",\"sheet-connector\",\"trademark-risk\",\"variation-checks\"]")
         List<String> packs) {
 }
