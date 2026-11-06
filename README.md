@@ -54,8 +54,10 @@ Working end to end:
   marked, a verified value for the fixes that have one, the readiness score **always next to** the trademark result and its
   disclaimer, and a simulated preview. "Apply suggestion" only fills a form field and never checks again; the listing you
   type is never stored. The editor shows fixes and readiness whatever `listing-guard.fixes.enabled` says; the API and batch
-  report keep following that flag. Production requires HTTPS and SMTP; development can log links. Saved listings and
-  history remain planned.
+  report keep following that flag. An **API keys** page lists, creates and revokes the keys of the signed-in account (the
+  secret is shown once; at most `listing-guard.console.max-active-keys`, default 5, active keys; no plan check and no
+  migration), and while the trademark catalog is the fictional DEMO one every page carries a banner that says so.
+  Production requires HTTPS and SMTP; development can log links. Saved listings and history remain planned.
 
 Before you rely on it:
 
@@ -418,7 +420,8 @@ the public DTD V2.0 and **unverified against real data**), the `batch-check` job
 (V19, [ADR-013](docs/adr/ADR-013-client-plans-and-monthly-quota.md); off by default; billing, `sheet-connector` and the
 enforcement of `policy-analyzer` are not part of it), and the Listing Workspace API and batch integration
 ([ADR-014](docs/adr/ADR-014-listing-workspace.md); off by default, V20), and the optional console with its sign-in,
-dashboard and Check listing editor ([ADR-014](docs/adr/ADR-014-listing-workspace.md) part B, V21; off by default).
+dashboard, Check listing editor and API keys page ([ADR-014](docs/adr/ADR-014-listing-workspace.md) part B, V21; off by
+default).
 What follows, in this order, is **not built yet**:
 
 1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
@@ -430,9 +433,10 @@ What follows, in this order, is **not built yet**:
    exist today (the `LlmProvider` contract, a scripted test provider and the citation verifier); there is no call to a
    real model and no endpoint. The analyzer is designed to be off by default and enabled by configuring an LLM.
 4. Add Amazon product-type overrides only when their limits and sources have been verified.
-5. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)): the console, its dashboard and the Check listing
-   editor are implemented (part B, V21; off by default). What remains is saved listings and history; any page that shows
-   readiness must always show the trademark result alongside it. The Etsy rule `tag_count_underused` remains planned for the
+5. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)): the console, its dashboard, the Check listing
+   editor and the API keys page are implemented (part B, V21; off by default). What remains is saved listings and history;
+   any page that shows readiness must always show the trademark result alongside it. Plan-based gating of API keys, a plan
+   comparison page and billing are deferred. The Etsy rule `tag_count_underused` remains planned for the
    next Etsy ruleset update so that `analysisVersion` changes once.
 
 ## Documentation
@@ -455,7 +459,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
 - [ADR-012: Embeddings default to an external API](docs/adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)
 - [ADR-013: Client plans and monthly quota](docs/adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
-- [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor are implemented, all off by default; saved listings and history are not designed yet)
+- [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor and API keys page are implemented, all off by default; saved listings and history are not designed yet)
 
 ## License
 MIT © 2026 Thanh Dat Tran. See [LICENSE](LICENSE).
