@@ -1,0 +1,26 @@
+# Optional override: joins the api to an existing Docker network that another application on the same host also
+# joins, so that application can call the API without any published port. Not part of the default setup.
+#
+#   docker network create <name>          # once, unless the other application's Compose project already created it
+#   # .env: LISTING_GUARD_SHARED_NETWORK=<name>
+#   docker compose -f docker-compose.prod.yml -f docker-compose.prod.shared-network.yml --profile prod up -d
+#
+# The other application declares the same network as `external: true` and calls http://listing-guard-api:8080 (see
+# docs/deployment.md, "Running next to an internal application"). The api keeps its own default network for postgres,
+# and its `ports` stay bound to 127.0.0.1: nothing is published on a public address. Every container on the shared
+# network can reach the API (every endpoint but /health still needs an API key), so join only containers you trust.
+#
+# The alias is there because Compose also gives the service name `api` as an alias on every network; a caller that has
+# a service named `api` of its own would then resolve two containers. Use `listing-guard-api`.
+services:
+  api:
+    networks:
+      default: {}
+      shared:
+        aliases:
+          - listing-guard-api
+
+networks:
+  shared:
+    name: ${LISTING_GUARD_SHARED_NETWORK:?Set LISTING_GUARD_SHARED_NETWORK in .env}
+    external: true
