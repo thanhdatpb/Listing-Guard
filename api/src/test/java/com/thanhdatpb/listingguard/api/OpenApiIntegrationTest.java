@@ -75,7 +75,14 @@ class OpenApiIntegrationTest {
         JsonNode spec = mapper.readTree(generatedSpec());
 
         assertThat(fieldNames(spec.at("/paths"))).containsExactlyInAnyOrder("/api/v1/checks", "/api/v1/checks/{id}",
-                "/api/v1/trademark-checks", "/api/v1/trademark-checks/{id}", "/api/v1/usage", "/health");
+                "/api/v1/trademark-checks", "/api/v1/trademark-checks/{id}", "/api/v1/usage",
+                "/api/v1/rulesets/{marketplace}/limits", "/health");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1rulesets~1{marketplace}~1limits/get/responses")))
+                .containsExactlyInAnyOrder("200", "304", "401", "404", "429");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1rulesets~1{marketplace}~1limits")))
+                .as("read only: no other method").containsExactly("get");
+        assertThat(fieldNames(spec.at("/components/schemas/LimitView/properties")))
+                .containsExactlyInAnyOrder("field", "ruleId", "kind", "value", "unit", "severity", "sourceStatus", "enabled");
         assertThat(spec.at("/components/securitySchemes/ApiKeyAuth/name").asText()).isEqualTo("X-API-Key");
         assertThat(spec.at("/security/0/ApiKeyAuth").isArray()).isTrue();
         assertThat(spec.at("/paths/~1health/get/security").isEmpty()).as("/health needs no key").isTrue();

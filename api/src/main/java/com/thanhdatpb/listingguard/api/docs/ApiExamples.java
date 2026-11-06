@@ -466,6 +466,37 @@ public final class ApiExamples {
             }
             """;
 
+    /** The limits of {@code etsy-2026-11}; a test holds it equal to what the endpoint answers. */
+    public static final String RULESET_LIMITS_ETSY = """
+            {
+              "marketplace": "ETSY",
+              "rulesetVersion": "etsy-2026-11",
+              "productType": null,
+              "limits": [
+                {"field": "title", "ruleId": "title_length", "kind": "MAX_LENGTH", "value": 140, "unit": "CODE_POINTS",
+                 "severity": "ERROR", "sourceStatus": "VERIFIED", "enabled": true},
+                {"field": "title", "ruleId": "title_repeated_special_chars", "kind": "MAX_OCCURRENCES", "value": 1,
+                 "unit": "OCCURRENCES", "severity": "WARNING", "sourceStatus": "SECONDARY", "enabled": true},
+                {"field": "tags", "ruleId": "tag_count", "kind": "MAX_COUNT", "value": 13, "unit": "ITEMS",
+                 "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true},
+                {"field": "tags", "ruleId": "tag_length", "kind": "MAX_LENGTH", "value": 20, "unit": "CODE_POINTS",
+                 "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true}
+              ]
+            }
+            """;
+
+    public static final String PROBLEM_RULESET_NOT_FOUND = """
+            {
+              "type": "urn:listing-guard:problem:ruleset-not-found",
+              "title": "Not Found",
+              "status": 404,
+              "detail": "No ruleset is active for marketplace WALMART. Supported: AMAZON, ETSY.",
+              "instance": "/api/v1/rulesets/WALMART/limits",
+              "code": "ruleset-not-found",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
     public static final String PROBLEM_TOO_LARGE = """
             {
               "type": "urn:listing-guard:problem:payload-too-large",
