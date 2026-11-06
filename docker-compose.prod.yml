@@ -32,6 +32,8 @@ services:
       # refuses to start while the key is empty.
       LISTING_GUARD_EMBEDDING_PROVIDER: ${LISTING_GUARD_EMBEDDING_PROVIDER:-none}
       LISTING_GUARD_EMBEDDING_API_KEY: ${LISTING_GUARD_EMBEDDING_API_KEY:-}
+      # Trademark catalog version to serve (ADR-009), as the trademark-import job printed it. Empty: trademark checks off.
+      LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
       # Client plans and the monthly quota (ADR-013): off by default, so nothing about a plan is read or enforced.
       # Give every client its plan first: docker compose run --rm admin plan set <client> <plan>
       LISTING_GUARD_PLANS_ENABLED: ${LISTING_GUARD_PLANS_ENABLED:-false}
@@ -67,6 +69,75 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+
+  # ---- one-shot trademark and batch jobs (profile `tools`; none of them starts with `--profile prod up`) ----
+  # Run them with both profiles, like `admin`, so that postgres (profile `prod`) is known to Compose:
+  #   docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm <job> ...
+  # `run` starts only the job and the database, never the api. The image runs as uid 10001: a folder that a job writes
+  # to must be writable by that uid (docs/deployment.md). No job needs a network or an embedding model.
+
+  # Imports one catalog of catalogs/manifest.yaml from catalogs/raw/ into the database (ADR-009) and prints the version
+  # to set as TRADEMARK_CATALOG_VERSION. You are responsible for checking that the terms of the data source allow this
+  # use and storage.
+  #   docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm trademark-import --catalog=<label>
+  trademark-import:
+    image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: trademark-import
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      CATALOGS_DIR: /catalogs
+    volumes:
+      - ./catalogs:/catalogs:ro
+
+  # Converts one USPTO Trademark Applications Daily XML file (DTD V2.0) in catalogs/raw/ to jsonl-1 in the same folder
+  # (ADR-009). Unverified against real data. Local files only; it still starts through the database (migrations and
+  # ruleset registration). You are responsible for the terms of the data.
+  #   docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm uspto-convert --input=uspto/<file.xml>
+  uspto-convert:
+    image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: uspto-convert
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      CATALOGS_DIR: /catalogs
+      LISTING_GUARD_TRADEMARK_USPTO_ALLOW_OTHER_VERSION: ${USPTO_ALLOW_OTHER_VERSION:-false}
+    volumes:
+      # only raw/ is mounted, and writable: the job reads the XML there and writes the jsonl-1 file and its report there
+      - ./catalogs/raw:/catalogs/raw
+
+  # Checks every listing of a CSV export (rules and trademark) and writes findings.csv, listings.csv and summary.html to
+  # batch/out/ (docs/batch-check.md). The client must exist and be active. The three settings below must equal the ones
+  # of the api, or the batch counts and answers differently from the API.
+  #   docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm batch-check \
+  #     --input=/batch/input/<file.csv> --mapping=/batch/mappings/<mapping.yaml> --client=<client name> --marketplace=ETSY|AMAZON
+  batch-check:
+    image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: batch-check
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      LISTING_GUARD_PLANS_ENABLED: ${LISTING_GUARD_PLANS_ENABLED:-false}
+      LISTING_GUARD_FIXES_ENABLED: ${LISTING_GUARD_FIXES_ENABLED:-false}
+      BATCH_DIR: /batch
+    volumes:
+      - ./batch:/batch
 
 volumes:
   listing_guard_postgres_data:
