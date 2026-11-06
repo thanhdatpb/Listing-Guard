@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.core.listing.Money;
+import com.thanhdatpb.listingguard.core.listing.PersonalizationQuestion;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetLoader;
 import java.math.BigDecimal;
@@ -26,12 +27,46 @@ class FixCoverageTest {
 
     private static final RuleEngine ENGINE = new RuleEngine(RuleRegistry.withDefaults());
 
+    /** Distinct words that are each long enough for a title cut at {@code titleMax} to stay under {@code maxWords} words. */
+    private static String longWords(int minLength, int titleMax, int maxWords) {
+        int padding = titleMax / maxWords + 2;
+        StringBuilder text = new StringBuilder();
+        for (int i = 1; text.length() <= minLength; i++) {
+            text.append(i > 1 ? " " : "").append("w".repeat(padding)).append(i);
+        }
+        return text.toString();
+    }
+
     private static String words(int minLength) {
         StringBuilder text = new StringBuilder("alpha1");
         for (int i = 2; text.length() <= minLength; i++) {
             text.append(" alpha").append(i);
         }
         return text.toString();
+    }
+
+    /** Personalization questions that break every personalization rule once, with the numbers read from the ruleset. */
+    private static List<PersonalizationQuestion> brokenQuestions(RulesetConfig config) {
+        int maxQuestions = config.rule("personalization_question_count").intParam("max_count");
+        int maxText = config.rule("personalization_question_text").intParam("max_length");
+        int maxOptions = config.rule("personalization_dropdown_options").intParam("max_count");
+        int maxLabel = config.rule("personalization_dropdown_options").intParam("max_length");
+        int maxFiles = config.rule("personalization_upload_files").intParam("max_files");
+        int maxInstructions = config.rule("personalization_instructions_length").intParam("max_length");
+
+        List<String> options = new java.util.ArrayList<>(List.of("Dup", "Dup", "x".repeat(maxLabel + 1)));
+        for (int i = 0; options.size() <= maxOptions; i++) {
+            options.add("Option " + i);
+        }
+        List<PersonalizationQuestion> questions = new java.util.ArrayList<>(List.of(
+                new PersonalizationQuestion("TEXT", "Player name", "x".repeat(maxInstructions + 1), true, 20, List.of(), null),
+                new PersonalizationQuestion("TEXT", "x".repeat(maxText + 1), null, null, null, List.of(), null),
+                new PersonalizationQuestion("DROPDOWN", "Font", null, null, null, options, null),
+                new PersonalizationQuestion("UPLOAD", "Photo A", null, null, null, List.of("Front"), 1),
+                new PersonalizationQuestion("UPLOAD", "Photo B", null, null, null, List.of(), maxFiles + 1),
+                new PersonalizationQuestion("TEXT", null, null, null, null, List.of(), null)));
+        assertThat(questions.size()).as("more questions than allowed").isGreaterThan(maxQuestions);
+        return questions;
     }
 
     private static Set<String> ruleIds(List<Finding> findings, boolean withFix) {
@@ -41,23 +76,28 @@ class FixCoverageTest {
 
     @Test
     void etsyRulesOutsideTheTableNeverCarryAFix() {
-        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/etsy-2026-12.yaml");
         int titleMax = config.rule("title_length").intParam("max_length");
         int tagMax = config.rule("tag_length").intParam("max_length");
         int tagCount = config.rule("tag_count").intParam("max_count");
+        int maxWords = config.rule("title_word_count").intParam("max_words");
         List<String> tags = new java.util.ArrayList<>(List.of("dup", "DUP", "mug " + "x".repeat(tagMax), "bad!tag", "replica"));
         for (int i = 0; tags.size() <= tagCount; i++) {
             tags.add("filler" + i);
         }
-        Listing listing = new Listing("replica a & b & c \u0007 " + words(titleMax), null, tags,
-                new Money(BigDecimal.ZERO, "USD"), null, List.of(), List.of(), 0, null, null);
+        List<PersonalizationQuestion> questions = brokenQuestions(config);
+        String title = "replica sale a & b & c mug mug \u0007 " + longWords(titleMax, titleMax, maxWords) + " "
+                + words(maxWords * 8);
+        Listing listing = new Listing(title, null, tags, new Money(BigDecimal.ZERO, "USD"), null, List.of(), List.of(), 0,
+                null, null, null, List.of(), null, null, null, questions);
 
         List<Finding> findings = ENGINE.runDetailed(listing, config).findings();
 
-        Set<String> allRules = RuleRegistry.withDefaults().rulesFor("ETSY").stream().map(Rule::id)
-                .collect(Collectors.toCollection(TreeSet::new));
+        Set<String> enabledRules = RuleRegistry.withDefaults().rulesFor("ETSY").stream().map(Rule::id)
+                .filter(id -> config.rule(id).enabled()).collect(Collectors.toCollection(TreeSet::new));
+        assertThat(enabledRules).as("banned_words is switched off in this ruleset").doesNotContain("banned_words");
         assertThat(findings.stream().map(Finding::ruleId).collect(Collectors.toSet()))
-                .as("the listing breaks every Etsy rule").containsExactlyInAnyOrderElementsOf(allRules);
+                .as("the listing breaks every enabled Etsy rule").containsExactlyInAnyOrderElementsOf(enabledRules);
         assertThat(ruleIds(findings, true)).as("rules that carry a fix").isEqualTo(new TreeSet<>(ETSY_FIXABLE));
     }
 

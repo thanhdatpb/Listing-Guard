@@ -35,7 +35,7 @@ listing-guard:
     enabled: ${LISTING_GUARD_FIXES_ENABLED:false}
   rulesets:
     locations:
-      - classpath:rulesets/etsy-2026-11.yaml
+      - classpath:rulesets/etsy-2026-12.yaml
       - classpath:rulesets/amazon-2026-12.yaml
   trademark:
     # The trademark ruleset (ADR-009), registered for each marketplace below as pack `trademark-risk` (ADR-010).

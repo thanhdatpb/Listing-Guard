@@ -19,7 +19,7 @@ public record Limit(String field, Kind kind, Unit unit, int value) {
     public enum Kind {
         /** The length of a text, or of each item of a list, in {@link Unit#CODE_POINTS}. */
         MAX_LENGTH,
-        /** The number of items in a list. */
+        /** The number of items in a list, of words in a text, or of files an upload question accepts. */
         MAX_COUNT,
         /** The size of a text, or of each item of a list, in {@link Unit#UTF8_BYTES}. */
         MAX_BYTES,
@@ -31,8 +31,10 @@ public record Limit(String field, Kind kind, Unit unit, int value) {
     public enum Unit {
         /** Unicode code points: an emoji counts once. */
         CODE_POINTS,
-        /** Items of a list. */
+        /** Items of a list, or files of an upload question. */
         ITEMS,
+        /** Words of a text, split as {@link TitleWords} splits a title. */
+        WORDS,
         /** Bytes of the UTF-8 encoding. */
         UTF8_BYTES,
         /** Occurrences of a word or a character. */
@@ -53,6 +55,11 @@ public record Limit(String field, Kind kind, Unit unit, int value) {
     /** A number of items in a list. */
     public static Limit maxCount(String field, int value) {
         return new Limit(field, Kind.MAX_COUNT, Unit.ITEMS, value);
+    }
+
+    /** A number of words in a text. */
+    public static Limit maxWords(String field, int value) {
+        return new Limit(field, Kind.MAX_COUNT, Unit.WORDS, value);
     }
 
     /** A size counted in UTF-8 bytes. */

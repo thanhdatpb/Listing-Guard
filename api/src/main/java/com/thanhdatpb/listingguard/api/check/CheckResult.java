@@ -26,13 +26,13 @@ public record CheckResult(
         String marketplace,
         @JsonView(LegacyView.class)
         @Schema(description = "Version of the ruleset that produced the findings. Null for checks stored before versions were recorded.",
-                example = "etsy-2026-11", nullable = true)
+                example = "etsy-2026-12", nullable = true)
         String rulesetVersion,
         @JsonView(LegacyView.class)
         @Schema(description = "Version of the whole analysis that produced the result. Currently equal to rulesetVersion; it will "
                 + "also change when other analyzers (for example an LLM step) are added. Two checks with the same "
                 + "marketplace, contentHash and analysisVersion have the same result.",
-                example = "etsy-2026-11", nullable = true)
+                example = "etsy-2026-12", nullable = true)
         String analysisVersion,
         @JsonView(LegacyView.class)
         @Schema(description = "SHA-256 of the normalized listing content.")

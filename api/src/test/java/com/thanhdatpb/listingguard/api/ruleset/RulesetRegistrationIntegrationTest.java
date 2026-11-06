@@ -19,7 +19,7 @@ import org.springframework.core.io.ClassPathResource;
 @Import(TestcontainersConfig.class)
 class RulesetRegistrationIntegrationTest {
 
-    private static final String LOCATION = "rulesets/etsy-2026-11.yaml";
+    private static final String LOCATION = "rulesets/etsy-2026-12.yaml";
 
     @Autowired
     ActiveRulesets rulesets;
@@ -35,13 +35,13 @@ class RulesetRegistrationIntegrationTest {
     void startupRegistersTheEtsyRulesetWithItsMetadata() {
         RulesetConfig config = rulesets.get("ETSY").config();
 
-        RulesetVersion row = versions.findByPackIdAndMarketplaceCodeAndVersion("listing-rules", "ETSY", "etsy-2026-11").orElseThrow();
+        RulesetVersion row = versions.findByPackIdAndMarketplaceCodeAndVersion("listing-rules", "ETSY", "etsy-2026-12").orElseThrow();
 
         assertThat(row.getPackId()).isEqualTo("listing-rules");
         assertThat(rulesets.get("listing-rules", "ETSY")).isEqualTo(rulesets.get("ETSY"));
         assertThat(rulesets.get("ETSY").rulesetVersionId()).isEqualTo(row.getId());
         assertThat(row.getContentHash()).isEqualTo(config.contentHash()).matches("[0-9a-f]{64}");
-        assertThat(row.getCheckedAt()).isEqualTo(LocalDate.of(2026, 10, 27));
+        assertThat(row.getCheckedAt()).isEqualTo(LocalDate.of(2026, 11, 6));
         assertThat(row.getSource()).contains("https://www.etsy.com/openapi/generated/oas/3.0.0.json");
     }
 
@@ -65,13 +65,13 @@ class RulesetRegistrationIntegrationTest {
 
         assertThatThrownBy(() -> rulesets.register(edited))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("etsy-2026-11")
+                .hasMessageContaining("etsy-2026-12")
                 .hasMessageContaining("bump its version");
     }
 
     @Test
     void aNewVersionIsRegisteredAsANewRow() throws IOException {
-        RulesetConfig next = RulesetLoader.parse(yaml().replace("version: etsy-2026-11", "version: etsy-2099-01"));
+        RulesetConfig next = RulesetLoader.parse(yaml().replace("version: etsy-2026-12", "version: etsy-2099-01"));
 
         ActiveRulesets.Active active = rulesets.register(next);
 

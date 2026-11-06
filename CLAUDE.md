@@ -7,7 +7,9 @@ It never edits a listing, never publishes, and does no SEO.
 
 - **Rule Engine** (`rule-engine/`): deterministic rules (title length/characters/repeated special
   characters, tag count/length/characters/duplicates, required fields, positive price and quantity,
-  banned words), configured per marketplace in versioned YAML. Current ruleset: `etsy-2026-11`. **Fix suggestions and
+  title word count, repeated words and promotional terms, the structured personalization questions; `banned_words` is
+  switched off since `etsy-2026-12`), configured per marketplace in versioned YAML. Current ruleset: `etsy-2026-12`
+  (`etsy-2026-10` and `etsy-2026-11` are kept unchanged as history). **Fix suggestions and
   readiness (ADR-014, part A, done)**: `RuleEngine.runDetailed` returns the findings with a verified `FixSuggestion` (cut a
   long title or tag at a word boundary, remove a repeated tag; `Fixes`, `FixApplier`) and the ids of the rules that
   failed (`RuleRun`), and `ReadinessScorer` (`readiness/readiness-2026-11.yaml`, `listing-rules` pack only) scores a run.
@@ -160,7 +162,8 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
 7. Listing Workspace (ADR-014, Accepted). Part A, the optional API/batch integration and part B authentication/dashboard
    the Check listing editor (B3) and the API keys page with the shared layout and the DEMO banner (B4a) are implemented;
    fixes and console default off, V20/V21 store their respective data (B3 and B4a add no migration). Next: saved
-   listings/history (not designed) and `tag_count_underused` in the next Etsy ruleset update. Plan-based gating of keys, a
+   listings/history (not designed) and `tag_count_underused` (deferred: it needs `FixAction.ADD`, and `etsy-2026-12` shipped without
+   it, so it comes with a later Etsy ruleset version). Plan-based gating of keys, a
    Plan & usage page and billing are deferred, not planned.
 
 8. Variation checks (ADR-015, Proposed): done as one PR (`feat/variation-checks-pack`: module, ruleset, V22, V23, endpoint,
@@ -224,7 +227,7 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   never guess a limit: say it is unverified. Amazon rules are ERROR only when `verified`, else WARNING
   (ADR-006); a category override needs its own `source`; raising a status or severity is a new ruleset version.
   `ContentHasher` leaves the Amazon-only `Listing` components out while empty so Etsy hashes never change (a
-  test pins one): keep it that way when adding components.
+  test pins one): keep it that way when adding components (the Etsy `personalizationQuestions` are left out while empty too).
 - Rule messages and suggestions are Vietnamese and cite the actual numbers.
 - Normalizers map and clean data only (trim, drop blanks); they never dedupe, truncate or correct, because
   rules must see what the user wrote.

@@ -252,7 +252,7 @@ class AmazonCheckIntegrationTest {
 
         JsonNode etsyResult = mapper.readTree(etsy);
         assertThat(etsyResult.get("checkId").asText()).isNotEqualTo(amazon.get("checkId").asText());
-        assertThat(etsyResult.get("rulesetVersion").asText()).isEqualTo("etsy-2026-11");
+        assertThat(etsyResult.get("rulesetVersion").asText()).isEqualTo("etsy-2026-12");
         assertThat(etsyResult.get("cached").asBoolean()).isFalse();
     }
 

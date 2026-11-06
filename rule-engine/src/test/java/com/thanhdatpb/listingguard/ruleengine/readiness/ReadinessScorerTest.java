@@ -160,7 +160,7 @@ class ReadinessScorerTest {
 
     // ---- with the real engine and the real Etsy ruleset ---------------------------------------------------------------
 
-    private static final RulesetConfig ETSY = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
+    private static final RulesetConfig ETSY = RulesetLoader.loadClasspath("rulesets/etsy-2026-12.yaml");
     private static final RuleEngine ENGINE = new RuleEngine(RuleRegistry.withDefaults());
 
     private static Listing etsy(String title) {

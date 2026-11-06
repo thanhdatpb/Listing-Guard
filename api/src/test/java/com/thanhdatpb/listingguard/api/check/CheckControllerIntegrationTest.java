@@ -67,7 +67,10 @@ class CheckControllerIntegrationTest {
     @SpyBean
     RuleEngine ruleEngine;
 
-    /** A listing that satisfies every Etsy rule; the title makes it unique so tests never share a cached result. */
+    /**
+     * A listing that satisfies every Etsy rule; the title makes it unique so tests never share a cached result. The id is one
+     * word (no hyphens): the title rules split a title into words, and two equal groups of a hyphenated UUID would be a repeated word.
+     */
     private String validBody() {
         return """
                 {
@@ -85,7 +88,7 @@ class CheckControllerIntegrationTest {
                     "when_made": "made_to_order"
                   }
                 }
-                """.formatted(UUID.randomUUID());
+                """.formatted(UUID.randomUUID().toString().replace("-", ""));
     }
 
     private JsonNode postOk(String body) throws Exception {
@@ -101,8 +104,8 @@ class CheckControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.marketplace").value("ETSY"))
-                .andExpect(jsonPath("$.rulesetVersion").value("etsy-2026-11"))
-                .andExpect(jsonPath("$.analysisVersion").value("etsy-2026-11"))
+                .andExpect(jsonPath("$.rulesetVersion").value("etsy-2026-12"))
+                .andExpect(jsonPath("$.analysisVersion").value("etsy-2026-12"))
                 .andExpect(jsonPath("$.cached").value(false))
                 .andExpect(jsonPath("$.createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.summary.errors").value(0))
@@ -121,7 +124,7 @@ class CheckControllerIntegrationTest {
         assertThat(saved.getStatus()).isEqualTo(CheckStatus.COMPLETED);
         assertThat(saved.getPackId()).isEqualTo("listing-rules");
         assertThat(saved.getRulesetVersionId()).isEqualTo(rulesets.get("ETSY").rulesetVersionId());
-        assertThat(saved.getAnalysisVersion()).isEqualTo("etsy-2026-11");
+        assertThat(saved.getAnalysisVersion()).isEqualTo("etsy-2026-12");
         assertThat(findings.findByCheckId(checkId)).isEmpty();
     }
 
@@ -149,8 +152,9 @@ class CheckControllerIntegrationTest {
             assertThat(finding.get("suggestion").asText()).isNotBlank();
             assertThat(finding.has("value")).isTrue();
         });
-        assertThat(ruleIds).containsExactlyInAnyOrder("required_fields", "title_length", "tag_count", "tag_length",
-                "tag_characters", "duplicate_tags", "banned_words");
+        assertThat(ruleIds).as("banned_words is switched off in etsy-2026-12, so the banned word reports nothing")
+                .containsExactlyInAnyOrder("required_fields", "title_length", "tag_count", "tag_length", "tag_characters",
+                        "duplicate_tags");
 
         JsonNode badTag = findingOf(json, "tag_characters");
         assertThat(badTag.get("value").asText()).isEqualTo("bad_tag");
@@ -253,7 +257,7 @@ class CheckControllerIntegrationTest {
 
         JsonNode fetched = mapper.readTree(response);
         assertThat(fetched.get("cached").asBoolean()).isFalse();
-        assertThat(fetched.get("analysisVersion").asText()).isEqualTo("etsy-2026-11");
+        assertThat(fetched.get("analysisVersion").asText()).isEqualTo("etsy-2026-12");
         ObjectNode expected = created.deepCopy();
         expected.put("cached", false);
         assertThat(fetched).isEqualTo(expected);

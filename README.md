@@ -391,7 +391,7 @@ results. Without a catalog the endpoint answers `503` (`trademark-not-configured
 
 ## Rulesets
 
-`rule-engine/src/main/resources/rulesets/etsy-2026-11.yaml` holds every threshold, word list and
+`rule-engine/src/main/resources/rulesets/etsy-2026-12.yaml` holds every threshold, word list and
 severity. Each rule records where its values come from:
 
 | Rule | Severity | Source status |
@@ -404,7 +404,19 @@ severity. Each rule records where its values come from:
 | `required_fields` | ERROR | verified: Etsy Open API `createDraftListing` |
 | `price_quantity_positive` | ERROR | verified: Etsy Open API `createDraftListing` |
 | `duplicate_tags` | WARNING | unverified |
-| `banned_words` | WARNING | unverified: sample list only |
+| `title_word_count` (over 15 words) | INFO | secondary: Etsy Seller Handbook of August 2025, read in an article; advice, not an Etsy limit |
+| `title_repeated_words` (a word more than once, articles, prepositions, conjunctions exempt) | WARNING | secondary: same article ("Try not to repeat words", no number: once is our reading); the exempt list is ours |
+| `title_promotional_terms` (`free shipping`, `sale`, `% off`, `discount`, ...) | WARNING | secondary: same article (price, shipping and sales are badged by Etsy); the term list is ours |
+| `personalization_question_count` (max 5 questions, max 1 upload) | ERROR | verified: Etsy developer guide "Personalization migration" |
+| `personalization_question_text` (1 to 45 characters) | ERROR | verified: same guide |
+| `personalization_dropdown_options` (1 to 30 options, each 1 to 20 characters, no label twice) | ERROR | verified: same guide; whether "Red" and "red" are the same label is not stated, so only exact repeats are reported |
+| `personalization_upload_files` (max 10 files, a labeled upload at least 2) | ERROR | verified: same guide |
+| `personalization_instructions_length` (max 120 characters) | WARNING | secondary: the guide says 120, an Etsy account in discussion 1551 of the open-api repository says 256 still applies until the general launch |
+| `personalization_free_text_sensitive` (a free text question with `name`, `number`, `team` or `player`) | INFO, never higher | unverified: our own reminder that a dropdown keeps buyers from typing a team or player that is a trademark; no trademark verdict |
+| `banned_words` | WARNING, **switched off** | unverified: sample list only, never backed by an Etsy policy |
+
+`etsy-2026-12` adds the optional `personalization` input block (see [input schema](docs/input-schema.md)): a listing that does not send it is
+hashed exactly as before. `tag_count_underused` is not in it (it needs a fix action that adds a value, ADR-014).
 
 `amazon-2026-12.yaml` is the Amazon ruleset (`amazon-2026-11.yaml` is kept unchanged as history, like
 `etsy-2026-10.yaml`; a test pins its hash). It follows the Amazon announcement in the Seller Forums of June 10, 2026
@@ -443,7 +455,7 @@ brief. The product types and themes it knows are few on purpose (one apparel pro
 
 To change a threshold or a severity, create a new ruleset file with a new `version`: the API refuses to
 start if a registered version has different content (see [ADR-002](docs/adr/ADR-002-ruleset-versioning.md)).
-`etsy-2026-10.yaml` and `amazon-2026-11.yaml` are kept unchanged as history (a test pins their hashes) and are no longer loaded.
+`etsy-2026-10.yaml`, `etsy-2026-11.yaml` and `amazon-2026-11.yaml` are kept unchanged as history (a test pins their hashes) and are no longer loaded.
 Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `application.yml`.
 
 The numeric limits of the loaded rulesets are served, read only, by `GET /api/v1/rulesets/{marketplace}/limits` (and
@@ -484,8 +496,8 @@ What follows, in this order, is **not built yet**:
 6. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)): the console, its dashboard, the Check listing
    editor and the API keys page are implemented (part B, V21; off by default). What remains is saved listings and history;
    any page that shows readiness must always show the trademark result alongside it. Plan-based gating of API keys, a plan
-   comparison page and billing are deferred. The Etsy rule `tag_count_underused` remains planned for the
-   next Etsy ruleset update so that `analysisVersion` changes once.
+   comparison page and billing are deferred. The Etsy rule `tag_count_underused` is still planned: it needs a fix
+   action that adds a value, so `etsy-2026-12` shipped without it and it will come with a later Etsy ruleset version.
 
 ## Documentation
 

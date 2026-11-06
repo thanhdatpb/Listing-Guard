@@ -363,7 +363,11 @@ class BatchMappingTest {
 
     @Test
     void theFieldsOfEachMarketplaceAreTheOnesDocumentedInTheInputSchema() throws IOException {
-        assertThat(BatchMapping.schema("ETSY").keySet()).containsExactlyInAnyOrderElementsOf(documentedFields("Etsy"));
+        // The personalization questions are a nested object; a CSV cell cannot hold them, so the batch job does not read them
+        // (the input schema says so). Every other documented Etsy field is mappable.
+        Set<String> etsy = new TreeSet<>(documentedFields("Etsy"));
+        assertThat(etsy.remove("personalization")).as("personalization is documented for Etsy").isTrue();
+        assertThat(BatchMapping.schema("ETSY").keySet()).containsExactlyInAnyOrderElementsOf(etsy);
         assertThat(BatchMapping.schema("AMAZON").keySet()).containsExactlyInAnyOrderElementsOf(documentedFields("Amazon"));
     }
 

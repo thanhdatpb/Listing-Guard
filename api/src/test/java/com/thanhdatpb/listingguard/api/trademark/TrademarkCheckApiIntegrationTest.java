@@ -464,8 +464,8 @@ class TrademarkCheckApiIntegrationTest {
         assertThat(checks1.get("cached").asBoolean()).isFalse();
         assertThat(checks2.get("cached").asBoolean()).isTrue();
         assertThat(checks2.get("checkId")).isEqualTo(checks1.get("checkId"));
-        assertThat(checks2.get("analysisVersion").asText()).isEqualTo("etsy-2026-11");
-        assertThat(checks2.get("rulesetVersion").asText()).isEqualTo("etsy-2026-11");
+        assertThat(checks2.get("analysisVersion").asText()).isEqualTo("etsy-2026-12");
+        assertThat(checks2.get("rulesetVersion").asText()).isEqualTo("etsy-2026-12");
         assertThat(fieldNames(checks2)).containsExactly("checkId", "status", "marketplace", "rulesetVersion", "analysisVersion",
                 "contentHash", "cached", "createdAt", "summary", "findings");
         assertThat(trademark.get("checkId")).isNotEqualTo(checks1.get("checkId"));

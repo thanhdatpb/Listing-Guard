@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.core.listing.Money;
+import com.thanhdatpb.listingguard.core.listing.PersonalizationQuestion;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -82,6 +83,10 @@ class InputSchemaDocTest {
         assertThat(listing.quantity()).isEqualTo(5);
         assertThat(listing.whoMade()).isEqualTo("i_did");
         assertThat(listing.whenMade()).isEqualTo("made_to_order");
+        assertThat(listing.personalizationQuestions()).containsExactly(
+                new PersonalizationQuestion("TEXT", "Name to engrave", "Letters only", true, 20, List.of(), null),
+                new PersonalizationQuestion("DROPDOWN", "Font", null, false, null, List.of("Serif", "Script"), null),
+                new PersonalizationQuestion("UPLOAD", "Photo", null, null, null, List.of("Front", "Back"), 2));
     }
 
     @Test
@@ -110,6 +115,30 @@ class InputSchemaDocTest {
         List<String> documented = new ArrayList<>(documentedFields("Etsy"));
         documented.remove("category");
         assertThat(documented).containsExactlyInAnyOrderElementsOf(fieldNames(example));
+    }
+
+    @Test
+    void everyFieldOfAPersonalizationQuestionIsReadAndEveryDocumentedFieldIsInTheExample() throws IOException {
+        ObjectNode example = example("etsy-listing");
+        List<ObjectNode> questions = new ArrayList<>();
+        example.get("personalization").get("questions").forEach(question -> questions.add((ObjectNode) question));
+        List<String> inExample = new ArrayList<>();
+        for (ObjectNode question : questions) {
+            for (String field : fieldNames(question)) {
+                if (!inExample.contains(field)) {
+                    inExample.add(field);
+                }
+                ObjectNode withoutField = example.deepCopy();
+                ObjectNode copy = (ObjectNode) withoutField.get("personalization").get("questions")
+                        .get(questions.indexOf(question));
+                copy.remove(field);
+                assertThat(etsy.normalize(withoutField).personalizationQuestions())
+                        .as("question field '%s' is read", field)
+                        .isNotEqualTo(etsy.normalize(example).personalizationQuestions());
+            }
+        }
+
+        assertThat(documentedFields("Etsy personalization questions")).containsExactlyInAnyOrderElementsOf(inExample);
     }
 
     @Test

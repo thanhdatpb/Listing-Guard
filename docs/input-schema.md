@@ -59,6 +59,7 @@ Etsy Open API v3 style, snake_case.
 | `quantity` | number | A JSON number; a string is not accepted. A fractional part is dropped. |
 | `who_made` | string | Etsy's code, for example `i_did`. |
 | `when_made` | string | Etsy's code, for example `made_to_order`. |
+| `personalization` | object | Optional: `{"questions": [...]}`, the structured personalization questions of the listing (see [Etsy personalization questions](#etsy-personalization-questions)). A listing without it is checked, and hashed, exactly as before the field existed. Not available in the batch job: a CSV cell cannot hold it. |
 
 ```json etsy-listing
 {
@@ -71,9 +72,35 @@ Etsy Open API v3 style, snake_case.
   "images": ["https://example.com/mug-1.jpg", {"url_fullxfull": "https://example.com/mug-2.jpg"}],
   "quantity": 5,
   "who_made": "i_did",
-  "when_made": "made_to_order"
+  "when_made": "made_to_order",
+  "personalization": {
+    "questions": [
+      {"type": "TEXT", "question_text": "Name to engrave", "instructions": "Letters only", "required": true, "max_chars": 20},
+      {"type": "DROPDOWN", "question_text": "Font", "required": false, "options": ["Serif", "Script"]},
+      {"type": "UPLOAD", "question_text": "Photo", "options": ["Front", "Back"], "max_files": 2}
+    ]
+  }
 }
 ```
+
+## Etsy personalization questions
+
+Each entry of `personalization.questions` is an object; anything else in the array is dropped. Etsy calls these
+structured personalization questions (a listing may have several, of different types). Like every list, the array keeps what was
+written: a question is never merged, reordered or corrected, and an empty `questions` array is the same as no `personalization`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `type` | string | `TEXT`, `DROPDOWN` or `UPLOAD`, in any case (it is read as upper case). Any other value is kept as written; that question is then only checked by the rules that do not depend on its type. |
+| `question_text` | string | The question the buyer sees. A question without it is kept, so that a rule can report it. |
+| `instructions` | string | Help text for the buyer. |
+| `required` | boolean | A JSON `true` or `false`; anything else counts as absent. |
+| `max_chars` | number | The longest answer of a `TEXT` question. A JSON number; a string is not accepted. |
+| `options` | array of strings | The choices of a `DROPDOWN`, or the labels of the files of an `UPLOAD`: an upload with `options` is a *labeled* upload, one without is an unlabeled upload. Duplicates are kept. |
+| `max_files` | number | The number of files an `UPLOAD` accepts. A JSON number; a string is not accepted. |
+
+Fields of the Etsy API that are not listed here, such as `question_id` or `option_id`, are ignored. An option given as an object
+(`{"label": "Serif"}`) is not read: send the label as a string.
 
 ## Amazon (`AMAZON`)
 

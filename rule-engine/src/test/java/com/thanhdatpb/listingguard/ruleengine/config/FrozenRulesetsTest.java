@@ -21,6 +21,15 @@ class FrozenRulesetsTest {
     }
 
     @Test
+    void etsy202611IsUnchanged() {
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
+
+        assertThat(config.version()).isEqualTo("etsy-2026-11");
+        assertThat(config.contentHash())
+                .isEqualTo("97913da09c1eb2b79d419a60a89ff7ca8e1beafa2b5abb246dbc16995c163da8");
+    }
+
+    @Test
     void amazon202611IsUnchanged() {
         RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-11.yaml");
 
@@ -47,5 +56,32 @@ class FrozenRulesetsTest {
         assertThat(current.version()).isEqualTo("etsy-2026-11");
         assertThat(current.contentHash()).isNotEqualTo(old.contentHash());
         assertThat(current.rules().keySet()).containsAll(old.rules().keySet());
+    }
+
+    @Test
+    void etsy202612IsADifferentVersionThatKeepsEveryRuleOfTheOldOneAndAddsTheTitleGuidance() {
+        RulesetConfig old = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
+        RulesetConfig current = RulesetLoader.loadClasspath("rulesets/etsy-2026-12.yaml");
+
+        assertThat(current.version()).isEqualTo("etsy-2026-12");
+        assertThat(current.contentHash()).isNotEqualTo(old.contentHash());
+        assertThat(current.rules().keySet()).containsAll(old.rules().keySet())
+                .contains("title_word_count", "title_repeated_words", "title_promotional_terms");
+    }
+
+    @Test
+    void etsy202612SwitchesBannedWordsOffAndChangesNothingElseOfTheRulesItKeeps() {
+        RulesetConfig old = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
+        RulesetConfig current = RulesetLoader.loadClasspath("rulesets/etsy-2026-12.yaml");
+
+        assertThat(old.rule("banned_words").enabled()).isTrue();
+        assertThat(current.rule("banned_words").enabled()).isFalse();
+        assertThat(current.rule("banned_words").stringListParam("words")).isEqualTo(old.rule("banned_words").stringListParam("words"));
+        for (String id : old.rules().keySet()) {
+            if (id.equals("banned_words")) {
+                continue;
+            }
+            assertThat(current.rule(id)).as("rule %s is unchanged", id).isEqualTo(old.rule(id));
+        }
     }
 }

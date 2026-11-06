@@ -12,6 +12,9 @@ import java.util.List;
  * example {@code LUGGAGE}) is what selects category overrides in an Amazon ruleset. {@code searchTerms} is one string;
  * a source that sends several terms has them joined by a single space. {@code itemHighlights} is one string, the
  * Amazon "Item Highlights" field.
+ *
+ * <p>{@code personalizationQuestions} are the structured personalization questions of an Etsy listing (empty when the seller
+ * sent none). It is never null.
  */
 public record Listing(
         String title,
@@ -28,13 +31,24 @@ public record Listing(
         List<String> bulletPoints,
         String searchTerms,
         String productType,
-        String itemHighlights) {
+        String itemHighlights,
+        List<PersonalizationQuestion> personalizationQuestions) {
 
     public Listing {
         tags = tags == null ? List.of() : List.copyOf(tags);
         materials = materials == null ? List.of() : List.copyOf(materials);
         images = images == null ? List.of() : List.copyOf(images);
         bulletPoints = bulletPoints == null ? List.of() : List.copyOf(bulletPoints);
+        personalizationQuestions = personalizationQuestions == null ? List.of() : List.copyOf(personalizationQuestions);
+    }
+
+    /** A listing without personalization questions; every component but {@code personalizationQuestions}. */
+    public Listing(String title, String description, List<String> tags, Money price, String category,
+                   List<String> materials, List<String> images, Integer quantity, String whoMade, String whenMade,
+                   String brand, List<String> bulletPoints, String searchTerms, String productType,
+                   String itemHighlights) {
+        this(title, description, tags, price, category, materials, images, quantity, whoMade, whenMade,
+                brand, bulletPoints, searchTerms, productType, itemHighlights, List.of());
     }
 
     /** An Etsy-style listing: the Amazon-only components are absent. */
@@ -55,12 +69,12 @@ public record Listing(
     /** A copy with another title; every other component is kept (used to check a proposed fix, ADR-014). */
     public Listing withTitle(String newTitle) {
         return new Listing(newTitle, description, tags, price, category, materials, images, quantity, whoMade, whenMade,
-                brand, bulletPoints, searchTerms, productType, itemHighlights);
+                brand, bulletPoints, searchTerms, productType, itemHighlights, personalizationQuestions);
     }
 
     /** A copy with other tags; every other component is kept (used to check a proposed fix, ADR-014). */
     public Listing withTags(List<String> newTags) {
         return new Listing(title, description, newTags, price, category, materials, images, quantity, whoMade, whenMade,
-                brand, bulletPoints, searchTerms, productType, itemHighlights);
+                brand, bulletPoints, searchTerms, productType, itemHighlights, personalizationQuestions);
     }
 }

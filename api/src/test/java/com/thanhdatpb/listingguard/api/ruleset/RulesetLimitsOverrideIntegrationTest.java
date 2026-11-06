@@ -32,7 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * check: a title one over the declared limit is a finding, one at the limit is not.
  */
 @SpringBootTest(properties = {
-        "listing-guard.rulesets.locations[0]=classpath:rulesets/etsy-2026-11.yaml",
+        "listing-guard.rulesets.locations[0]=classpath:rulesets/etsy-2026-12.yaml",
         "listing-guard.rulesets.locations[1]=file:../rule-engine/src/test/resources/rulesets/amazon-test-categories.yaml"
 })
 @AutoConfigureMockMvc

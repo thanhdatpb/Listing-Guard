@@ -12,7 +12,7 @@ public record RulesetLimitsResult(
         @Schema(description = "The marketplace code, in upper case.", example = "ETSY")
         String marketplace,
         @Schema(description = "The version of the ruleset the limits come from; the same value as `rulesetVersion` of a check. "
-                + "Opaque: compare for equality, do not parse.", example = "etsy-2026-11")
+                + "Opaque: compare for equality, do not parse.", example = "etsy-2026-12")
         String rulesetVersion,
         @Schema(description = "The product type asked for, trimmed and as sent; null when none was asked for.", nullable = true,
                 example = "LUGGAGE")
@@ -30,18 +30,20 @@ public record RulesetLimitsResult(
     public record LimitView(
             @Schema(description = "The field of the standard input (`docs/input-schema.md`) the limit applies to, such as `title`, "
                     + "`tags`, `bullet_points` or `search_terms`. For a list field, `MAX_COUNT` limits the list and "
-                    + "`MAX_LENGTH` or `MAX_BYTES` limit each item.", example = "title")
+                    + "`MAX_LENGTH` or `MAX_BYTES` limit each item. A field inside the Etsy `personalization` block is a path: "
+                    + "`[]` stands for every question, and `[type=DROPDOWN]` or `[type=UPLOAD]` for the questions of that type, "
+                    + "for example `personalization.questions[].question_text`.", example = "title")
             String field,
             @Schema(description = "The rule that enforces the limit; the `ruleId` of its findings.", example = "title_length")
             String ruleId,
             @Schema(description = "What is limited: `MAX_LENGTH` (length of a text, or of each item of a list), `MAX_COUNT` "
-                    + "(number of items of a list), `MAX_BYTES` (size in UTF-8 bytes) or `MAX_OCCURRENCES` (how often the same "
+                    + "(number of items of a list, or of words of a text), `MAX_BYTES` (size in UTF-8 bytes) or `MAX_OCCURRENCES` (how often the same "
                     + "word or character may appear).", example = "MAX_LENGTH")
             Limit.Kind kind,
             @Schema(description = "The limit.", example = "140")
             int value,
             @Schema(description = "What is counted, as the rule counts it: `CODE_POINTS` (an emoji counts once, not the UTF-16 "
-                    + "length of a JavaScript string), `ITEMS`, `UTF8_BYTES` or `OCCURRENCES`.", example = "CODE_POINTS")
+                    + "length of a JavaScript string), `ITEMS`, `WORDS`, `UTF8_BYTES` or `OCCURRENCES`.", example = "CODE_POINTS")
             Limit.Unit unit,
             @Schema(description = "How a finding that breaks the limit is rated.", example = "ERROR")
             Severity severity,

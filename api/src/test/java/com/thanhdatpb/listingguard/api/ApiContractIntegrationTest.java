@@ -147,6 +147,6 @@ class ApiContractIntegrationTest {
     }
 
     private static String body(String description) {
-        return "{\"marketplace\":\"ETSY\",\"listing\":{\"title\":\"Body size " + UUID.randomUUID() + "\",\"description\":\"" + description + "\"}}";
+        return "{\"marketplace\":\"ETSY\",\"listing\":{\"title\":\"Body size " + UUID.randomUUID().toString().replace("-", "") + "\",\"description\":\"" + description + "\"}}";
     }
 }

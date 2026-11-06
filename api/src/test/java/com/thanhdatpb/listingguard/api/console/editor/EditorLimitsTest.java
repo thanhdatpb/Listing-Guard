@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
  */
 class EditorLimitsTest {
 
-    private static final RulesetConfig ETSY = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
+    private static final RulesetConfig ETSY = RulesetLoader.loadClasspath("rulesets/etsy-2026-12.yaml");
     private static final RulesetConfig AMAZON = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
 
     private final RuleEngine engine = new RuleEngine(RuleRegistry.withDefaults());

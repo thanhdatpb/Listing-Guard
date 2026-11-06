@@ -86,6 +86,6 @@ class TrademarkNotConfiguredIntegrationTest {
     void checksKeepsWorking() throws Exception {
         mvc.perform(post("/api/v1/checks").header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"marketplace\":\"ETSY\",\"listing\":{\"title\":\"Plain mug " + UUID.randomUUID() + "\"}}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.analysisVersion").value("etsy-2026-11"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.analysisVersion").value("etsy-2026-12"));
     }
 }

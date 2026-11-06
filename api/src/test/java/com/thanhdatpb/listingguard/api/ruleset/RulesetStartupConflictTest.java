@@ -46,7 +46,7 @@ class RulesetStartupConflictTest {
     }
 
     private static String shippedRuleset() throws IOException {
-        return new ClassPathResource("rulesets/etsy-2026-11.yaml").getContentAsString(StandardCharsets.UTF_8);
+        return new ClassPathResource("rulesets/etsy-2026-12.yaml").getContentAsString(StandardCharsets.UTF_8);
     }
 
     @Test
@@ -68,12 +68,12 @@ class RulesetStartupConflictTest {
         String shipped = shippedRuleset();
         String edited = shipped.replace("max_length: 140", "max_length: 141");
         assertThat(edited).as("the edit must actually change the file").isNotEqualTo(shipped);
-        Path conflicting = tempDir.resolve("etsy-2026-11.yaml");
+        Path conflicting = tempDir.resolve("etsy-2026-12.yaml");
         Files.writeString(conflicting, edited, StandardCharsets.UTF_8);
 
         assertThatThrownBy(() -> start("--listing-guard.rulesets.locations[0]=" + conflicting.toUri()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("etsy-2026-11")
+                .hasMessageContaining("etsy-2026-12")
                 .hasMessageContaining("already registered")
                 .hasMessageContaining("bump its version");
     }

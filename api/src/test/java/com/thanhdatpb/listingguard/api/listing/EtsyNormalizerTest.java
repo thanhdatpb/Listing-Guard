@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.core.listing.PersonalizationQuestion;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
@@ -122,5 +123,89 @@ class EtsyNormalizerTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> normalizer.normalize(null))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aListingWithoutPersonalizationHasNoQuestions() throws Exception {
+        assertThat(normalizer.normalize(json("{}")).personalizationQuestions()).isEmpty();
+        assertThat(normalizer.normalize(json("{\"personalization\": {}}")).personalizationQuestions()).isEmpty();
+        assertThat(normalizer.normalize(json("{\"personalization\": {\"questions\": []}}")).personalizationQuestions()).isEmpty();
+        assertThat(normalizer.normalize(json("{\"personalization\": \"yes\"}")).personalizationQuestions()).isEmpty();
+        assertThat(normalizer.normalize(json("{\"personalization\": {\"questions\": \"Name\"}}")).personalizationQuestions())
+                .isEmpty();
+    }
+
+    @Test
+    void mapsEveryFieldOfEveryQuestion() throws Exception {
+        Listing listing = normalizer.normalize(json("""
+                {"personalization": {"questions": [
+                  {"type": "TEXT", "question_text": "Name", "instructions": "Letters only", "required": true, "max_chars": 20},
+                  {"type": "DROPDOWN", "question_text": "Font", "required": false, "options": ["Serif", "Script"]},
+                  {"type": "UPLOAD", "question_text": "Photo", "options": ["Front", "Back"], "max_files": 2}
+                ]}}
+                """));
+
+        assertThat(listing.personalizationQuestions()).containsExactly(
+                new PersonalizationQuestion("TEXT", "Name", "Letters only", true, 20, java.util.List.of(), null),
+                new PersonalizationQuestion("DROPDOWN", "Font", null, false, null, java.util.List.of("Serif", "Script"), null),
+                new PersonalizationQuestion("UPLOAD", "Photo", null, null, null, java.util.List.of("Front", "Back"), 2));
+    }
+
+    @Test
+    void trimsAndDropsBlanksButNeverCorrectsAQuestion() throws Exception {
+        String longText = "x".repeat(300);
+        Listing listing = normalizer.normalize(json("""
+                {"personalization": {"questions": [
+                  {"type": " dropdown ", "question_text": "  Colour  ", "instructions": "   ",
+                   "options": [" Red ", "", "  ", "Red", "RED"]},
+                  {"type": "text", "question_text": "%s"}
+                ]}}
+                """.formatted(longText)));
+
+        PersonalizationQuestion dropdown = listing.personalizationQuestions().get(0);
+        assertThat(dropdown.type()).isEqualTo("DROPDOWN");
+        assertThat(dropdown.questionText()).isEqualTo("Colour");
+        assertThat(dropdown.instructions()).isNull();
+        assertThat(dropdown.options()).containsExactly("Red", "Red", "RED");
+        assertThat(listing.personalizationQuestions().get(1).type()).isEqualTo("TEXT");
+        assertThat(listing.personalizationQuestions().get(1).questionText()).hasSize(300);
+    }
+
+    @Test
+    void aQuestionWithNoTextIsKeptSoARuleCanReportIt() throws Exception {
+        Listing listing = normalizer.normalize(json("""
+                {"personalization": {"questions": [{"type": "TEXT", "question_text": "  "}, {}, "Name", 3, null, []]}}
+                """));
+
+        assertThat(listing.personalizationQuestions()).hasSize(2);
+        assertThat(listing.personalizationQuestions().get(0).questionText()).isNull();
+        assertThat(listing.personalizationQuestions().get(1)).isEqualTo(
+                new PersonalizationQuestion(null, null, null, null, null, java.util.List.of(), null));
+    }
+
+    @Test
+    void anUnknownTypeIsKeptAsWritten() throws Exception {
+        Listing listing = normalizer.normalize(json("""
+                {"personalization": {"questions": [{"type": "radio", "question_text": "Size"}]}}
+                """));
+
+        assertThat(listing.personalizationQuestions().get(0).type()).isEqualTo("RADIO");
+    }
+
+    @Test
+    void numbersAndFlagsAreReadOnlyWhenTheyAreJsonNumbersAndBooleans() throws Exception {
+        Listing listing = normalizer.normalize(json("""
+                {"personalization": {"questions": [
+                  {"type": "TEXT", "question_text": "A", "required": "true", "max_chars": "20", "max_files": 2.9},
+                  {"type": "TEXT", "question_text": "B", "required": null, "max_chars": null}
+                ]}}
+                """));
+
+        PersonalizationQuestion first = listing.personalizationQuestions().get(0);
+        assertThat(first.required()).isNull();
+        assertThat(first.maxChars()).isNull();
+        assertThat(first.maxFiles()).isEqualTo(2);
+        assertThat(listing.personalizationQuestions().get(1).required()).isNull();
+        assertThat(listing.personalizationQuestions().get(1).maxChars()).isNull();
     }
 }

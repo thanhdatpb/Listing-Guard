@@ -18,10 +18,19 @@ public final class EtsyRules {
                 new TitleLengthRule(),
                 new TitleCharactersRule(),
                 new TitleRepeatedSpecialCharsRule(),
+                new TitleWordCountRule(),
+                new TitleRepeatedWordsRule(),
+                new TitlePromotionalTermsRule(),
                 new TagCountRule(),
                 new TagLengthRule(),
                 new TagCharactersRule(),
                 new DuplicateTagsRule(),
-                new BannedWordsRule());
+                new BannedWordsRule(),
+                new PersonalizationQuestionCountRule(),
+                new PersonalizationQuestionTextRule(),
+                new PersonalizationDropdownOptionsRule(),
+                new PersonalizationUploadFilesRule(),
+                new PersonalizationInstructionsLengthRule(),
+                new PersonalizationFreeTextSensitiveRule());
     }
 }

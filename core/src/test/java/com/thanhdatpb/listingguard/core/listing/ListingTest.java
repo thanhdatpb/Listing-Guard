@@ -29,4 +29,32 @@ class ListingTest {
         assertThat(copy.withTags(List.of("a", "b"))).isEqualTo(AMAZON_STYLE);
         assertThat(AMAZON_STYLE.tags()).containsExactly("a", "b");
     }
+
+    @Test
+    void personalizationQuestionsAreEmptyWhenNotGivenAndNeverNull() {
+        assertThat(AMAZON_STYLE.personalizationQuestions()).isEmpty();
+        assertThat(new Listing("t", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null)
+                .personalizationQuestions()).isEmpty();
+    }
+
+    @Test
+    void theCopiesKeepThePersonalizationQuestions() {
+        PersonalizationQuestion question = new PersonalizationQuestion(PersonalizationQuestion.DROPDOWN, "Colour", null, true,
+                null, List.of("Red", "Blue"), null);
+        Listing withQuestion = new Listing("Title", "Description", List.of("a"), null, null, List.of(), List.of(), 1, null,
+                null, null, List.of(), null, null, null, List.of(question));
+
+        assertThat(withQuestion.withTitle("Other").personalizationQuestions()).containsExactly(question);
+        assertThat(withQuestion.withTags(List.of("x")).personalizationQuestions()).containsExactly(question);
+    }
+
+    @Test
+    void aQuestionKeepsItsOptionsAndNeverHasNull() {
+        List<String> options = new java.util.ArrayList<>(List.of("Red"));
+        PersonalizationQuestion question = new PersonalizationQuestion("DROPDOWN", "Colour", null, null, null, options, null);
+        options.add("Blue");
+
+        assertThat(question.options()).containsExactly("Red");
+        assertThat(new PersonalizationQuestion("TEXT", "Name", null, null, 20, null, null).options()).isEmpty();
+    }
 }

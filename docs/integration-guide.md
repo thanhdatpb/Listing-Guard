@@ -228,8 +228,8 @@ Response `200`:
   "checkId": "5331208a-583a-4ff3-a990-99a7440ae59f",
   "status": "COMPLETED",
   "marketplace": "ETSY",
-  "rulesetVersion": "etsy-2026-11",
-  "analysisVersion": "etsy-2026-11",
+  "rulesetVersion": "etsy-2026-12",
+  "analysisVersion": "etsy-2026-12",
   "contentHash": "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
   "cached": false,
   "createdAt": "2026-10-28T09:15:30.123456Z",
@@ -248,7 +248,7 @@ Response `200`:
 |---|---|
 | `checkId` | Identifier of the stored check. Use it for `GET /api/v1/checks/{id}`. |
 | `status` | `COMPLETED`. Only completed checks are returned. |
-| `rulesetVersion` | Version of the rules that produced the findings (for example `etsy-2026-11`). |
+| `rulesetVersion` | Version of the rules that produced the findings (for example `etsy-2026-12`). |
 | `analysisVersion` | Version of the whole analysis. Today equal to `rulesetVersion`; see below. |
 | `contentHash` | SHA-256 of the normalized listing. Same content gives the same hash. |
 | `cached` | `true` when the stored result of an identical earlier check is returned. |
@@ -313,7 +313,35 @@ position in `message`.
 
 Etsy finding rules and what they report: `required_fields`, `title_length`, `title_characters`,
 `title_repeated_special_chars`, `tag_count`, `tag_length`, `tag_characters`, `duplicate_tags`,
-`price_quantity_positive`, `banned_words` (`title`, `description` or `tags[i]`).
+`price_quantity_positive`. `banned_words` is in the ruleset but switched off since `etsy-2026-12` (its word list was only a
+development sample, never backed by an Etsy policy), so it reports nothing. The rules `etsy-2026-12` adds:
+
+| `ruleId` | `field` | `value` | Severity | Source status |
+|---|---|---|---|---|
+| `title_word_count` | `title` | the title | INFO | secondary |
+| `title_repeated_words` | `title` | the word (one finding per word) | WARNING | secondary |
+| `title_promotional_terms` | `title` | the term found, as written in the title (one finding per term) | WARNING | secondary |
+| `personalization_question_count` | `personalization.questions` (too many questions); `personalization.questions[i]` (each upload question over the limit) | `null`; the question text | ERROR | verified |
+| `personalization_question_text` | `personalization.questions[i].question_text` | the text; `null` when the question has none | ERROR | verified |
+| `personalization_dropdown_options` | `personalization.questions[i].options` (too few or too many); `personalization.questions[i].options[j]` (a label too long, or one that repeats an earlier label) | `null`; the label | ERROR | verified |
+| `personalization_upload_files` | `personalization.questions[i].max_files` | the number, as text | ERROR | verified |
+| `personalization_instructions_length` | `personalization.questions[i].instructions` | the instructions | WARNING | secondary |
+| `personalization_free_text_sensitive` | `personalization.questions[i].question_text` | the question text | INFO (never higher) | unverified |
+
+None of them has a fix suggestion. `personalization.questions[i]` is the question at zero-based position `i` of the cleaned list
+(an entry of the array that is not an object is dropped), and `options[j]` the option at position `j` of the cleaned options. The
+input block is described in [`input-schema.md`](input-schema.md#etsy-personalization-questions).
+`personalization_instructions_length` is only a WARNING because Etsy describes its number two ways: the developer guide says 120
+characters, and an Etsy account in a public discussion says 256 still applies until the general launch.
+`personalization_free_text_sensitive` is a reminder, not a trademark verdict: a buyer who can type any text can type a team or a
+player that is a trademark, and a dropdown whose choices you set keeps that out. The trademark check does not read personalization
+questions.
+
+**What changed with `etsy-2026-12`.** The `analysisVersion` of Etsy checks is now `etsy-2026-12`, so an Etsy listing that was
+checked before is checked again. A listing that does not send `personalization` has the same content hash as before. A title that
+was clean can now get an INFO (`title_word_count`) or a WARNING (a repeated word, or a term about price, shipping or sales), a
+listing that had a `banned_words` WARNING no longer gets it, and the fields of `personalization` are checked. `tag_count_underused`
+is not part of this version.
 
 ### Amazon
 
@@ -387,22 +415,46 @@ curl -H 'X-API-Key: <key>' 'http://localhost:8080/api/v1/rulesets/ETSY/limits'
 ```json
 {
   "marketplace": "ETSY",
-  "rulesetVersion": "etsy-2026-11",
+  "rulesetVersion": "etsy-2026-12",
   "productType": null,
   "limits": [
     {"field": "title", "ruleId": "title_length", "kind": "MAX_LENGTH", "value": 140, "unit": "CODE_POINTS",
      "severity": "ERROR", "sourceStatus": "VERIFIED", "enabled": true},
     {"field": "title", "ruleId": "title_repeated_special_chars", "kind": "MAX_OCCURRENCES", "value": 1,
      "unit": "OCCURRENCES", "severity": "WARNING", "sourceStatus": "SECONDARY", "enabled": true},
+    {"field": "title", "ruleId": "title_word_count", "kind": "MAX_COUNT", "value": 15, "unit": "WORDS",
+     "severity": "INFO", "sourceStatus": "SECONDARY", "enabled": true},
+    {"field": "title", "ruleId": "title_repeated_words", "kind": "MAX_OCCURRENCES", "value": 1,
+     "unit": "OCCURRENCES", "severity": "WARNING", "sourceStatus": "SECONDARY", "enabled": true},
     {"field": "tags", "ruleId": "tag_count", "kind": "MAX_COUNT", "value": 13, "unit": "ITEMS",
      "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true},
     {"field": "tags", "ruleId": "tag_length", "kind": "MAX_LENGTH", "value": 20, "unit": "CODE_POINTS",
-     "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true}
+     "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true},
+    {"field": "personalization.questions", "ruleId": "personalization_question_count", "kind": "MAX_COUNT",
+     "value": 5, "unit": "ITEMS", "severity": "ERROR", "sourceStatus": "VERIFIED", "enabled": true},
+    {"field": "personalization.questions[type=UPLOAD]", "ruleId": "personalization_question_count",
+     "kind": "MAX_COUNT", "value": 1, "unit": "ITEMS", "severity": "ERROR", "sourceStatus": "VERIFIED",
+     "enabled": true},
+    {"field": "personalization.questions[].question_text", "ruleId": "personalization_question_text",
+     "kind": "MAX_LENGTH", "value": 45, "unit": "CODE_POINTS", "severity": "ERROR", "sourceStatus": "VERIFIED",
+     "enabled": true},
+    {"field": "personalization.questions[type=DROPDOWN].options", "ruleId": "personalization_dropdown_options",
+     "kind": "MAX_COUNT", "value": 30, "unit": "ITEMS", "severity": "ERROR", "sourceStatus": "VERIFIED",
+     "enabled": true},
+    {"field": "personalization.questions[type=DROPDOWN].options", "ruleId": "personalization_dropdown_options",
+     "kind": "MAX_LENGTH", "value": 20, "unit": "CODE_POINTS", "severity": "ERROR", "sourceStatus": "VERIFIED",
+     "enabled": true},
+    {"field": "personalization.questions[type=UPLOAD].max_files", "ruleId": "personalization_upload_files",
+     "kind": "MAX_COUNT", "value": 10, "unit": "ITEMS", "severity": "ERROR", "sourceStatus": "VERIFIED",
+     "enabled": true},
+    {"field": "personalization.questions[].instructions", "ruleId": "personalization_instructions_length",
+     "kind": "MAX_LENGTH", "value": 120, "unit": "CODE_POINTS", "severity": "WARNING", "sourceStatus": "SECONDARY",
+     "enabled": true}
   ]
 }
 ```
 
-(The numbers are those of `etsy-2026-11`; a test holds this example equal to what the endpoint answers, and your code must read
+(The numbers are those of `etsy-2026-12`; a test holds this example equal to what the endpoint answers, and your code must read
 the numbers from the answer, not from here.)
 
 | Member | Meaning |
@@ -410,11 +462,11 @@ the numbers from the answer, not from here.)
 | `marketplace` | The marketplace code, in upper case. |
 | `rulesetVersion` | The version of the ruleset the limits come from; the same value as `rulesetVersion` of a check. Opaque: compare for equality. When it changes, read the limits again. |
 | `productType` | The product type asked for, trimmed and as sent (not upper-cased); `null` when none was asked for. |
-| `limits[].field` | The field of [`input-schema.md`](input-schema.md) the limit applies to: `title`, `tags`, `bullet_points`, `search_terms`, `item_highlights`, ... |
+| `limits[].field` | The field of [`input-schema.md`](input-schema.md) the limit applies to: `title`, `tags`, `bullet_points`, `search_terms`, `item_highlights`, ... A field inside the Etsy `personalization` block is a path: `[]` stands for every question and `[type=DROPDOWN]` or `[type=UPLOAD]` for the questions of that type, for example `personalization.questions[].question_text`. |
 | `limits[].ruleId` | The rule that enforces it, the `ruleId` of its findings. |
-| `limits[].kind` | What is limited: `MAX_LENGTH`, `MAX_COUNT`, `MAX_BYTES` or `MAX_OCCURRENCES`. |
+| `limits[].kind` | What is limited: `MAX_LENGTH`, `MAX_COUNT` (items of a list, or words of a text), `MAX_BYTES` or `MAX_OCCURRENCES`. |
 | `limits[].value` | The limit. |
-| `limits[].unit` | What the rule counts: `CODE_POINTS`, `ITEMS`, `UTF8_BYTES` or `OCCURRENCES`. |
+| `limits[].unit` | What the rule counts: `CODE_POINTS`, `ITEMS`, `WORDS`, `UTF8_BYTES` or `OCCURRENCES`. |
 | `limits[].severity` | How a finding that breaks the limit is rated (`ERROR`, `WARNING`, `INFO`). |
 | `limits[].sourceStatus` | How well the number is backed by the marketplace's documentation: `VERIFIED`, `SECONDARY` or `UNVERIFIED`. |
 | `limits[].enabled` | `false` when the rule is switched off (for this product type): nothing is enforced. |
@@ -438,7 +490,8 @@ its severity is `WARNING`.
 |---|---|
 | `CODE_POINTS` | `Array.from(text.trim()).length`. **Not** `text.length`: that counts UTF-16 code units, so an emoji counts as 2 there and as 1 here. |
 | `UTF8_BYTES` | `new TextEncoder().encode(text.trim()).length`. Amazon `search_terms` are limited in bytes, so an accented letter takes 2 or more. |
-| `ITEMS` | The number of entries of the cleaned list: each entry trimmed, blank entries dropped (the same cleaning as [`input-schema.md`](input-schema.md)). |
+| `ITEMS` | The number of entries of the cleaned list: each entry trimmed, blank entries dropped (the same cleaning as [`input-schema.md`](input-schema.md)). For `personalization.questions[type=UPLOAD].max_files` it is the number of files a question accepts. |
+| `WORDS` | The words of the trimmed text: `(text.trim().match(/[\p{L}\p{Nd}]+(?:['’][\p{L}\p{Nd}]+)*/gu) ?? []).length`. Letters and digits make a word, an apostrophe inside a word keeps it together, any other punctuation separates words. Every word counts, articles included. |
 
 Text is trimmed before it is counted, as the API does (Java's `trim`, which keeps the no-break spaces that JavaScript's `trim()`
 removes; see "Highlighting a finding"). Do not mix this with the offsets of a trademark finding: `start` and `end` there count
