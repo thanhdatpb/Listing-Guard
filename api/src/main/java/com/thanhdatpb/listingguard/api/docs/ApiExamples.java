@@ -423,6 +423,90 @@ public final class ApiExamples {
             }
             """;
 
+    // ---- variation checks (ADR-015); synthetic SKUs and titles only
+
+    public static final String VARIATION_REQUEST_AMAZON = """
+            {
+              "marketplace": "AMAZON",
+              "parent": {"sku": "TEE-P", "product_type": "SHIRT", "variation_theme": "Color-Size", "title": "Retro Sunset Tee"},
+              "children": [
+                {"sku": "TEE-RED-S", "parent_sku": "TEE-P", "title": "Retro Sunset Tee - Red - S",
+                 "attributes": {"color": "Red", "size": "S", "size_system": "as1", "size_class": "alpha", "body_type": "regular"}},
+                {"sku": "TEE-RED-M", "parent_sku": "TEE-X", "title": "Retro Sunset Tee - Red - M",
+                 "attributes": {"color": "Red", "size": "M", "size_system": "as1", "size_class": "alpha", "body_type": "regular"}}
+              ]
+            }
+            """;
+
+    public static final String VARIATION_REQUEST_ETSY = """
+            {
+              "marketplace": "ETSY",
+              "variation_properties": ["Primary color", "Size", "Holiday"],
+              "children": [
+                {"sku": "TEE-RED-S", "attributes": {"Primary color": "Red", "Size": "S", "Holiday": "Christmas"}},
+                {"sku": "TEE-RED-M", "attributes": {"Primary color": "Red", "Size": "M", "Holiday": "Christmas"}}
+              ]
+            }
+            """;
+
+    public static final String VARIATION_RESULT = """
+            {
+              "checkId": "3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+              "marketplace": "AMAZON",
+              "rulesetVersion": "variation-checks-2026-11",
+              "analysisVersion": "d1f0b7c4e9a3582b6c0e4f7a1d9b3c5e8f2a4b6d0c1e3f5a7b9d1c3e5f708192",
+              "cached": false,
+              "completeness": "COMPLETE",
+              "failedRuleIds": [],
+              "disclaimer": "Kết quả chỉ là cảnh báo tham khảo dựa trên nguồn thứ cấp và quy tắc nội bộ, không phải xác nhận hay kết luận của Amazon hoặc Etsy.",
+              "createdAt": "2026-11-06T09:15:30.123456Z",
+              "expiresAt": "2026-12-06T09:15:30.123456Z",
+              "summary": {"errors": 0, "warnings": 1, "infos": 0},
+              "findings": [
+                {"ruleId": "parent_child_structure", "kind": "child_parent_sku_mismatch", "severity": "WARNING",
+                 "sourceStatus": "SECONDARY", "field": "children[1].parent_sku", "value": "TEE-X",
+                 "relatedFields": ["parent.sku"],
+                 "message": "Child thứ 2 có parent_sku 'TEE-X', khác SKU của parent 'TEE-P'.",
+                 "suggestion": "Sửa parent_sku của child này cho trùng SKU của parent 'TEE-P', hoặc đưa child sang parent đúng."}
+              ]
+            }
+            """;
+
+    public static final String VARIATION_RESULT_CACHED = """
+            {
+              "checkId": "3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+              "marketplace": "AMAZON",
+              "rulesetVersion": "variation-checks-2026-11",
+              "analysisVersion": "d1f0b7c4e9a3582b6c0e4f7a1d9b3c5e8f2a4b6d0c1e3f5a7b9d1c3e5f708192",
+              "cached": true,
+              "completeness": "COMPLETE",
+              "failedRuleIds": [],
+              "disclaimer": "Kết quả chỉ là cảnh báo tham khảo dựa trên nguồn thứ cấp và quy tắc nội bộ, không phải xác nhận hay kết luận của Amazon hoặc Etsy.",
+              "createdAt": "2026-11-06T09:15:30.123456Z",
+              "expiresAt": "2026-12-06T09:15:30.123456Z",
+              "summary": {"errors": 0, "warnings": 1, "infos": 0},
+              "findings": [
+                {"ruleId": "parent_child_structure", "kind": "child_parent_sku_mismatch", "severity": "WARNING",
+                 "sourceStatus": "SECONDARY", "field": "children[1].parent_sku", "value": "TEE-X",
+                 "relatedFields": ["parent.sku"],
+                 "message": "Child thứ 2 có parent_sku 'TEE-X', khác SKU của parent 'TEE-P'.",
+                 "suggestion": "Sửa parent_sku của child này cho trùng SKU của parent 'TEE-P', hoặc đưa child sang parent đúng."}
+              ]
+            }
+            """;
+
+    public static final String PROBLEM_VARIATION_NOT_FOUND = """
+            {
+              "type": "urn:listing-guard:problem:variation-check-not-found",
+              "title": "Not Found",
+              "status": 404,
+              "detail": "No variation check with id 3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73 was found for this client.",
+              "instance": "/api/v1/variation-checks/3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+              "code": "variation-check-not-found",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
     public static final String USAGE_RESULT = """
             {
               "enforced": true,
@@ -432,7 +516,7 @@ public final class ApiExamples {
               "remaining": 958,
               "periodStart": "2026-11-01",
               "resetAt": "2026-12-01T00:00:00Z",
-              "packs": ["batch", "listing-rules", "sheet-connector", "trademark-risk"]
+              "packs": ["batch", "listing-rules", "sheet-connector", "trademark-risk", "variation-checks"]
             }
             """;
 

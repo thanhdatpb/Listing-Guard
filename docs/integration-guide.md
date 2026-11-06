@@ -60,11 +60,12 @@ operator of the deployment you call whether plans are on. The operator sets your
 (`plan set <client> <plan>`) and it takes effect at once; there is no endpoint to change it.
 
 What counts: **one unit is one new result that is stored, per endpoint.** A full check of one listing, that is
-`POST /api/v1/checks` and `POST /api/v1/trademark-checks` for the same listing, is two units. What does not count:
+`POST /api/v1/checks` and `POST /api/v1/trademark-checks` for the same listing, is two units; a variation family sent to
+`POST /api/v1/variation-checks` (`SELLER` and `PRO` plans) is one more. What does not count:
 
 - a result answered from the cache (`"cached": true`), also when you are at the limit;
-- `GET /api/v1/checks/{id}`, `GET /api/v1/trademark-checks/{id}` and `GET /api/v1/usage`;
-- a trademark result that is `INCOMPLETE` (it is stored for `GET` and never reused);
+- `GET /api/v1/checks/{id}`, `GET /api/v1/trademark-checks/{id}`, `GET /api/v1/variation-checks/{id}` and `GET /api/v1/usage`;
+- a trademark or variation result that is `INCOMPLETE` (it is stored for `GET` and never reused);
 - a request that is refused or fails (`400`, `401`, `403`, `413`, `429`, `503`).
 
 Repeating a request is therefore safe for your quota: the second identical request is answered from the cache and costs
@@ -83,7 +84,7 @@ The month is the calendar month in UTC; the counter resets at 00:00 UTC on the f
   "remaining": 958,
   "periodStart": "2026-11-01",
   "resetAt": "2026-12-01T00:00:00Z",
-  "packs": ["batch", "listing-rules", "sheet-connector", "trademark-risk"]
+  "packs": ["batch", "listing-rules", "sheet-connector", "trademark-risk", "variation-checks"]
 }
 ```
 
@@ -611,6 +612,103 @@ limit is the one of the client, shared with the other endpoints.
 
 Known limitation: the catalog is shared, so if your own brand matches a mark in it the check can report a false positive.
 
+## Variation checks
+
+`POST /api/v1/variation-checks` checks the **structure** of a listing with variations: for Amazon a parent and its
+children, for Etsy the variation types and the children. It is a separate check with its own request, endpoint, result and
+retention; `POST /api/v1/checks` and `POST /api/v1/trademark-checks` do not change and do not depend on it. Call it when
+the listing has variations, next to `/checks`, which reads the listing text. It never edits anything and **proposes no fix and
+no replacement value**: a finding says what is inconsistent, and what to do about it is the seller's decision.
+
+The result is a **reference warning built on secondary sources and internal heuristics**, not a statement of the marketplace:
+no official page could be read, so no rule of the ruleset is `verified`, and no finding is an `ERROR`. Each finding says how
+well its rule is backed in `sourceStatus`, and the response carries a `disclaimer` to show with it.
+
+### Request
+
+`Content-Type: application/json`, body at most 256 KB. The fields are at the top level (not in a `listing` object); they, their
+accepted forms and the cleaning are the public contract in [`docs/input-schema.md`](input-schema.md#variation-checks). In short:
+`marketplace` (`ETSY` or `AMAZON`), and for Amazon a `parent` (`sku`, `product_type`, `variation_theme`, `title`) and its
+`children`, for Etsy `variation_properties` and `children`; each child has `sku`, `parent_sku` (Amazon), `title` and `attributes`,
+a map from an attribute name to its value. Unknown fields are ignored, strings are trimmed, blank entries are dropped and nothing
+is corrected. A missing field is not an error: the rules say what is missing.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/variation-checks \
+  -H 'X-API-Key: <key>' -H 'Content-Type: application/json' \
+  -d '{"marketplace":"AMAZON",
+       "parent":{"sku":"TEE-P","product_type":"SHIRT","variation_theme":"Color-Size","title":"Retro Sunset Tee"},
+       "children":[
+         {"sku":"TEE-RED-S","parent_sku":"TEE-P","title":"Retro Sunset Tee - Red - S",
+          "attributes":{"color":"Red","size":"S","size_system":"as1","size_class":"alpha","body_type":"regular"}},
+         {"sku":"TEE-RED-M","parent_sku":"TEE-X","title":"Retro Sunset Tee - Red - M",
+          "attributes":{"color":"Red","size":"M","size_system":"as1","size_class":"alpha","body_type":"regular"}}]}'
+```
+
+### Response
+
+`200`, new or stored (`cached`). The example has one finding (the second child points at another parent):
+
+```json
+{
+  "checkId": "3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+  "marketplace": "AMAZON",
+  "rulesetVersion": "variation-checks-2026-11",
+  "analysisVersion": "d1f0b7c4e9a3582b6c0e4f7a1d9b3c5e8f2a4b6d0c1e3f5a7b9d1c3e5f708192",
+  "cached": false,
+  "completeness": "COMPLETE",
+  "failedRuleIds": [],
+  "disclaimer": "Kết quả chỉ là cảnh báo tham khảo dựa trên nguồn thứ cấp và quy tắc nội bộ, không phải xác nhận hay kết luận của Amazon hoặc Etsy.",
+  "createdAt": "2026-11-06T09:15:30.123456Z",
+  "expiresAt": "2026-12-06T09:15:30.123456Z",
+  "summary": {"errors": 0, "warnings": 1, "infos": 0},
+  "findings": [
+    {"ruleId": "parent_child_structure", "kind": "child_parent_sku_mismatch", "severity": "WARNING",
+     "sourceStatus": "SECONDARY", "field": "children[1].parent_sku", "value": "TEE-X",
+     "relatedFields": ["parent.sku"],
+     "message": "Child thứ 2 có parent_sku 'TEE-X', khác SKU của parent 'TEE-P'.",
+     "suggestion": "Sửa parent_sku của child này cho trùng SKU của parent 'TEE-P', hoặc đưa child sang parent đúng."}
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `checkId` | Identifier of the stored result; `GET /api/v1/variation-checks/{id}` until `expiresAt`. |
+| `rulesetVersion`, `analysisVersion` | What produced the result. Opaque strings: compare for equality, do not parse. |
+| `cached` | `true` when the stored result of an identical earlier request is returned. |
+| `completeness` | `COMPLETE`, or `INCOMPLETE` when a rule failed. The findings of the rules that succeeded are kept and `failedRuleIds` names the others. **An `INCOMPLETE` result is not a clean result**; it is stored so it can be read with GET, is never returned for another request and costs no quota. |
+| `summary` | Number of findings per severity. |
+| `disclaimer` | The statement that the result is a reference warning. Show it with the result. |
+| `createdAt`, `expiresAt` | When the result was stored and when it stops being readable (UTC). |
+
+A finding:
+
+| Field | Meaning |
+|---|---|
+| `ruleId`, `kind` | The rule (`parent_child_structure`, `variation_theme_allowed`, `apparel_size_attributes`, `duplicate_combination`, `duplicate_sku`, `children_differ_outside_theme`, `etsy_variation_limits`) and the case inside it (`child_parent_sku_mismatch`, `theme_not_allowed`, ...). Both are stable: branch on them, not on the text. |
+| `severity` | `WARNING` (worth checking) or `INFO` (a note, for example "no data for this product type"). `ERROR` is reserved for a rule with a verified source; none has one today. |
+| `sourceStatus` | `SECONDARY` (consistent secondary sources) or `UNVERIFIED` (our own check or heuristic); `VERIFIED` is not used yet. |
+| `field` | Where the problem is: `parent.sku`, `parent.variation_theme`, `children[3].attributes.size`, `children[3]`, `variation_properties[1]`. The index is zero-based and counts the **cleaned** list (blank entries dropped), so if your own list had blank entries match by `value`. |
+| `value` | The offending text, cut to a length limit, or `null` when no single value applies (a missing attribute). |
+| `relatedFields` | Other places the message refers to, for example the first child with the same combination. |
+| `message`, `suggestion` | Human text, currently Vietnamese, with the real values. A suggestion never offers a value. |
+
+`children_differ_outside_theme` is a heuristic: it compares the part of each child's title that is left once its own size and
+color (and the words the ruleset lists) are removed, and says the child **may** be a different product. `INFO` findings such as
+`product_type_not_covered` mean the ruleset has no data for that product type, not that anything is wrong. A product type or theme
+that the ruleset does not know is never an error.
+
+### Caching, retention and quota
+
+Only a hash of the family and each finding's short evidence (the field, the offending value, the message) are stored, **not the
+family**, for 30 days (`expiresAt`; an operational setting, not a guarantee). After that `GET` answers `404` whether or not the
+server's cleanup has run, and the same family sent again is analysed again and gets a new `checkId`. An identical request of the
+same client (same marketplace, same cleaned family, same `analysisVersion`) returns the stored `COMPLETE` result with
+`cached: true`; a different ruleset or comparison logic changes `analysisVersion` and with it the cache. Another client never
+reads your results, and a `checkId` of another client answers `404` exactly like one that does not exist. Where plans are on, the
+pack `variation-checks` must be in your plan (`403 plan-not-allowed` otherwise) and a new `COMPLETE` result costs one unit.
+
 ## Errors
 
 Errors are `application/problem+json` (RFC 7807) with these members: `type` (`urn:listing-guard:problem:<code>`),
@@ -625,6 +723,7 @@ validation. Branch on `code`, not on `detail`.
 | 403 | `plan-not-allowed` | Only where plans are on (see "Plans and monthly quota"). Your client's plan does not include the pack of the endpoint; `plan` and `pack` say which. | Do not retry. Ask the operator for a plan that includes the pack. |
 | 404 | `check-not-found` | No check with that id for your client. A check of another client gives this same answer. | The id is wrong, or it is not yours. |
 | 404 | `trademark-check-not-found` | `GET /api/v1/trademark-checks/{id}`: no retained trademark check with that id for your client. A check of another client, an id that never existed and an expired check give this same answer. | The id is wrong, not yours, or past its retention: send the listing again. |
+| 404 | `variation-check-not-found` | `GET /api/v1/variation-checks/{id}`: no retained variation check with that id for your client. A check of another client, an id that never existed and an expired check give this same answer. | The id is wrong, not yours, or past its retention: send the family again. |
 | 404 | `ruleset-not-found` | `GET /api/v1/rulesets/{marketplace}/limits`: no ruleset is active for the marketplace. `detail` lists the supported ones. | Fix the marketplace code. |
 | 404 | `not-found` | Unknown route. | Check the URL. |
 | 405 | `method-not-allowed` | Wrong HTTP method. | |

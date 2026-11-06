@@ -15,6 +15,10 @@ edit or publish anything, and it does not do SEO.
   catalog of marks that you load yourself (exact, phrase and fuzzy matching, plus color and place context rules).
   Every finding carries explainable evidence (field, span, matched mark, match type, score, source ids) and every
   result carries a disclaimer: it is a reference warning, not a legal conclusion.
+- **Variation checks** (`POST /api/v1/variation-checks`): checks the parent/child structure of a listing with variations
+  (Amazon: the parent, its theme and the attributes of its children, apparel size attributes; Etsy: the variation types)
+  and repeated combinations and SKUs, in a request of its own. It is built on secondary sources and internal heuristics
+  (nothing in its ruleset is `verified`, so nothing is an `ERROR`), proposes no fix, and does not change `/checks`.
 - **Ruleset limits** (`GET /api/v1/rulesets/{marketplace}/limits`): the numeric limits of the loaded rulesets (title length,
   number and length of tags, Amazon search terms in bytes, ...), each with the field, the unit it is counted in, its severity
   and how well it is sourced, read from the same rules and ruleset the check uses. A client shows a character counter from it
@@ -38,12 +42,18 @@ Working end to end:
 - The trademark check, once you configure a catalog. `POST /api/v1/trademark-checks` is a separate check with its own
   endpoint and result; it does not change `/checks`. Only a hash of the listing and short evidence snippets are
   stored, for 30 days.
+- The variation checks. `POST /api/v1/variation-checks` takes a parent and its children (Etsy: the variation types and the
+  children) in a request of its own, checks the structure and returns findings with the field and the offending value;
+  only a hash of the family and short evidence are stored, for 30 days. It is a reference warning: **nothing in its ruleset
+  is `verified`** (see [Rulesets](#rulesets)), so every finding is a `WARNING` or `INFO`, and it never proposes a value. It
+  is in the `SELLER` and `PRO` plans and costs one unit per new result where plans are on.
 - The `batch-check` job, which calls the same services as the two endpoints.
 - Client API keys, per-client rate limits and per-client isolation; see the
   [integration guide](docs/integration-guide.md).
 - Client plans and a monthly quota ([ADR-013](docs/adr/ADR-013-client-plans-and-monthly-quota.md)), **off by default**
   (`listing-guard.plans.enabled=false`): the operator sets a client's plan with `admin plan set <client> <plan>`, a new
-  stored result counts one unit per endpoint (a cached one costs nothing, so a full check of one listing is two units), and
+  stored result counts one unit per endpoint (a cached one costs nothing, so a full check of one listing is two units, three
+  with a variation family), and
   over the limit the API answers `429 quota-exceeded` (a pack outside the plan: `403 plan-not-allowed`). The packs
   `policy-analyzer` and `sheet-connector` are reserved in the plans and not enforced yet. There is no billing or payment;
   see [deployment](docs/deployment.md#client-plans-and-the-monthly-quota-adr-013).
@@ -88,6 +98,7 @@ What is not built yet is listed in the [Roadmap](#roadmap). Changes between vers
 Client backend -- X-API-Key --> Listing Guard API (Spring Boot)
    POST /api/v1/checks               |
    POST /api/v1/trademark-checks     |
+   POST /api/v1/variation-checks     |   (its own request: a parent and its children; pack `variation-checks`)
    GET  /api/v1/rulesets/{m}/limits  |   (read only: the limits of the rules below)
                          API key --> authenticated client
                          rate limit per client
@@ -136,8 +147,9 @@ Modules:
 | `core/` | Plain Java domain types shared by all modules: `Listing`, `Money`, `Finding`, `Severity`. No Spring. |
 | `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
 | `trademark-scanner/` | Trademark risk scanner core (ADR-009): versioned ruleset, canonical input hash, normalization with offsets, the `TrademarkCatalog` port with an in-memory catalog, exact/phrase/fuzzy matching, color and place context rules, risk aggregation, the pack fingerprint, and the catalog manifest and data file reader. No Spring, no database. |
+| `variation-checks/` | Variation checks core (ADR-015): the input of a parent and its children, its canonical hash, a strict ruleset loader, `variation-checks-2026-11.yaml` and the seven rules, the pack fingerprint, and `INCOMPLETE` when a rule fails. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, hashing for tests), `PolicyRetriever`, retrieval metrics, and the `LlmProvider` contract with a scripted test provider and a `CitationVerifier` (no call to a real model is implemented). No Spring. |
-| `api/` | Spring Boot REST app and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks` and `/trademark-checks` endpoints with trademark retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
+| `api/` | Spring Boot REST app and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks`, `/trademark-checks` and `/variation-checks` endpoints with their retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
 | `batch/` | `mappings/` (example column mappings, committed); `input/` and `out/` (your exports and the reports, git-ignored) |
@@ -414,6 +426,21 @@ overridden yet. See [ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-seve
 | `prohibited_content` (web addresses, emails; title, description, bullets and `item_highlights`) | WARNING | secondary; scanning `item_highlights` is our extension of the same ban |
 | `category_not_covered` | INFO | not an Amazon rule: the product type has no overrides (only reported when the ruleset has some) |
 
+`variation-checks-2026-11.yaml` (in `variation-checks/`) is the ruleset of the variation checks
+([ADR-015](docs/adr/ADR-015-variation-checks.md)). No official page could be read, so **no value is `verified`** and no
+finding is an `ERROR`; two of the four secondary pages answered `403` and their statements come from the maintainer's
+brief. The product types and themes it knows are few on purpose (one apparel product type); any other product type is an
+`INFO` ("no data"), not an error.
+
+| Rule | Severity | Source status |
+|---|---|---|
+| `parent_child_structure` (Amazon: a parent with a SKU and a theme, children that point at it and fill the theme's attributes) | WARNING | secondary: godatafeed, error 8024 |
+| `variation_theme_allowed` (Amazon: the theme is one of those listed for the parent's product type) | WARNING; INFO when the product type is unknown | secondary; the product type and one theme are unverified |
+| `apparel_size_attributes` (Amazon apparel: `size_system`, `size_class`, `size`, `size_to` of a range, `body_type`) | WARNING; INFO when a range cannot be compared | secondary: storeautomator (not readable, from the brief); the alpha order is ours |
+| `duplicate_combination`, `duplicate_sku` | WARNING | unverified |
+| `children_differ_outside_theme` (titles that look like different products) | WARNING, never ERROR | unverified: a heuristic |
+| `etsy_variation_limits` (at most 2 variation types, `Holiday` and `Occasion` cannot vary, only 10 variations take a photo) | WARNING; INFO for the photo limit | secondary: alura.io |
+
 To change a threshold or a severity, create a new ruleset file with a new `version`: the API refuses to
 start if a registered version has different content (see [ADR-002](docs/adr/ADR-002-ruleset-versioning.md)).
 `etsy-2026-10.yaml` and `amazon-2026-11.yaml` are kept unchanged as history (a test pins their hashes) and are no longer loaded.
@@ -435,7 +462,8 @@ the public DTD V2.0 and **unverified against real data**), the `batch-check` job
 enforcement of `policy-analyzer` are not part of it), and the Listing Workspace API and batch integration
 ([ADR-014](docs/adr/ADR-014-listing-workspace.md); off by default, V20), and the optional console with its sign-in,
 dashboard, Check listing editor and API keys page ([ADR-014](docs/adr/ADR-014-listing-workspace.md) part B, V21; off by
-default).
+default), and the variation checks ([ADR-015](docs/adr/ADR-015-variation-checks.md); the plan pack in V22 and the result
+tables in V23).
 What follows, in this order, is **not built yet**:
 
 1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
@@ -449,7 +477,11 @@ What follows, in this order, is **not built yet**:
    exist today (the `LlmProvider` contract, a scripted test provider and the citation verifier); there is no call to a
    real model and no endpoint. The analyzer is designed to be off by default and enabled by configuring an LLM.
 4. Add Amazon product-type overrides only when their limits and sources have been verified.
-5. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)): the console, its dashboard, the Check listing
+5. Variation checks ([ADR-015](docs/adr/ADR-015-variation-checks.md)), what remains: confirm the two secondary pages that
+   returned `403` and the product types and themes the ruleset knows (it has one apparel product type), `height_type`, and
+   a synthetic evaluation like the trademark one if numbers are wanted. The `batch-check` job does not check variation
+   families (a CSV row is a listing), and there is no console page for them.
+6. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)): the console, its dashboard, the Check listing
    editor and the API keys page are implemented (part B, V21; off by default). What remains is saved listings and history;
    any page that shows readiness must always show the trademark result alongside it. Plan-based gating of API keys, a plan
    comparison page and billing are deferred. The Etsy rule `tag_count_underused` remains planned for the
@@ -458,7 +490,7 @@ What follows, in this order, is **not built yet**:
 ## Documentation
 
 - [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, plans and quota, the ruleset limits for a character counter, and client isolation.
-- [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields.
+- [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields, and the request of the variation checks.
 - [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
 - [Deployment](docs/deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
 - [Release notes](docs/releases/v0.5.0.md): what changed in each version and what to do when upgrading.
@@ -475,6 +507,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
 - [ADR-012: Embeddings default to an external API](docs/adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)
 - [ADR-013: Client plans and monthly quota](docs/adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
+- [ADR-015: Variation checks](docs/adr/ADR-015-variation-checks.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; it ends with the questions the maintainer has to decide)
 - [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor and API keys page are implemented, all off by default; saved listings and history are not designed yet)
 
 ## License

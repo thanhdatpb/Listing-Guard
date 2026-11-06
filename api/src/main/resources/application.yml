@@ -65,6 +65,23 @@ listing-guard:
       cleanup-interval: 1h
       cleanup-initial-delay: 1m
       cleanup-batch-size: 500
+  variation:
+    # The variation ruleset (ADR-015), registered for each marketplace below as pack `variation-checks` (ADR-010).
+    ruleset: classpath:rulesets/variation-checks-2026-11.yaml
+    marketplaces:
+      - ETSY
+      - AMAZON
+    retention:
+      # How long a variation result, its input hash and its evidence are kept (ADR-015), as for trademark results: an
+      # operational proposal, not a guarantee. GET and the cache lookup treat a row past this as absent whether or not the
+      # cleanup has run.
+      period: 30d
+      # The scheduled cleanup runs in every API instance and shares the retention advisory lock with the trademark cleanup,
+      # so one batch of either runs at a time; a skipped run is tried again at the next interval.
+      cleanup-enabled: true
+      cleanup-interval: 1h
+      cleanup-initial-delay: 2m
+      cleanup-batch-size: 500
   batch:
     # The batch-check job (docs/batch-check.md): mappings, inputs and reports; the reports go to <dir>/out by default.
     dir: ${BATCH_DIR:batch}

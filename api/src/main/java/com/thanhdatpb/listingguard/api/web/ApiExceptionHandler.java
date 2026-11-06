@@ -9,6 +9,7 @@ import com.thanhdatpb.listingguard.api.policy.CorpusModelMismatchException;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
+import com.thanhdatpb.listingguard.api.variation.VariationCheckNotFoundException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingNotConfiguredException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -65,6 +66,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(TrademarkCheckNotFoundException.class)
     public ProblemDetail trademarkCheckNotFound(TrademarkCheckNotFoundException e) {
         return Problems.of(HttpStatus.NOT_FOUND, "trademark-check-not-found", e.getMessage());
+    }
+
+    /** A variation check of another client, an unknown one and an expired one all answer alike (ADR-007, ADR-015). */
+    @ExceptionHandler(VariationCheckNotFoundException.class)
+    public ProblemDetail variationCheckNotFound(VariationCheckNotFoundException e) {
+        return Problems.of(HttpStatus.NOT_FOUND, "variation-check-not-found", e.getMessage());
     }
 
     /** No trademark catalog is served (not configured, or refused); only trademark checks are affected, not /checks (ADR-009). */

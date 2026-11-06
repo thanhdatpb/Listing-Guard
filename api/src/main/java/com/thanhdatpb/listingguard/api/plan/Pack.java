@@ -5,9 +5,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * What a plan can include (ADR-013). The first three are analysis packs of ADR-010 and their ids are the {@code pack_id}
- * of the rulesets; {@code batch} and {@code sheet-connector} are capabilities sold the same way. Held equal to the
- * {@code ck_plan_pack_pack_id} constraint of V19 by a test.
+ * What a plan can include (ADR-013). {@code listing-rules}, {@code trademark-risk}, {@code policy-analyzer} and
+ * {@code variation-checks} are analysis packs of ADR-010 and their ids are the {@code pack_id} of the rulesets;
+ * {@code batch} and {@code sheet-connector} are capabilities sold the same way. Held equal to the
+ * {@code ck_plan_pack_pack_id} constraint (V19, replaced by V22 for ADR-015) by a test.
  *
  * <p>{@link #POLICY_ANALYZER} and {@link #SHEET_CONNECTOR} are reserved: nothing calls {@link PlanService#requirePack} for
  * them yet. The policy analyzer endpoint (ADR-011, PR 5) and the sheet connector (phase 4b) will.
@@ -17,7 +18,8 @@ public enum Pack {
     TRADEMARK_RISK("trademark-risk"),
     POLICY_ANALYZER("policy-analyzer"),
     BATCH("batch"),
-    SHEET_CONNECTOR("sheet-connector");
+    SHEET_CONNECTOR("sheet-connector"),
+    VARIATION_CHECKS("variation-checks");
 
     private final String id;
 

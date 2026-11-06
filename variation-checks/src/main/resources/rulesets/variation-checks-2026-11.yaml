@@ -1,0 +1,283 @@
+# Variation checks ruleset (ADR-015). Lists, numbers, severities and messages live here; the logic lives in Java
+# (ADR-001).
+#
+# Any change to this file changes its content hash. Bump `version` for every change: a published version is
+# immutable (ADR-002), and the analysis version of every stored result depends on this hash (ADR-010).
+#
+# Sources. No official page is readable (the help pages need a login), so NOTHING in this file is `verified`. A rule or
+# a value is `secondary` when a secondary page says it, `unverified` when it is our own reading or heuristic. The four
+# pages the maintainer named, and what could be read on 2026-11-06:
+#   godatafeed   https://www.godatafeed.com/disapproval/amazon-8024-variation-error                      read
+#   alura        https://www.alura.io/docs/article/the-sellers-guide-to-etsy-listing-variations         read
+#   storeautomator https://support.storeautomator.com/hc/en-us/articles/4406848817682-New-Apparel-Size-Requirements-for-Amazon
+#                HTTP 403, not read: its values come from the maintainer's brief
+#   riverbend    https://riverbendconsulting.com/blog/product-variations-amazon/                         HTTP 403, not read
+# ERROR is only allowed for a `verified` rule (ADR-006), so every finding here is WARNING or INFO.
+#
+# Messages and suggestions are Vietnamese and cite the real values. They report an inconsistency and never say that a
+# listing is accepted or approved. No suggestion proposes a replacement value.
+pack_id: variation-checks
+version: variation-checks-2026-11
+checked_at: 2026-11-06
+
+disclaimer: Kết quả chỉ là cảnh báo tham khảo dựa trên nguồn thứ cấp và quy tắc nội bộ, không phải xác nhận hay kết luận của Amazon hoặc Etsy.
+
+evidence:
+  # The longest text kept in a finding's `value` and quoted from the client inside a message.
+  max_value_chars: 200
+
+# The Amazon variation themes this ruleset knows and the attributes a child must fill for each. The attribute names are
+# the standard input's names (lower-case words of the theme joined by `_`, docs/input-schema.md), not Amazon's.
+themes:
+  Color-Size:
+    attributes:
+      - color
+      - size
+    source:
+      status: secondary
+      urls:
+        - https://www.godatafeed.com/disapproval/amazon-8024-variation-error
+      note: "Read 2026-11-06: 'Apparel uses Color-Size'; the page lists no other theme."
+  SizeName-ColorName:
+    attributes:
+      - size_name
+      - color_name
+    source:
+      status: unverified
+      note: Named in the maintainer's brief; it is not in the text of the page that could be read.
+
+rules:
+  parent_child_structure:
+    marketplaces:
+      - AMAZON
+    source:
+      status: secondary
+      urls:
+        - https://www.godatafeed.com/disapproval/amazon-8024-variation-error
+      note: "Read 2026-11-06: the parent is a parent, each child is a child with a parent_sku equal to the parent's SKU, and the children fill the attributes of the variation theme."
+    kinds:
+      parent_missing:
+        severity: WARNING
+        message: Chưa khai báo parent (hoặc parent không có SKU), nên không đối chiếu được các child với parent.
+        suggestion: Khai báo parent kèm SKU và variation_theme; mỗi child trỏ về SKU đó bằng parent_sku.
+      parent_theme_missing:
+        severity: WARNING
+        message: Parent chưa khai báo variation_theme.
+        suggestion: Khai báo variation_theme của parent; mọi child cùng parent phải điền đủ thuộc tính của theme đó.
+      no_children:
+        severity: INFO
+        message: Chưa có child nào được gửi kèm, nên không có gì để kiểm tra.
+        suggestion: Gửi kèm danh sách child nếu muốn kiểm tra cấu trúc biến thể.
+      theme_attributes_unknown:
+        severity: INFO
+        message: "Chưa có dữ liệu về thuộc tính của theme '{theme}', nên không kiểm tra được các child đã điền đủ thuộc tính chưa."
+        suggestion: Kiểm tra thủ công các child của theme này.
+      child_parent_sku_missing:
+        severity: WARNING
+        message: "Child thứ {position} chưa có parent_sku; cần trỏ về SKU của parent '{parent_sku}'."
+        suggestion: "Điền parent_sku '{parent_sku}' cho child này."
+      child_parent_sku_mismatch:
+        severity: WARNING
+        message: "Child thứ {position} có parent_sku '{actual}', khác SKU của parent '{parent_sku}'."
+        suggestion: "Sửa parent_sku của child này cho trùng SKU của parent '{parent_sku}', hoặc đưa child sang parent đúng."
+      child_attribute_missing:
+        severity: WARNING
+        message: "Child thứ {position} chưa điền thuộc tính '{attribute}' của theme '{theme}'."
+        suggestion: "Điền '{attribute}' cho child này; các child cùng parent phải điền đủ thuộc tính của theme."
+
+  variation_theme_allowed:
+    marketplaces:
+      - AMAZON
+    source:
+      status: secondary
+      urls:
+        - https://www.godatafeed.com/disapproval/amazon-8024-variation-error
+      note: "Read 2026-11-06: the theme must match what the category expects ('Color-Size' for apparel); using more attributes than the theme allows, for example Color-Size-Material, is a common mistake. The page gives no list of themes per category, so only the product types below are known."
+    # A product type that is not listed gets an INFO ("no data"), never a warning. Each entry needs its own source.
+    product_types:
+      SHIRT:
+        themes:
+          - Color-Size
+          - SizeName-ColorName
+        source:
+          status: unverified
+          note: SHIRT is the product type name Amazon's product type definitions use for shirts, but no readable page says which themes it allows; the themes are the two the brief names for clothing.
+    kinds:
+      theme_not_allowed:
+        severity: WARNING
+        message: "Theme '{theme}' không nằm trong danh sách theme đã biết cho product_type '{product_type}': {allowed}."
+        suggestion: "Dùng một trong các theme đó; dùng nhiều thuộc tính hơn theme cho phép (ví dụ Color-Size-Material) là nguyên nhân thường gặp của lỗi 8024."
+      product_type_not_covered:
+        severity: INFO
+        message: "Chưa có dữ liệu về theme cho product_type '{product_type}', nên không kiểm tra được theme."
+        suggestion: Kiểm tra theme trong tài liệu của Amazon cho loại sản phẩm này.
+      product_type_missing:
+        severity: INFO
+        message: Parent chưa khai báo product_type, nên không kiểm tra được theme.
+        suggestion: Khai báo product_type của parent.
+
+  apparel_size_attributes:
+    marketplaces:
+      - AMAZON
+    source:
+      status: secondary
+      urls:
+        - https://support.storeautomator.com/hc/en-us/articles/4406848817682-New-Apparel-Size-Requirements-for-Amazon
+      note: "The page returned HTTP 403 on 2026-11-06 and was not read: the attributes, their value lists and the size_to rule are the maintainer's brief. height_type is not checked (no value list, and the product types that require it are not known)."
+    product_types:
+      value:
+        - SHIRT
+      source:
+        status: unverified
+        note: The apparel product types are not named by any readable page; SHIRT is the one this pack was built for. Add others when the maintainer has a source.
+    required_attributes:
+      - size_system
+      - size_class
+      - size
+      - body_type
+    value_lists:
+      size_system: [as1, as2, as3, as4, as5, as6, as7, as8]
+      size_class: [numeric, numeric_range, alpha, alpha_range, age, age_range]
+      body_type: [big, slim, regular, plus]
+    # A size class that is a range needs `size_to`, larger than `size`. How the two are compared depends on the class.
+    range:
+      class_attribute: size_class
+      size_attribute: size
+      size_to_attribute: size_to
+      classes:
+        numeric_range: numeric
+        alpha_range: alpha
+        age_range: none
+    alpha_scale:
+      source:
+        status: unverified
+        note: Our own ordering of common alpha size labels, used only to compare a range; labels in one entry share a rank. A label that is not here makes the range not comparable (INFO).
+      order:
+        - [xxs]
+        - [xs]
+        - [s, small]
+        - [m, medium]
+        - [l, large]
+        - [xl]
+        - [xxl, 2xl]
+        - [xxxl, 3xl]
+        - [4xl]
+        - [5xl]
+    kinds:
+      size_attribute_missing:
+        severity: WARNING
+        message: "Child thứ {position} thiếu thuộc tính '{attribute}' của quần áo (product_type '{product_type}')."
+        suggestion: "Điền '{attribute}' cho child này; theo nguồn thứ cấp, quần áo cần bộ thuộc tính size này."
+      size_attribute_invalid:
+        severity: WARNING
+        message: "Child thứ {position}: '{attribute}' là '{value}', không nằm trong danh sách giá trị đã biết ({allowed})."
+        suggestion: "Dùng một trong các giá trị: {allowed}."
+      size_to_missing:
+        severity: WARNING
+        message: "Child thứ {position}: size_class '{size_class}' là dạng khoảng nhưng chưa có '{attribute}'."
+        suggestion: "Điền '{attribute}' cho child này; giá trị phải lớn hơn size."
+      size_to_not_greater:
+        severity: WARNING
+        message: "Child thứ {position}: '{attribute}' là '{size_to}', không lớn hơn size '{size}'."
+        suggestion: "'{attribute}' phải lớn hơn size khi size_class là dạng khoảng."
+      size_range_not_comparable:
+        severity: INFO
+        message: "Child thứ {position}: không so sánh được size '{size}' với '{size_to}' (size_class '{size_class}')."
+        suggestion: Kiểm tra thủ công rằng khoảng size đi từ nhỏ đến lớn.
+
+  duplicate_combination:
+    marketplaces:
+      - AMAZON
+      - ETSY
+    source:
+      status: unverified
+      note: Our own check; two children with the same combination of the theme's attributes are almost certainly a mistake, but no readable page states it as a rule.
+    kinds:
+      duplicate_combination:
+        severity: WARNING
+        message: "Child thứ {position} trùng tổ hợp thuộc tính '{combination}' với child thứ {first_position}."
+        suggestion: Mỗi child cần một tổ hợp thuộc tính riêng; đổi giá trị của một trong hai child hoặc bỏ bớt một child.
+
+  duplicate_sku:
+    marketplaces:
+      - AMAZON
+      - ETSY
+    source:
+      status: unverified
+      note: Our own check; a SKU is expected to identify one child.
+    kinds:
+      duplicate_sku:
+        severity: WARNING
+        message: "Child thứ {position} dùng lại SKU '{sku}' của child thứ {first_position}."
+        suggestion: Mỗi child cần một SKU riêng.
+      sku_equals_parent:
+        severity: WARNING
+        message: "Child thứ {position} dùng SKU '{sku}' trùng với SKU của parent."
+        suggestion: Đặt cho child một SKU khác SKU của parent.
+
+  children_differ_outside_theme:
+    marketplaces:
+      - AMAZON
+      - ETSY
+    source:
+      status: unverified
+      urls:
+        - https://riverbendconsulting.com/blog/product-variations-amazon/
+      note: A heuristic. The statement that putting different products under one parent is a violation comes from a page that returned HTTP 403 on 2026-11-06 and was not read. Never an ERROR.
+    # Words removed from titles before they are compared (besides the child's own theme values): sizes and colors.
+    ignore_words:
+      source:
+        status: unverified
+        note: Our own short lists; add the words the real catalog needs in a new version.
+      size_words: [xxs, xs, s, m, l, xl, xxl, xxxl, 2xl, 3xl, 4xl, 5xl, small, medium, large]
+      color_words: [black, white, red, blue, green, yellow, orange, purple, pink, gray, grey, brown, navy, beige]
+    kinds:
+      children_differ_outside_theme:
+        severity: WARNING
+        message: "Child thứ {position} có thể không cùng sản phẩm với child thứ {reference_position}: phần title ngoài size và màu là '{remainder}', còn child kia là '{reference_remainder}'."
+        suggestion: Nếu đây là hai sản phẩm khác nhau, tách thành hai parent; mỗi parent chỉ nên gộp các biến thể của cùng một sản phẩm.
+
+  etsy_variation_limits:
+    marketplaces:
+      - ETSY
+    source:
+      status: secondary
+      urls:
+        - https://www.alura.io/docs/article/the-sellers-guide-to-etsy-listing-variations
+      note: Read 2026-11-06. The page gives the three statements below and no complete list of properties that cannot be variations.
+    max_variation_types:
+      value: 2
+      source:
+        status: secondary
+        urls:
+          - https://www.alura.io/docs/article/the-sellers-guide-to-etsy-listing-variations
+        note: "'Each listing permits up to two types of variations.'"
+    unsupported_properties:
+      value:
+        - Holiday
+        - Occasion
+      source:
+        status: secondary
+        urls:
+          - https://www.alura.io/docs/article/the-sellers-guide-to-etsy-listing-variations
+        note: "'Some attributes like Holiday or Occasion don't support variations.' Only these two are named; the list is not complete."
+    photo_variation_limit:
+      value: 10
+      source:
+        status: secondary
+        urls:
+          - https://www.alura.io/docs/article/the-sellers-guide-to-etsy-listing-variations
+        note: "'If there are more than 10 variations, only 10 can have linked photos.'"
+    kinds:
+      too_many_variation_types:
+        severity: WARNING
+        message: "Listing khai báo {count} loại biến thể ({properties}); theo nguồn thứ cấp, Etsy cho tối đa {limit} loại."
+        suggestion: "Giảm xuống còn {limit} loại biến thể."
+      variation_type_not_supported:
+        severity: WARNING
+        message: "'{property}' không dùng làm biến thể được trên Etsy (danh sách đã biết: {unsupported}; danh sách này có thể chưa đầy đủ)."
+        suggestion: "Bỏ '{property}' khỏi các loại biến thể; đặt nó ở phần thuộc tính của listing."
+      many_variations_photo_limit:
+        severity: INFO
+        message: "Listing có {count} biến thể; theo nguồn thứ cấp, chỉ {limit} biến thể gắn được ảnh riêng."
+        suggestion: "Chọn tối đa {limit} biến thể để gắn ảnh riêng."
