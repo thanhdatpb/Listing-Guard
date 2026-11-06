@@ -46,6 +46,11 @@ final class JsonFields {
         return node != null && node.canConvertToInt() && !node.isNull() ? node.intValue() : null;
     }
 
+    /** A boolean value, or null when absent, null or not a JSON boolean (a string such as "true" is not read). */
+    static Boolean bool(JsonNode node) {
+        return node != null && node.isBoolean() ? node.booleanValue() : null;
+    }
+
     /** A price as {@code {amount, divisor, currency_code}} or {@code {amount, currency}}, or a plain number. */
     static Money price(JsonNode node) {
         if (node == null || node.isNull()) {
