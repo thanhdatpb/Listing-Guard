@@ -16,11 +16,15 @@ import java.util.regex.PatternSyntaxException;
 /**
  * Content that must not appear in the listed fields (for example web addresses and email addresses), found by the
  * configured {@code patterns} (name to regex). One finding per field and pattern, for the first match. The
- * {@code fields} are {@code title}, {@code description} and {@code bullet_points} (each bullet separately).
+ * {@code fields} are {@code title}, {@code description}, {@code bullet_points} (each bullet separately) and
+ * {@code item_highlights}.
  */
 public final class ProhibitedContentRule extends AmazonRule {
 
     public static final String ID = "prohibited_content";
+
+    /** The fields a ruleset may list under {@code fields}. */
+    private static final List<String> FIELDS = List.of("title", "description", "bullet_points", "item_highlights");
 
     @Override
     public String id() {
@@ -30,7 +34,7 @@ public final class ProhibitedContentRule extends AmazonRule {
     @Override
     void validateSettings(RuleSettings settings) {
         for (String field : settings.stringListParam("fields")) {
-            if (!List.of("title", "description", "bullet_points").contains(field)) {
+            if (!FIELDS.contains(field)) {
                 throw new RulesetException("Rule '" + ID + "': unknown field '" + field + "'");
             }
         }
@@ -45,6 +49,7 @@ public final class ProhibitedContentRule extends AmazonRule {
             switch (field) {
                 case "title" -> addIfPresent(texts, "title", listing.title());
                 case "description" -> addIfPresent(texts, "description", listing.description());
+                case "item_highlights" -> addIfPresent(texts, "item_highlights", listing.itemHighlights());
                 default -> {
                     for (int i = 0; i < listing.bulletPoints().size(); i++) {
                         addIfPresent(texts, "bullet_points[" + i + "]", listing.bulletPoints().get(i));

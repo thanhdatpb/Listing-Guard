@@ -96,6 +96,28 @@ class ProhibitedContentRuleTest {
     }
 
     @Test
+    void aWebAddressInTheItemHighlightsIsReportedWithItsOwnFieldPath() {
+        List<Finding> findings = run(AmazonTestData.withItemHighlights("Hard shell, see www.example.com"));
+
+        assertThat(findings).hasSize(1);
+        Finding finding = findings.get(0);
+        assertThat(finding.ruleId()).isEqualTo("prohibited_content");
+        assertThat(finding.severity()).isEqualTo(Severity.WARNING);
+        assertThat(finding.field()).isEqualTo("item_highlights");
+        assertThat(finding.value()).isEqualTo("www.example.com");
+        assertThat(finding.message()).isEqualTo("Phát hiện url trong item_highlights: 'www.example.com'.");
+    }
+
+    @Test
+    void itemHighlightsAreScannedOnlyWhenTheConfigListsThem() {
+        Listing listing = AmazonTestData.withItemHighlights("see www.example.com");
+
+        assertThat(rule.evaluate(listing, config("[title]", "url: '(?i)\\bwww\\.\\S+'"))).isEmpty();
+        assertThat(rule.evaluate(listing, config("[item_highlights]", "url: '(?i)\\bwww\\.\\S+'"))).hasSize(1);
+        assertThat(run(AmazonTestData.withItemHighlights("A clean line of text"))).isEmpty();
+    }
+
+    @Test
     void theSearchTermsAreNotScanned() {
         Listing listing = listing("Luggage", "Roadster", List.of(), "ok", "www.example.com", "LUGGAGE");
 

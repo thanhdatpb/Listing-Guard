@@ -86,6 +86,12 @@ rules:
           urls:
             - https://example.com/testmug-style-guide
 
+  item_highlights_length:
+    severity: WARNING
+    max_length: 30
+    source:
+      status: unverified
+
   search_terms_length:
     severity: WARNING
     max_bytes: 20

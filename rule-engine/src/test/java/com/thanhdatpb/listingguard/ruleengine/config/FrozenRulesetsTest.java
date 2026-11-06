@@ -21,6 +21,25 @@ class FrozenRulesetsTest {
     }
 
     @Test
+    void amazon202611IsUnchanged() {
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-11.yaml");
+
+        assertThat(config.version()).isEqualTo("amazon-2026-11");
+        assertThat(config.contentHash())
+                .isEqualTo("9ede48e885e91644521dd9568b2cfbf9a292954a063bf9f52d5fe9d707509063");
+    }
+
+    @Test
+    void amazon202612IsADifferentVersionThatKeepsEveryRuleOfTheOldOne() {
+        RulesetConfig old = RulesetLoader.loadClasspath("rulesets/amazon-2026-11.yaml");
+        RulesetConfig current = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
+
+        assertThat(current.version()).isEqualTo("amazon-2026-12");
+        assertThat(current.contentHash()).isNotEqualTo(old.contentHash());
+        assertThat(current.rules().keySet()).containsAll(old.rules().keySet()).contains("item_highlights_length");
+    }
+
+    @Test
     void etsy202611IsADifferentVersionWithDifferentContent() {
         RulesetConfig old = RulesetLoader.loadClasspath("rulesets/etsy-2026-10.yaml");
         RulesetConfig current = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");

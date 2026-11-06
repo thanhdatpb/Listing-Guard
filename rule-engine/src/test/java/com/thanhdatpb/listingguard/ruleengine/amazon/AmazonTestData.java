@@ -10,7 +10,7 @@ import java.util.List;
 /** Shared fixtures. Limits are read from the real ruleset so tests never hard-code them. */
 final class AmazonTestData {
 
-    static final RulesetConfig CONFIG = RulesetLoader.loadClasspath("rulesets/amazon-2026-11.yaml");
+    static final RulesetConfig CONFIG = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
 
     private AmazonTestData() {
     }
@@ -54,6 +54,13 @@ final class AmazonTestData {
     static Listing withDescription(String description) {
         Listing base = valid();
         return listing(base.title(), base.brand(), base.bulletPoints(), description, base.searchTerms(), base.productType());
+    }
+
+    static Listing withItemHighlights(String itemHighlights) {
+        Listing base = valid();
+        return new Listing(base.title(), base.description(), base.tags(), base.price(), base.category(), base.materials(),
+                base.images(), base.quantity(), base.whoMade(), base.whenMade(), base.brand(), base.bulletPoints(),
+                base.searchTerms(), base.productType(), itemHighlights);
     }
 
     static Listing withProductType(String productType) {

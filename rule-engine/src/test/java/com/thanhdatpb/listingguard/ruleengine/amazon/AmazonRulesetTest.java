@@ -26,12 +26,12 @@ class AmazonRulesetTest {
     @Test
     void loadsTheAmazonRuleset() {
         assertThat(CONFIG.marketplace()).isEqualTo("AMAZON");
-        assertThat(CONFIG.version()).isEqualTo("amazon-2026-11");
-        assertThat(CONFIG.checkedAt()).isEqualTo(LocalDate.of(2026, 10, 28));
+        assertThat(CONFIG.version()).isEqualTo("amazon-2026-12");
+        assertThat(CONFIG.checkedAt()).isEqualTo(LocalDate.of(2026, 11, 6));
         assertThat(CONFIG.contentHash()).matches("[0-9a-f]{64}");
         assertThat(CONFIG.rules()).containsOnlyKeys("required_fields", "title_length", "title_repeated_words",
-                "title_forbidden_chars", "bullet_count", "bullet_length", "search_terms_length", "prohibited_content",
-                "category_not_covered");
+                "title_forbidden_chars", "bullet_count", "bullet_length", "item_highlights_length", "search_terms_length",
+                "prohibited_content", "category_not_covered");
     }
 
     @Test
@@ -61,6 +61,7 @@ class AmazonRulesetTest {
         assertRule("title_forbidden_chars", Severity.WARNING, SourceStatus.SECONDARY);
         assertRule("bullet_count", Severity.WARNING, SourceStatus.UNVERIFIED);
         assertRule("bullet_length", Severity.WARNING, SourceStatus.UNVERIFIED);
+        assertRule("item_highlights_length", Severity.WARNING, SourceStatus.SECONDARY);
         assertRule("search_terms_length", Severity.WARNING, SourceStatus.SECONDARY);
         assertRule("prohibited_content", Severity.WARNING, SourceStatus.SECONDARY);
         assertRule("category_not_covered", Severity.INFO, SourceStatus.UNVERIFIED);
@@ -70,6 +71,24 @@ class AmazonRulesetTest {
         RuleSettings settings = CONFIG.rule(id);
         assertThat(settings.severity()).as(id).isEqualTo(severity);
         assertThat(settings.source().status()).as(id).isEqualTo(status);
+    }
+
+    @Test
+    void theTitleAndItemHighlightsSourcesNameTheJune2026Announcement() {
+        // secondary, never verified: the official help page needs a Seller Central login (ADR-006)
+        for (String id : List.of("title_length", "item_highlights_length")) {
+            assertThat(CONFIG.rule(id).source().status()).as(id).isEqualTo(SourceStatus.SECONDARY);
+            assertThat(CONFIG.rule(id).source().urls()).as(id).containsExactly(
+                    "https://ppc.land/amazon-cuts-product-title-limit-to-75-characters-on-july-27/");
+        }
+        assertThat(CONFIG.rule("title_length").source().note()).contains("June 10, 2026", "July 27, 2026", "75 characters");
+        assertThat(CONFIG.rule("item_highlights_length").source().note()).contains("June 10, 2026", "July 27, 2026", "125");
+    }
+
+    @Test
+    void prohibitedContentAlsoScansTheItemHighlights() {
+        assertThat(CONFIG.rule("prohibited_content").stringListParam("fields"))
+                .containsExactly("title", "description", "bullet_points", "item_highlights");
     }
 
     @Test
