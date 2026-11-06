@@ -16,6 +16,7 @@
         <module>rule-engine</module>
         <module>rag-analyzer</module>
         <module>trademark-scanner</module>
+        <module>variation-checks</module>
         <module>api</module>
     </modules>
 
@@ -53,6 +54,11 @@
             <dependency>
                 <groupId>com.thanhdatpb.listingguard</groupId>
                 <artifactId>trademark-scanner</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thanhdatpb.listingguard</groupId>
+                <artifactId>variation-checks</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
