@@ -239,7 +239,10 @@ class PlanQuotaApiIntegrationTest {
         assertThat(usage.get("resetAt").asText()).isEqualTo("2026-12-01T00:00:00Z");
         List<String> packs = new ArrayList<>();
         usage.get("packs").forEach(pack -> packs.add(pack.asText()));
-        assertThat(packs).containsExactly("batch", "listing-rules", "sheet-connector", "trademark-risk");
+        // the packs of the plan as the table has them (sorted), not a list repeated here
+        assertThat(packs).containsExactlyElementsOf(jdbc.queryForList(
+                "SELECT pack_id FROM plan_pack WHERE plan_code = 'SELLER' ORDER BY pack_id", String.class));
+        assertThat(packs).contains(Pack.TRADEMARK_RISK.id(), Pack.VARIATION_CHECKS.id());
     }
 
     @Test

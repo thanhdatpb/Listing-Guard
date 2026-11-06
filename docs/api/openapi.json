@@ -367,7 +367,7 @@
           },
           "packs" : {
             "description" : "The packs the client may use.",
-            "example" : [ "batch", "listing-rules", "sheet-connector", "trademark-risk" ],
+            "example" : [ "batch", "listing-rules", "sheet-connector", "trademark-risk", "variation-checks" ],
             "items" : {
               "type" : "string"
             },
@@ -1618,7 +1618,7 @@
                 "example" : {
                   "enforced" : true,
                   "monthlyQuota" : 1000,
-                  "packs" : [ "batch", "listing-rules", "sheet-connector", "trademark-risk" ],
+                  "packs" : [ "batch", "listing-rules", "sheet-connector", "trademark-risk", "variation-checks" ],
                   "periodStart" : "2026-11-01",
                   "plan" : "SELLER",
                   "remaining" : 958,

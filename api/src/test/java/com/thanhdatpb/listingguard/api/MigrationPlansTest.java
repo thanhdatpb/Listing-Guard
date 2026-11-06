@@ -90,6 +90,46 @@ class MigrationPlansTest {
     }
 
     @Test
+    void v22GivesVariationChecksToSellerAndProOnlyAndKeepsWhatAnOperatorSet() throws Exception {
+        flyway("21").migrate();
+        try (Connection connection = open(); Statement statement = connection.createStatement()) {
+            // an operator removed a pack from SELLER before the upgrade; the migration must not put it back
+            statement.executeUpdate("DELETE FROM plan_pack WHERE plan_code = 'SELLER' AND pack_id = 'batch'");
+            assertThatThrownBy(() -> statement.executeUpdate(
+                    "INSERT INTO plan_pack (plan_code, pack_id) VALUES ('SELLER', 'variation-checks')"))
+                    .as("V19's constraint does not know the pack yet")
+                    .isInstanceOf(SQLException.class).hasMessageContaining("ck_plan_pack_pack_id");
+
+            flyway("22").migrate();
+
+            assertThat(column(statement, "SELECT pack_id FROM plan_pack WHERE plan_code = 'FREE'"))
+                    .containsExactlyInAnyOrder("listing-rules");
+            assertThat(column(statement, "SELECT pack_id FROM plan_pack WHERE plan_code = 'SELLER'"))
+                    .containsExactlyInAnyOrder("listing-rules", "trademark-risk", "sheet-connector", "variation-checks");
+            assertThat(column(statement, "SELECT pack_id FROM plan_pack WHERE plan_code = 'PRO'"))
+                    .containsExactlyInAnyOrder("listing-rules", "trademark-risk", "policy-analyzer", "batch",
+                            "sheet-connector", "variation-checks");
+            // the constraint still refuses a pack that is not in the enum
+            assertThatThrownBy(() -> statement.executeUpdate("INSERT INTO plan_pack (plan_code, pack_id) VALUES ('FREE', 'image-compliance')"))
+                    .isInstanceOf(SQLException.class).hasMessageContaining("ck_plan_pack_pack_id");
+        }
+    }
+
+    @Test
+    void v22MigratesAlsoWhenAnOperatorRemovedAPlanRow() throws Exception {
+        flyway("21").migrate();
+        try (Connection connection = open(); Statement statement = connection.createStatement()) {
+            statement.executeUpdate("DELETE FROM plan_pack WHERE plan_code = 'PRO'");
+            statement.executeUpdate("DELETE FROM plan WHERE code = 'PRO'");
+
+            flyway("22").migrate();
+
+            assertThat(column(statement, "SELECT code FROM plan")).containsExactlyInAnyOrder("FREE", "SELLER");
+            assertThat(column(statement, "SELECT pack_id FROM plan_pack WHERE plan_code = 'SELLER'")).contains("variation-checks");
+        }
+    }
+
+    @Test
     void theJavaEnumsAreExactlyTheSeededAndCheckedValues() throws Exception {
         flyway("latest").migrate();
         try (Connection connection = open(); Statement statement = connection.createStatement()) {

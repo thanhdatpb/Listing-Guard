@@ -96,8 +96,7 @@ class PlansOffIntegrationTest {
                 .andExpect(jsonPath("$.used").value(0))
                 .andExpect(jsonPath("$.periodStart").isNotEmpty())
                 .andExpect(jsonPath("$.resetAt").isNotEmpty())
-                .andExpect(jsonPath("$.packs", Matchers.contains("batch", "listing-rules", "policy-analyzer", "sheet-connector",
-                        "trademark-risk")));
+                .andExpect(jsonPath("$.packs", Matchers.contains(Pack.allIds().toArray(new String[0]))));
     }
 
     @Test

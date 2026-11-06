@@ -432,7 +432,7 @@ public final class ApiExamples {
               "remaining": 958,
               "periodStart": "2026-11-01",
               "resetAt": "2026-12-01T00:00:00Z",
-              "packs": ["batch", "listing-rules", "sheet-connector", "trademark-risk"]
+              "packs": ["batch", "listing-rules", "sheet-connector", "trademark-risk", "variation-checks"]
             }
             """;
 
