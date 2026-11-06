@@ -67,7 +67,10 @@ class CheckControllerIntegrationTest {
     @SpyBean
     RuleEngine ruleEngine;
 
-    /** A listing that satisfies every Etsy rule; the title makes it unique so tests never share a cached result. */
+    /**
+     * A listing that satisfies every Etsy rule; the title makes it unique so tests never share a cached result. The id is one
+     * word (no hyphens): the title rules split a title into words, and two equal groups of a hyphenated UUID would be a repeated word.
+     */
     private String validBody() {
         return """
                 {
@@ -85,7 +88,7 @@ class CheckControllerIntegrationTest {
                     "when_made": "made_to_order"
                   }
                 }
-                """.formatted(UUID.randomUUID());
+                """.formatted(UUID.randomUUID().toString().replace("-", ""));
     }
 
     private JsonNode postOk(String body) throws Exception {

@@ -43,6 +43,8 @@ class RulesetLoaderTest {
         assertThat(config.contentHash()).matches("[0-9a-f]{64}");
         assertThat(config.rules()).containsOnlyKeys("title_length", "title_characters", "title_repeated_special_chars",
                 "title_word_count", "title_repeated_words", "title_promotional_terms",
+                "personalization_question_count", "personalization_question_text", "personalization_dropdown_options",
+                "personalization_upload_files", "personalization_instructions_length", "personalization_free_text_sensitive",
                 "tag_count", "tag_length", "tag_characters", "duplicate_tags", "required_fields",
                 "price_quantity_positive", "banned_words");
     }
@@ -79,6 +81,19 @@ class RulesetLoaderTest {
         assertThat(config.rule("title_word_count").source().status()).isEqualTo(SourceStatus.SECONDARY);
         assertThat(config.rule("title_repeated_words").source().status()).isEqualTo(SourceStatus.SECONDARY);
         assertThat(config.rule("title_promotional_terms").source().status()).isEqualTo(SourceStatus.SECONDARY);
+
+        // Hard limits the Etsy developer guide states are verified ERRORs; what Etsy describes two ways is a secondary WARNING;
+        // our own hint is an unverified INFO.
+        for (String id : java.util.List.of("personalization_question_count", "personalization_question_text",
+                "personalization_dropdown_options", "personalization_upload_files")) {
+            assertThat(config.rule(id).severity()).as(id).isEqualTo(Severity.ERROR);
+            assertThat(config.rule(id).source().status()).as(id).isEqualTo(SourceStatus.VERIFIED);
+            assertThat(config.rule(id).source().urls()).as(id).isNotEmpty();
+        }
+        assertThat(config.rule("personalization_instructions_length").severity()).isEqualTo(Severity.WARNING);
+        assertThat(config.rule("personalization_instructions_length").source().status()).isEqualTo(SourceStatus.SECONDARY);
+        assertThat(config.rule("personalization_free_text_sensitive").severity()).isEqualTo(Severity.INFO);
+        assertThat(config.rule("personalization_free_text_sensitive").source().status()).isEqualTo(SourceStatus.UNVERIFIED);
     }
 
     @Test

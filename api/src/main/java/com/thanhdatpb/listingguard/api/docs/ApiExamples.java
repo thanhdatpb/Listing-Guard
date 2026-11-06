@@ -484,7 +484,27 @@ public final class ApiExamples {
                 {"field": "tags", "ruleId": "tag_count", "kind": "MAX_COUNT", "value": 13, "unit": "ITEMS",
                  "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true},
                 {"field": "tags", "ruleId": "tag_length", "kind": "MAX_LENGTH", "value": 20, "unit": "CODE_POINTS",
-                 "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true}
+                 "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true},
+                {"field": "personalization.questions", "ruleId": "personalization_question_count", "kind": "MAX_COUNT",
+                 "value": 5, "unit": "ITEMS", "severity": "ERROR", "sourceStatus": "VERIFIED", "enabled": true},
+                {"field": "personalization.questions[type=UPLOAD]", "ruleId": "personalization_question_count",
+                 "kind": "MAX_COUNT", "value": 1, "unit": "ITEMS", "severity": "ERROR", "sourceStatus": "VERIFIED",
+                 "enabled": true},
+                {"field": "personalization.questions[].question_text", "ruleId": "personalization_question_text",
+                 "kind": "MAX_LENGTH", "value": 45, "unit": "CODE_POINTS", "severity": "ERROR", "sourceStatus": "VERIFIED",
+                 "enabled": true},
+                {"field": "personalization.questions[type=DROPDOWN].options", "ruleId": "personalization_dropdown_options",
+                 "kind": "MAX_COUNT", "value": 30, "unit": "ITEMS", "severity": "ERROR", "sourceStatus": "VERIFIED",
+                 "enabled": true},
+                {"field": "personalization.questions[type=DROPDOWN].options", "ruleId": "personalization_dropdown_options",
+                 "kind": "MAX_LENGTH", "value": 20, "unit": "CODE_POINTS", "severity": "ERROR", "sourceStatus": "VERIFIED",
+                 "enabled": true},
+                {"field": "personalization.questions[type=UPLOAD].max_files", "ruleId": "personalization_upload_files",
+                 "kind": "MAX_COUNT", "value": 10, "unit": "ITEMS", "severity": "ERROR", "sourceStatus": "VERIFIED",
+                 "enabled": true},
+                {"field": "personalization.questions[].instructions", "ruleId": "personalization_instructions_length",
+                 "kind": "MAX_LENGTH", "value": 120, "unit": "CODE_POINTS", "severity": "WARNING",
+                 "sourceStatus": "SECONDARY", "enabled": true}
               ]
             }
             """;

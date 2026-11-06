@@ -30,7 +30,9 @@ public record RulesetLimitsResult(
     public record LimitView(
             @Schema(description = "The field of the standard input (`docs/input-schema.md`) the limit applies to, such as `title`, "
                     + "`tags`, `bullet_points` or `search_terms`. For a list field, `MAX_COUNT` limits the list and "
-                    + "`MAX_LENGTH` or `MAX_BYTES` limit each item.", example = "title")
+                    + "`MAX_LENGTH` or `MAX_BYTES` limit each item. A field inside the Etsy `personalization` block is a path: "
+                    + "`[]` stands for every question, and `[type=DROPDOWN]` or `[type=UPLOAD]` for the questions of that type, "
+                    + "for example `personalization.questions[].question_text`.", example = "title")
             String field,
             @Schema(description = "The rule that enforces the limit; the `ruleId` of its findings.", example = "title_length")
             String ruleId,

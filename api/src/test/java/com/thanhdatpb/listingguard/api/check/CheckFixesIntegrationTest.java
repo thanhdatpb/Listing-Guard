@@ -229,6 +229,6 @@ class CheckFixesIntegrationTest {
                     "when_made": "made_to_order"
                   }
                 }
-                """.formatted(UUID.randomUUID());
+                """.formatted(UUID.randomUUID().toString().replace("-", ""));
     }
 }

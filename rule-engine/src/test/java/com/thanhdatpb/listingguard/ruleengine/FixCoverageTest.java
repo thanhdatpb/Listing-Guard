@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.core.listing.Money;
+import com.thanhdatpb.listingguard.core.listing.PersonalizationQuestion;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetLoader;
 import java.math.BigDecimal;
@@ -44,6 +45,30 @@ class FixCoverageTest {
         return text.toString();
     }
 
+    /** Personalization questions that break every personalization rule once, with the numbers read from the ruleset. */
+    private static List<PersonalizationQuestion> brokenQuestions(RulesetConfig config) {
+        int maxQuestions = config.rule("personalization_question_count").intParam("max_count");
+        int maxText = config.rule("personalization_question_text").intParam("max_length");
+        int maxOptions = config.rule("personalization_dropdown_options").intParam("max_count");
+        int maxLabel = config.rule("personalization_dropdown_options").intParam("max_length");
+        int maxFiles = config.rule("personalization_upload_files").intParam("max_files");
+        int maxInstructions = config.rule("personalization_instructions_length").intParam("max_length");
+
+        List<String> options = new java.util.ArrayList<>(List.of("Dup", "Dup", "x".repeat(maxLabel + 1)));
+        for (int i = 0; options.size() <= maxOptions; i++) {
+            options.add("Option " + i);
+        }
+        List<PersonalizationQuestion> questions = new java.util.ArrayList<>(List.of(
+                new PersonalizationQuestion("TEXT", "Player name", "x".repeat(maxInstructions + 1), true, 20, List.of(), null),
+                new PersonalizationQuestion("TEXT", "x".repeat(maxText + 1), null, null, null, List.of(), null),
+                new PersonalizationQuestion("DROPDOWN", "Font", null, null, null, options, null),
+                new PersonalizationQuestion("UPLOAD", "Photo A", null, null, null, List.of("Front"), 1),
+                new PersonalizationQuestion("UPLOAD", "Photo B", null, null, null, List.of(), maxFiles + 1),
+                new PersonalizationQuestion("TEXT", null, null, null, null, List.of(), null)));
+        assertThat(questions.size()).as("more questions than allowed").isGreaterThan(maxQuestions);
+        return questions;
+    }
+
     private static Set<String> ruleIds(List<Finding> findings, boolean withFix) {
         return findings.stream().filter(f -> (f.fix() != null) == withFix).map(Finding::ruleId)
                 .collect(Collectors.toCollection(TreeSet::new));
@@ -60,10 +85,11 @@ class FixCoverageTest {
         for (int i = 0; tags.size() <= tagCount; i++) {
             tags.add("filler" + i);
         }
+        List<PersonalizationQuestion> questions = brokenQuestions(config);
         String title = "replica sale a & b & c mug mug \u0007 " + longWords(titleMax, titleMax, maxWords) + " "
                 + words(maxWords * 8);
-        Listing listing = new Listing(title, null, tags,
-                new Money(BigDecimal.ZERO, "USD"), null, List.of(), List.of(), 0, null, null);
+        Listing listing = new Listing(title, null, tags, new Money(BigDecimal.ZERO, "USD"), null, List.of(), List.of(), 0,
+                null, null, null, List.of(), null, null, null, questions);
 
         List<Finding> findings = ENGINE.runDetailed(listing, config).findings();
 

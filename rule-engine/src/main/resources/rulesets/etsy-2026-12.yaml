@@ -1,8 +1,13 @@
 # Etsy ruleset. Thresholds, word lists and severities live here; rule logic lives in Java (ADR-001).
 #
-# Successor of etsy-2026-11, which is kept unchanged as history (as is etsy-2026-10). Changes: the title guidance of the
-# Etsy Seller Handbook of August 2025 (title_word_count, title_repeated_words, title_promotional_terms) and banned_words
-# switched off, because its word list never had a source.
+# Successor of etsy-2026-11, which is kept unchanged as history (as is etsy-2026-10). Changes:
+#   - the structured personalization questions of Etsy (the personalization_* rules), after Etsy's developer guide
+#     "Personalization migration". Values that guide states are verified and rated ERROR; the instructions limit, which
+#     Etsy itself describes two ways, is secondary and a WARNING;
+#   - the title guidance of the Etsy Seller Handbook of August 2025 (title_word_count, title_repeated_words,
+#     title_promotional_terms), secondary;
+#   - banned_words switched off, because its word list never had a source.
+# tag_count_underused is not in this version: it needs a fix action that adds a value (ADR-014, Deferred).
 #
 # Any change to this file changes its content hash. Bump `version` for every change: the API refuses to start when a
 # registered version has a different hash (ADR-002).
@@ -221,3 +226,75 @@ rules:
     source:
       status: unverified
       note: Sample words only, switched off since etsy-2026-12 because no Etsy policy backs them; replace with a list backed by Etsy policy before switching it on.
+
+  # ---- Structured personalization (Etsy developer guide "Personalization migration") ------------------------------------
+  # Field paths start at the `personalization` block of the input (docs/input-schema.md). Every number below is read by its
+  # rule; none is written in Java.
+
+  personalization_question_count:
+    severity: ERROR
+    max_count: 5
+    # Upload questions among them, labeled or not.
+    max_upload_questions: 1
+    source:
+      status: verified
+      urls:
+        - https://developers.etsy.com/documentation/tutorials/personalization-migration/
+      note: 'Etsy developer guide "Personalization migration", "Writing listing personalization data": "The `personalization_questions` array must contain between 1 and 5 elements" and "At most one upload-type question (either `unlabeled_upload` or `labeled_upload`) may be sent per listing." An empty list is no personalization, not an error.'
+
+  personalization_question_text:
+    severity: ERROR
+    min_length: 1
+    max_length: 45
+    source:
+      status: verified
+      urls:
+        - https://developers.etsy.com/documentation/tutorials/personalization-migration/
+      note: 'Same guide, field constraints: "`question_text` - Must be between 1 and 45 characters". The guide has two more constraints on it that are not checked here: it must begin with a letter or number, and it must not contain more than one word starting with 3+ capitalized letters. A question with no text is reported as below the minimum.'
+
+  personalization_dropdown_options:
+    severity: ERROR
+    min_count: 1
+    max_count: 30
+    max_length: 20
+    # Whether "Red" and "red" are the same label. The guide does not say, so only exact repeats are reported.
+    case_insensitive: false
+    source:
+      status: verified
+      urls:
+        - https://developers.etsy.com/documentation/tutorials/personalization-migration/
+      note: 'Same guide, options of a dropdown: "Must contain 1 - 30 options", "Each label must be 1 - 20 characters", "Labels must be unique within the question". The guide does not say whether uniqueness ignores case or surrounding blanks, so only exact repeats (after trimming) are reported (case_insensitive false); a stricter reading would be a new ruleset version. A blank label is dropped by the input normalizer, so it cannot be reported as too short. The labels of a labeled upload question (1 - 45 characters in the guide) are not checked.'
+
+  personalization_upload_files:
+    severity: ERROR
+    max_files: 10
+    # A labeled upload (an upload question with options, one label per file) needs at least this many files.
+    labeled_min_files: 2
+    source:
+      status: verified
+      urls:
+        - https://developers.etsy.com/documentation/tutorials/personalization-migration/
+      note: 'Same guide: "`max_allowed_files` - Required for upload questions ... Must be between 1 and 10 - For `labeled_upload` questions, `max_allowed_files` must be 2 or more". Only the upper bound and the labeled minimum are checked; an upload question that sends no max_files, or a number below 1 on an unlabeled one, is not reported.'
+
+  personalization_instructions_length:
+    severity: WARNING
+    max_length: 120
+    source:
+      status: secondary
+      urls:
+        - https://developers.etsy.com/documentation/tutorials/personalization-migration/
+        - https://github.com/etsy/open-api/discussions/1551
+      note: 'The guide says "We are introducing a 120 character limit on the `instructions` field" and "Must not exceed 120 characters when provided". In discussion 1551 (March 2026) an account answering for Etsy says that during the current migration phase `instructions` still accepts up to 256 characters, and that the 120 limit is enforced only after the general launch (GA) and only for an integration that opts in with `supports_multiple_personalization_questions`; it calls the earlier 120 in the documentation incorrect. The two statements disagree, which is why this is secondary and a WARNING, not an ERROR. The page the discussion points to for the corrected text was not read.'
+
+  personalization_free_text_sensitive:
+    # Never above INFO: the rule refuses to start otherwise.
+    severity: INFO
+    # A free text (TEXT) question whose text has one of these words (whole word, ignoring case) gets a reminder.
+    keywords:
+      - name
+      - number
+      - team
+      - player
+    source:
+      status: unverified
+      note: 'Our own hint, not an Etsy rule and not a trademark verdict: a buyer who can type any text can type a team or a player that is a trademark, so a dropdown whose choices the seller sets keeps that out. The word list is ours. The trademark check (POST /api/v1/trademark-checks) is separate and does not read personalization questions.'

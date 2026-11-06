@@ -149,7 +149,7 @@
             "type" : "boolean"
           },
           "field" : {
-            "description" : "The field of the standard input (`docs/input-schema.md`) the limit applies to, such as `title`, `tags`, `bullet_points` or `search_terms`. For a list field, `MAX_COUNT` limits the list and `MAX_LENGTH` or `MAX_BYTES` limit each item.",
+            "description" : "The field of the standard input (`docs/input-schema.md`) the limit applies to, such as `title`, `tags`, `bullet_points` or `search_terms`. For a list field, `MAX_COUNT` limits the list and `MAX_LENGTH` or `MAX_BYTES` limit each item. A field inside the Etsy `personalization` block is a path: `[]` stands for every question, and `[type=DROPDOWN]` or `[type=UPLOAD]` for the questions of that type, for example `personalization.questions[].question_text`.",
             "example" : "title",
             "type" : "string"
           },
@@ -1036,6 +1036,69 @@
                         "sourceStatus" : "SECONDARY",
                         "unit" : "CODE_POINTS",
                         "value" : 20
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "personalization_question_count",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "ITEMS",
+                        "value" : 5
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[type=UPLOAD]",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "personalization_question_count",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "ITEMS",
+                        "value" : 1
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[].question_text",
+                        "kind" : "MAX_LENGTH",
+                        "ruleId" : "personalization_question_text",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "CODE_POINTS",
+                        "value" : 45
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[type=DROPDOWN].options",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "personalization_dropdown_options",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "ITEMS",
+                        "value" : 30
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[type=DROPDOWN].options",
+                        "kind" : "MAX_LENGTH",
+                        "ruleId" : "personalization_dropdown_options",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "CODE_POINTS",
+                        "value" : 20
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[type=UPLOAD].max_files",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "personalization_upload_files",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "ITEMS",
+                        "value" : 10
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[].instructions",
+                        "kind" : "MAX_LENGTH",
+                        "ruleId" : "personalization_instructions_length",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "SECONDARY",
+                        "unit" : "CODE_POINTS",
+                        "value" : 120
                       } ],
                       "marketplace" : "ETSY",
                       "productType" : null,

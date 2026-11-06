@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.ruleengine.etsy;
 
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.core.listing.Money;
+import com.thanhdatpb.listingguard.core.listing.PersonalizationQuestion;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetLoader;
 import java.math.BigDecimal;
@@ -33,6 +34,26 @@ final class EtsyTestData {
         Listing base = valid();
         return new Listing(base.title(), description, base.tags(), base.price(), base.category(), base.materials(),
                 base.images(), base.quantity(), base.whoMade(), base.whenMade());
+    }
+
+    /** A valid listing with these personalization questions. */
+    static Listing withQuestions(PersonalizationQuestion... questions) {
+        Listing base = valid();
+        return new Listing(base.title(), base.description(), base.tags(), base.price(), base.category(), base.materials(),
+                base.images(), base.quantity(), base.whoMade(), base.whenMade(), null, List.of(), null, null, null,
+                List.of(questions));
+    }
+
+    static PersonalizationQuestion text(String question) {
+        return new PersonalizationQuestion(PersonalizationQuestion.TEXT, question, null, null, null, List.of(), null);
+    }
+
+    static PersonalizationQuestion dropdown(String question, String... options) {
+        return new PersonalizationQuestion(PersonalizationQuestion.DROPDOWN, question, null, null, null, List.of(options), null);
+    }
+
+    static PersonalizationQuestion upload(String question, Integer maxFiles, String... labels) {
+        return new PersonalizationQuestion(PersonalizationQuestion.UPLOAD, question, null, null, null, List.of(labels), maxFiles);
     }
 
     static Listing empty() {

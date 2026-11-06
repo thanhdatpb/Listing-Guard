@@ -67,7 +67,7 @@ class EtsyLimitsTest {
     void aRuleWithNoNumberDeclaresNoLimit() {
         assertThat(limits).extracting(RuleLimit::ruleId)
                 .doesNotContain("required_fields", "title_characters", "tag_characters", "banned_words", "duplicate_tags",
-                        "price_quantity_positive", "title_promotional_terms");
+                        "price_quantity_positive", "title_promotional_terms", "personalization_free_text_sensitive");
     }
 
     @Test
@@ -105,6 +105,35 @@ class EtsyLimitsTest {
         assertThat(occurrences.unit()).isEqualTo(Limit.Unit.OCCURRENCES);
         assertThat(ruleIds(EtsyTestData.listing(atLimit, List.of("mug")))).doesNotContain("title_repeated_special_chars");
         assertThat(ruleIds(EtsyTestData.listing(atLimit + character, List.of("mug")))).contains("title_repeated_special_chars");
+    }
+
+    @Test
+    void thePersonalizationLimitsAreTheNumbersOfTheRulesetWithTheirFieldPaths() {
+        String questions = "personalization.questions";
+        List<RuleLimit> personalization = limits.stream().filter(l -> l.ruleId().startsWith("personalization_")).toList();
+
+        assertThat(personalization).containsExactly(
+                expected("personalization_question_count", questions, Limit.Kind.MAX_COUNT, "max_count", Limit.Unit.ITEMS),
+                expected("personalization_question_count", questions + "[type=UPLOAD]", Limit.Kind.MAX_COUNT,
+                        "max_upload_questions", Limit.Unit.ITEMS),
+                expected("personalization_question_text", questions + "[].question_text", Limit.Kind.MAX_LENGTH, "max_length",
+                        Limit.Unit.CODE_POINTS),
+                expected("personalization_dropdown_options", questions + "[type=DROPDOWN].options", Limit.Kind.MAX_COUNT,
+                        "max_count", Limit.Unit.ITEMS),
+                expected("personalization_dropdown_options", questions + "[type=DROPDOWN].options", Limit.Kind.MAX_LENGTH,
+                        "max_length", Limit.Unit.CODE_POINTS),
+                expected("personalization_upload_files", questions + "[type=UPLOAD].max_files", Limit.Kind.MAX_COUNT,
+                        "max_files", Limit.Unit.ITEMS),
+                expected("personalization_instructions_length", questions + "[].instructions", Limit.Kind.MAX_LENGTH,
+                        "max_length", Limit.Unit.CODE_POINTS));
+    }
+
+    @Test
+    void noTwoPersonalizationLimitsShareAFieldAndKindSoACounterNeverTakesTheWrongOne() {
+        List<String> keys = limits.stream().filter(l -> l.ruleId().startsWith("personalization_"))
+                .map(l -> l.field() + "|" + l.kind()).toList();
+
+        assertThat(keys).doesNotHaveDuplicates();
     }
 
     @Test

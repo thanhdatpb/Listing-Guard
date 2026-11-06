@@ -25,6 +25,12 @@ public final class EtsyRules {
                 new TagLengthRule(),
                 new TagCharactersRule(),
                 new DuplicateTagsRule(),
-                new BannedWordsRule());
+                new BannedWordsRule(),
+                new PersonalizationQuestionCountRule(),
+                new PersonalizationQuestionTextRule(),
+                new PersonalizationDropdownOptionsRule(),
+                new PersonalizationUploadFilesRule(),
+                new PersonalizationInstructionsLengthRule(),
+                new PersonalizationFreeTextSensitiveRule());
     }
 }
