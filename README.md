@@ -389,7 +389,9 @@ severity. Each rule records where its values come from:
 | `duplicate_tags` | WARNING | unverified |
 | `banned_words` | WARNING | unverified: sample list only |
 
-`amazon-2026-11.yaml` is the Amazon ruleset. Amazon uses ERROR only for verified values, so most of its rules
+`amazon-2026-12.yaml` is the Amazon ruleset (`amazon-2026-11.yaml` is kept unchanged as history, like
+`etsy-2026-10.yaml`; a test pins its hash). It follows the Amazon announcement in the Seller Forums of June 10, 2026
+(effective July 27, 2026): a 75-character title and the new Item Highlights field. Amazon uses ERROR only for verified values, so most of its rules
 are WARNING (the sources are an Amazon announcement and forum replies; Seller Central help needs a login). A
 rule can be overridden per product type (`categories`) and switched off (`enabled: false`); no product type is
 overridden yet. See [ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md).
@@ -397,18 +399,19 @@ overridden yet. See [ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-seve
 | Rule | Severity | Source status |
 |---|---|---|
 | `required_fields` (`product_type`) | ERROR | verified: Listings Items API model |
-| `title_length` (max 200) | WARNING | secondary: Amazon announcement, Jan 2025 |
+| `title_length` (max 75) | WARNING | secondary: Seller Forums announcement of June 10, 2026, read in an article (the official page needs a Seller Central login). Media is exempt at Amazon; here it needs an override, none yet |
 | `title_repeated_words` (max 2, articles, prepositions, conjunctions exempt) | WARNING | secondary; the exempt list is ours |
 | `title_forbidden_chars` (`! $ ? _ { } ^ ¬ ¦`, unless in the brand) | WARNING | secondary |
 | `bullet_count` (max 5) | WARNING | unverified |
 | `bullet_length` | WARNING, **switched off** | unverified: sources disagree |
+| `item_highlights_length` (max 125 characters) | WARNING | secondary: same announcement; no fix suggestion |
 | `search_terms_length` (max 249 bytes) | WARNING | secondary: Amazon staff, Seller Forums |
-| `prohibited_content` (web addresses, emails) | WARNING | secondary |
+| `prohibited_content` (web addresses, emails; title, description, bullets and `item_highlights`) | WARNING | secondary; scanning `item_highlights` is our extension of the same ban |
 | `category_not_covered` | INFO | not an Amazon rule: the product type has no overrides (only reported when the ruleset has some) |
 
 To change a threshold or a severity, create a new ruleset file with a new `version`: the API refuses to
 start if a registered version has different content (see [ADR-002](docs/adr/ADR-002-ruleset-versioning.md)).
-`etsy-2026-10.yaml` is kept unchanged as history (a test pins its hash) and is no longer loaded.
+`etsy-2026-10.yaml` and `amazon-2026-11.yaml` are kept unchanged as history (a test pins their hashes) and are no longer loaded.
 Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `application.yml`.
 
 ## Roadmap
@@ -426,7 +429,9 @@ What follows, in this order, is **not built yet**:
 
 1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
    on a real USPTO file, PR A2c (the latest transaction of a serial number wins, which a catalog made of daily files
-   needs), and A4, the evaluation that would give the first measured numbers.
+   needs), and A4, the evaluation that would give the first measured numbers. The trademark pack does not scan the
+   Amazon `item_highlights` field yet (the rule checks do): adding it is a change of the trademark ruleset and of its
+   canonical input, so it is a separate step.
 2. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)). Deferred; nothing is implemented.
 3. After step 1: run the retrieval evaluation and record the measured results (this needs an embedding provider: an API
    key or Ollama), then build the policy analyzer ([ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md)). Only parts

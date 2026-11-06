@@ -317,7 +317,7 @@ Etsy finding rules and what they report: `required_fields`, `title_length`, `tit
 ### Amazon
 
 Amazon field paths use the same snake_case names as the request: `title`, `brand`, `description`, `search_terms`,
-`product_type`, `bullet_points` (the list as a whole, for example too many bullets) and `bullet_points[i]` (the
+`product_type`, `item_highlights`, `bullet_points` (the list as a whole, for example too many bullets) and `bullet_points[i]` (the
 bullet at zero-based position `i` in the cleaned list; blank bullets are dropped, so match by `value`).
 
 | `ruleId` | `field` | `value` | Severity | Source status |
@@ -327,16 +327,25 @@ bullet at zero-based position `i` in the cleaned list; blank bullets are dropped
 | `title_repeated_words` | `title` | the word (one finding per word) | WARNING | secondary |
 | `title_forbidden_chars` | `title` | the character (one finding per character; allowed when the `brand` contains it) | WARNING | secondary |
 | `bullet_count` | `bullet_points` | the count, as text | WARNING | unverified |
+| `item_highlights_length` | `item_highlights` | the Item Highlights text (optional field; no fix suggestion) | WARNING | secondary |
 | `search_terms_length` | `search_terms` | the search terms (limit in UTF-8 **bytes**, not characters) | WARNING | secondary |
-| `prohibited_content` | `title`, `description`, `bullet_points[i]` | the matched web address or email | WARNING | secondary |
+| `prohibited_content` | `title`, `description`, `bullet_points[i]`, `item_highlights` | the matched web address or email | WARNING | secondary |
 | `category_not_covered` | `product_type` | the product type as sent | INFO | not an Amazon rule; only reported once the ruleset overrides at least one product type |
 
 `bullet_length` is in the ruleset but switched off: the sources disagree on the limit. Amazon uses ERROR only
-for verified values; everything else is WARNING (see ADR-006). The limits are in `amazon-2026-11.yaml`, each with
+for verified values; everything else is WARNING (see ADR-006). The limits are in `amazon-2026-12.yaml`, each with
 its source and status. Numbers in the messages are the real limits and the real counts.
 
+**What changed with `amazon-2026-12`.** The title limit is 75 characters, down from 200 (Amazon announced it in the
+Seller Forums on June 10, 2026, effective July 27, 2026; Amazon rewrites a longer title itself), so a title that was
+clean before can now get a `title_length` WARNING, with a suggested cut at a word boundary when fixes are enabled. The
+optional input field `item_highlights` is checked by `item_highlights_length` and scanned by `prohibited_content`. The
+`analysisVersion` of Amazon checks is now `amazon-2026-12`, so an Amazon listing that was checked before is checked
+again. A listing that does not send `item_highlights` has the same content hash as before. The Amazon limits are
+`secondary`, never `verified`, and the trademark check does not read `item_highlights` yet.
+
 **Product types.** Some Amazon limits depend on the product type. The ruleset can override a rule per product
-type, but `amazon-2026-11` overrides none, so every listing is checked with the same limits and nothing is
+type, but `amazon-2026-12` overrides none, so every listing is checked with the same limits and nothing is
 reported about product types. Once a ruleset overrides some product types, a listing whose product type has no
 override gets one `INFO` finding, `category_not_covered`, to say that category-specific limits were not checked;
 it needs no change in the listing. A listing without `product_type` gets the `required_fields` ERROR instead. The

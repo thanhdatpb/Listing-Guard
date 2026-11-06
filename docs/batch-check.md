@@ -94,7 +94,7 @@ docker compose run --rm batch-check \
 docker compose run --rm batch-check \
   --input=/batch/input/amazon-flat-file.txt \
   --mapping=/batch/mappings/my-amazon-mapping.yaml \
-  --client=demo-client --marketplace=AMAZON --out=/batch/out/amazon-2026-11
+  --client=demo-client --marketplace=AMAZON --out=/batch/out/amazon-2026-12
 ```
 
 `./batch` of the repository is mounted at `/batch` in the container, so the paths above are `batch/input/...` on your
