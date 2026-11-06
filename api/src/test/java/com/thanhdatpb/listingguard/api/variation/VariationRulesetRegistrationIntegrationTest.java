@@ -73,7 +73,8 @@ class VariationRulesetRegistrationIntegrationTest {
         assertThat(textRulesets.get("AMAZON").config().packId()).isEqualTo("listing-rules");
         assertThatThrownBy(() -> textRulesets.get("variation-checks", "ETSY")).isInstanceOf(IllegalStateException.class);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ruleset_version WHERE pack_id = 'listing-rules' "
-                + "AND marketplace_code = 'ETSY' AND version = 'etsy-2026-11'", Integer.class)).isEqualTo(1);
+                + "AND marketplace_code = 'ETSY' AND version = ?", Integer.class,
+                textRulesets.get("ETSY").config().version())).isEqualTo(1);
     }
 
     @Test

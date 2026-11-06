@@ -22,6 +22,11 @@ public final class AmazonRules {
                 new ItemHighlightsLengthRule(),
                 new SearchTermsLengthRule(),
                 new ProhibitedContentRule(),
+                new CustomizationTextInputCountRule(),
+                new CustomizationDropdownOptionsRule(),
+                new CustomizationImageInputCountRule(),
+                new CustomizationTextInputMaxCharsRule(),
+                new CustomizationFreeTextSensitiveRule(),
                 new CategoryNotCoveredRule());
     }
 }

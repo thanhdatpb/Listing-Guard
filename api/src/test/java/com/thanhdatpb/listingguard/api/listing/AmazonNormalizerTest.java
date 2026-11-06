@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thanhdatpb.listingguard.core.listing.CustomizationSurface;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import java.math.BigDecimal;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class AmazonNormalizerTest {
@@ -145,6 +147,53 @@ class AmazonNormalizerTest {
         assertThat(listing.whoMade()).isNull();
         assertThat(listing.category()).isNull();
         assertThat(listing.materials()).isEmpty();
+    }
+
+    @Test
+    void customizationIsMappedAsWrittenExceptForTrimmingAndBlanks() throws Exception {
+        Listing listing = normalize("""
+                {"customization": {"surfaces": [
+                  {"name": " Front ",
+                   "text_inputs": [{"label": " Player name ", "max_chars": 20, "allowed_char_types": [" letters ", "", "digits"]},
+                                   {"label": "  "}],
+                   "dropdowns": [{"label": "Font", "options": [" Serif ", "", "Script", "Serif"]}],
+                   "image_inputs": [{"label": " Photo "}, {}]},
+                  {"name": "  "}
+                ]}}
+                """);
+
+        assertThat(listing.customizationSurfaces()).containsExactly(
+                new CustomizationSurface("Front",
+                        List.of(new CustomizationSurface.TextInput("Player name", 20, List.of("letters", "digits")),
+                                new CustomizationSurface.TextInput(null, null, List.of())),
+                        List.of(new CustomizationSurface.Dropdown("Font", List.of("Serif", "Script", "Serif"))),
+                        List.of(new CustomizationSurface.ImageInput("Photo"), new CustomizationSurface.ImageInput(null))),
+                new CustomizationSurface(null, List.of(), List.of(), List.of()));
+    }
+
+    @Test
+    void anAbsentOrUnreadableCustomizationIsNoSurface() throws Exception {
+        for (String json : new String[] {"{}", "{\"customization\": null}", "{\"customization\": []}",
+                "{\"customization\": \"x\"}", "{\"customization\": {}}", "{\"customization\": {\"surfaces\": {}}}",
+                "{\"customization\": {\"surfaces\": []}}", "{\"customization\": {\"surfaces\": [1, \"a\", null, []]}}"}) {
+            assertThat(normalize(json).customizationSurfaces()).as(json).isEmpty();
+        }
+    }
+
+    @Test
+    void entriesOfTheInputListsThatAreNotObjectsAreDroppedAndMaxCharsMustBeANumber() throws Exception {
+        Listing listing = normalize("""
+                {"customization": {"surfaces": [
+                  {"text_inputs": [5, "a", {"label": "Name", "max_chars": "20"}, {"label": "Note", "max_chars": 12.0}],
+                   "dropdowns": "Font", "image_inputs": [1, {"label": "Photo"}]}
+                ]}}
+                """);
+
+        CustomizationSurface surface = listing.customizationSurfaces().get(0);
+        assertThat(surface.textInputs()).extracting(CustomizationSurface.TextInput::label).containsExactly("Name", "Note");
+        assertThat(surface.textInputs().get(0).maxChars()).as("a string is not a number").isNull();
+        assertThat(surface.dropdowns()).isEmpty();
+        assertThat(surface.imageInputs()).extracting(CustomizationSurface.ImageInput::label).containsExactly("Photo");
     }
 
     @Test

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.thanhdatpb.listingguard.core.listing.CustomizationSurface;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.core.listing.Money;
 import com.thanhdatpb.listingguard.core.listing.PersonalizationQuestion;
@@ -150,6 +151,63 @@ class InputSchemaDocTest {
             assertThat(amazon.normalize(without(example, field))).as("Amazon field '%s' is read", field).isNotEqualTo(full);
         }
         assertThat(documentedFields("Amazon")).containsExactlyInAnyOrderElementsOf(fieldNames(example));
+    }
+
+    /** The field names in the first column of the table under the exact heading line (any level), up to the next heading. */
+    private static List<String> documentedFieldsUnder(String headingLine) throws IOException {
+        String text = doc().replace("\r\n", "\n");
+        int start = text.indexOf("\n" + headingLine + "\n");
+        assertThat(start).as("heading line '%s'", headingLine).isNotNegative();
+        int end = text.indexOf("\n#", start + 1);
+        String section = text.substring(start, end < 0 ? text.length() : end);
+        List<String> fields = new ArrayList<>();
+        Matcher row = Pattern.compile("^\\| `([a-z_]+)` \\|", Pattern.MULTILINE).matcher(section);
+        while (row.find()) {
+            fields.add(row.group(1));
+        }
+        return fields;
+    }
+
+    @Test
+    void theAmazonExampleCustomizationIsReadAsDocumented() throws IOException {
+        Listing listing = amazon.normalize(example("amazon-listing"));
+
+        assertThat(listing.customizationSurfaces()).containsExactly(new CustomizationSurface("Front",
+                List.of(new CustomizationSurface.TextInput("Name to print", 20, List.of("letters"))),
+                List.of(new CustomizationSurface.Dropdown("Font", List.of("Serif", "Script"))),
+                List.of(new CustomizationSurface.ImageInput("Photo"))));
+    }
+
+    @Test
+    void everyFieldOfACustomizationSurfaceAndOfItsInputsIsReadAndEveryDocumentedFieldIsInTheExample() throws IOException {
+        ObjectNode example = example("amazon-listing");
+        ObjectNode surface = (ObjectNode) example.get("customization").get("surfaces").get(0);
+        assertThat(fieldNames((ObjectNode) example.get("customization"))).containsExactly("surfaces");
+        assertThat(documentedFieldsUnder("## Amazon customization")).containsExactly("surfaces");
+
+        assertThat(documentedFieldsUnder("### Surfaces")).containsExactlyInAnyOrderElementsOf(fieldNames(surface));
+        assertThat(documentedFieldsUnder("### Text inputs"))
+                .containsExactlyInAnyOrderElementsOf(fieldNames((ObjectNode) surface.get("text_inputs").get(0)));
+        assertThat(documentedFieldsUnder("### Dropdowns"))
+                .containsExactlyInAnyOrderElementsOf(fieldNames((ObjectNode) surface.get("dropdowns").get(0)));
+        assertThat(documentedFieldsUnder("### Image inputs"))
+                .containsExactlyInAnyOrderElementsOf(fieldNames((ObjectNode) surface.get("image_inputs").get(0)));
+
+        Listing full = amazon.normalize(example);
+        for (String field : fieldNames(surface)) {
+            ObjectNode copy = example.deepCopy();
+            ((ObjectNode) copy.get("customization").get("surfaces").get(0)).remove(field);
+            assertThat(amazon.normalize(copy).customizationSurfaces()).as("surface field '%s' is read", field)
+                    .isNotEqualTo(full.customizationSurfaces());
+        }
+        for (String list : List.of("text_inputs", "dropdowns", "image_inputs")) {
+            for (String field : fieldNames((ObjectNode) surface.get(list).get(0))) {
+                ObjectNode copy = example.deepCopy();
+                ((ObjectNode) copy.get("customization").get("surfaces").get(0).get(list).get(0)).remove(field);
+                assertThat(amazon.normalize(copy).customizationSurfaces()).as("%s field '%s' is read", list, field)
+                        .isNotEqualTo(full.customizationSurfaces());
+            }
+        }
     }
 
     @Test

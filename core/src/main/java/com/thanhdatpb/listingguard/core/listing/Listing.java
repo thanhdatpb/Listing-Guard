@@ -15,6 +15,9 @@ import java.util.List;
  *
  * <p>{@code personalizationQuestions} are the structured personalization questions of an Etsy listing (empty when the seller
  * sent none). It is never null.
+ *
+ * <p>{@code customizationSurfaces} are the print surfaces of an Amazon Custom product with their inputs (empty when the seller
+ * sent none). It is never null.
  */
 public record Listing(
         String title,
@@ -32,7 +35,8 @@ public record Listing(
         String searchTerms,
         String productType,
         String itemHighlights,
-        List<PersonalizationQuestion> personalizationQuestions) {
+        List<PersonalizationQuestion> personalizationQuestions,
+        List<CustomizationSurface> customizationSurfaces) {
 
     public Listing {
         tags = tags == null ? List.of() : List.copyOf(tags);
@@ -40,15 +44,25 @@ public record Listing(
         images = images == null ? List.of() : List.copyOf(images);
         bulletPoints = bulletPoints == null ? List.of() : List.copyOf(bulletPoints);
         personalizationQuestions = personalizationQuestions == null ? List.of() : List.copyOf(personalizationQuestions);
+        customizationSurfaces = customizationSurfaces == null ? List.of() : List.copyOf(customizationSurfaces);
     }
 
-    /** A listing without personalization questions; every component but {@code personalizationQuestions}. */
+    /** A listing without customization surfaces; every component but {@code customizationSurfaces}. */
+    public Listing(String title, String description, List<String> tags, Money price, String category,
+                   List<String> materials, List<String> images, Integer quantity, String whoMade, String whenMade,
+                   String brand, List<String> bulletPoints, String searchTerms, String productType,
+                   String itemHighlights, List<PersonalizationQuestion> personalizationQuestions) {
+        this(title, description, tags, price, category, materials, images, quantity, whoMade, whenMade,
+                brand, bulletPoints, searchTerms, productType, itemHighlights, personalizationQuestions, List.of());
+    }
+
+    /** A listing without personalization questions or customization surfaces. */
     public Listing(String title, String description, List<String> tags, Money price, String category,
                    List<String> materials, List<String> images, Integer quantity, String whoMade, String whenMade,
                    String brand, List<String> bulletPoints, String searchTerms, String productType,
                    String itemHighlights) {
         this(title, description, tags, price, category, materials, images, quantity, whoMade, whenMade,
-                brand, bulletPoints, searchTerms, productType, itemHighlights, List.of());
+                brand, bulletPoints, searchTerms, productType, itemHighlights, List.of(), List.of());
     }
 
     /** An Etsy-style listing: the Amazon-only components are absent. */
@@ -69,12 +83,14 @@ public record Listing(
     /** A copy with another title; every other component is kept (used to check a proposed fix, ADR-014). */
     public Listing withTitle(String newTitle) {
         return new Listing(newTitle, description, tags, price, category, materials, images, quantity, whoMade, whenMade,
-                brand, bulletPoints, searchTerms, productType, itemHighlights, personalizationQuestions);
+                brand, bulletPoints, searchTerms, productType, itemHighlights, personalizationQuestions,
+                customizationSurfaces);
     }
 
     /** A copy with other tags; every other component is kept (used to check a proposed fix, ADR-014). */
     public Listing withTags(List<String> newTags) {
         return new Listing(title, description, newTags, price, category, materials, images, quantity, whoMade, whenMade,
-                brand, bulletPoints, searchTerms, productType, itemHighlights, personalizationQuestions);
+                brand, bulletPoints, searchTerms, productType, itemHighlights, personalizationQuestions,
+                customizationSurfaces);
     }
 }

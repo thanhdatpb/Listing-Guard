@@ -61,8 +61,8 @@ tags: {column: Tags, separator: ","}   # ... or one column cut at a separator
 | text or list | AMAZON `search_terms` | a column, a list of columns, or `{column, separator}` |
 
 - The fields for each marketplace are those of [`input-schema.md`](input-schema.md) (a test compares them), except the Etsy
-  `personalization` block: it is a nested object that a CSV cell cannot hold, so the batch job does not read it and the
-  personalization rules never report anything for a batch row.
+  `personalization` block and the Amazon `customization` block: they are nested objects that a CSV cell cannot hold, so the
+  batch job does not read them and the personalization and customization rules never report anything for a batch row.
   `category` is an Etsy field and `product_type` an Amazon one; a field of the other marketplace is an error, not
   something that is silently ignored.
 - A separator is cut literally, not as a pattern. Entries are trimmed and empty ones dropped by the same normalizer the

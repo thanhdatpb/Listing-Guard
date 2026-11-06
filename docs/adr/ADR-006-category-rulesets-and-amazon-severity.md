@@ -100,3 +100,24 @@ July 27, 2026), read through a secondary article because the official page needs
   is our extension of the same ban, and the ruleset note says so.
 - No fix is proposed for `item_highlights_length` (ADR-014 keeps fixes to its table). The trademark pack does not read the
   field yet.
+
+## Update (2026-11-06): `amazon-2026-12b`, Amazon Custom
+
+`amazon-2026-12` is kept unchanged as history (a test pins its hash) and `amazon-2026-12b` is loaded; nothing above is changed.
+The version name follows a convention the repository did not have before: a change inside a month that already has a
+version adds a letter after the month (`b`, `c`, ...), so the `YYYY-MM` part stays. The loader does not parse the name.
+
+- `Listing` gains `customizationSurfaces` (the optional `customization` input block of an Amazon listing: print surfaces with
+  text inputs, dropdowns and image inputs). The normalizer only trims and drops blanks, and the content hash leaves the
+  component out while it is empty, so the hash of a listing without it is unchanged (a test pins one).
+- Five rules, all in the Amazon rule set and all overridable per product type like the others. Three have a number and are
+  `secondary` WARNINGs: `customization_text_input_count` (10, all surfaces together), `customization_dropdown_options` (100 options
+  per print surface, all its dropdowns together) and `customization_image_input_count` (10 per print surface). The numbers come from
+  two articles that report Amazon's Custom rules; the Seller Central help page needs a login and was not read, so none is `verified`
+  and, by the policy of this record, none is an ERROR. Two are our own checks, not Amazon rules, and are `unverified`:
+  a dropdown label repeated in the same dropdown (a part of `customization_dropdown_options`; only exact repeats, as for Etsy) and
+  `customization_text_input_max_chars` (a text input with no `max_chars`, which lets a long text overflow the print area).
+  `customization_free_text_sensitive` is the Amazon twin of the Etsy rule `personalization_free_text_sensitive`: INFO, never higher,
+  keywords in the YAML, matching shared in `SensitiveKeywords`.
+- The three numbers declare their `Rule.limits` (unit: items); the other two rules declare none. No rule proposes a fix, and the
+  trademark pack does not read the block. The block cannot be sent through `batch-check`.

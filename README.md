@@ -418,12 +418,17 @@ severity. Each rule records where its values come from:
 `etsy-2026-12` adds the optional `personalization` input block (see [input schema](docs/input-schema.md)): a listing that does not send it is
 hashed exactly as before. `tag_count_underused` is not in it (it needs a fix action that adds a value, ADR-014).
 
-`amazon-2026-12.yaml` is the Amazon ruleset (`amazon-2026-11.yaml` is kept unchanged as history, like
-`etsy-2026-10.yaml`; a test pins its hash). It follows the Amazon announcement in the Seller Forums of June 10, 2026
+`amazon-2026-12b.yaml` is the Amazon ruleset (`amazon-2026-11.yaml` and `amazon-2026-12.yaml` are kept unchanged as history, like
+`etsy-2026-10.yaml`; a test pins their hashes). It follows the Amazon announcement in the Seller Forums of June 10, 2026
 (effective July 27, 2026): a 75-character title and the new Item Highlights field. Amazon uses ERROR only for verified values, so most of its rules
 are WARNING (the sources are an Amazon announcement and forum replies; Seller Central help needs a login). A
 rule can be overridden per product type (`categories`) and switched off (`enabled: false`); no product type is
 overridden yet. See [ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md).
+
+A change to a ruleset inside the same month gets a letter after the month (`amazon-2026-12b`, then `c`), so the next
+version of a month that is already taken keeps the `YYYY-MM` part. `amazon-2026-12b` adds the optional `customization` input block for Amazon
+Custom products (see [input schema](docs/input-schema.md)) and the five `customization_*` rules below; a listing that does not send the block is
+hashed exactly as before, and every other rule is copied unchanged from `amazon-2026-12`.
 
 | Rule | Severity | Source status |
 |---|---|---|
@@ -436,6 +441,11 @@ overridden yet. See [ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-seve
 | `item_highlights_length` (max 125 characters) | WARNING | secondary: same announcement; no fix suggestion |
 | `search_terms_length` (max 249 bytes) | WARNING | secondary: Amazon staff, Seller Forums |
 | `prohibited_content` (web addresses, emails; title, description, bullets and `item_highlights`) | WARNING | secondary; scanning `item_highlights` is our extension of the same ban |
+| `customization_text_input_count` (max 10 text inputs, all surfaces together) | WARNING | secondary: two articles on Amazon Custom (ecomcrew, sellersnap); the Seller Central page needs a login |
+| `customization_dropdown_options` (max 100 options per print surface; no label twice in one dropdown) | WARNING | secondary: same articles; the repeated-label check is ours and reports only exact repeats |
+| `customization_image_input_count` (max 10 image inputs per print surface) | WARNING | secondary: same articles |
+| `customization_text_input_max_chars` (a text input without `max_chars`) | WARNING | unverified: our own check, the text can overflow the print area |
+| `customization_free_text_sensitive` (a text input whose label has `name`, `number`, `team` or `player`) | INFO, never higher | unverified: our own reminder to use a dropdown or limit the kinds of characters; no trademark verdict; shares its matching with the Etsy rule |
 | `category_not_covered` | INFO | not an Amazon rule: the product type has no overrides (only reported when the ruleset has some) |
 
 `variation-checks-2026-11.yaml` (in `variation-checks/`) is the ruleset of the variation checks
@@ -455,7 +465,7 @@ brief. The product types and themes it knows are few on purpose (one apparel pro
 
 To change a threshold or a severity, create a new ruleset file with a new `version`: the API refuses to
 start if a registered version has different content (see [ADR-002](docs/adr/ADR-002-ruleset-versioning.md)).
-`etsy-2026-10.yaml`, `etsy-2026-11.yaml` and `amazon-2026-11.yaml` are kept unchanged as history (a test pins their hashes) and are no longer loaded.
+`etsy-2026-10.yaml`, `etsy-2026-11.yaml`, `amazon-2026-11.yaml` and `amazon-2026-12.yaml` are kept unchanged as history (a test pins their hashes) and are no longer loaded.
 Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `application.yml`.
 
 The numeric limits of the loaded rulesets are served, read only, by `GET /api/v1/rulesets/{marketplace}/limits` (and

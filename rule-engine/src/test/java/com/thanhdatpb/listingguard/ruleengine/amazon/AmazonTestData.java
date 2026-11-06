@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.ruleengine.amazon;
 
+import com.thanhdatpb.listingguard.core.listing.CustomizationSurface;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.core.listing.Money;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
@@ -10,7 +11,7 @@ import java.util.List;
 /** Shared fixtures. Limits are read from the real ruleset so tests never hard-code them. */
 final class AmazonTestData {
 
-    static final RulesetConfig CONFIG = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
+    static final RulesetConfig CONFIG = RulesetLoader.loadClasspath("rulesets/amazon-2026-12b.yaml");
 
     private AmazonTestData() {
     }
@@ -61,6 +62,13 @@ final class AmazonTestData {
         return new Listing(base.title(), base.description(), base.tags(), base.price(), base.category(), base.materials(),
                 base.images(), base.quantity(), base.whoMade(), base.whenMade(), base.brand(), base.bulletPoints(),
                 base.searchTerms(), base.productType(), itemHighlights);
+    }
+
+    static Listing withCustomization(CustomizationSurface... surfaces) {
+        Listing base = valid();
+        return new Listing(base.title(), base.description(), base.tags(), base.price(), base.category(), base.materials(),
+                base.images(), base.quantity(), base.whoMade(), base.whenMade(), base.brand(), base.bulletPoints(),
+                base.searchTerms(), base.productType(), base.itemHighlights(), List.of(), List.of(surfaces));
     }
 
     static Listing withProductType(String productType) {

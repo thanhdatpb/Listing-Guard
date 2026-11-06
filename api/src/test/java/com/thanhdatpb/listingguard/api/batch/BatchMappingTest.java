@@ -368,7 +368,10 @@ class BatchMappingTest {
         Set<String> etsy = new TreeSet<>(documentedFields("Etsy"));
         assertThat(etsy.remove("personalization")).as("personalization is documented for Etsy").isTrue();
         assertThat(BatchMapping.schema("ETSY").keySet()).containsExactlyInAnyOrderElementsOf(etsy);
-        assertThat(BatchMapping.schema("AMAZON").keySet()).containsExactlyInAnyOrderElementsOf(documentedFields("Amazon"));
+        // The Amazon Custom surfaces are a nested object too, and are not read by the batch job either.
+        Set<String> amazon = new TreeSet<>(documentedFields("Amazon"));
+        assertThat(amazon.remove("customization")).as("customization is documented for Amazon").isTrue();
+        assertThat(BatchMapping.schema("AMAZON").keySet()).containsExactlyInAnyOrderElementsOf(amazon);
     }
 
     private static Set<String> documentedFields(String heading) throws IOException {

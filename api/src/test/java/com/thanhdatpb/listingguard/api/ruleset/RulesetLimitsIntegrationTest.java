@@ -182,9 +182,9 @@ class RulesetLimitsIntegrationTest {
         RulesetConfig amazon = rulesets.get("AMAZON").config();
         JsonNode body = json(AMAZON);
 
-        // the ruleset in force is amazon-2026-12 (75-character title, Item Highlights); the numbers are read from it
-        assertThat(amazon.version()).isEqualTo("amazon-2026-12");
-        assertThat(body.get("rulesetVersion").asText()).isEqualTo("amazon-2026-12");
+        // the ruleset in force is amazon-2026-12b (75-character title, Item Highlights, Amazon Custom); the numbers are read from it
+        assertThat(amazon.version()).isEqualTo("amazon-2026-12b");
+        assertThat(body.get("rulesetVersion").asText()).isEqualTo("amazon-2026-12b");
 
         JsonNode title = limit(body, "title_length");
         assertThat(title.get("field").asText()).isEqualTo("title");
@@ -200,6 +200,32 @@ class RulesetLimitsIntegrationTest {
         assertThat(highlights.get("sourceStatus").asText())
                 .isEqualTo(amazon.rule("item_highlights_length").source().status().name());
         assertThat(highlights.get("enabled").asBoolean()).isEqualTo(amazon.rule("item_highlights_length").enabled());
+    }
+
+    @Test
+    void amazonCustomizationLimitsAreTheRulesetNumbersInItems() throws Exception {
+        RulesetConfig amazon = rulesets.get("AMAZON").config();
+        JsonNode body = json(AMAZON);
+
+        assertThat(amazon.version()).isEqualTo("amazon-2026-12b");
+        for (String[] expected : new String[][] {
+                {"customization_text_input_count", "customization.surfaces[].text_inputs"},
+                {"customization_dropdown_options", "customization.surfaces[].dropdowns[].options"},
+                {"customization_image_input_count", "customization.surfaces[].image_inputs"}}) {
+            String ruleId = expected[0];
+            JsonNode limit = limit(body, ruleId);
+            assertThat(limit.get("field").asText()).as(ruleId).isEqualTo(expected[1]);
+            assertThat(limit.get("kind").asText()).as(ruleId).isEqualTo("MAX_COUNT");
+            assertThat(limit.get("unit").asText()).as(ruleId).isEqualTo("ITEMS");
+            assertThat(limit.get("value").asInt()).as(ruleId).isEqualTo(amazon.rule(ruleId).intParam("max_count"));
+            assertThat(limit.get("severity").asText()).as(ruleId).isEqualTo(amazon.rule(ruleId).severity().name());
+            assertThat(limit.get("sourceStatus").asText()).as(ruleId)
+                    .isEqualTo(amazon.rule(ruleId).source().status().name());
+            assertThat(limit.get("enabled").asBoolean()).as(ruleId).isTrue();
+        }
+        // the two rules without a number of their own declare no limit
+        body.get("limits").forEach(limit -> assertThat(limit.get("ruleId").asText())
+                .isNotIn("customization_text_input_max_chars", "customization_free_text_sensitive"));
     }
 
     // ---- generic: whatever ruleset is registered --------------------------------------------------------

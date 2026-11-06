@@ -49,6 +49,41 @@ class ListingTest {
     }
 
     @Test
+    void customizationSurfacesAreEmptyWhenNotGivenAndNeverNull() {
+        assertThat(AMAZON_STYLE.customizationSurfaces()).isEmpty();
+        assertThat(new Listing("t", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null).customizationSurfaces()).isEmpty();
+    }
+
+    @Test
+    void theCopiesKeepTheCustomizationSurfaces() {
+        CustomizationSurface surface = new CustomizationSurface("Front",
+                List.of(new CustomizationSurface.TextInput("Name", 20, List.of("letters"))),
+                List.of(new CustomizationSurface.Dropdown("Font", List.of("Serif", "Script"))),
+                List.of(new CustomizationSurface.ImageInput("Photo")));
+        Listing withSurface = new Listing("Title", "Description", List.of("a"), null, null, List.of(), List.of(), 1, null,
+                null, null, List.of(), null, null, null, List.of(), List.of(surface));
+
+        assertThat(withSurface.withTitle("Other").customizationSurfaces()).containsExactly(surface);
+        assertThat(withSurface.withTags(List.of("x")).customizationSurfaces()).containsExactly(surface);
+    }
+
+    @Test
+    void aSurfaceAndItsInputsNeverHaveNullListsAndCopyWhatTheyAreGiven() {
+        CustomizationSurface empty = new CustomizationSurface(null, null, null, null);
+        assertThat(empty.textInputs()).isEmpty();
+        assertThat(empty.dropdowns()).isEmpty();
+        assertThat(empty.imageInputs()).isEmpty();
+        assertThat(new CustomizationSurface.TextInput("Name", null, null).allowedCharTypes()).isEmpty();
+
+        List<String> options = new java.util.ArrayList<>(List.of("Red"));
+        CustomizationSurface.Dropdown dropdown = new CustomizationSurface.Dropdown("Colour", options);
+        options.add("Blue");
+        assertThat(dropdown.options()).containsExactly("Red");
+        assertThat(new CustomizationSurface.Dropdown("Colour", null).options()).isEmpty();
+    }
+
+    @Test
     void aQuestionKeepsItsOptionsAndNeverHasNull() {
         List<String> options = new java.util.ArrayList<>(List.of("Red"));
         PersonalizationQuestion question = new PersonalizationQuestion("DROPDOWN", "Colour", null, null, null, options, null);
