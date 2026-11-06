@@ -2,7 +2,9 @@ package com.thanhdatpb.listingguard.ruleengine.etsy;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.Limit;
 import com.thanhdatpb.listingguard.ruleengine.Rule;
+import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.List;
 
@@ -19,6 +21,12 @@ public final class TagCountRule implements Rule {
     @Override
     public void validate(RulesetConfig config) {
         config.rule(ID).intParam("max_count");
+    }
+
+    /** The number of items in the cleaned tag list. */
+    @Override
+    public List<Limit> limits(RuleSettings settings) {
+        return List.of(Limit.maxCount("tags", settings.intParam("max_count")));
     }
 
     @Override

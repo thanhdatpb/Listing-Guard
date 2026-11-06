@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.ruleengine.amazon;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.Limit;
 import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.ArrayList;
@@ -23,6 +24,12 @@ public final class BulletLengthRule extends AmazonRule {
     @Override
     void validateSettings(RuleSettings settings) {
         settings.intParam("max_length");
+    }
+
+    /** Applies to each bullet point, measured in code points ({@link Texts#length}). */
+    @Override
+    public List<Limit> limits(RuleSettings settings) {
+        return List.of(Limit.maxLength("bullet_points", settings.intParam("max_length")));
     }
 
     @Override

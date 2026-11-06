@@ -3,7 +3,9 @@ package com.thanhdatpb.listingguard.ruleengine.etsy;
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.ruleengine.Fixes;
+import com.thanhdatpb.listingguard.ruleengine.Limit;
 import com.thanhdatpb.listingguard.ruleengine.Rule;
+import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +23,12 @@ public final class TagLengthRule implements Rule {
     @Override
     public void validate(RulesetConfig config) {
         config.rule(ID).intParam("max_length");
+    }
+
+    /** Applies to each tag, measured in code points ({@link Texts#length}). */
+    @Override
+    public List<Limit> limits(RuleSettings settings) {
+        return List.of(Limit.maxLength("tags", settings.intParam("max_length")));
     }
 
     @Override

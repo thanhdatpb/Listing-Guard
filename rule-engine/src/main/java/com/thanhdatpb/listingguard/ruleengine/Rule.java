@@ -25,6 +25,19 @@ public interface Rule {
     }
 
     /**
+     * The numbers this rule enforces, read from {@code settings}: the settings that apply to one category (the defaults, or
+     * the override of an Amazon product type), already merged. A rule with a numeric limit overrides this and declares each
+     * one with the unit that its {@link #evaluate} really counts; a rule with no number (characters, banned words, required
+     * fields) keeps the default and declares none. Clients read the result through {@link RuleEngine#limits}, so a new rule
+     * shows its limits without any change outside the rule.
+     *
+     * <p>Call it only for a ruleset that passed {@link #validate}: it reads the same keys and does not check them again.
+     */
+    default List<Limit> limits(RuleSettings settings) {
+        return List.of();
+    }
+
+    /**
      * Reads every config key this rule needs so a missing or malformed key fails at startup, not on
      * the first request. Override and call the typed getters.
      */

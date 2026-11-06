@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.ruleengine.amazon;
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.ruleengine.Fixes;
+import com.thanhdatpb.listingguard.ruleengine.Limit;
 import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.List;
@@ -20,6 +21,12 @@ public final class TitleLengthRule extends AmazonRule {
     @Override
     void validateSettings(RuleSettings settings) {
         settings.intParam("max_length");
+    }
+
+    /** The title is measured in code points ({@link Texts#length}). */
+    @Override
+    public List<Limit> limits(RuleSettings settings) {
+        return List.of(Limit.maxLength("title", settings.intParam("max_length")));
     }
 
     @Override
