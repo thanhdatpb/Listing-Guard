@@ -106,6 +106,43 @@ rules:
     source:
       status: unverified
 
+  customization_text_input_count:
+    severity: WARNING
+    max_count: 4
+    source:
+      status: unverified
+
+  customization_dropdown_options:
+    severity: WARNING
+    max_count: 6
+    case_insensitive: false
+    source:
+      status: unverified
+
+  customization_image_input_count:
+    severity: WARNING
+    max_count: 2
+    source:
+      status: unverified
+    categories:
+      TESTMUG:
+        max_count: 3
+        source:
+          status: secondary
+          urls:
+            - https://example.com/testmug-style-guide
+
+  customization_text_input_max_chars:
+    severity: WARNING
+    source:
+      status: unverified
+
+  customization_free_text_sensitive:
+    severity: INFO
+    keywords: [name]
+    source:
+      status: unverified
+
   category_not_covered:
     severity: INFO
     source:

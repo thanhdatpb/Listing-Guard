@@ -26,12 +26,14 @@ class AmazonRulesetTest {
     @Test
     void loadsTheAmazonRuleset() {
         assertThat(CONFIG.marketplace()).isEqualTo("AMAZON");
-        assertThat(CONFIG.version()).isEqualTo("amazon-2026-12");
+        assertThat(CONFIG.version()).isEqualTo("amazon-2026-12b");
         assertThat(CONFIG.checkedAt()).isEqualTo(LocalDate.of(2026, 11, 6));
         assertThat(CONFIG.contentHash()).matches("[0-9a-f]{64}");
         assertThat(CONFIG.rules()).containsOnlyKeys("required_fields", "title_length", "title_repeated_words",
                 "title_forbidden_chars", "bullet_count", "bullet_length", "item_highlights_length", "search_terms_length",
-                "prohibited_content", "category_not_covered");
+                "prohibited_content", "customization_text_input_count", "customization_dropdown_options",
+                "customization_image_input_count", "customization_text_input_max_chars",
+                "customization_free_text_sensitive", "category_not_covered");
     }
 
     @Test
@@ -64,6 +66,11 @@ class AmazonRulesetTest {
         assertRule("item_highlights_length", Severity.WARNING, SourceStatus.SECONDARY);
         assertRule("search_terms_length", Severity.WARNING, SourceStatus.SECONDARY);
         assertRule("prohibited_content", Severity.WARNING, SourceStatus.SECONDARY);
+        assertRule("customization_text_input_count", Severity.WARNING, SourceStatus.SECONDARY);
+        assertRule("customization_dropdown_options", Severity.WARNING, SourceStatus.SECONDARY);
+        assertRule("customization_image_input_count", Severity.WARNING, SourceStatus.SECONDARY);
+        assertRule("customization_text_input_max_chars", Severity.WARNING, SourceStatus.UNVERIFIED);
+        assertRule("customization_free_text_sensitive", Severity.INFO, SourceStatus.UNVERIFIED);
         assertRule("category_not_covered", Severity.INFO, SourceStatus.UNVERIFIED);
     }
 

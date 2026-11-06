@@ -39,6 +39,30 @@ class FrozenRulesetsTest {
     }
 
     @Test
+    void amazon202612IsUnchanged() {
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
+
+        assertThat(config.version()).isEqualTo("amazon-2026-12");
+        assertThat(config.contentHash())
+                .isEqualTo("bb04603f694afe013a7e8794585fa9e65fb87ed989710d3d11a4a85fedd58bcd");
+    }
+
+    @Test
+    void amazon202612bIsADifferentVersionThatAddsTheCustomizationRulesAndChangesNothingElse() {
+        RulesetConfig old = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
+        RulesetConfig current = RulesetLoader.loadClasspath("rulesets/amazon-2026-12b.yaml");
+
+        assertThat(current.version()).isEqualTo("amazon-2026-12b");
+        assertThat(current.contentHash()).isNotEqualTo(old.contentHash());
+        assertThat(current.rules().keySet()).containsAll(old.rules().keySet()).contains(
+                "customization_text_input_count", "customization_dropdown_options", "customization_image_input_count",
+                "customization_text_input_max_chars", "customization_free_text_sensitive");
+        for (String id : old.rules().keySet()) {
+            assertThat(current.rule(id)).as("rule %s is unchanged", id).isEqualTo(old.rule(id));
+        }
+    }
+
+    @Test
     void amazon202612IsADifferentVersionThatKeepsEveryRuleOfTheOldOne() {
         RulesetConfig old = RulesetLoader.loadClasspath("rulesets/amazon-2026-11.yaml");
         RulesetConfig current = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");

@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.ruleengine;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
+import com.thanhdatpb.listingguard.core.listing.CustomizationSurface;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.core.listing.Money;
 import com.thanhdatpb.listingguard.core.listing.PersonalizationQuestion;
@@ -103,27 +104,40 @@ class FixCoverageTest {
 
     @Test
     void amazonRulesOutsideTheTableNeverCarryAFix() {
-        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-12b.yaml");
         int titleMax = config.rule("title_length").intParam("max_length");
         int highlightsMax = config.rule("item_highlights_length").intParam("max_length");
+        int textInputs = config.rule("customization_text_input_count").intParam("max_count");
+        int options = config.rule("customization_dropdown_options").intParam("max_count");
+        int images = config.rule("customization_image_input_count").intParam("max_count");
+        List<String> manyOptions = new java.util.ArrayList<>(List.of("Dup", "Dup"));
+        for (int i = 0; manyOptions.size() <= options; i++) {
+            manyOptions.add("Option " + i);
+        }
+        List<CustomizationSurface> surfaces = List.of(new CustomizationSurface("Front",
+                java.util.Collections.nCopies(textInputs + 1, new CustomizationSurface.TextInput("Player name", null, List.of())),
+                List.of(new CustomizationSurface.Dropdown("Font", manyOptions)),
+                java.util.Collections.nCopies(images + 1, new CustomizationSurface.ImageInput("Photo"))));
         Listing listing = new Listing("Roadster! Roadster! Roadster! www.example.com " + words(titleMax),
                 "See https://example.com for more.", List.of(), new Money(new BigDecimal("49.99"), "USD"), null,
                 List.of(), List.of(), 5, null, null, "Roadster",
                 List.of("one", "two", "three", "four", "five", "six"), "term ".repeat(80), null,
-                words(highlightsMax));
+                words(highlightsMax), List.of(), surfaces);
 
         List<Finding> findings = ENGINE.runDetailed(listing, config).findings();
 
         Set<String> fired = findings.stream().map(Finding::ruleId).collect(Collectors.toSet());
         assertThat(fired).as("rules this listing breaks").contains(
                 "required_fields", "title_length", "title_repeated_words", "title_forbidden_chars", "bullet_count",
-                "item_highlights_length", "search_terms_length", "prohibited_content");
+                "item_highlights_length", "search_terms_length", "prohibited_content", "customization_text_input_count",
+                "customization_dropdown_options", "customization_image_input_count", "customization_text_input_max_chars",
+                "customization_free_text_sensitive");
         assertThat(ruleIds(findings, true)).as("rules that carry a fix").isEqualTo(new TreeSet<>(AMAZON_FIXABLE));
     }
 
     @Test
     void aTitleThatBreaksOtherRulesStillGetsItsCutBecauseTheCutAddsNothing() {
-        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-12b.yaml");
         int titleMax = config.rule("title_length").intParam("max_length");
         Listing listing = new Listing("Roadster! Roadster! Roadster! " + words(titleMax), "ok", List.of(),
                 new Money(new BigDecimal("49.99"), "USD"), null, List.of(), List.of(), 5, null, null, "Roadster",
