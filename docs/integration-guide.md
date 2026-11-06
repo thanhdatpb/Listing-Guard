@@ -359,22 +359,40 @@ bullet at zero-based position `i` in the cleaned list; blank bullets are dropped
 | `item_highlights_length` | `item_highlights` | the Item Highlights text (optional field; no fix suggestion) | WARNING | secondary |
 | `search_terms_length` | `search_terms` | the search terms (limit in UTF-8 **bytes**, not characters) | WARNING | secondary |
 | `prohibited_content` | `title`, `description`, `bullet_points[i]`, `item_highlights` | the matched web address or email | WARNING | secondary |
+| `customization_text_input_count` | `customization.surfaces[].text_inputs` (all surfaces together) | `null` | WARNING | secondary |
+| `customization_dropdown_options` | `customization.surfaces[i].dropdowns` (too many options on a surface); `customization.surfaces[i].dropdowns[j].options[k]` (a label that repeats an earlier label of the same dropdown) | `null`; the label | WARNING | secondary |
+| `customization_image_input_count` | `customization.surfaces[i].image_inputs` | `null` | WARNING | secondary |
+| `customization_text_input_max_chars` | `customization.surfaces[i].text_inputs[j].max_chars` | `null` | WARNING | unverified |
+| `customization_free_text_sensitive` | `customization.surfaces[i].text_inputs[j].label` | the label | INFO (never higher) | unverified |
 | `category_not_covered` | `product_type` | the product type as sent | INFO | not an Amazon rule; only reported once the ruleset overrides at least one product type |
 
 `bullet_length` is in the ruleset but switched off: the sources disagree on the limit. Amazon uses ERROR only
-for verified values; everything else is WARNING (see ADR-006). The limits are in `amazon-2026-12.yaml`, each with
+for verified values; everything else is WARNING (see ADR-006). The limits are in `amazon-2026-12b.yaml`, each with
 its source and status. Numbers in the messages are the real limits and the real counts.
+
+**What changed with `amazon-2026-12b`.** The optional input block `customization` (Amazon Custom products; see
+[`input-schema.md`](input-schema.md#amazon-customization)) is checked by the five `customization_*` rules above; every other rule is
+exactly as in `amazon-2026-12`. None of them has a fix suggestion. `surfaces[i]`, `text_inputs[j]`, `dropdowns[j]` and `options[k]` are
+zero-based positions in the cleaned lists. The numbers (10 text inputs per product, 100 dropdown options and 10 image inputs per
+print surface) come from two secondary articles that report Amazon's rules, not from a page of Amazon that could be read, so the
+rules are WARNING; the dropdown options of a surface are counted over all its dropdowns together. A text input without `max_chars`
+is reported because a long text can overflow the print area; the right number depends on the product and is yours to set.
+`customization_free_text_sensitive` is a reminder, not a trademark verdict: a buyer who can type any text can type a team or a player
+that is a trademark, and a dropdown whose choices you set, or a limit on the kinds of characters, keeps that out. The trademark check
+does not read the `customization` block. The `analysisVersion` of Amazon checks is now `amazon-2026-12b`, so an Amazon listing that
+was checked before is checked again. A listing that does not send `customization` has the same content hash as before. The block
+cannot be sent through the batch job: a CSV cell cannot hold it.
 
 **What changed with `amazon-2026-12`.** The title limit is 75 characters, down from 200 (Amazon announced it in the
 Seller Forums on June 10, 2026, effective July 27, 2026; Amazon rewrites a longer title itself), so a title that was
 clean before can now get a `title_length` WARNING, with a suggested cut at a word boundary when fixes are enabled. The
 optional input field `item_highlights` is checked by `item_highlights_length` and scanned by `prohibited_content`. The
-`analysisVersion` of Amazon checks is now `amazon-2026-12`, so an Amazon listing that was checked before is checked
-again. A listing that does not send `item_highlights` has the same content hash as before. The Amazon limits are
+`analysisVersion` of Amazon checks became `amazon-2026-12` (it is `amazon-2026-12b` since the next change), so an Amazon
+listing that was checked before is checked again. A listing that does not send `item_highlights` has the same content hash as before. The Amazon limits are
 `secondary`, never `verified`, and the trademark check does not read `item_highlights` yet.
 
 **Product types.** Some Amazon limits depend on the product type. The ruleset can override a rule per product
-type, but `amazon-2026-12` overrides none, so every listing is checked with the same limits and nothing is
+type, but `amazon-2026-12b` overrides none, so every listing is checked with the same limits and nothing is
 reported about product types. Once a ruleset overrides some product types, a listing whose product type has no
 override gets one `INFO` finding, `category_not_covered`, to say that category-specific limits were not checked;
 it needs no change in the listing. A listing without `product_type` gets the `required_fields` ERROR instead. The
@@ -462,7 +480,7 @@ the numbers from the answer, not from here.)
 | `marketplace` | The marketplace code, in upper case. |
 | `rulesetVersion` | The version of the ruleset the limits come from; the same value as `rulesetVersion` of a check. Opaque: compare for equality. When it changes, read the limits again. |
 | `productType` | The product type asked for, trimmed and as sent (not upper-cased); `null` when none was asked for. |
-| `limits[].field` | The field of [`input-schema.md`](input-schema.md) the limit applies to: `title`, `tags`, `bullet_points`, `search_terms`, `item_highlights`, ... A field inside the Etsy `personalization` block is a path: `[]` stands for every question and `[type=DROPDOWN]` or `[type=UPLOAD]` for the questions of that type, for example `personalization.questions[].question_text`. |
+| `limits[].field` | The field of [`input-schema.md`](input-schema.md) the limit applies to: `title`, `tags`, `bullet_points`, `search_terms`, `item_highlights`, ... A field inside the Etsy `personalization` block is a path: `[]` stands for every question and `[type=DROPDOWN]` or `[type=UPLOAD]` for the questions of that type, for example `personalization.questions[].question_text`. A field inside the Amazon `customization` block is a path in the same way: `customization.surfaces[].text_inputs` is the text inputs of all surfaces together, `customization.surfaces[].dropdowns[].options` the options of all the dropdowns of one surface together, and `customization.surfaces[].image_inputs` the image inputs of one surface. |
 | `limits[].ruleId` | The rule that enforces it, the `ruleId` of its findings. |
 | `limits[].kind` | What is limited: `MAX_LENGTH`, `MAX_COUNT` (items of a list, or words of a text), `MAX_BYTES` or `MAX_OCCURRENCES`. |
 | `limits[].value` | The limit. |

@@ -130,14 +130,23 @@ It never edits a listing, never publishes, and does no SEO.
   endpoint, the variation checks (ADR-015), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
-- **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12.yaml`): simple input format (`title`, `brand`,
-  `bullet_points`, `description`, `search_terms`, `product_type`, `item_highlights`, ...), US store (English word
+- **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12b.yaml`): simple input format (`title`, `brand`,
+  `bullet_points`, `description`, `search_terms`, `product_type`, `item_highlights`, `customization`, ...), US store (English word
   rules; title limit 75 and `item_highlights_length` 125, both `secondary`, read from the Seller Forums announcement of
   2026-06-10 through ppc.land; `prohibited_content` scans `item_highlights` too, the trademark pack does not yet;
-  `amazon-2026-11` is kept unchanged as history and a test pins its hash). Settings can
+  `amazon-2026-11` and `amazon-2026-12` are kept unchanged as history and a test pins each hash). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
   product type with no override gets the defaults, plus an INFO `category_not_covered` only when the ruleset has
-  at least one override (none yet in `amazon-2026-12`, so it reports nothing today).
+  at least one override (none yet in `amazon-2026-12b`, so it reports nothing today). **Amazon Custom** (`amazon-2026-12b`):
+  the optional `customization` block (`surfaces[]` with `text_inputs[]`, `dropdowns[]`, `image_inputs[]`; `docs/input-schema.md`
+  "Amazon customization"; the normalizer only trims and drops blanks; `Listing.customizationSurfaces`, left out of the content hash
+  while empty, a test pins the hash; not available in `batch-check`) and five rules in `ruleengine/amazon/Customization*Rule`:
+  `customization_text_input_count` (all surfaces together), `customization_dropdown_options` (per surface, plus a label repeated
+  in one dropdown), `customization_image_input_count` (per surface), `customization_text_input_max_chars` (a text input without
+  `max_chars`) and `customization_free_text_sensitive` (INFO, never higher; shares `SensitiveKeywords` with the Etsy rule, keywords
+  in the Amazon YAML). The three counts come from two secondary articles (`secondary`), the other two are our own checks
+  (`unverified`); all are WARNING but the INFO one, none has a fix, and the three counts declare their `Rule.limits`. The trademark
+  pack does not read the block.
 
 ## Planned work
 
@@ -221,13 +230,15 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 - **A ruleset version is immutable** (ADR-002). Never edit a published `rulesets/*.yaml`: copy it to a new
   file with a new `version` and change that one. Old files stay (a test pins `etsy-2026-10`'s hash). The API
   fails at startup if a registered version has a different content hash. Every YAML key a rule needs must be
-  read in that rule's `validate()` so mistakes fail at startup.
+  read in that rule's `validate()` so mistakes fail at startup. A version is `<marketplace>-YYYY-MM`; a change inside a month
+  that already has one adds a letter (`amazon-2026-12b`, then `c`). The loader does not parse the format.
 - Every rule has a `source` with `status`: `verified` (official doc), `secondary` (official page not
   readable, consistent secondary sources) or `unverified`. Never mark a value `verified` without a URL, and
   never guess a limit: say it is unverified. Amazon rules are ERROR only when `verified`, else WARNING
   (ADR-006); a category override needs its own `source`; raising a status or severity is a new ruleset version.
   `ContentHasher` leaves the Amazon-only `Listing` components out while empty so Etsy hashes never change (a
-  test pins one): keep it that way when adding components (the Etsy `personalizationQuestions` are left out while empty too).
+  test pins one): keep it that way when adding components (the Etsy `personalizationQuestions` and the Amazon
+  `customizationSurfaces` are left out while empty too).
 - Rule messages and suggestions are Vietnamese and cite the actual numbers.
 - Normalizers map and clean data only (trim, drop blanks); they never dedupe, truncate or correct, because
   rules must see what the user wrote.
