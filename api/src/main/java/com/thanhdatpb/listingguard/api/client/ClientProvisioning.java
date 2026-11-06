@@ -5,6 +5,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +24,9 @@ public class ClientProvisioning {
 
     public static final int MIN_SECRET_LENGTH = 32;
 
+    /** The size of {@code api_key.label} (V6). */
+    public static final int MAX_LABEL_LENGTH = 100;
+
     private static final Pattern NAME = Pattern.compile("[a-z0-9][a-z0-9_-]{0,31}");
     private static final Pattern SECRET = Pattern.compile("[A-Za-z0-9._~+/=-]{" + MIN_SECRET_LENGTH + ",256}");
     private static final String KEY_ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -33,6 +37,34 @@ public class ClientProvisioning {
 
     /** A freshly issued key: the only moment the secret is available. */
     public record IssuedKey(String keyId, String secret) {
+    }
+
+    /** What {@link #revokeKey(UUID, String)} did. */
+    public enum RevokeOutcome {
+        REVOKED, ALREADY_REVOKED
+    }
+
+    /** The client already has the most active keys it may have. */
+    public static final class KeyLimitReachedException extends RuntimeException {
+
+        private final int limit;
+
+        public KeyLimitReachedException(int limit) {
+            super("The client already has " + limit + " active keys.");
+            this.limit = limit;
+        }
+
+        public int limit() {
+            return limit;
+        }
+    }
+
+    /** No such key for this client: it does not exist, or it belongs to another client (the two are not told apart). */
+    public static final class KeyNotFoundException extends RuntimeException {
+
+        public KeyNotFoundException() {
+            super("No such key.");
+        }
     }
 
     private final ClientRepository clients;
@@ -133,6 +165,70 @@ public class ClientProvisioning {
         }
         audit("key.register", clientName, added.keyId());
         return true;
+    }
+
+    /**
+     * Issues a key for the client with this id, for the console (ADR-014 B4a), where the signed-in account knows its client
+     * by id. Same key, same hash and same audit line ({@code key.create}) as {@link #createKey(String, String)}. The client's
+     * row is locked while the active keys are counted and the new one is stored, so concurrent requests cannot take the
+     * client past {@code maxActiveKeys}. The secret in the result is shown once and cannot be read again.
+     *
+     * @throws KeyLimitReachedException if the client already has {@code maxActiveKeys} active keys
+     * @throws IllegalArgumentException if there is no such client, the limit is below 1 or the label is longer than
+     *                                  {@link #MAX_LABEL_LENGTH}
+     */
+    public IssuedKey createKey(UUID clientId, String label, int maxActiveKeys) {
+        if (maxActiveKeys < 1) {
+            throw new IllegalArgumentException("The limit of active keys must be at least 1.");
+        }
+        if (label != null && label.length() > MAX_LABEL_LENGTH) {
+            throw new IllegalArgumentException("A key label is at most " + MAX_LABEL_LENGTH + " characters.");
+        }
+        String secret = KEY_PREFIX + randomSecret();
+        record Created(String clientName, String keyId) {
+        }
+        Created created = transactions.execute(status -> {
+            Client client = clients.findByIdForUpdate(clientId)
+                    .orElseThrow(() -> new IllegalArgumentException("No client with id " + clientId + "."));
+            if (keys.countByClient_IdAndActiveTrue(clientId) >= maxActiveKeys) {
+                throw new KeyLimitReachedException(maxActiveKeys);
+            }
+            return new Created(client.getName(), store(client, secret, label));
+        });
+        audit("key.create", created.clientName(), created.keyId());
+        return new IssuedKey(created.keyId(), secret);
+    }
+
+    /**
+     * Revokes a key of the client with this id. A key of another client is treated as if it did not exist, so the console
+     * answers 404 and does not tell whether the id is in use. Same audit line ({@code key.revoke}) as
+     * {@link #revokeKey(String)}; nothing is logged when the key was already revoked.
+     *
+     * @throws KeyNotFoundException if there is no such key, or it belongs to another client
+     */
+    public RevokeOutcome revokeKey(UUID clientId, String keyId) {
+        record Result(RevokeOutcome outcome, String clientName) {
+        }
+        Result result = transactions.execute(status -> {
+            ApiKey key = keys.findByKeyIdForUpdate(keyId)
+                    .filter(found -> found.getClient().getId().equals(clientId))
+                    .orElseThrow(KeyNotFoundException::new);
+            if (!key.isActive()) {
+                return new Result(RevokeOutcome.ALREADY_REVOKED, null);
+            }
+            key.revoke(Instant.now());
+            keys.save(key);
+            return new Result(RevokeOutcome.REVOKED, key.getClient().getName());
+        });
+        if (result.outcome() == RevokeOutcome.REVOKED) {
+            audit("key.revoke", result.clientName(), keyId);
+        }
+        return result.outcome();
+    }
+
+    /** The keys of the client that can still authenticate, oldest first. */
+    public List<ApiKey> activeKeys(UUID clientId) {
+        return keys.findByClient_IdAndActiveTrueOrderByCreatedAtAsc(clientId);
     }
 
     /** @throws IllegalArgumentException if there is no such key or it is already revoked */

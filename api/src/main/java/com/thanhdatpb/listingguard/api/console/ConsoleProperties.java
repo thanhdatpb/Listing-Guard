@@ -12,5 +12,6 @@ public record ConsoleProperties(
         @DefaultValue("") String mailFrom,
         @DefaultValue("5") int emailLimit,
         @DefaultValue("30") int ipLimit,
-        @DefaultValue("15m") Duration rateWindow) {
+        @DefaultValue("15m") Duration rateWindow,
+        @DefaultValue("5") int maxActiveKeys) {
 }

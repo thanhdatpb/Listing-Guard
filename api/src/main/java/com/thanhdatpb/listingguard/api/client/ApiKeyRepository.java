@@ -1,10 +1,12 @@
 package com.thanhdatpb.listingguard.api.client;
 
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,6 +25,15 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, UUID> {
     boolean existsByKeyId(String keyId);
 
     List<ApiKey> findByClient_IdOrderByCreatedAtAsc(UUID clientId);
+
+    List<ApiKey> findByClient_IdAndActiveTrueOrderByCreatedAtAsc(UUID clientId);
+
+    long countByClient_IdAndActiveTrue(UUID clientId);
+
+    /** The key with its row locked until the transaction ends, so two revocations of one key do not both succeed. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select k from ApiKey k where k.keyId = :keyId")
+    Optional<ApiKey> findByKeyIdForUpdate(@Param("keyId") String keyId);
 
     /** Keys that can authenticate right now: the key and its client are both active. */
     @Query("select count(k) from ApiKey k where k.active = true and k.client.active = true")

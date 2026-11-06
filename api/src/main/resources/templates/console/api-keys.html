@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>API keys - Listing Guard</title>
+    <link rel="stylesheet" th:href="@{/console/editor.css}">
+    <link rel="stylesheet" th:href="@{/console/console.css}">
+    <script th:src="@{/console/keys.js}" defer></script>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('keys')}"></header>
+<main class="page">
+    <h1>API keys</h1>
+    <p class="muted">
+        Signed in as <span th:text="${email}"></span>. A key lets one of your applications call the Listing Guard API as this
+        account, and its checks count against this account's plan. Send it in the <code>X-API-Key</code> header.
+    </p>
+
+    <div class="notice applied" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
+    <div class="notice refused" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
+
+    <section class="secret-box" id="new-key" th:if="${issued != null}" aria-labelledby="new-key-heading">
+        <h2 id="new-key-heading">Your new key</h2>
+        <p class="warning-text">
+            Copy it now. It is shown only once and cannot be shown again, and anyone who has it can use this account's quota.
+            Keep it in your application's secret store, not in its code.
+        </p>
+        <div class="secret-row">
+            <label for="new-secret" class="visually-hidden">API key</label>
+            <input type="text" id="new-secret" readonly autocomplete="off" spellcheck="false" th:value="${issued.secret}">
+            <button type="button" id="copy-secret" data-copy-from="new-secret" hidden>Copy</button>
+        </div>
+        <p class="copy-status" id="copy-status" role="status" aria-live="polite"></p>
+        <p class="muted small">Key id: <code th:text="${issued.keyId}"></code>. The key id is not a secret: it names the key in this list.</p>
+    </section>
+
+    <h2 id="keys-heading">
+        Active keys <span class="muted" id="key-count" th:text="'(' + ${activeCount} + ' of ' + ${maxActiveKeys} + ')'"></span>
+    </h2>
+    <p id="no-keys" th:if="${keys.isEmpty()}">You have no active keys.</p>
+    <table class="keys" id="keys-table" th:unless="${keys.isEmpty()}" aria-labelledby="keys-heading">
+        <thead>
+        <tr>
+            <th scope="col">Key id</th>
+            <th scope="col">Label</th>
+            <th scope="col">Created (UTC)</th>
+            <th scope="col">Last used (UTC)</th>
+            <th scope="col"><span class="visually-hidden">Action</span></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="key : ${keys}">
+            <td><code th:text="${key.keyId}"></code></td>
+            <td class="label"><span th:if="${key.label != null}" th:text="${key.label}"></span><span class="muted" th:if="${key.label == null}">(no label)</span></td>
+            <td><time th:text="${key.created}"></time></td>
+            <td><time th:if="${key.lastUsed != null}" th:text="${key.lastUsed}"></time><span class="muted" th:if="${key.lastUsed == null}">never</span></td>
+            <td><a class="button danger" th:href="@{/console/api-keys/{id}/revoke(id=${key.keyId})}" th:attr="aria-label='Revoke key ' + ${key.keyId}">Revoke</a></td>
+        </tr>
+        </tbody>
+    </table>
+
+    <h2>Create a key</h2>
+    <p id="limit-message" th:unless="${canCreate}">
+        You have <span th:text="${maxActiveKeys}"></span> active keys, the most allowed. Revoke one to create another.
+    </p>
+    <form id="create-form" method="post" th:action="@{/console/api-keys}" th:if="${canCreate}">
+        <div class="field">
+            <label for="label">Label <span class="muted">(optional, up to <span th:text="${maxLabelLength}"></span> characters)</span></label>
+            <input type="text" id="label" name="label" autocomplete="off" th:attr="maxlength=${maxLabelLength}" th:value="${label}">
+            <p class="hint">For example the name of the application that will use the key.</p>
+        </div>
+        <button type="submit" class="primary">Create key</button>
+    </form>
+</main>
+</body>
+</html>

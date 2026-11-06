@@ -114,6 +114,31 @@ while `/api/v1/checks` and `batch-check` keep following that flag. What it uses 
   pages are sent with `Cache-Control: no-store`; if a reverse proxy adds its own caching, keep `/console/check` out of it,
   because that page carries what the user typed.
 
+### API keys page (ADR-014 B4a)
+
+A signed-in user can open **API keys** (`/console/api-keys`) to list, create and revoke the keys of their own account, for
+example for an application that calls the API. It needs no migration and no plan, and plan limits do not apply to it.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS` | `5` | The most active keys one account may hold. At least 1, or the API does not start. Keys made with the admin job count too. |
+
+- A new key's secret is shown once, in the page that creates it, and cannot be shown again. The page and the confirmation
+  step of a revocation are sent with `Cache-Control: no-store`; keep `/console/api-keys` out of any proxy cache.
+- Keys made here and keys made with `docker compose run --rm admin key create <client>` are the same kind of key, and the audit
+  log gets the same lines (`key.create`, `key.revoke`; client, key id and time, never the secret). Revoking from the console
+  takes effect at once.
+- A client that an operator gave more keys than the limit keeps them all; the console only refuses to create another until
+  enough are revoked.
+- The page serves `/console/console.css` and `/console/keys.js` behind the console sign-in.
+
+### DEMO catalog banner
+
+While `listing-guard.trademark.catalog-version` starts with `demo-` (the DEMO catalog of `catalogs/demo/`), every console page
+shows "Demo catalog: fictional marks only. Real trademark checking is not active." and so does the trademark panel of the
+Check listing page. The banner follows the configured version only. Never serve the DEMO catalog in a deployment other people
+use.
+
 ## Database backup and restore
 
 Back up the PostgreSQL database regularly and store the backup off the server with access controls. This

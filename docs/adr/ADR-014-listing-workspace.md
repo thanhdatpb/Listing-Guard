@@ -4,7 +4,8 @@
 - Date: 2026-11-05
 - Applies to: `core`, `rule-engine` (part A); `api` and the optional web console (part B)
 - Acceptance: Part A, the API/batch integration (B1) and the console sign-in and dashboard (B2) have merged. The editor (B3)
-  is recorded below. Later part B decisions are recorded as they are implemented.
+  has merged too; the API keys page and the shared layout (B4a, reduced scope) are recorded below. Later part B decisions are
+  recorded as they are implemented.
 
 ## Context
 
@@ -273,7 +274,61 @@ CSRF, apply (title, tag by value, repeated tag, stale field, nothing checked or 
 Not included: saving a listing or its history, a live preview while typing, applying several fixes at once, editing anything in
 a marketplace.
 
-### Remaining listing workspace pages (planned: GĐ4 B4)
+### API keys page and shared console layout (GĐ4 B4a)
+
+**Scope.** B4a was first planned with plan-based gating of key creation (a pack `api-access`), a Plan & usage page and a plan
+comparison. That was dropped: paid features are deferred, and the priority is practical use by an internal team and by API
+clients such as a preview app. **No plan check guards key creation, there is no migration, no new pack and no plan page** (the
+dashboard keeps showing plan and usage). Billing and an upgrade path remain unplanned (ADR-013). What B4a adds is small and
+needs no new API endpoint and no change to `docs/api/openapi.json`.
+
+**API keys.** `GET /console/api-keys` lists the active keys of the signed-in account's client (key id, label, created, last
+used in UTC; "never" when `last_used_at` is empty, which the API writes at most about once a minute per key). `POST
+/console/api-keys` creates one; `GET /console/api-keys/{keyId}/revoke` is only a confirmation page that describes the key, and
+`POST` to the same path revokes it. Every POST is CSRF-protected in the console's session chain; API-key authentication
+(`ApiKeyFilter`) is untouched, so keys that an operator made with the admin job keep working and keep being listed.
+
+- **The secret is shown once.** It is in the response of the POST that created the key and nowhere else: not in a redirect, the
+  session, a URL, a log or an audit line, and the response is `Cache-Control: no-store`. The page shows a warning and a Copy
+  button; `static/console/keys.js` only copies the read-only field, sends nothing and the page has no inline script. Without
+  clipboard support the field is selected for copying by hand. A reload of that page makes the browser ask to send the form again,
+  which would make a new key (the limit below bounds it); the alternative, a redirect, would have to keep the secret in the session.
+- **Same provisioning, same audit.** The page calls `ClientProvisioning.createKey(clientId, label, maxActiveKeys)` and
+  `revokeKey(clientId, keyId)`, which store the same hash and write the same audit lines (`key.create`, `key.revoke`) as the
+  name-based methods the admin job uses. `revokeKey(clientId, keyId)` treats a key of another client as not found, so the
+  console answers **404, never 403**, and does not tell whether an id is in use; revoking an already revoked key logs nothing and
+  the page says it was already revoked.
+- **Limit.** `listing-guard.console.max-active-keys` (`LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS`), default 5, at least 1 (start-up
+  fails otherwise). It counts every active key of the client, including keys made by the operator; when an operator gave a client
+  more than the limit, the console creates no further key until enough are revoked. The count and the insert run in one
+  transaction that holds a row lock on the client (`PESSIMISTIC_WRITE`), so concurrent requests cannot pass the limit (a test
+  starts twelve at once with a limit of three). The answer is 409 and a message; a revoked key frees a place. The limit is
+  not a plan feature and is not read from the plan tables.
+- **Label.** Optional, trimmed, at most 100 characters (the size of `api_key.label`), no control characters (400 and nothing is
+  created); a blank label means no label. It is printed with `th:text` only.
+
+**Shared layout.** `templates/console/layout.html` holds the bar (Dashboard, Check listing, API keys, Sign out; the current page
+carries `aria-current`) and the banner. The dashboard, the editor and the keys pages use the bar.
+
+**DEMO banner.** `ConsoleModelAdvice` sets the model attribute `demoCatalog` when `listing-guard.trademark.catalog-version`
+starts with `demo-` (the manifest label of the DEMO catalog, `demo-fictional-2026-11`, plus the digest of the import). It is
+decided from the configured version only, whatever the catalog's state (ready, refused or not yet imported). Every console page,
+the public sign-in and verify pages included, then shows "Demo catalog: fictional marks only. Real trademark checking is not
+active." in a sticky banner whose style is inline: the sign-in pages are public and cannot load the style sheets, which sit
+behind the sign-in. The trademark panel of the editor repeats the sentence in every state. The API, the batch reports and the
+stored results are not marked.
+
+**Tests** use synthetic accounts and read the limit from the setting: the list shows the account's active keys only and no
+secret; a new key works against `/api/v1/usage`, is shown once and is not in the later list; labels (trim, blank, escaping, 100,
+control characters); the limit, operator keys counting, a revocation freeing a place, and the limit per account; the confirmation
+(a GET revokes nothing), the revocation and the stopped key; another account's key as 404 on GET and POST; CSRF on both POSTs and
+the token in both forms; the sign-in redirect; the audit lines without the secret; the concurrent limit; and the banner and the bar
+with and without a demo catalog.
+
+Not included: plan gating of keys, a Plan & usage page, renaming a key, showing a key again, per-key permissions or expiry, and
+`last used` more precise than the API's own once-a-minute write.
+
+### Remaining listing workspace pages (planned)
 
 - A listing workspace beyond one check (saved listings, history) is not designed yet. Whatever it adds must keep these
   rules: **the trademark result is always shown next to the score**, in the same place and with the same prominence (a risk

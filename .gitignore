@@ -55,3 +55,7 @@ batch/out/
 
 # Claude Code local state
 .claude/
+
+# JVM crash and replay dumps
+hs_err_pid*.log
+replay_pid*.log

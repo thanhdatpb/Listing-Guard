@@ -90,11 +90,21 @@ It never edits a listing, never publishes, and does no SEO.
   Counter limits come from the active ruleset as `data-*` attributes; `editor.js` only counts and holds no number. The preview
   is labelled "Simulation", cuts the search result by CSS and holds no character count, logo, image, brand color or domain.
   Rendered values always go through `th:text`.
+  **API keys page and shared layout (B4a, reduced scope)** (`ConsoleApiKeysController`, `templates/console/{layout,api-keys,
+  api-key-revoke}.html`, `static/console/{console.css,keys.js}`): `GET|POST /console/api-keys`, `GET|POST
+  /console/api-keys/{keyId}/revoke` (GET only confirms). **No plan gating, no migration, no Plan & usage page** (dropped: paid
+  features are deferred). The page calls `ClientProvisioning.createKey(clientId, label, maxActiveKeys)` / `revokeKey(clientId,
+  keyId)`, which write the same audit lines as the admin job; a key of another client is a 404, never a 403. The secret is in
+  the POST response only (`no-store`, no redirect, nothing in the session, a URL or a log) and no page has an inline script.
+  `listing-guard.console.max-active-keys` (default 5, at least 1 or start-up fails) counts every active key of the client,
+  operator keys too; the count and insert hold a row lock on the client. `ConsoleModelAdvice` sets `demoCatalog` when
+  `listing-guard.trademark.catalog-version` starts with `demo-`: every console page (sign-in pages included, inline style) shows
+  the banner and the editor's trademark panel repeats it.
 - Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
   endpoint, the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
-  dashboard and the Check listing editor (no saved listings or history yet; no LLM call, no structured output, no citation
-  verification yet).
+  dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
+  output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
@@ -122,9 +132,10 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
 6. Client plans and monthly quota (done, ADR-013, V19; off by default). Next for it: ADR-011 PR 5 and the sheet connector
    (phase 4b) call `requirePack` for their packs. Billing, payment and a self-service upgrade are not planned here.
 7. Listing Workspace (ADR-014, Accepted). Part A, the optional API/batch integration and part B authentication/dashboard
-   and the Check listing editor (B3) are implemented; fixes and console default off, V20/V21 store their respective data
-   (the editor adds no migration). Next: saved listings/history (not designed) and `tag_count_underused` in the next Etsy
-   ruleset update.
+   the Check listing editor (B3) and the API keys page with the shared layout and the DEMO banner (B4a) are implemented;
+   fixes and console default off, V20/V21 store their respective data (B3 and B4a add no migration). Next: saved
+   listings/history (not designed) and `tag_count_underused` in the next Etsy ruleset update. Plan-based gating of keys, a
+   Plan & usage page and billing are deferred, not planned.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).

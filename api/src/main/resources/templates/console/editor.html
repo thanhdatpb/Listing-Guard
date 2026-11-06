@@ -8,15 +8,8 @@
     <script th:src="@{/console/editor.js}" defer></script>
 </head>
 <body>
-<header class="bar">
-    <nav aria-label="Console">
-        <a th:href="@{/console}">Dashboard</a>
-        <a th:href="@{/console/check}" aria-current="page">Check listing</a>
-    </nav>
-    <form method="post" th:action="@{/logout}">
-        <button type="submit" class="link">Sign out</button>
-    </form>
-</header>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('check')}"></header>
 <main class="layout">
     <section class="editor" aria-labelledby="editor-heading">
         <h1 id="editor-heading">Check listing</h1>
@@ -177,6 +170,7 @@
                     <p class="headline" th:text="${result.trademark.headline}"></p>
                     <p class="muted small" th:text="${result.trademark.detail}"></p>
                     <p class="hint-upgrade small" th:if="${result.trademark.hint != null}" th:text="${result.trademark.hint}"></p>
+                    <p class="demo-note small" id="trademark-demo-note" th:if="${demoCatalog}"><span th:replace="~{console/layout :: demoText}"></span></p>
                     <p class="muted small disclaimer" th:text="${result.trademark.disclaimer}"></p>
                 </section>
             </div>

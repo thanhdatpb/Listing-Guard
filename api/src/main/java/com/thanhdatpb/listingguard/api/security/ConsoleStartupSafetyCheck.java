@@ -58,6 +58,9 @@ public final class ConsoleStartupSafetyCheck {
                 || properties.rateWindow().toSeconds() < 1) {
             throw new IllegalStateException("Console login rate limits must be positive.");
         }
+        if (properties.maxActiveKeys() < 1) {
+            throw new IllegalStateException("listing-guard.console.max-active-keys must be at least 1.");
+        }
         if (dev) {
             log.warn("Console development mail delivery logs magic links. Do not use the 'dev' profile in production.");
         }
