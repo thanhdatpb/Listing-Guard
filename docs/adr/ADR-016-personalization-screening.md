@@ -98,7 +98,7 @@ key nobody read fails `finish()`).
 - **`char_classes`**: named sets of code points, each a list of `chars` (a string) and `ranges` (`U+0041-U+005A`).
   Shipped: `latin_letters` (A-Z, a-z), `digits` (0-9), `space` (U+0020), `basic_punctuation` (`-`, `'`, `.`, `&`) and
   `latin_diacritics` (the precomposed Latin letters with marks, among them the Vietnamese ones).
-- **`print_profiles`**: `default_profile` and `profiles.<code>`, each with `allowed_classes` (names of classes),
+- **`print_profiles`**: `default_profile` and `profiles.<code>`, each with `allowed_chars` (names of classes),
   `max_length` (code points after NFC, spaces included), `max_length_by_label` (optional; label compared ignoring case after
   NFC, overriding `max_length`), `allow_lowercase` (false means the workshop prints capitals only) and a `source`. Shipped:
   `latin_basic` (the default; no diacritics) and `latin_extended` (adds `latin_diacritics`).
@@ -129,10 +129,11 @@ A character that is not allowed is never also reported as lowercase.
 `too_long`, WARNING; `start` is the offset of the first code point over the limit, `end` the end of the text, `value` null
 (the text is not kept). The message cites the length and the limit.
 
-**`whitespace_issue`.** INFO, and the pack never removes the space: kind `leading_or_trailing_space` (a whitespace
-character, U+0020 or any other `Character.isWhitespace` / `isSpaceChar`, at either end; one finding per end) and kind
-`repeated_space` (two or more whitespace characters in a row inside the text; one per run; a run that touches an end is
-reported as leading or trailing only). `value` is null. The message cites the position and the count.
+**`whitespace_issue`.** INFO, and the pack never removes the space: kinds `leading_space` and `trailing_space` (a whitespace
+character, U+0020 or any other `Character.isWhitespace` / `isSpaceChar`, at the start or the end; one finding per end; a text
+of only whitespace is reported as leading once) and `repeated_space` (two or more whitespace characters in a row inside the
+text; one per run; a run that touches an end is reported as leading or trailing only). `value` is null. The message cites the
+position and the count.
 
 ### Trademark part
 
@@ -148,8 +149,8 @@ The trademark scanner of ADR-009 runs on the values, with the catalog the applic
   `rules_version`.
 - **The answer never repeats the buyer's text.** A trademark finding has `ruleId`, `risk`, `field`, `label`, `start`, `end`,
   `matchType`, `score`, `insideColorPhrase`, `otherRuleIds`, `mark` (the catalog's display form, which is catalog data, not
-  buyer data) and `sourceIds`, and a message and suggestion made from this ruleset's templates with `{field}`, `{label}`,
-  `{mark}`, `{score}`, `{start}` and `{end}`. The scanner's `snippet` and the text it puts in its own messages are not used. The
+  buyer data) and `sourceIds`, and a message and suggestion made from this ruleset's templates with `{subject}` (the field
+  and the label), `{from}` and `{to}` (the 1-based positions of the first and last character), `{mark}` and `{score}`. The scanner's `snippet` and the text it puts in its own messages are not used. The
   client has the text and the offsets; the service keeps nothing to find the buyer again.
 - `trademark.riskLevel` is the scanner's: `LOW`, `MEDIUM`, `HIGH`, or `UNKNOWN`. The rule of ADR-009 stands: an incomplete
   scan keeps a MEDIUM or HIGH level and is otherwise `UNKNOWN`, never `LOW`.
@@ -187,13 +188,13 @@ Retention is `listing-guard.personalization.retention.period`, 30 days by defaul
 `expires_at` is decided on read by GET and the cache lookup, whatever the cleanup does; an expired id, an unknown id and
 another client's id are the same `404 personalization-screening-not-found`.
 
-**Cleanup.** `PersonalizationRetentionCleanup` has the shape of the other two (a scheduled task of a web application,
-`cleanup-enabled`, bounded batches, oldest expiry first, `FOR UPDATE SKIP LOCKED`, children by `ON DELETE CASCADE`) but
-**does not take the advisory lock `(1279746628, 1380271182)`** and takes no other advisory lock. `SKIP LOCKED` already makes
-two instances delete different rows, so a second instance running a batch is harmless duplicate work, never a double delete.
-ADR-010 reserves that pair for "Listing Guard retention cleanup" and says only one instance may perform a batch;
-ADR-015 reuses it. The maintainer asked that this pack not take it (Open question 2), so this record departs from ADR-010 on
-that one point and says so; the other choice is one line in the cleanup class.
+**Cleanup.** `PersonalizationRetentionCleanup` has the shape of `VariationRetentionCleanup` (a scheduled task of a web
+application, `cleanup-enabled`, bounded batches, oldest expiry first, `FOR UPDATE SKIP LOCKED`, children by
+`ON DELETE CASCADE`). Each batch is one transaction that first calls `pg_try_advisory_xact_lock(1279746628, 1380271182)`, the
+key pair that ADR-010 reserves for Listing Guard retention cleanup; this is a retention cleanup, so it shares that pair with the
+trademark and variation cleanups, and the code takes the key constants from `TrademarkRetentionCleanup` instead of copying the
+numbers. A run that cannot take the lock is skipped and tried again at the next interval. The start delay differs from the
+other two so they rarely meet. No other kind of query may take the pair.
 
 ### Cache
 
@@ -266,7 +267,7 @@ are read from the ruleset, never repeated in a test.
 5. **API** (Testcontainers): fresh `cached: false`, again `cached: true` with the same `checkId`; another client's GET is `404`
    like an unknown and an expired id; **no column of the new tables contains the submitted text** beyond the bounded evidence;
    two identical concurrent requests store one result; expiry is decided on read and by the lookup; the cleanup deletes
-   expired rows and takes no advisory lock; an `INCOMPLETE` result is stored and never reused; an unknown print profile is
+   expired rows under the shared retention advisory lock and skips its run while another holds it; an `INCOMPLETE` result is stored and never reused; an unknown print profile is
    `400`; a catalog that is off does not make a `503`.
 6. **Plans**: with plans on, `FREE` is `403 plan-not-allowed`, `SELLER` and `PRO` pass; a cached answer is free, also at the
    limit; a new complete result is one unit; `INCOMPLETE` is not charged; with plans off nothing is queried or written. `Pack`
@@ -289,11 +290,9 @@ Written as questions, not decided here; each says what this record assumed meanw
    apostrophes? the ampersand?), which limits apply per field (name, number) and per product, and does the workshop print
    capitals only? The shipped `latin_basic` and `latin_extended` are placeholders with invented numbers (20 characters, 3 for
    a field labelled `number`). Replacing them is a new ruleset version.
-2. **Advisory lock.** ADR-010 reserves `(1279746628, 1380271182)` for "Listing Guard retention cleanup" and ADR-015 reuses it
-   for the variation cleanup; the request for this pack was not to reuse "the lock reserved for the trademark retention".
-   This record takes no advisory lock (safe because of `SKIP LOCKED`, but it allows two instances to clean at once, which
-   ADR-010 wanted to avoid). Alternatives: take the shared pair like ADR-015 (one line), or a second pair (ADR-010 would need an
-   amendment). Which one?
+2. **Advisory lock (settled).** An early draft of the request said not to reuse the lock reserved for the trademark
+   retention. The maintainer then decided this pack shares the pair ADR-010 reserves for retention cleanup, as ADR-015 does, so
+   there is no departure from ADR-010 and nothing to answer. Kept here so the record shows the choice.
 3. **Cost and plan seed.** One unit per new complete result, `SELLER` and `PRO` only. A fulfillment team checking every order
    spends units quickly; is a quota per order the right unit, or should this pack be priced differently?
 4. **Counting.** Length is in code points after NFC. A family emoji or a flag is several code points and one glyph; the
