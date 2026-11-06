@@ -1,16 +1,14 @@
 package com.thanhdatpb.listingguard.ruleengine.etsy;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
-import com.thanhdatpb.listingguard.core.finding.Severity;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.core.listing.PersonalizationQuestion;
 import com.thanhdatpb.listingguard.ruleengine.Rule;
-import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
+import com.thanhdatpb.listingguard.ruleengine.SensitiveKeywords;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
-import com.thanhdatpb.listingguard.ruleengine.config.RulesetException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * A reminder for a free text question ({@code TEXT}) whose text contains one of the configured keywords (name, number, team,
@@ -29,14 +27,7 @@ public final class PersonalizationFreeTextSensitiveRule implements Rule {
 
     @Override
     public void validate(RulesetConfig config) {
-        RuleSettings settings = config.rule(ID);
-        if (settings.severity() != Severity.INFO) {
-            throw new RulesetException("Rule '" + ID + "' can only be INFO, got " + settings.severity());
-        }
-        List<String> keywords = settings.stringListParam("keywords");
-        if (keywords.isEmpty() || keywords.stream().anyMatch(String::isBlank)) {
-            throw new RulesetException("Rule '" + ID + "': key 'keywords' must list at least one non-blank word");
-        }
+        SensitiveKeywords.validate(ID, config.rule(ID));
     }
 
     @Override
@@ -49,15 +40,11 @@ public final class PersonalizationFreeTextSensitiveRule implements Rule {
             if (!PersonalizationQuestion.TEXT.equals(question.type()) || question.questionText() == null) {
                 continue;
             }
-            List<String> found = new ArrayList<>();
-            for (String keyword : keywords) {
-                if (wholeWord(keyword).matcher(question.questionText()).find()) {
-                    found.add(Texts.quote(keyword.trim()));
-                }
-            }
+            List<String> found = SensitiveKeywords.found(question.questionText(), keywords);
             if (!found.isEmpty()) {
                 findings.add(finding(config, Personalization.field(i, "question_text"), question.questionText(),
-                        "Câu hỏi nhập tự do " + Texts.quote(question.questionText()) + " có từ " + String.join(", ", found)
+                        "Câu hỏi nhập tự do " + Texts.quote(question.questionText()) + " có từ "
+                                + found.stream().map(Texts::quote).collect(Collectors.joining(", "))
                                 + ": khách có thể nhập tên đội hoặc cầu thủ có nhãn hiệu.",
                         "Cân nhắc dùng câu hỏi dạng dropdown với các lựa chọn do bạn đặt, để hạn chế khách nhập tên đội hoặc cầu "
                                 + "thủ có nhãn hiệu. Đây chỉ là gợi ý, không phải kết luận về nhãn hiệu; kết quả kiểm tra nhãn "
@@ -65,10 +52,5 @@ public final class PersonalizationFreeTextSensitiveRule implements Rule {
             }
         }
         return findings;
-    }
-
-    private static Pattern wholeWord(String keyword) {
-        return Pattern.compile("(?<![\\p{L}\\p{Nd}])" + Pattern.quote(keyword.trim()) + "(?![\\p{L}\\p{Nd}])",
-                Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     }
 }
