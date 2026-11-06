@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.core.listing.Money;
+import com.thanhdatpb.listingguard.core.listing.PersonalizationQuestion;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -112,5 +113,41 @@ class ContentHasherTest {
         assertThat(hasher.hash(amazon("Roadster", List.of("One"), "carry on", "LUGGAGE")))
                 .isEqualTo(hasher.hash(amazon("Roadster", List.of("One"), "carry on", "LUGGAGE")))
                 .matches("[0-9a-f]{64}");
+    }
+
+    private static Listing etsyWith(List<PersonalizationQuestion> questions) {
+        return new Listing("Handmade ceramic mug", "A nice mug for tea.", List.of("mug", "ceramic"),
+                new Money(new BigDecimal("19.99"), "USD"), "Home > Mugs", List.of("clay"), List.of("https://example.com/1.jpg"),
+                5, "i_did", "made_to_order", null, List.of(), null, null, null, questions);
+    }
+
+    private static PersonalizationQuestion text(String question) {
+        return new PersonalizationQuestion("TEXT", question, null, true, 20, List.of(), null);
+    }
+
+    @Test
+    void noPersonalizationQuestionsLeavesTheEtsyHashUnchanged() {
+        assertThat(hasher.hash(etsyWith(List.of()))).isEqualTo(ETSY_HASH);
+        assertThat(hasher.hash(etsyWith(null))).isEqualTo(ETSY_HASH);
+    }
+
+    @Test
+    void personalizationQuestionsChangeTheHashAndEveryPartOfAQuestionCountsInIt() {
+        String base = hasher.hash(etsyWith(List.of(text("Name"))));
+
+        assertThat(base).isNotEqualTo(ETSY_HASH).matches("[0-9a-f]{64}");
+        assertThat(hasher.hash(etsyWith(List.of(text("Name"))))).isEqualTo(base);
+        assertThat(hasher.hash(etsyWith(List.of(text("Nickname"))))).isNotEqualTo(base);
+        assertThat(hasher.hash(etsyWith(List.of(text("Name"), text("Date"))))).isNotEqualTo(base);
+        assertThat(hasher.hash(etsyWith(List.of(new PersonalizationQuestion("TEXT", "Name", "Letters only", true, 20,
+                List.of(), null))))).isNotEqualTo(base);
+        assertThat(hasher.hash(etsyWith(List.of(new PersonalizationQuestion("TEXT", "Name", null, false, 20,
+                List.of(), null))))).isNotEqualTo(base);
+        assertThat(hasher.hash(etsyWith(List.of(new PersonalizationQuestion("TEXT", "Name", null, true, 21,
+                List.of(), null))))).isNotEqualTo(base);
+        assertThat(hasher.hash(etsyWith(List.of(new PersonalizationQuestion("DROPDOWN", "Name", null, true, 20,
+                List.of("A"), null))))).isNotEqualTo(base);
+        assertThat(hasher.hash(etsyWith(List.of(new PersonalizationQuestion("UPLOAD", "Name", null, true, 20,
+                List.of(), 2))))).isNotEqualTo(base);
     }
 }

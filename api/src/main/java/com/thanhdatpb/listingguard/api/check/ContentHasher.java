@@ -23,9 +23,12 @@ public class ContentHasher {
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
             .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true);
 
-    /** Components added for Amazon. They are left out while empty so the hash of an Etsy listing never changed. */
+    /**
+     * Components added after the first release: the Amazon ones, and the Etsy personalization questions. They are left out
+     * while empty, so the hash of a listing that does not use them never changed.
+     */
     private static final List<String> OPTIONAL_KEYS =
-            List.of("brand", "bulletPoints", "searchTerms", "productType", "itemHighlights");
+            List.of("brand", "bulletPoints", "searchTerms", "productType", "itemHighlights", "personalizationQuestions");
 
     public String hash(Listing listing) {
         JsonNode tree = canonicalMapper.valueToTree(listing);
