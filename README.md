@@ -15,6 +15,10 @@ edit or publish anything, and it does not do SEO.
   catalog of marks that you load yourself (exact, phrase and fuzzy matching, plus color and place context rules).
   Every finding carries explainable evidence (field, span, matched mark, match type, score, source ids) and every
   result carries a disclaimer: it is a reference warning, not a legal conclusion.
+- **Ruleset limits** (`GET /api/v1/rulesets/{marketplace}/limits`): the numeric limits of the loaded rulesets (title length,
+  number and length of tags, Amazon search terms in bytes, ...), each with the field, the unit it is counted in, its severity
+  and how well it is sourced, read from the same rules and ruleset the check uses. A client shows a character counter from it
+  instead of copying the numbers into its own code.
 - **Batch check** (the `batch-check` job): checks a whole export file (an Etsy CSV, an Amazon flat file) with both
   checks and writes CSV and HTML reports, without an integration.
 - **Multi-client REST API**: every API key belongs to a client; results, cache and rate limit are per client.
@@ -84,6 +88,7 @@ What is not built yet is listed in the [Roadmap](#roadmap). Changes between vers
 Client backend -- X-API-Key --> Listing Guard API (Spring Boot)
    POST /api/v1/checks               |
    POST /api/v1/trademark-checks     |
+   GET  /api/v1/rulesets/{m}/limits  |   (read only: the limits of the rules below)
                          API key --> authenticated client
                          rate limit per client
                                      |
@@ -414,6 +419,12 @@ start if a registered version has different content (see [ADR-002](docs/adr/ADR-
 `etsy-2026-10.yaml` and `amazon-2026-11.yaml` are kept unchanged as history (a test pins their hashes) and are no longer loaded.
 Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `application.yml`.
 
+The numeric limits of the loaded rulesets are served, read only, by `GET /api/v1/rulesets/{marketplace}/limits` (and
+`?productType=` for an Amazon override). Each rule that has a number declares it with `Rule.limits`, with the unit its own check
+counts (code points, items, UTF-8 bytes, occurrences), so the endpoint and the console editor's counters show what the check
+enforces and a new rule appears in the answer without a change outside the rule. See the
+[integration guide](docs/integration-guide.md#limits-for-a-character-counter).
+
 ## Roadmap
 
 Done: pack identity (PR 0a, migration V7, and PR 0b, migrations V8-V14; composite analysis versions,
@@ -446,7 +457,7 @@ What follows, in this order, is **not built yet**:
 
 ## Documentation
 
-- [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, plans and quota, and client isolation.
+- [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, plans and quota, the ruleset limits for a character counter, and client isolation.
 - [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields.
 - [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
 - [Deployment](docs/deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.

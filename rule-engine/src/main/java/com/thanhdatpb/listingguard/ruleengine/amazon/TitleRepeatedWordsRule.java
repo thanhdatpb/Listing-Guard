@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.ruleengine.amazon;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.Limit;
 import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.ArrayList;
@@ -34,6 +35,12 @@ public final class TitleRepeatedWordsRule extends AmazonRule {
     void validateSettings(RuleSettings settings) {
         settings.intParam("max_occurrences");
         settings.stringListParam("exempt_words");
+    }
+
+    /** How many times the same word (ignoring case, exempt words aside) may appear in the title. */
+    @Override
+    public List<Limit> limits(RuleSettings settings) {
+        return List.of(Limit.maxOccurrences("title", settings.intParam("max_occurrences")));
     }
 
     @Override

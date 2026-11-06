@@ -2,7 +2,9 @@ package com.thanhdatpb.listingguard.ruleengine.etsy;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.Limit;
 import com.thanhdatpb.listingguard.ruleengine.Rule;
+import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetException;
 import java.util.ArrayList;
@@ -26,6 +28,12 @@ public final class TitleRepeatedSpecialCharsRule implements Rule {
                 throw new RulesetException("Rule '" + ID + "': each entry of 'chars' must be one character, got '" + character + "'");
             }
         }
+    }
+
+    /** How many times each of the configured characters may appear in the title. */
+    @Override
+    public List<Limit> limits(RuleSettings settings) {
+        return List.of(Limit.maxOccurrences("title", settings.intParam("max_occurrences")));
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.ruleengine;
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.finding.Severity;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetException;
 import java.util.ArrayList;
@@ -64,6 +65,28 @@ public final class RuleEngine {
             findings.add(fixHolds(finding, listing, config, base, baseCounts) ? finding : finding.withoutFix());
         }
         return new RuleRun(config.packId(), findings, base.failedRuleIds());
+    }
+
+    /**
+     * The numeric limits of every rule of the ruleset, as each rule declares them ({@link Rule#limits}), for a listing of
+     * {@code category} (an Amazon product type, matched ignoring case and blanks; null or a category with no override gets the
+     * defaults), in rule registration order. Severity, source status and {@code enabled} are those of the settings that apply to
+     * the category, exactly as {@link #run} uses them, so what this returns cannot differ from what the check enforces.
+     *
+     * <p>A rule that is switched off for the category is included with {@code enabled} false.
+     *
+     * @throws IllegalArgumentException if no rules are registered for the ruleset's pack and marketplace
+     */
+    public List<RuleLimit> limits(RulesetConfig config, String category) {
+        List<RuleLimit> limits = new ArrayList<>();
+        for (Rule rule : registry.rulesFor(config.packId(), config.marketplace())) {
+            RuleSettings settings = config.rule(rule.id(), category);
+            for (Limit limit : rule.limits(settings)) {
+                limits.add(new RuleLimit(limit.field(), rule.id(), limit.kind(), limit.value(), limit.unit(),
+                        settings.severity(), settings.source().status(), settings.enabled()));
+            }
+        }
+        return List.copyOf(limits);
     }
 
     private Evaluation evaluate(Listing listing, RulesetConfig config) {

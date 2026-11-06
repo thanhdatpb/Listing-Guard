@@ -2,8 +2,7 @@ package com.thanhdatpb.listingguard.api.console.editor;
 
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
-import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
-import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
+import com.thanhdatpb.listingguard.api.ruleset.RulesetLimitsService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -34,12 +33,12 @@ public class ConsoleEditorController {
     private static final Pattern FIX_ID = Pattern.compile("\\d{1,4}");
 
     private final PlanService plans;
-    private final ActiveRulesets rulesets;
+    private final RulesetLimitsService rulesetLimits;
     private final EditorCheckService checks;
 
-    public ConsoleEditorController(PlanService plans, ActiveRulesets rulesets, EditorCheckService checks) {
+    public ConsoleEditorController(PlanService plans, RulesetLimitsService rulesetLimits, EditorCheckService checks) {
         this.plans = plans;
-        this.rulesets = rulesets;
+        this.rulesetLimits = rulesetLimits;
         this.checks = checks;
     }
 
@@ -97,12 +96,11 @@ public class ConsoleEditorController {
 
     /** Everything the page needs besides a result: the form, the counters' limits, the cost of a press and the field errors. */
     void populate(Model model, ConsoleUser user, EditorMarketplace marketplace, EditorForm form, Map<String, String> errors) {
-        RulesetConfig config = rulesets.get(marketplace.code()).config();
         model.addAttribute("email", user.email());
         model.addAttribute("marketplace", marketplace);
         model.addAttribute("marketplaces", EditorMarketplace.values());
         model.addAttribute("form", form);
-        EditorLimits limits = EditorLimits.of(config, marketplace, form.productType());
+        EditorLimits limits = EditorLimits.of(rulesetLimits.limits(marketplace.code(), form.productType()).limits());
         model.addAttribute("limits", limits);
         model.addAttribute("preview", EditorPreview.of(form, limits.titleMax()));
         model.addAttribute("cost", EditorCost.of(plans.usage(user.clientId())));

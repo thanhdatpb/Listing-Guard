@@ -4,6 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.thanhdatpb.listingguard.api.plan.Usage;
 import com.thanhdatpb.listingguard.core.finding.Severity;
+import com.thanhdatpb.listingguard.ruleengine.Limit;
+import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
+import com.thanhdatpb.listingguard.ruleengine.RuleLimit;
+import com.thanhdatpb.listingguard.ruleengine.RuleRegistry;
 import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetLoader;
@@ -16,15 +20,25 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** The limits the editor shows are the ones in the active ruleset; the numbers are read from it here, not repeated. */
+/**
+ * The limits the editor shows are the limits of the active ruleset, as the rules declare them; the numbers are read from the
+ * ruleset here, not repeated. That the page and {@code GET /api/v1/rulesets/{marketplace}/limits} agree is held by
+ * {@code RulesetLimitsConsoleParityIntegrationTest}.
+ */
 class EditorLimitsTest {
 
     private static final RulesetConfig ETSY = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
     private static final RulesetConfig AMAZON = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
 
+    private final RuleEngine engine = new RuleEngine(RuleRegistry.withDefaults());
+
+    private EditorLimits limits(RulesetConfig config, String productType) {
+        return EditorLimits.of(engine.limits(config, productType));
+    }
+
     @Test
     void etsyLimitsAreTheRulesetValues() {
-        EditorLimits limits = EditorLimits.of(ETSY, EditorMarketplace.ETSY, "");
+        EditorLimits limits = limits(ETSY, "");
 
         assertThat(limits.titleMax()).isEqualTo(ETSY.rule("title_length").intParam("max_length"));
         assertThat(limits.tagLengthMax()).isEqualTo(ETSY.rule("tag_length").intParam("max_length"));
@@ -36,7 +50,7 @@ class EditorLimitsTest {
 
     @Test
     void amazonLimitsAreTheRulesetValuesAndASwitchedOffRuleHasNoCounter() {
-        EditorLimits limits = EditorLimits.of(AMAZON, EditorMarketplace.AMAZON, "");
+        EditorLimits limits = limits(AMAZON, "");
 
         assertThat(limits.titleMax()).isEqualTo(AMAZON.rule("title_length").intParam("max_length"));
         assertThat(limits.bulletCountMax()).isEqualTo(AMAZON.rule("bullet_count").intParam("max_count"));
@@ -60,11 +74,34 @@ class EditorLimitsTest {
         RulesetConfig config = new RulesetConfig(AMAZON.packId(), AMAZON.marketplace(), AMAZON.version(), AMAZON.checkedAt(),
                 AMAZON.contentHash(), rules);
 
-        assertThat(EditorLimits.of(config, EditorMarketplace.AMAZON, "luggage").titleMax()).isEqualTo(80);
-        assertThat(EditorLimits.of(config, EditorMarketplace.AMAZON, " LUGGAGE ").titleMax()).isEqualTo(80);
-        assertThat(EditorLimits.of(config, EditorMarketplace.AMAZON, "SHOES").titleMax())
-                .isEqualTo(base.intParam("max_length"));
-        assertThat(EditorLimits.of(config, EditorMarketplace.AMAZON, "").titleMax()).isEqualTo(base.intParam("max_length"));
+        assertThat(limits(config, "luggage").titleMax()).isEqualTo(80);
+        assertThat(limits(config, " LUGGAGE ").titleMax()).isEqualTo(80);
+        assertThat(limits(config, "SHOES").titleMax()).isEqualTo(base.intParam("max_length"));
+        assertThat(limits(config, "").titleMax()).isEqualTo(base.intParam("max_length"));
+    }
+
+    @Test
+    void aLimitOfAnotherFieldOrAnotherKindIsNotTakenForTheCounter() {
+        List<RuleLimit> only = List.of(
+                new RuleLimit("description", "x", Limit.Kind.MAX_LENGTH, 1, Limit.Unit.CODE_POINTS, Severity.ERROR,
+                        SourceStatus.VERIFIED, true),
+                new RuleLimit("title", "y", Limit.Kind.MAX_OCCURRENCES, 2, Limit.Unit.OCCURRENCES, Severity.ERROR,
+                        SourceStatus.VERIFIED, true));
+
+        assertThat(EditorLimits.of(only)).isEqualTo(new EditorLimits(null, null, null, null, null, null));
+    }
+
+    @Test
+    void whenSeveralEnabledRulesLimitTheSameThingTheStrictestWinsAndASwitchedOffOneIsIgnored() {
+        List<RuleLimit> limits = List.of(
+                new RuleLimit("title", "a", Limit.Kind.MAX_LENGTH, 100, Limit.Unit.CODE_POINTS, Severity.WARNING,
+                        SourceStatus.SECONDARY, true),
+                new RuleLimit("title", "b", Limit.Kind.MAX_LENGTH, 60, Limit.Unit.CODE_POINTS, Severity.WARNING,
+                        SourceStatus.SECONDARY, true),
+                new RuleLimit("title", "c", Limit.Kind.MAX_LENGTH, 10, Limit.Unit.CODE_POINTS, Severity.WARNING,
+                        SourceStatus.UNVERIFIED, false));
+
+        assertThat(EditorLimits.of(limits).titleMax()).isEqualTo(60);
     }
 
     @Test

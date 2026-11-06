@@ -6,6 +6,7 @@ import com.thanhdatpb.listingguard.api.check.UnknownMarketplaceException;
 import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
 import com.thanhdatpb.listingguard.api.plan.QuotaExceededException;
 import com.thanhdatpb.listingguard.api.policy.CorpusModelMismatchException;
+import com.thanhdatpb.listingguard.api.ruleset.RulesetNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
@@ -52,6 +53,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(CheckNotFoundException.class)
     public ProblemDetail checkNotFound(CheckNotFoundException e) {
         return Problems.of(HttpStatus.NOT_FOUND, "check-not-found", e.getMessage());
+    }
+
+    /** No text ruleset is active for the marketplace of {@code GET /api/v1/rulesets/{marketplace}/limits}. */
+    @ExceptionHandler(RulesetNotFoundException.class)
+    public ProblemDetail rulesetNotFound(RulesetNotFoundException e) {
+        return Problems.of(HttpStatus.NOT_FOUND, "ruleset-not-found", e.getMessage());
     }
 
     /** A trademark check of another client, an unknown one and an expired one all answer alike (ADR-007, ADR-009). */

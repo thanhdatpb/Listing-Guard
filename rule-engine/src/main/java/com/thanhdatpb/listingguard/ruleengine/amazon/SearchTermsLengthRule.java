@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.ruleengine.amazon;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.Limit;
 import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.util.List;
@@ -22,6 +23,12 @@ public final class SearchTermsLengthRule extends AmazonRule {
     @Override
     void validateSettings(RuleSettings settings) {
         settings.intParam("max_bytes");
+    }
+
+    /** Search terms are measured in UTF-8 bytes ({@link Texts#utf8Bytes}), not in characters. */
+    @Override
+    public List<Limit> limits(RuleSettings settings) {
+        return List.of(Limit.maxBytes("search_terms", settings.intParam("max_bytes")));
     }
 
     @Override
