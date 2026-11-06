@@ -45,7 +45,9 @@ class EtsyRulesTest {
         tags.add("TAG0");
         tags.add(CONFIG.rule("banned_words").stringListParam("words").get(0));
         Listing base = valid();
-        String badTitle = "x".repeat(limit("title_length", "max_length") + 1) + " 😀 100% 50%";
+        String manyWords = IntStream.range(0, limit("title_word_count", "max_words") + 1).mapToObj(i -> "word" + i)
+                .collect(java.util.stream.Collectors.joining(" "));
+        String badTitle = "x".repeat(limit("title_length", "max_length") + 1) + " 😀 100% 50% sale sale " + manyWords;
         Listing bad = new Listing(badTitle, null, tags, new Money(BigDecimal.ZERO, "USD"),
                 base.category(), base.materials(), base.images(), base.quantity(), base.whoMade(), base.whenMade());
 
@@ -53,13 +55,27 @@ class EtsyRulesTest {
 
         assertThat(findings).extracting(Finding::ruleId).containsExactlyInAnyOrder(
                 "required_fields", "price_quantity_positive", "title_length", "title_characters",
-                "title_repeated_special_chars", "tag_count", "tag_length", "tag_characters", "duplicate_tags",
-                "banned_words");
+                "title_repeated_special_chars", "title_word_count", "title_repeated_words", "title_promotional_terms",
+                "tag_count", "tag_length", "tag_characters", "duplicate_tags");
+    }
+
+    @Test
+    void bannedWordsIsSwitchedOffSoItNeverRunsEvenOnABannedWord() {
+        String banned = CONFIG.rule("banned_words").stringListParam("words").get(0);
+        Listing base = valid();
+        Listing listing = new Listing(banned + " " + base.title(), banned, List.of(banned), base.price(), base.category(),
+                base.materials(), base.images(), base.quantity(), base.whoMade(), base.whenMade());
+
+        assertThat(CONFIG.rule("banned_words").enabled()).isFalse();
+        assertThat(new BannedWordsRule().evaluate(listing, CONFIG)).as("the rule itself still works").isNotEmpty();
+        assertThat(engine.run(listing, CONFIG)).extracting(Finding::ruleId).doesNotContain("banned_words");
+        assertThat(engine.runDetailed(listing, CONFIG).failedRuleIds()).isEmpty();
+        assertThat(engine.limits(CONFIG, null)).extracting(l -> l.ruleId()).doesNotContain("banned_words");
     }
 
     @Test
     void severityCanBeChangedInYamlWithoutTouchingCode() throws IOException {
-        String yaml = new String(getClass().getResourceAsStream("/rulesets/etsy-2026-11.yaml").readAllBytes(),
+        String yaml = new String(getClass().getResourceAsStream("/rulesets/etsy-2026-12.yaml").readAllBytes(),
                 StandardCharsets.UTF_8);
         String relaxed = yaml.replace("  tag_count:\n    severity: ERROR", "  tag_count:\n    severity: INFO");
         assertThat(relaxed).isNotEqualTo(yaml);

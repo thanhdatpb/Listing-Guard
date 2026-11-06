@@ -78,7 +78,7 @@ class EditorCheckServiceTest {
 
     private static CheckResult rules(CheckResult.ReadinessView readiness, CheckResult.FindingView... findings) {
         List<CheckResult.FindingView> list = List.of(findings);
-        return new CheckResult(UUID.randomUUID(), CheckStatus.COMPLETED, "ETSY", "etsy-2026-11", "etsy-2026-11", "hash", false,
+        return new CheckResult(UUID.randomUUID(), CheckStatus.COMPLETED, "ETSY", "etsy-2026-12", "etsy-2026-12", "hash", false,
                 NOVEMBER_15, new CheckResult.Summary(0, 0, 0), list, true, readiness);
     }
 

@@ -31,8 +31,8 @@ public final class ApiExamples {
               "checkId": "5331208a-583a-4ff3-a990-99a7440ae59f",
               "status": "COMPLETED",
               "marketplace": "ETSY",
-              "rulesetVersion": "etsy-2026-11",
-              "analysisVersion": "etsy-2026-11",
+              "rulesetVersion": "etsy-2026-12",
+              "analysisVersion": "etsy-2026-12",
               "contentHash": "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
               "cached": false,
               "createdAt": "2026-10-28T09:15:30.123456Z",
@@ -168,8 +168,8 @@ public final class ApiExamples {
               "checkId": "5331208a-583a-4ff3-a990-99a7440ae59f",
               "status": "COMPLETED",
               "marketplace": "ETSY",
-              "rulesetVersion": "etsy-2026-11",
-              "analysisVersion": "etsy-2026-11",
+              "rulesetVersion": "etsy-2026-12",
+              "analysisVersion": "etsy-2026-12",
               "contentHash": "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
               "cached": true,
               "createdAt": "2026-10-28T09:15:30.123456Z",
@@ -466,16 +466,20 @@ public final class ApiExamples {
             }
             """;
 
-    /** The limits of {@code etsy-2026-11}; a test holds it equal to what the endpoint answers. */
+    /** The limits of {@code etsy-2026-12}; a test holds it equal to what the endpoint answers. */
     public static final String RULESET_LIMITS_ETSY = """
             {
               "marketplace": "ETSY",
-              "rulesetVersion": "etsy-2026-11",
+              "rulesetVersion": "etsy-2026-12",
               "productType": null,
               "limits": [
                 {"field": "title", "ruleId": "title_length", "kind": "MAX_LENGTH", "value": 140, "unit": "CODE_POINTS",
                  "severity": "ERROR", "sourceStatus": "VERIFIED", "enabled": true},
                 {"field": "title", "ruleId": "title_repeated_special_chars", "kind": "MAX_OCCURRENCES", "value": 1,
+                 "unit": "OCCURRENCES", "severity": "WARNING", "sourceStatus": "SECONDARY", "enabled": true},
+                {"field": "title", "ruleId": "title_word_count", "kind": "MAX_COUNT", "value": 15, "unit": "WORDS",
+                 "severity": "INFO", "sourceStatus": "SECONDARY", "enabled": true},
+                {"field": "title", "ruleId": "title_repeated_words", "kind": "MAX_OCCURRENCES", "value": 1,
                  "unit": "OCCURRENCES", "severity": "WARNING", "sourceStatus": "SECONDARY", "enabled": true},
                 {"field": "tags", "ruleId": "tag_count", "kind": "MAX_COUNT", "value": 13, "unit": "ITEMS",
                  "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true},

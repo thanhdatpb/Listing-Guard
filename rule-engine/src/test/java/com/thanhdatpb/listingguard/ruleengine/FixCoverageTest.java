@@ -26,6 +26,16 @@ class FixCoverageTest {
 
     private static final RuleEngine ENGINE = new RuleEngine(RuleRegistry.withDefaults());
 
+    /** Distinct words that are each long enough for a title cut at {@code titleMax} to stay under {@code maxWords} words. */
+    private static String longWords(int minLength, int titleMax, int maxWords) {
+        int padding = titleMax / maxWords + 2;
+        StringBuilder text = new StringBuilder();
+        for (int i = 1; text.length() <= minLength; i++) {
+            text.append(i > 1 ? " " : "").append("w".repeat(padding)).append(i);
+        }
+        return text.toString();
+    }
+
     private static String words(int minLength) {
         StringBuilder text = new StringBuilder("alpha1");
         for (int i = 2; text.length() <= minLength; i++) {
@@ -41,23 +51,27 @@ class FixCoverageTest {
 
     @Test
     void etsyRulesOutsideTheTableNeverCarryAFix() {
-        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/etsy-2026-12.yaml");
         int titleMax = config.rule("title_length").intParam("max_length");
         int tagMax = config.rule("tag_length").intParam("max_length");
         int tagCount = config.rule("tag_count").intParam("max_count");
+        int maxWords = config.rule("title_word_count").intParam("max_words");
         List<String> tags = new java.util.ArrayList<>(List.of("dup", "DUP", "mug " + "x".repeat(tagMax), "bad!tag", "replica"));
         for (int i = 0; tags.size() <= tagCount; i++) {
             tags.add("filler" + i);
         }
-        Listing listing = new Listing("replica a & b & c \u0007 " + words(titleMax), null, tags,
+        String title = "replica sale a & b & c mug mug \u0007 " + longWords(titleMax, titleMax, maxWords) + " "
+                + words(maxWords * 8);
+        Listing listing = new Listing(title, null, tags,
                 new Money(BigDecimal.ZERO, "USD"), null, List.of(), List.of(), 0, null, null);
 
         List<Finding> findings = ENGINE.runDetailed(listing, config).findings();
 
-        Set<String> allRules = RuleRegistry.withDefaults().rulesFor("ETSY").stream().map(Rule::id)
-                .collect(Collectors.toCollection(TreeSet::new));
+        Set<String> enabledRules = RuleRegistry.withDefaults().rulesFor("ETSY").stream().map(Rule::id)
+                .filter(id -> config.rule(id).enabled()).collect(Collectors.toCollection(TreeSet::new));
+        assertThat(enabledRules).as("banned_words is switched off in this ruleset").doesNotContain("banned_words");
         assertThat(findings.stream().map(Finding::ruleId).collect(Collectors.toSet()))
-                .as("the listing breaks every Etsy rule").containsExactlyInAnyOrderElementsOf(allRules);
+                .as("the listing breaks every enabled Etsy rule").containsExactlyInAnyOrderElementsOf(enabledRules);
         assertThat(ruleIds(findings, true)).as("rules that carry a fix").isEqualTo(new TreeSet<>(ETSY_FIXABLE));
     }
 

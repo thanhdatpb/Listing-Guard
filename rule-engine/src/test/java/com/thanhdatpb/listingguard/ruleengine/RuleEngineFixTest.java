@@ -26,7 +26,7 @@ class RuleEngineFixTest {
 
     // ---- the real Etsy ruleset -------------------------------------------------------------------------------
 
-    private static final RulesetConfig ETSY = RulesetLoader.loadClasspath("rulesets/etsy-2026-11.yaml");
+    private static final RulesetConfig ETSY = RulesetLoader.loadClasspath("rulesets/etsy-2026-12.yaml");
     private static final RuleEngine RAW_ENGINE = new RuleEngine(RuleRegistry.withDefaults());
     private static final FixingEngine ETSY_ENGINE = new FixingEngine(RAW_ENGINE);
     private static final int TITLE_MAX = ETSY.rule("title_length").intParam("max_length");
@@ -37,11 +37,16 @@ class RuleEngineFixTest {
                 List.of("clay"), List.of("https://example.com/1.jpg"), 5, "i_did", "made_to_order");
     }
 
-    /** "alpha1 alpha2 ..." longer than {@code minLength}, with spaces to cut at and nothing any rule dislikes. */
+    /**
+     * Distinct words longer than {@code minLength} altogether, with spaces to cut at and nothing any rule dislikes. Each word is
+     * long enough that a title cut at {@code TITLE_MAX} has fewer words than the title word count guidance, so no rule reports
+     * the cut title (the Etsy ruleset has a word count rule at INFO).
+     */
     private static String words(int minLength) {
-        StringBuilder text = new StringBuilder("alpha1");
-        for (int i = 2; text.length() <= minLength; i++) {
-            text.append(" alpha").append(i);
+        int padding = TITLE_MAX / ETSY.rule("title_word_count").intParam("max_words") + 2;
+        StringBuilder text = new StringBuilder();
+        for (int i = 1; text.length() <= minLength; i++) {
+            text.append(i > 1 ? " " : "").append("w".repeat(padding)).append(i);
         }
         return text.toString();
     }

@@ -22,7 +22,7 @@
         "properties" : {
           "analysisVersion" : {
             "description" : "Version of the whole analysis that produced the result. Currently equal to rulesetVersion; it will also change when other analyzers (for example an LLM step) are added. Two checks with the same marketplace, contentHash and analysisVersion have the same result.",
-            "example" : "etsy-2026-11",
+            "example" : "etsy-2026-12",
             "type" : [ "string", "null" ]
           },
           "cached" : {
@@ -68,7 +68,7 @@
           },
           "rulesetVersion" : {
             "description" : "Version of the ruleset that produced the findings. Null for checks stored before versions were recorded.",
-            "example" : "etsy-2026-11",
+            "example" : "etsy-2026-12",
             "type" : [ "string", "null" ]
           },
           "status" : {
@@ -154,7 +154,7 @@
             "type" : "string"
           },
           "kind" : {
-            "description" : "What is limited: `MAX_LENGTH` (length of a text, or of each item of a list), `MAX_COUNT` (number of items of a list), `MAX_BYTES` (size in UTF-8 bytes) or `MAX_OCCURRENCES` (how often the same word or character may appear).",
+            "description" : "What is limited: `MAX_LENGTH` (length of a text, or of each item of a list), `MAX_COUNT` (number of items of a list, or of words of a text), `MAX_BYTES` (size in UTF-8 bytes) or `MAX_OCCURRENCES` (how often the same word or character may appear).",
             "enum" : [ "MAX_LENGTH", "MAX_COUNT", "MAX_BYTES", "MAX_OCCURRENCES" ],
             "example" : "MAX_LENGTH",
             "type" : "string"
@@ -177,8 +177,8 @@
             "type" : "string"
           },
           "unit" : {
-            "description" : "What is counted, as the rule counts it: `CODE_POINTS` (an emoji counts once, not the UTF-16 length of a JavaScript string), `ITEMS`, `UTF8_BYTES` or `OCCURRENCES`.",
-            "enum" : [ "CODE_POINTS", "ITEMS", "UTF8_BYTES", "OCCURRENCES" ],
+            "description" : "What is counted, as the rule counts it: `CODE_POINTS` (an emoji counts once, not the UTF-16 length of a JavaScript string), `ITEMS`, `WORDS`, `UTF8_BYTES` or `OCCURRENCES`.",
+            "enum" : [ "CODE_POINTS", "ITEMS", "WORDS", "UTF8_BYTES", "OCCURRENCES" ],
             "example" : "CODE_POINTS",
             "type" : "string"
           },
@@ -258,7 +258,7 @@
           },
           "rulesetVersion" : {
             "description" : "The version of the ruleset the limits come from; the same value as `rulesetVersion` of a check. Opaque: compare for equality, do not parse.",
-            "example" : "etsy-2026-11",
+            "example" : "etsy-2026-12",
             "type" : "string"
           }
         },
@@ -541,14 +541,14 @@
                     "description" : "cached",
                     "summary" : "The same listing again: stored result",
                     "value" : {
-                      "analysisVersion" : "etsy-2026-11",
+                      "analysisVersion" : "etsy-2026-12",
                       "cached" : true,
                       "checkId" : "5331208a-583a-4ff3-a990-99a7440ae59f",
                       "contentHash" : "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
                       "createdAt" : "2026-10-28T09:15:30.123456Z",
                       "findings" : [ ],
                       "marketplace" : "ETSY",
-                      "rulesetVersion" : "etsy-2026-11",
+                      "rulesetVersion" : "etsy-2026-12",
                       "status" : "COMPLETED",
                       "summary" : {
                         "errors" : 0,
@@ -561,7 +561,7 @@
                     "description" : "findings",
                     "summary" : "A fresh Etsy check with findings",
                     "value" : {
-                      "analysisVersion" : "etsy-2026-11",
+                      "analysisVersion" : "etsy-2026-12",
                       "cached" : false,
                       "checkId" : "5331208a-583a-4ff3-a990-99a7440ae59f",
                       "contentHash" : "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
@@ -608,7 +608,7 @@
                         "value" : "Mug"
                       } ],
                       "marketplace" : "ETSY",
-                      "rulesetVersion" : "etsy-2026-11",
+                      "rulesetVersion" : "etsy-2026-12",
                       "status" : "COMPLETED",
                       "summary" : {
                         "errors" : 4,
@@ -817,7 +817,7 @@
             "content" : {
               "application/json" : {
                 "example" : {
-                  "analysisVersion" : "etsy-2026-11",
+                  "analysisVersion" : "etsy-2026-12",
                   "cached" : false,
                   "checkId" : "5331208a-583a-4ff3-a990-99a7440ae59f",
                   "contentHash" : "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
@@ -864,7 +864,7 @@
                     "value" : "Mug"
                   } ],
                   "marketplace" : "ETSY",
-                  "rulesetVersion" : "etsy-2026-11",
+                  "rulesetVersion" : "etsy-2026-12",
                   "status" : "COMPLETED",
                   "summary" : {
                     "errors" : 4,
@@ -1002,6 +1002,24 @@
                         "value" : 1
                       }, {
                         "enabled" : true,
+                        "field" : "title",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "title_word_count",
+                        "severity" : "INFO",
+                        "sourceStatus" : "SECONDARY",
+                        "unit" : "WORDS",
+                        "value" : 15
+                      }, {
+                        "enabled" : true,
+                        "field" : "title",
+                        "kind" : "MAX_OCCURRENCES",
+                        "ruleId" : "title_repeated_words",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "SECONDARY",
+                        "unit" : "OCCURRENCES",
+                        "value" : 1
+                      }, {
+                        "enabled" : true,
                         "field" : "tags",
                         "kind" : "MAX_COUNT",
                         "ruleId" : "tag_count",
@@ -1021,7 +1039,7 @@
                       } ],
                       "marketplace" : "ETSY",
                       "productType" : null,
-                      "rulesetVersion" : "etsy-2026-11"
+                      "rulesetVersion" : "etsy-2026-12"
                     }
                   }
                 },

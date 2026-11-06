@@ -51,6 +51,10 @@ class EtsyLimitsTest {
                 .isEqualTo(expected("tag_length", "tags", Limit.Kind.MAX_LENGTH, "max_length", Limit.Unit.CODE_POINTS));
         assertThat(limitOf("title_repeated_special_chars")).isEqualTo(expected("title_repeated_special_chars", "title",
                 Limit.Kind.MAX_OCCURRENCES, "max_occurrences", Limit.Unit.OCCURRENCES));
+        assertThat(limitOf("title_word_count"))
+                .isEqualTo(expected("title_word_count", "title", Limit.Kind.MAX_COUNT, "max_words", Limit.Unit.WORDS));
+        assertThat(limitOf("title_repeated_words")).isEqualTo(expected("title_repeated_words", "title",
+                Limit.Kind.MAX_OCCURRENCES, "max_occurrences", Limit.Unit.OCCURRENCES));
     }
 
     @Test
@@ -63,7 +67,7 @@ class EtsyLimitsTest {
     void aRuleWithNoNumberDeclaresNoLimit() {
         assertThat(limits).extracting(RuleLimit::ruleId)
                 .doesNotContain("required_fields", "title_characters", "tag_characters", "banned_words", "duplicate_tags",
-                        "price_quantity_positive");
+                        "price_quantity_positive", "title_promotional_terms");
     }
 
     @Test
@@ -101,6 +105,22 @@ class EtsyLimitsTest {
         assertThat(occurrences.unit()).isEqualTo(Limit.Unit.OCCURRENCES);
         assertThat(ruleIds(EtsyTestData.listing(atLimit, List.of("mug")))).doesNotContain("title_repeated_special_chars");
         assertThat(ruleIds(EtsyTestData.listing(atLimit + character, List.of("mug")))).contains("title_repeated_special_chars");
+    }
+
+    @Test
+    void theTitleIsCountedInWordsAndTheSameWordInOccurrences() {
+        RuleLimit words = limitOf("title_word_count");
+        RuleLimit occurrences = limitOf("title_repeated_words");
+        String atLimit = IntStream.range(0, words.value()).mapToObj(i -> "word" + i).collect(java.util.stream.Collectors.joining(" "));
+
+        assertThat(words.unit()).isEqualTo(Limit.Unit.WORDS);
+        assertThat(ruleIds(EtsyTestData.listing(atLimit, List.of("mug")))).doesNotContain("title_word_count");
+        assertThat(ruleIds(EtsyTestData.listing(atLimit + " more", List.of("mug")))).contains("title_word_count");
+
+        assertThat(occurrences.unit()).isEqualTo(Limit.Unit.OCCURRENCES);
+        String repeatedAtLimit = String.join(" ", java.util.Collections.nCopies(occurrences.value(), "mug"));
+        assertThat(ruleIds(EtsyTestData.listing(repeatedAtLimit, List.of("mug")))).doesNotContain("title_repeated_words");
+        assertThat(ruleIds(EtsyTestData.listing(repeatedAtLimit + " mug", List.of("mug")))).contains("title_repeated_words");
     }
 
     private static List<String> tags(int count) {
