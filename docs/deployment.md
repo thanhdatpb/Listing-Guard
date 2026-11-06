@@ -527,14 +527,36 @@ nothing has deleted it yet.
 
 With several instances only one deletes at a time: each batch first takes the PostgreSQL advisory lock
 `pg_try_advisory_xact_lock(1279746628, 1380271182)` and skips the run if it cannot. **That key pair is reserved for
-this cleanup (ADR-010): do not use it for anything else** (another job taking it would make the cleanup skip). The lock is
-released when the batch ends. A cleanup that is late, off or skipped changes nothing a client sees; it only leaves expired
+retention cleanup (ADR-010): do not use it for anything else** (another job taking it would make the cleanup skip). The
+variation checks' cleanup (below) is the only other user and shares it on purpose. The lock is released when the batch ends. A cleanup that is late, off or skipped changes nothing a client sees; it only leaves expired
 rows in the table.
 
 **Catalog versions.** A stored result refers to the catalog version that produced it with a foreign key without cascade, so
 `DELETE FROM trademark_catalog_version` (the way out of a refused V16, above, or a clean-up of an old catalog) fails
 while a retained result uses that version. Wait for the retention period, or delete those results first
 (`DELETE FROM trademark_check WHERE catalog_version_id = <id>`; their findings go with them).
+
+## Variation results, their retention and the plan pack (ADR-015)
+
+Two migrations, both additive. **V22** replaces the `CHECK` of `plan_pack` (V19 is not edited) so that it accepts the pack
+`variation-checks`, and gives the pack to `SELLER` and `PRO`; a row an operator already removed is not put back, and a missing
+plan row does not stop the migration. **V23** creates `variation_check` and `variation_check_finding`. Neither touches an existing
+row, both apply on any database, and nothing changes for a deployment while `listing-guard.plans.enabled` is false. To give or
+take the pack away from a plan by hand: `INSERT INTO plan_pack (plan_code, pack_id) VALUES ('FREE', 'variation-checks')` or the
+matching `DELETE` (the change applies at once). Rolling back is `DROP TABLE variation_check_finding, variation_check;` and, after
+every instance runs a version without the pack, restoring the old `CHECK` (V22 does not undo itself).
+
+Variation results hold a hash of the submitted family, the result and short evidence (a field path, the offending value cut to
+`evidence.max_value_chars` of the ruleset, the message: client-derived text such as a SKU or a theme), never the family itself.
+They are kept for `listing-guard.variation.retention.period` (30 days by default; `LISTING_GUARD_VARIATION_RETENTION_PERIOD=30d`)
+and `GET` and the cache treat a result past it as absent even if nothing has deleted it. The cleanup has the same settings as the
+trademark one (`listing-guard.variation.retention.cleanup-enabled`, `cleanup-interval` 1h, `cleanup-initial-delay` 2m, one minute
+after the trademark cleanup, `cleanup-batch-size` 500) and takes the **same advisory lock**, so one batch of either runs at a time
+and a skipped run is tried again at the next interval.
+
+The ruleset `variation-checks-2026-11` is registered at start-up for `ETSY` and `AMAZON` under the pack `variation-checks`. The API
+refuses to start if that version is already registered with other content: a published ruleset is never edited, a change is a new
+file and a new version. Nothing in it is `verified`; see ADR-015 for the sources.
 
 ## Client plans and the monthly quota (ADR-013)
 
@@ -565,7 +587,8 @@ UPDATE plan SET monthly_quota = 2000 WHERE code = 'SELLER';      -- NULL means u
 ```
 
 A change applies at once to every client on that plan and keeps this month's `used`. The codes (`FREE`, `SELLER`, `PRO`
-and the five pack ids) are fixed by `CHECK` constraints and the Java enums, so a new plan or pack needs a migration.
+and the six pack ids, `variation-checks` since V22) are fixed by `CHECK` constraints and the Java enums, so a new plan or pack
+needs a migration.
 `policy-analyzer` and `sheet-connector` are in the seed but **nothing enforces them yet** (ADR-011 PR 5 and phase 4b).
 
 **Usage.** `client_usage` has one row per client and calendar month (UTC), counted in the transaction that stores a result.

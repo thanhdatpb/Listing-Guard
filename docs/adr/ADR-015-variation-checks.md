@@ -53,7 +53,8 @@ shows or depends on this one.
   `com.thanhdatpb.listingguard.variation`): no Spring, no database, no HTTP. It depends on `core` for `Severity` only.
 - `pack_id` is `variation-checks`.
 - `POST /api/v1/variation-checks` and `GET /api/v1/variation-checks/{id}`, in `api/.../variation/`.
-- Tables `variation_check` and `variation_check_finding` (migration V22). Plan pack `variation-checks` (migration V23).
+- Plan pack `variation-checks` (migration V22). Tables `variation_check` and `variation_check_finding` (migration V23).
+  The plan pack comes first because the Java enum `Pack` and the plan tests need it before the endpoint exists.
 - It checks and suggests. It never edits a listing, never publishes, proposes **no fix and no replacement value**, and
   does no SEO (a finding says what is inconsistent, not what to write).
 
@@ -170,8 +171,9 @@ closed list (`size_system` `as1`..`as8`, `size_class`, `body_type`) must hold on
 (`size_attribute_invalid`); when `size_class` is one of the `*_range` classes, `size_to` must be present
 (`size_to_missing`) and larger than `size` (`size_to_not_greater`, also when equal). The comparison is per class:
 `numeric_range` as decimal numbers, `alpha_range` by the position in the ruleset's `alpha_scale` (an ordered list; labels
-that share a rank are listed together), `age_range` is not compared. When the two values cannot be compared (not a
-number, not in the scale, an age range) the finding is INFO `size_range_not_comparable`, never a warning: the alpha scale
+that share a rank are listed together), `age_range` is not compared (it still needs `size_to`) and says nothing about the
+order. When the two values cannot be compared (not a number, not in the scale) the finding is INFO
+`size_range_not_comparable`, never a warning: the alpha scale
 is our own ordering of common labels (`unverified`) and the sources give no list of valid sizes. `height_type` is not
 checked: neither a list of values nor the product types that require it is available.
 
@@ -181,8 +183,9 @@ ignoring case. One finding for each later child, naming the first. A child that 
 combination and is skipped (the structure rule reports the gap); when the attributes of the theme are not known, the
 rule says nothing.
 
-**`duplicate_sku`** (both, WARNING, unverified). A child SKU that appears on an earlier child or equals the parent's SKU.
-One finding for each later occurrence, naming the first. Children without a SKU are skipped.
+**`duplicate_sku`** (both, WARNING, unverified). A child SKU that appears on an earlier child (kind `duplicate_sku`) or
+equals the parent's SKU (kind `sku_equals_parent`). One finding for each later occurrence, naming the first. SKUs are
+compared exactly after Unicode NFC. Children without a SKU are skipped.
 
 **`children_differ_outside_theme`** (both, WARNING at most, unverified, never `ERROR`). Detects children that look like
 different products put under one parent. For each child with a title: lower-case the title, split it into tokens (runs of
@@ -225,7 +228,7 @@ text (a SKU, a theme, a title fragment), so it lives and dies with the result. R
 `expires_at` is decided on read by GET and the cache lookup, whatever the cleanup does; an expired id, an unknown id and
 another client's id are the same `404` (`variation-check-not-found`).
 
-Tables (V22), mirroring V17: `variation_check` (id, `client_id`, `marketplace_code`, `pack_id`, `input_hash`,
+Tables (V23), mirroring V17: `variation_check` (id, `client_id`, `marketplace_code`, `pack_id`, `input_hash`,
 `ruleset_version_id`, `analysis_version`, `completeness`, `failed_rule_ids`, `disclaimer`, `created_at`, `expires_at`;
 CHECKs on `completeness` and `expires_at > created_at`) and `variation_check_finding` (`check_id` with
 `ON DELETE CASCADE`, `position`, `rule_id`, `kind`, `severity`, `source_status`, `field`, `value`, `related_fields`,
@@ -257,10 +260,10 @@ changes it, so old results are not reused.
 
 ### Plans and quota ([ADR-013](ADR-013-client-plans-and-monthly-quota.md))
 
-- A new pack id `variation-checks`: the Java enum `Pack` gets `VARIATION_CHECKS`; migration **V23** replaces the CHECK
+- A new pack id `variation-checks`: the Java enum `Pack` gets `VARIATION_CHECKS`; migration **V22** replaces the CHECK
   `ck_plan_pack_pack_id` (V19 is not edited) and gives the pack to `SELLER` and `PRO` (`ON CONFLICT DO NOTHING`, so an
   operator's own rows are respected). `FREE` does not get it. The test that holds the enum equal to the constraint reads
-  the constraint as it is after V23.
+  the constraint as it is after V22.
 - Order in `VariationCheckService`: `requirePack` (403 `plan-not-allowed`), cache, `requireQuota` (429), analysis,
   `charge` inside the storing transaction. **One unit is one new `COMPLETE` result**, per ADR-013's "per endpoint";
   cached results, GETs and `INCOMPLETE` results cost nothing. While plans are off nothing is queried or written.
@@ -326,15 +329,15 @@ repeated in a test.
    `INCOMPLETE` result is stored for GET and never reused; a different ruleset or analysis version is a cache miss.
 6. **Plans**: with plans on and a plan without the pack, `403 plan-not-allowed`; `SELLER` and `PRO` are allowed and `FREE`
    is not; a cached answer is free, also at the limit; a new complete result is one unit; `INCOMPLETE` is not charged; with
-   plans off nothing is queried or written. The enum `Pack` equals the constraint after V23, and V23 applied to a V22
-   database seeds the two plans without touching other rows.
+   plans off nothing is queried or written. The enum `Pack` equals the constraint after V22, and V22 applied to a V21
+   database seeds the two plans without touching other rows (and migrates even if an operator removed a plan row).
 7. **Contract**: `docs/api/openapi.json` shows both routes and the new problem codes, and a test fails on drift.
    `/checks` and `/trademark-checks` are unchanged: their OpenAPI parts, hashes and tests pass as they are.
 
 ## Planned pull request
 
 One pull request (`feat/variation-checks-pack`), in small commits: this ADR; the module and its ruleset; the pack, the
-tables and the cleanup in `api` (V22); the plan pack (V23); the docs (`docs/api/openapi.json`, `docs/input-schema.md`,
+plan pack (V22); the endpoint, the tables (V23) and the cleanup in `api`; the docs (`docs/api/openapi.json`, `docs/input-schema.md`,
 `docs/integration-guide.md`, `README.md`, `CLAUDE.md`). `docs/releases` is not touched. If another migration reaches
 `main` first, V22 and V23 are renumbered before the merge.
 

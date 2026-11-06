@@ -32,7 +32,8 @@ It never edits a listing, never publishes, and does no SEO.
   `listing-guard.trademark.catalog-version`, never "latest"). **Endpoint (A3, done)**: `POST /api/v1/trademark-checks`
   (the `/checks` envelope and `Normalizer`, own DTO) and `GET /api/v1/trademark-checks/{id}`; V17 `trademark_check` +
   `trademark_check_finding`, only the canonical input hash and bounded evidence are stored, 30-day retention enforced on
-  read and by a scheduled cleanup under the advisory lock `(1279746628, 1380271182)`, which is reserved for it; a catalog
+  read and by a scheduled cleanup under the advisory lock `(1279746628, 1380271182)`, which ADR-010 reserves for retention
+  cleanup (the variation checks' cleanup shares it); a catalog
   that is DISABLED or REFUSED answers `503 trademark-not-configured` and `/checks` is unaffected. **A2b (done)**: an
   entry of `catalogs/manifest.yaml` may list `sources:` (each with a `source_key`; stored source ids are `<key>:<id>`),
   the import reads files as a stream through a temporary staging table merged by SQL (`listing-guard.trademark.import.batch-size`),
@@ -43,6 +44,21 @@ It never edits a listing, never publishes, and does no SEO.
   follows the public DTD and documentation named in ADR-009 and has never read a real file. The next steps are PR A2c
   (the latest transaction of a serial number wins) and A4 (evaluation).
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`, `FixSuggestion`). No Spring.
+- **Variation checks** (`variation-checks/`, ADR-015, Proposed; implemented): pure Java (no Spring, database or HTTP) checks
+  of a parent/child variation family, in a request of its own (`parent`, `variation_properties`, `children[]`;
+  `docs/input-schema.md` "Variation checks"; the normalizer only trims and drops blanks). Ruleset
+  `rulesets/variation-checks-2026-11.yaml` (pack `variation-checks`, registered for ETSY and AMAZON; lists, numbers,
+  severities and the Vietnamese messages are keys; a test pins its hash), seven rules: `parent_child_structure`,
+  `variation_theme_allowed`, `apparel_size_attributes` (Amazon), `duplicate_combination`, `duplicate_sku`,
+  `children_differ_outside_theme` (a heuristic, never ERROR), `etsy_variation_limits`. **Nothing in the ruleset is
+  `verified`** (no official page is readable; two of the four secondary pages answered 403), so no finding is ERROR (ADR-006,
+  for Etsy too); the one apparel product type and two themes it knows are few on purpose and any other product type is an
+  INFO. A rule that throws makes the result `INCOMPLETE` and keeps the other findings. API: `POST /api/v1/variation-checks`
+  and `GET /api/v1/variation-checks/{id}` (`api/.../variation/`), V22 (plan pack `variation-checks` for SELLER and PRO) and V23
+  (`variation_check`, `variation_check_finding`), only the canonical input hash and bounded evidence stored, 30-day retention
+  (`listing-guard.variation.retention.*`) enforced on read and by a scheduled cleanup under the retention advisory lock, cache
+  `(client, marketplace, pack, input hash, ruleset version, analysis version)` with `COMPLETE` results only, one unit per new
+  `COMPLETE` result. No fix, no `batch-check` part, no console page, no `GET .../limits` entry.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Optional ADR-014 fix/readiness output is behind
@@ -74,7 +90,8 @@ It never edits a listing, never publishes, and does no SEO.
   `plan`, with their packs in `plan_pack` and the monthly quota, NULL = unlimited, seeded in V19) and `client_usage` counts
   results per client and UTC month. **Off by default** (`listing-guard.plans.enabled=false`): `PlanService` then returns at
   once without a query, so a self-hosted deployment is unchanged. One unit is one new result that is stored, per endpoint
-  (a full check of one listing is two); cached results, `GET`s, `GET /api/v1/usage` and `INCOMPLETE` trademark results cost
+  (a full check of one listing is two, three with a variation family); cached results, `GET`s, `GET /api/v1/usage` and
+  `INCOMPLETE` trademark and variation results cost
   nothing. Order in `CheckService` and `TrademarkCheckService`: `requirePack` the pack (403 `plan-not-allowed`), cache, `requireQuota`
   (429 `quota-exceeded`, no `Retry-After`), analysis, `charge` inside the transaction that stores the result. `batch-check`
   needs the `batch` pack, stops at once with `quota-exceeded` when no unit is left, and marks rows `QUOTA_EXCEEDED` when the
@@ -108,7 +125,7 @@ It never edits a listing, never publishes, and does no SEO.
   the banner and the editor's trademark panel repeats it.
 - Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
+  endpoint, the variation checks (ADR-015), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12.yaml`): simple input format (`title`, `brand`,
@@ -146,6 +163,11 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
    listings/history (not designed) and `tag_count_underused` in the next Etsy ruleset update. Plan-based gating of keys, a
    Plan & usage page and billing are deferred, not planned.
 
+8. Variation checks (ADR-015, Proposed): done as one PR (`feat/variation-checks-pack`: module, ruleset, V22, V23, endpoint,
+   cleanup, plan pack, docs). Open questions the maintainer decides are at the end of the ADR (apparel product types and
+   themes, the two pages that answered 403, the unit cost, the cleanup lock). Next, if wanted: `height_type`, a synthetic
+   evaluation, a console page, a `batch-check` part.
+
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
 
@@ -158,7 +180,7 @@ JUnit 5 + Testcontainers. Root package `com.thanhdatpb.listingguard`.
 
 ```bash
 ./mvnw -B verify                 # build + all tests (needs Docker for Testcontainers)
-./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner verify   # fast: no Docker needed
+./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks verify   # fast: no Docker needed
 docker compose up --build        # postgres + api (override ports: POSTGRES_PORT, API_PORT)
 ```
 
@@ -265,7 +287,7 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   alone. Only a `COMPLETE` result is cached (partial unique index); an `INCOMPLETE` one is stored for GET and never
   reused. Replacing an expired result deletes it and inserts in one transaction; only the unique violation of
   `uq_trademark_check_cache` counts as a cache race. The advisory-lock key pair `(1279746628, 1380271182)` is reserved for
-  retention cleanup: no other query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
+  retention cleanup (trademark and variation results, ADR-010, ADR-015): no other kind of query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
 - Ingest, eval, admin, trademark-import and batch-check are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`,
   `trademark-import`, `batch-check`), not HTTP endpoints.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
@@ -296,6 +318,14 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   falsely clean result; a risk that cannot be determined is `UNKNOWN`, never `LOW`. The existing `RuleEngine` still
   logs and skips a failing rule. Trademark seed, test and eval data use synthetic names only: never commit a real
   trademark, a real catalog or any company's data.
+- **Variation checks** (ADR-015): the ruleset is immutable (a test pins its hash; a change is a new file and version) and
+  every block has a `source`. Never write `verified` without a readable official URL, and ERROR only for a `verified` rule
+  (the loader refuses both). Never add a theme, a product type or a list value without a source: say it is `unverified`, or
+  leave it out. Messages and suggestions are in the ruleset, Vietnamese, with the real values, and never claim a listing
+  is accepted or propose a replacement value. How values, titles and SKUs are compared (`Texts`) and the canonical input
+  (`CanonicalInput`) are part of the analysis fingerprint: changing either needs a new `AlgorithmVersions` constant. The
+  normalizer only trims and drops blanks, and the submitted family is never stored (only its hash and bounded evidence).
+  Tests read themes, product types, attribute names, lists and limits from the ruleset and use synthetic SKUs and titles.
 - **Fix suggestions and readiness** (ADR-014): `listing-guard.fixes.enabled` defaults to false. Off means `/checks`
   uses `RuleEngine.run()` and its response and batch report keep their current shape. On, API/batch use `runDetailed()`
   and readiness covers only `listing-rules`; clients must show trademark results separately. V20 persists fix/readiness
