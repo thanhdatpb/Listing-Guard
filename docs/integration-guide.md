@@ -409,7 +409,7 @@ the numbers from the answer, not from here.)
 | `marketplace` | The marketplace code, in upper case. |
 | `rulesetVersion` | The version of the ruleset the limits come from; the same value as `rulesetVersion` of a check. Opaque: compare for equality. When it changes, read the limits again. |
 | `productType` | The product type asked for, trimmed and as sent (not upper-cased); `null` when none was asked for. |
-| `limits[].field` | The field of [`input-schema.md`](input-schema.md) the limit applies to: `title`, `tags`, `bullet_points`, `search_terms`, ... |
+| `limits[].field` | The field of [`input-schema.md`](input-schema.md) the limit applies to: `title`, `tags`, `bullet_points`, `search_terms`, `item_highlights`, ... |
 | `limits[].ruleId` | The rule that enforces it, the `ruleId` of its findings. |
 | `limits[].kind` | What is limited: `MAX_LENGTH`, `MAX_COUNT`, `MAX_BYTES` or `MAX_OCCURRENCES`. |
 | `limits[].value` | The limit. |
@@ -426,7 +426,7 @@ are not part of the answer, so a counter normally leaves it out. Unknown `field`
 ruleset gains a rule (additive changes only, as everywhere in `/api/v1`): ignore the ones you do not use.
 
 **Switched-off rules are listed, with `enabled: false`.** A rule that is off for the product type (`bullet_length` in
-`amazon-2026-11`: the sources disagree on its number) is still returned, so you can see that it exists and what number is on
+`amazon-2026-12`: the sources disagree on its number) is still returned, so you can see that it exists and what number is on
 record, but **a counter must not enforce it or show it as a limit**. `sourceStatus` is worth showing as well: a value that is
 `UNVERIFIED` (the Amazon bullet count, for example) is the best number we have, not a statement of the marketplace, which is why
 its severity is `WARNING`.

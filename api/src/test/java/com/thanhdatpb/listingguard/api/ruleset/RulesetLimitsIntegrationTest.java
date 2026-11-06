@@ -177,6 +177,31 @@ class RulesetLimitsIntegrationTest {
         assertThat(bulletLength.get("value").asInt()).isEqualTo(amazon.rule("bullet_length").intParam("max_length"));
     }
 
+    @Test
+    void amazonTitleAndItemHighlightsAreTheLimitsOfTheCurrentRulesetRead() throws Exception {
+        RulesetConfig amazon = rulesets.get("AMAZON").config();
+        JsonNode body = json(AMAZON);
+
+        // the ruleset in force is amazon-2026-12 (75-character title, Item Highlights); the numbers are read from it
+        assertThat(amazon.version()).isEqualTo("amazon-2026-12");
+        assertThat(body.get("rulesetVersion").asText()).isEqualTo("amazon-2026-12");
+
+        JsonNode title = limit(body, "title_length");
+        assertThat(title.get("field").asText()).isEqualTo("title");
+        assertThat(title.get("kind").asText()).isEqualTo("MAX_LENGTH");
+        assertThat(title.get("value").asInt()).isEqualTo(amazon.rule("title_length").intParam("max_length"));
+
+        JsonNode highlights = limit(body, "item_highlights_length");
+        assertThat(highlights.get("field").asText()).isEqualTo("item_highlights");
+        assertThat(highlights.get("kind").asText()).isEqualTo("MAX_LENGTH");
+        assertThat(highlights.get("unit").asText()).isEqualTo("CODE_POINTS");
+        assertThat(highlights.get("value").asInt()).isEqualTo(amazon.rule("item_highlights_length").intParam("max_length"));
+        assertThat(highlights.get("severity").asText()).isEqualTo(amazon.rule("item_highlights_length").severity().name());
+        assertThat(highlights.get("sourceStatus").asText())
+                .isEqualTo(amazon.rule("item_highlights_length").source().status().name());
+        assertThat(highlights.get("enabled").asBoolean()).isEqualTo(amazon.rule("item_highlights_length").enabled());
+    }
+
     // ---- generic: whatever ruleset is registered --------------------------------------------------------
 
     @Test
