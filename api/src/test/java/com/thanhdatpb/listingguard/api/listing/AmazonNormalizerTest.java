@@ -52,6 +52,15 @@ class AmazonNormalizerTest {
     }
 
     @Test
+    void itemHighlightsAreMappedAsWrittenExceptForTrimming() throws Exception {
+        assertThat(normalize("{\"item_highlights\": \"  Hard shell | 360 wheels | TSA lock  \"}").itemHighlights())
+                .isEqualTo("Hard shell | 360 wheels | TSA lock");
+        assertThat(normalize("{\"item_highlights\": \"   \"}").itemHighlights()).isNull();
+        assertThat(normalize("{\"item_highlights\": [\"a\"]}").itemHighlights()).isNull();
+        assertThat(normalize("{}").itemHighlights()).isNull();
+    }
+
+    @Test
     void anEmptyObjectGivesAnEmptyListing() throws Exception {
         Listing listing = normalize("{}");
 

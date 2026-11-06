@@ -89,6 +89,7 @@ and `language_tag`) is not accepted; convert to this format first.
 | `price` | see Prices | |
 | `quantity` | number | A JSON number; a string is not accepted. A fractional part is dropped. |
 | `images` | array of strings | URLs. Blank entries, and entries that are objects or arrays, are dropped. |
+| `item_highlights` | string | The Amazon "Item Highlights" field. Optional: a listing without it is checked, and hashed, exactly as before the field existed. |
 
 Fields of the Etsy format, such as `tags`, are ignored for Amazon.
 
@@ -102,7 +103,8 @@ Fields of the Etsy format, such as `tags`, are ignored for Amazon.
   "product_type": "LUGGAGE",
   "price": {"amount": "89.99", "currency_code": "USD"},
   "quantity": 12,
-  "images": ["https://example.com/suitcase-1.jpg"]
+  "images": ["https://example.com/suitcase-1.jpg"],
+  "item_highlights": "Hard shell, 360 degree spinner wheels, TSA-approved lock"
 }
 ```
 

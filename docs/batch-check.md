@@ -55,7 +55,7 @@ tags: {column: Tags, separator: ","}   # ... or one column cut at a separator
 
 | Field kind | Fields | Forms |
 |---|---|---|
-| text | `title`, `description`, `brand`, `category`, `product_type`, `who_made`, `when_made` | one column |
+| text | `title`, `description`, `brand`, `category`, `product_type`, `who_made`, `when_made`, AMAZON `item_highlights` | one column |
 | number | `quantity`, `price` | one column, a plain number |
 | list | ETSY `tags`, `taxonomy_path`, `materials`, `images`; AMAZON `bullet_points`, `images` | a list of columns, or `{column, separator}` |
 | text or list | AMAZON `search_terms` | a column, a list of columns, or `{column, separator}` |
@@ -94,7 +94,7 @@ docker compose run --rm batch-check \
 docker compose run --rm batch-check \
   --input=/batch/input/amazon-flat-file.txt \
   --mapping=/batch/mappings/my-amazon-mapping.yaml \
-  --client=demo-client --marketplace=AMAZON --out=/batch/out/amazon-2026-11
+  --client=demo-client --marketplace=AMAZON --out=/batch/out/amazon-2026-12
 ```
 
 `./batch` of the repository is mounted at `/batch` in the container, so the paths above are `batch/input/...` on your

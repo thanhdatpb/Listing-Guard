@@ -13,7 +13,8 @@ import org.springframework.stereotype.Component;
 /**
  * Normalizes the simple Amazon listing format: {@code title}, {@code brand}, {@code bullet_points} (array),
  * {@code description}, {@code search_terms} (string, or array joined by a single space), {@code product_type},
- * {@code price}, {@code quantity} and {@code images} (array of URLs). Only maps and cleans values; it never enforces
+ * {@code price}, {@code quantity}, {@code images} (array of URLs) and {@code item_highlights} (string). Only maps and
+ * cleans values; it never enforces
  * marketplace limits. The product type is kept as written: matching it to the ruleset ignores case.
  */
 @Component
@@ -45,7 +46,8 @@ public class AmazonNormalizer implements Normalizer {
                 text(raw.get("brand")),
                 strings(raw.get("bullet_points")),
                 searchTerms(raw.get("search_terms")),
-                text(raw.get("product_type")));
+                text(raw.get("product_type")),
+                text(raw.get("item_highlights")));
     }
 
     private static String searchTerms(JsonNode node) {

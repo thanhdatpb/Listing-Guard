@@ -75,7 +75,7 @@ public final class BatchMapping {
             Map.entry("title", Kind.TEXT), Map.entry("brand", Kind.TEXT), Map.entry("bullet_points", Kind.LIST),
             Map.entry("description", Kind.TEXT), Map.entry("search_terms", Kind.TEXT_OR_LIST),
             Map.entry("product_type", Kind.TEXT), Map.entry("price", Kind.PRICE), Map.entry("quantity", Kind.INTEGER),
-            Map.entry("images", Kind.LIST));
+            Map.entry("images", Kind.LIST), Map.entry("item_highlights", Kind.TEXT));
 
     /** The reader settings of the input file. */
     public record Csv(char delimiter, Charset encoding, int skipLines) {

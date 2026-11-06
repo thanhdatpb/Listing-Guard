@@ -90,14 +90,43 @@ class AmazonCheckIntegrationTest {
 
         assertThat(result.get("status").asText()).isEqualTo("COMPLETED");
         assertThat(result.get("marketplace").asText()).isEqualTo("AMAZON");
-        assertThat(result.get("rulesetVersion").asText()).isEqualTo("amazon-2026-11");
-        assertThat(result.get("analysisVersion").asText()).isEqualTo("amazon-2026-11");
+        assertThat(result.get("rulesetVersion").asText()).isEqualTo("amazon-2026-12");
+        assertThat(result.get("analysisVersion").asText()).isEqualTo("amazon-2026-12");
         assertThat(result.get("cached").asBoolean()).isFalse();
         assertThat(result.get("summary").get("errors").asInt()).isZero();
         assertThat(result.get("summary").get("warnings").asInt()).isZero();
         assertThat(result.get("summary").get("infos").asInt()).isZero();
         // the ruleset overrides no product type, so there is no "not covered" info either
         assertThat(result.get("findings")).isEmpty();
+    }
+
+    @Test
+    void itemHighlightsAreCheckedAndPartOfTheCacheIdentity() throws Exception {
+        String id = UUID.randomUUID().toString();
+        String listing = """
+                {
+                  "title": "Hardside luggage %s",
+                  "brand": "Roadster",
+                  "bullet_points": ["Lightweight shell"],
+                  "product_type": "LUGGAGE",
+                  "item_highlights": "%s"
+                }
+                """;
+
+        JsonNode tooLong = postOk(listing.formatted(id, "h".repeat(400)));
+        JsonNode withUrl = postOk(listing.formatted(id, "see www.example.com"));
+        JsonNode clean = postOk(listing.formatted(id, "Hard shell"));
+
+        assertThat(ruleIds(tooLong)).containsExactly("item_highlights_length");
+        JsonNode length = finding(tooLong, "item_highlights_length");
+        assertThat(length.get("severity").asText()).isEqualTo("WARNING");
+        assertThat(length.get("field").asText()).isEqualTo("item_highlights");
+        assertThat(length.get("message").asText()).startsWith("Item Highlights dài 400 ký tự, tối đa ");
+        assertThat(ruleIds(withUrl)).containsExactly("prohibited_content");
+        assertThat(finding(withUrl, "prohibited_content").get("field").asText()).isEqualTo("item_highlights");
+        assertThat(clean.get("findings")).isEmpty();
+        assertThat(List.of(tooLong, withUrl, clean).stream().map(r -> r.get("contentHash").asText()).distinct())
+                .as("a different Item Highlights is a different listing for the cache").hasSize(3);
     }
 
     @Test
@@ -179,7 +208,7 @@ class AmazonCheckIntegrationTest {
         assertThat(second.get("cached").asBoolean()).isTrue();
         assertThat(second.get("checkId").asText()).isEqualTo(first.get("checkId").asText());
         assertThat(second.get("contentHash").asText()).isEqualTo(first.get("contentHash").asText());
-        assertThat(second.get("analysisVersion").asText()).isEqualTo("amazon-2026-11");
+        assertThat(second.get("analysisVersion").asText()).isEqualTo("amazon-2026-12");
     }
 
     @Test
@@ -200,7 +229,7 @@ class AmazonCheckIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.marketplace").value("AMAZON"))
                 .andExpect(jsonPath("$.cached").value(false))
-                .andExpect(jsonPath("$.rulesetVersion").value("amazon-2026-11"))
+                .andExpect(jsonPath("$.rulesetVersion").value("amazon-2026-12"))
                 .andExpect(jsonPath("$.findings[0].ruleId").value("title_repeated_words"))
                 .andExpect(jsonPath("$.findings[0].value").value("bag"));
     }
@@ -208,7 +237,7 @@ class AmazonCheckIntegrationTest {
     @Test
     void theAmazonRulesetIsRegisteredOnceUnderAmazon() {
         Integer rows = jdbc.queryForObject(
-                "SELECT count(*) FROM ruleset_version WHERE marketplace_code = 'AMAZON' AND version = 'amazon-2026-11'", Integer.class);
+                "SELECT count(*) FROM ruleset_version WHERE marketplace_code = 'AMAZON' AND version = 'amazon-2026-12'", Integer.class);
 
         assertThat(rows).isEqualTo(1);
     }

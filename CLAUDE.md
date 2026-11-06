@@ -105,11 +105,14 @@ It never edits a listing, never publishes, and does no SEO.
   endpoint, the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
-- **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-11.yaml`): simple input format (`title`, `brand`,
-  `bullet_points`, `description`, `search_terms`, `product_type`, ...), US store (English word rules). Settings can
+- **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12.yaml`): simple input format (`title`, `brand`,
+  `bullet_points`, `description`, `search_terms`, `product_type`, `item_highlights`, ...), US store (English word
+  rules; title limit 75 and `item_highlights_length` 125, both `secondary`, read from the Seller Forums announcement of
+  2026-06-10 through ppc.land; `prohibited_content` scans `item_highlights` too, the trademark pack does not yet;
+  `amazon-2026-11` is kept unchanged as history and a test pins its hash). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
   product type with no override gets the defaults, plus an INFO `category_not_covered` only when the ruleset has
-  at least one override (none yet in `amazon-2026-11`, so it reports nothing today).
+  at least one override (none yet in `amazon-2026-12`, so it reports nothing today).
 
 ## Planned work
 

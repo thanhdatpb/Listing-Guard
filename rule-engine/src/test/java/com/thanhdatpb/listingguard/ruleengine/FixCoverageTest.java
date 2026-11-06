@@ -63,25 +63,27 @@ class FixCoverageTest {
 
     @Test
     void amazonRulesOutsideTheTableNeverCarryAFix() {
-        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-11.yaml");
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
         int titleMax = config.rule("title_length").intParam("max_length");
+        int highlightsMax = config.rule("item_highlights_length").intParam("max_length");
         Listing listing = new Listing("Roadster! Roadster! Roadster! www.example.com " + words(titleMax),
                 "See https://example.com for more.", List.of(), new Money(new BigDecimal("49.99"), "USD"), null,
                 List.of(), List.of(), 5, null, null, "Roadster",
-                List.of("one", "two", "three", "four", "five", "six"), "term ".repeat(80), null);
+                List.of("one", "two", "three", "four", "five", "six"), "term ".repeat(80), null,
+                words(highlightsMax));
 
         List<Finding> findings = ENGINE.runDetailed(listing, config).findings();
 
         Set<String> fired = findings.stream().map(Finding::ruleId).collect(Collectors.toSet());
         assertThat(fired).as("rules this listing breaks").contains(
                 "required_fields", "title_length", "title_repeated_words", "title_forbidden_chars", "bullet_count",
-                "search_terms_length", "prohibited_content");
+                "item_highlights_length", "search_terms_length", "prohibited_content");
         assertThat(ruleIds(findings, true)).as("rules that carry a fix").isEqualTo(new TreeSet<>(AMAZON_FIXABLE));
     }
 
     @Test
     void aTitleThatBreaksOtherRulesStillGetsItsCutBecauseTheCutAddsNothing() {
-        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-11.yaml");
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
         int titleMax = config.rule("title_length").intParam("max_length");
         Listing listing = new Listing("Roadster! Roadster! Roadster! " + words(titleMax), "ok", List.of(),
                 new Money(new BigDecimal("49.99"), "USD"), null, List.of(), List.of(), 5, null, null, "Roadster",

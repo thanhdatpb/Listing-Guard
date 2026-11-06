@@ -84,3 +84,19 @@ Amazon check is its ruleset version, `amazon-2026-11`.
 - Raising a severity or adding a category override is a new ruleset version and a new set of cached results.
 - The exempt-word list for repeated title words is ours (Amazon publishes none) and is marked as such.
 - Phone numbers and addresses are not checked by `prohibited_content`: a regex cannot tell them apart reliably.
+
+## Update (2026-11-06): `amazon-2026-12`
+
+`amazon-2026-11` is kept unchanged as history and `amazon-2026-12` is the ruleset that is loaded; nothing above is
+changed. It applies the policy of this record to an Amazon announcement in the Seller Forums (June 10, 2026, effective
+July 27, 2026), read through a secondary article because the official page needs a Seller Central login: both values are
+`secondary`, so both rules are WARNING.
+
+- `title_length` is 75 characters (it was 200). Amazon exempts media and rewrites a longer title itself; media is
+  not told apart here, only a product-type override could, and none exists.
+- `item_highlights_length` is new (125 characters). `Listing` gains `itemHighlights`, left out of the content hash while
+  empty like the other Amazon components, so the hash of a listing without it is unchanged (a test pins one).
+- `prohibited_content` also scans `item_highlights`. No text read for this ruleset names that field in the ban, so this
+  is our extension of the same ban, and the ruleset note says so.
+- No fix is proposed for `item_highlights_length` (ADR-014 keeps fixes to its table). The trademark pack does not read the
+  field yet.

@@ -19,6 +19,7 @@ public final class AmazonRules {
                 new TitleForbiddenCharsRule(),
                 new BulletCountRule(),
                 new BulletLengthRule(),
+                new ItemHighlightsLengthRule(),
                 new SearchTermsLengthRule(),
                 new ProhibitedContentRule(),
                 new CategoryNotCoveredRule());
