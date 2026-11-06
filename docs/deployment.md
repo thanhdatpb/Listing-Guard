@@ -21,6 +21,10 @@ administration.
 1. Install Docker Engine and Compose v2. Create a deployment directory and place
    `docker-compose.prod.yml` and `deploy/env.prod.example` there, preserving the template's relative path.
    The files can be obtained from a release or repository checkout; do not build the application from source.
+   The optional parts need more files next to them: `catalogs/` for the trademark jobs (see
+   [Importing a catalog with the production compose file](#importing-a-catalog-with-the-production-compose-file)),
+   `batch/` for `batch-check`, and `docker-compose.prod.shared-network.yml` for a caller on the same host (see
+   [Running next to an internal application](#running-next-to-an-internal-application)).
 2. Create the production environment file and replace every placeholder:
 
    ```bash
@@ -65,6 +69,71 @@ administration.
 
    A healthy response is `200 {"status":"UP"}`. This endpoint checks PostgreSQL and needs no API key.
    Confirm the same endpoint through the HTTPS reverse proxy before handing out the client key.
+
+## Running next to an internal application
+
+Listing Guard is an independent product that clients call over its API (ADR-007). This section is for one setup: an
+internal application (the *caller*, for example another backend) runs on the same host in its own Compose project and
+is the only client. Listing Guard is then not exposed to the internet at all: no reverse proxy, no public DNS name, and
+its published port stays on `127.0.0.1`. The caller reaches it over a Docker network that both projects join.
+
+1. **Deploy Listing Guard** as in [First deployment](#first-deployment), except that you skip the HTTPS reverse proxy
+   (step 6 then only needs the `127.0.0.1` check).
+2. **Create the shared network and join the api to it.** Pick a name, create the network once and put the name in
+   `.env` (the caller's Compose project may create it instead; the name must be the same on both sides):
+
+   ```bash
+   docker network create listing-guard-shared
+   # .env
+   LISTING_GUARD_SHARED_NETWORK=listing-guard-shared
+   ```
+
+   `docker-compose.prod.shared-network.yml` is an override file, not part of the default setup: the base file does not
+   read that variable, and a network declared `external` in the base file would have to exist for every `up`. Start
+   the api with both files:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml -f docker-compose.prod.shared-network.yml --profile prod up -d
+   ```
+
+   **Use both files every time you run `up`** (also for an upgrade, see below): `up` with the base file alone recreates
+   the api without the shared network and the caller can no longer reach it. To avoid forgetting, set
+   `COMPOSE_FILE=docker-compose.prod.yml:docker-compose.prod.shared-network.yml` in `.env` and leave out `-f`
+   (`:` is the path separator on Linux). The api keeps its own `default` network for PostgreSQL, PostgreSQL is not on
+   the shared network, and the api's `ports` are unchanged.
+3. **Create a client and a key for the caller** with the admin job (the commands of First deployment, step 5, with a
+   name such as `internal-app`). The key is printed once. Put it in the *caller's* secret store or environment, for
+   example `LISTING_GUARD_API_KEY` in the caller's own `.env`; never in this repository or in Listing Guard's `.env`.
+   To rotate it, create a second key, give it to the caller, then revoke the first (`key revoke <keyId>`).
+4. **Join the caller to the same network** and call the API by the alias `listing-guard-api`, in the caller's Compose
+   file:
+
+   ```yaml
+   services:
+     backend:                 # the caller's own service
+       environment:
+         LISTING_GUARD_URL: http://listing-guard-api:8080
+         LISTING_GUARD_API_KEY: ${LISTING_GUARD_API_KEY}
+       networks: [default, listing-guard]
+   networks:
+     listing-guard:
+       name: ${LISTING_GUARD_SHARED_NETWORK}   # the same name as above
+       external: true
+   ```
+
+   Send `X-API-Key: <key>` with every request (`/health` is the only endpoint without one). Use `listing-guard-api`,
+   not `api`: Compose also makes the service name `api` an alias on every network the service joins, so a caller that
+   has a service called `api` of its own would resolve two containers.
+5. **Check the result.** `docker compose -f docker-compose.prod.yml ps` must show a published port only for the api and
+   only as `127.0.0.1:<API_PORT>`. From a container of the caller, `http://listing-guard-api:8080/health` answers
+   `200 {"status":"UP"}` and `/api/v1/checks` answers `401` without a key. `docker network inspect <name>` lists the
+   containers that can reach the API: every container on that network can, so join only containers you trust.
+
+Rate limiting is per client (ADR-005). While plans are on (`LISTING_GUARD_PLANS_ENABLED=true`), give the client its plan
+first and note that trademark checks need a plan with the `trademark-risk` pack
+([Client plans and the monthly quota](#client-plans-and-the-monthly-quota-adr-013)). Trademark checks also need a loaded
+catalog ([below](#importing-a-catalog-with-the-production-compose-file)); without one `/api/v1/trademark-checks`
+answers `503` and `/api/v1/checks` is not affected.
 
 ## Optional web console (ADR-014 B2)
 
@@ -172,6 +241,9 @@ version (without `v`), then pull and recreate only the API:
 docker compose -f docker-compose.prod.yml --profile prod pull api
 docker compose -f docker-compose.prod.yml --profile prod up -d --no-deps api
 ```
+
+If the API is on a shared network ([Running next to an internal application](#running-next-to-an-internal-application)),
+add `-f docker-compose.prod.shared-network.yml` to the `up` command, or the recreated container leaves that network.
 
 The new API applies pending Flyway migrations automatically. Check container logs and `/health` after the
 upgrade. To roll back, set the previous image version and recreate the API in the same way. If the new
@@ -362,14 +434,78 @@ enough (a test runs a 60 MB file with 40 MB). Two things grow with the file inst
 - The transaction: it is one, so a failure at the end repeats the whole import. `listing-guard.trademark.import.batch-size`
   (`LISTING_GUARD_TRADEMARK_IMPORT_BATCHSIZE`, 5,000 by default) is the number of records sent to the database in one JDBC batch.
 
-In production put `catalogs/` next to the compose file (or set `CATALOGS_DIR` and mount it) and run the same job with
-the production compose file. Changing the active catalog is a configuration change plus a restart; the old version
-stays in the database. The API logs `Trademark checks are ready on catalog version ...`, `are off` (nothing
+In production run the same jobs with `docker-compose.prod.yml`
+([below](#importing-a-catalog-with-the-production-compose-file)). Changing the active catalog is a configuration change
+plus a restart; the old version stays in the database. The API logs `Trademark checks are ready on catalog version ...`, `are off` (nothing
 configured) or `are refused` (the version does not exist, or it was imported with another normalizer version or other
 normalization settings): import it again and configure the new version. A new trademark ruleset version that only
 changes thresholds, word lists, risk levels or messages does not need a new import, because a catalog depends only on
 the `normalization` section of the ruleset and the normalizer version. `/checks` is not
 affected by any of these states. Importing needs the database but no network and no embedding provider.
+
+### Importing a catalog with the production compose file
+
+`docker-compose.prod.yml` has the jobs `trademark-import`, `uspto-convert` and `batch-check` in the `tools` profile. They
+never start with `--profile prod up`, they use the release image (`LISTING_GUARD_VERSION`), and they need the database
+but no network and no model. Run them with both profiles, like `admin`: `--profile tools` alone fails because
+PostgreSQL belongs to the `prod` profile. `run` starts the database and the job, never the API.
+
+**The data is yours.** No trademark data is shipped or downloaded, and the DEMO catalog (`catalogs/demo/`, invented marks,
+versions starting with `demo-`) is only for local trials and demonstrations: never serve it in a deployment other people
+use. You are responsible for checking that the terms of your data source allow this storage and use.
+
+1. **Place the files next to the compose file.** `catalogs/manifest.yaml` (from the release or checkout, edited for your
+   data) and your data files in `catalogs/raw/`. The container runs as uid `10001`, so the files must be readable by that
+   uid (mode `644`). The USPTO converter writes its output into `catalogs/raw/` itself, so that one folder must be writable
+   by the same uid:
+
+   ```bash
+   mkdir -p catalogs/raw && sudo chown 10001 catalogs/raw
+   ```
+
+2. **Optional: convert a USPTO daily applications file** you downloaded yourself (put it in `catalogs/raw/uspto/`; the
+   converter is unverified against real data, read its report before you rely on the catalog):
+
+   ```bash
+   docker compose -f docker-compose.prod.yml --profile prod --profile tools \
+     run --rm uspto-convert --input=uspto/<file.xml>
+   ```
+
+   `USPTO_ALLOW_OTHER_VERSION=true` in `.env` lets it read a `version-no` other than 2.0.
+3. **Import the catalog** named by an entry of `catalogs/manifest.yaml`:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml --profile prod --profile tools \
+     run --rm trademark-import --catalog=<label>
+   # logs: Trademark catalog version <label>-<digest> (IMPORTED | ALREADY_IMPORTED)
+   ```
+
+4. **Serve it.** Set the printed version in `.env` and recreate the API (Compose sees the changed variable):
+
+   ```bash
+   # .env
+   TRADEMARK_CATALOG_VERSION=<label>-<digest>
+   # then
+   docker compose -f docker-compose.prod.yml --profile prod up -d --no-deps api
+   docker compose -f docker-compose.prod.yml --profile prod logs api | grep 'Trademark checks are'
+   ```
+
+   Expect `Trademark checks are ready on catalog version ...`. With a shared network, add
+   `-f docker-compose.prod.shared-network.yml` to the `up` command. Leave the variable empty to keep trademark checks
+   off. The `api` and `batch-check` services both read `TRADEMARK_CATALOG_VERSION`, so one setting covers both.
+
+**Batch check.** `batch-check` reads `./batch` (mounted at `/batch`): put the export in `batch/input/`, a mapping in
+`batch/mappings/` (copy the examples from the release or checkout) and create `batch/out/` writable by uid `10001`
+(`mkdir -p batch/input batch/mappings batch/out && sudo chown 10001 batch/out`). It reads `LISTING_GUARD_PLANS_ENABLED`
+and `LISTING_GUARD_FIXES_ENABLED` from `.env`, the same names as the API, so it is charged and answers like the API:
+
+```bash
+docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm batch-check \
+  --input=/batch/input/<file.csv> --mapping=/batch/mappings/<mapping.yaml> \
+  --client=<client name> --marketplace=ETSY|AMAZON
+```
+
+See [batch-check.md](batch-check.md) for the mapping, the options and the reports.
 
 ## Trademark results and their retention (ADR-009, PR A3)
 
