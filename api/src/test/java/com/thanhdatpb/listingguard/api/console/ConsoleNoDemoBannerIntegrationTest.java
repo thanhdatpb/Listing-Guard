@@ -70,6 +70,8 @@ class ConsoleNoDemoBannerIntegrationTest {
                 .andReturn().getResponse().getContentAsString());
         assertNoDemo(mvc.perform(get("/console/check").with(signedIn(user))).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
+        assertNoDemo(mvc.perform(get("/console/api-keys").with(signedIn(user))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
         assertNoDemo(mvc.perform(checkPost(user, etsyForm("Mug " + unique()))).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
     }

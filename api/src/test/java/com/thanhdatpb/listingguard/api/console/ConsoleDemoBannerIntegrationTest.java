@@ -7,7 +7,9 @@ import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.signedI
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.userOf;
 import static com.thanhdatpb.listingguard.api.plan.PlanTestSupport.unique;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
@@ -15,6 +17,7 @@ import com.thanhdatpb.listingguard.api.client.ClientProvisioning;
 import com.thanhdatpb.listingguard.api.client.ClientRepository;
 import com.thanhdatpb.listingguard.api.plan.PlanCode;
 import com.thanhdatpb.listingguard.api.plan.PlanTestSupport;
+import com.thanhdatpb.listingguard.api.plan.PlanTestSupport.TestClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -86,6 +89,24 @@ class ConsoleDemoBannerIntegrationTest {
         assertOneBanner(dashboard);
         assertOneBanner(form);
         assertThat(form).doesNotContain("trademark-demo-note");
+    }
+
+    @Test
+    void theKeysPagesCarryTheBannerToo() throws Exception {
+        TestClient client = PlanTestSupport.newClient(provisioning, clients, PlanCode.FREE);
+        ConsoleUser user = userOf(client);
+        String keyId = provisioning.activeKeys(client.id()).get(0).getKeyId();
+
+        String list = mvc.perform(get("/console/api-keys").with(signedIn(user))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String confirm = mvc.perform(get("/console/api-keys/" + keyId + "/revoke").with(signedIn(user))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String created = mvc.perform(post("/console/api-keys").with(signedIn(user)).with(csrf()).param("label", "demo"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertOneBanner(list);
+        assertOneBanner(confirm);
+        assertOneBanner(created);
     }
 
     @Test

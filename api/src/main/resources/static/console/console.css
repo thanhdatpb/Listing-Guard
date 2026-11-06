@@ -1,6 +1,18 @@
 /* Styles of the console pages other than the editor (dashboard, API keys). Plain CSS, no build step.
    These pages also load editor.css first: it holds the color tokens, the bar and the buttons they share. */
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .page { max-width: 48rem; margin: 0 auto; padding: 1rem; }
 .page h2 { margin-top: 1.75rem; }
 .page p { margin: 0.5rem 0; }

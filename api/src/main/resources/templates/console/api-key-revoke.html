@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Revoke an API key - Listing Guard</title>
+    <link rel="stylesheet" th:href="@{/console/editor.css}">
+    <link rel="stylesheet" th:href="@{/console/console.css}">
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('keys')}"></header>
+<main class="page">
+    <h1>Revoke this key?</h1>
+    <dl class="facts">
+        <dt>Key id</dt>
+        <dd><code th:text="${key.keyId}"></code></dd>
+        <dt>Label</dt>
+        <dd><span th:if="${key.label != null}" th:text="${key.label}"></span><span class="muted" th:if="${key.label == null}">(no label)</span></dd>
+        <dt>Created (UTC)</dt>
+        <dd th:text="${key.created}"></dd>
+        <dt>Last used (UTC)</dt>
+        <dd><span th:if="${key.lastUsed != null}" th:text="${key.lastUsed}"></span><span class="muted" th:if="${key.lastUsed == null}">never</span></dd>
+    </dl>
+    <p class="warning-text">
+        An application that uses this key is refused from the moment you confirm, and a revoked key cannot be restored.
+        You can create another key afterwards.
+    </p>
+    <form method="post" th:action="@{/console/api-keys/{id}/revoke(id=${key.keyId})}">
+        <div class="confirm-actions">
+            <button type="submit" class="danger">Revoke key</button>
+            <a th:href="@{/console/api-keys}">Cancel</a>
+        </div>
+    </form>
+</main>
+</body>
+</html>
