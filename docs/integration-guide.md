@@ -366,6 +366,100 @@ stored. `GET /api/v1/checks/{id}` always returns the result as it was stored, wi
 newer analysis version exists now. Treat `rulesetVersion` and `analysisVersion` as opaque strings: compare for
 equality, do not parse them.
 
+## Limits for a character counter
+
+`GET /api/v1/rulesets/{marketplace}/limits?productType=<optional>` returns the numeric limits of the ruleset that
+`POST /api/v1/checks` applies, so a counter next to a text field follows the rules instead of a copy of their numbers in your
+code. It needs `X-API-Key` like every endpoint, is read only, stores nothing, and costs no quota and needs no plan pack (a client
+over its monthly quota can still read it). **Call it from your backend**: the key must not be put in browser code (see "Calling
+flow"), so a browser UI asks its own backend, which keeps the answer (below).
+
+`marketplace` is `ETSY` or `AMAZON`, case-insensitive; any other value is `404` `ruleset-not-found` (its `detail` lists the
+supported ones). `productType` is optional and meant for Amazon: the ruleset can override a rule per product type (ADR-006), and
+the answer then carries the override's value, severity and source, exactly as the check applies it. A product type with no
+override, and any product type on Etsy, gets the defaults, not an error.
+
+```bash
+curl -H 'X-API-Key: <key>' 'http://localhost:8080/api/v1/rulesets/ETSY/limits'
+```
+
+```json
+{
+  "marketplace": "ETSY",
+  "rulesetVersion": "etsy-2026-11",
+  "productType": null,
+  "limits": [
+    {"field": "title", "ruleId": "title_length", "kind": "MAX_LENGTH", "value": 140, "unit": "CODE_POINTS",
+     "severity": "ERROR", "sourceStatus": "VERIFIED", "enabled": true},
+    {"field": "title", "ruleId": "title_repeated_special_chars", "kind": "MAX_OCCURRENCES", "value": 1,
+     "unit": "OCCURRENCES", "severity": "WARNING", "sourceStatus": "SECONDARY", "enabled": true},
+    {"field": "tags", "ruleId": "tag_count", "kind": "MAX_COUNT", "value": 13, "unit": "ITEMS",
+     "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true},
+    {"field": "tags", "ruleId": "tag_length", "kind": "MAX_LENGTH", "value": 20, "unit": "CODE_POINTS",
+     "severity": "ERROR", "sourceStatus": "SECONDARY", "enabled": true}
+  ]
+}
+```
+
+(The numbers are those of `etsy-2026-11`; a test holds this example equal to what the endpoint answers, and your code must read
+the numbers from the answer, not from here.)
+
+| Member | Meaning |
+|---|---|
+| `marketplace` | The marketplace code, in upper case. |
+| `rulesetVersion` | The version of the ruleset the limits come from; the same value as `rulesetVersion` of a check. Opaque: compare for equality. When it changes, read the limits again. |
+| `productType` | The product type asked for, trimmed and as sent (not upper-cased); `null` when none was asked for. |
+| `limits[].field` | The field of [`input-schema.md`](input-schema.md) the limit applies to: `title`, `tags`, `bullet_points`, `search_terms`, ... |
+| `limits[].ruleId` | The rule that enforces it, the `ruleId` of its findings. |
+| `limits[].kind` | What is limited: `MAX_LENGTH`, `MAX_COUNT`, `MAX_BYTES` or `MAX_OCCURRENCES`. |
+| `limits[].value` | The limit. |
+| `limits[].unit` | What the rule counts: `CODE_POINTS`, `ITEMS`, `UTF8_BYTES` or `OCCURRENCES`. |
+| `limits[].severity` | How a finding that breaks the limit is rated (`ERROR`, `WARNING`, `INFO`). |
+| `limits[].sourceStatus` | How well the number is backed by the marketplace's documentation: `VERIFIED`, `SECONDARY` or `UNVERIFIED`. |
+| `limits[].enabled` | `false` when the rule is switched off (for this product type): nothing is enforced. |
+
+**Read a limit by `field` and `kind`.** On a list field, `MAX_COUNT` limits the list (`tags`: how many tags) and `MAX_LENGTH` or
+`MAX_BYTES` limits each item (`tags`: how long one tag may be). The limits come in rule order and a ruleset can have several for
+the same field and kind; a counter should take the smallest `value` among the `enabled` ones. `MAX_OCCURRENCES` (how often the
+same word or character may repeat in a title) is a limit on the content, not on the length: the words and characters it ignores
+are not part of the answer, so a counter normally leaves it out. Unknown `field`, `kind` or `unit` values can appear when a
+ruleset gains a rule (additive changes only, as everywhere in `/api/v1`): ignore the ones you do not use.
+
+**Switched-off rules are listed, with `enabled: false`.** A rule that is off for the product type (`bullet_length` in
+`amazon-2026-11`: the sources disagree on its number) is still returned, so you can see that it exists and what number is on
+record, but **a counter must not enforce it or show it as a limit**. `sourceStatus` is worth showing as well: a value that is
+`UNVERIFIED` (the Amazon bullet count, for example) is the best number we have, not a statement of the marketplace, which is why
+its severity is `WARNING`.
+
+**Units.** Count the way the rule counts, or your counter and the check will disagree:
+
+| `unit` | How to count in JavaScript |
+|---|---|
+| `CODE_POINTS` | `Array.from(text.trim()).length`. **Not** `text.length`: that counts UTF-16 code units, so an emoji counts as 2 there and as 1 here. |
+| `UTF8_BYTES` | `new TextEncoder().encode(text.trim()).length`. Amazon `search_terms` are limited in bytes, so an accented letter takes 2 or more. |
+| `ITEMS` | The number of entries of the cleaned list: each entry trimmed, blank entries dropped (the same cleaning as [`input-schema.md`](input-schema.md)). |
+
+Text is trimmed before it is counted, as the API does (Java's `trim`, which keeps the no-break spaces that JavaScript's `trim()`
+removes; see "Highlighting a finding"). Do not mix this with the offsets of a trademark finding: `start` and `end` there count
+UTF-16 code units, not code points.
+
+```js
+const codePoints = (text) => Array.from(text.trim()).length;
+const utf8Bytes = (text) => new TextEncoder().encode(text.trim()).length;
+// the smallest enabled limit for a field and kind, or null when there is none
+const limitOf = (answer, field, kind) => {
+  const values = answer.limits.filter((l) => l.enabled && l.field === field && l.kind === kind).map((l) => l.value);
+  return values.length ? Math.min(...values) : null;
+};
+// title counter: codePoints(title) vs limitOf(answer, 'title', 'MAX_LENGTH'); a tag: codePoints(tag) vs limitOf(answer, 'tags', 'MAX_LENGTH')
+```
+
+**Caching.** The answer is the same for every client and changes only with a new ruleset version (a deployment). It carries
+`ETag` and `Cache-Control: private, max-age=300`. A backend can keep it per `(marketplace, productType)` and revalidate with
+`If-None-Match`: a matching tag gets `304` with no body. The `ETag` is the same for the same limits, so it also changes when a
+rule starts to declare another limit without a new ruleset version. A cache is still a copy: compare the `rulesetVersion` of a
+check you receive with the one you hold, and read the limits again when they differ.
+
 ## Trademark checks
 
 `POST /api/v1/trademark-checks` compares the text of a listing with a catalog of trademark marks and reports possible
@@ -531,6 +625,7 @@ validation. Branch on `code`, not on `detail`.
 | 403 | `plan-not-allowed` | Only where plans are on (see "Plans and monthly quota"). Your client's plan does not include the pack of the endpoint; `plan` and `pack` say which. | Do not retry. Ask the operator for a plan that includes the pack. |
 | 404 | `check-not-found` | No check with that id for your client. A check of another client gives this same answer. | The id is wrong, or it is not yours. |
 | 404 | `trademark-check-not-found` | `GET /api/v1/trademark-checks/{id}`: no retained trademark check with that id for your client. A check of another client, an id that never existed and an expired check give this same answer. | The id is wrong, not yours, or past its retention: send the listing again. |
+| 404 | `ruleset-not-found` | `GET /api/v1/rulesets/{marketplace}/limits`: no ruleset is active for the marketplace. `detail` lists the supported ones. | Fix the marketplace code. |
 | 404 | `not-found` | Unknown route. | Check the URL. |
 | 405 | `method-not-allowed` | Wrong HTTP method. | |
 | 413 | `payload-too-large` | Body over 256 KB. | Send less. |

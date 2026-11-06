@@ -48,7 +48,13 @@ It never edits a listing, never publishes, and does no SEO.
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Optional ADR-014 fix/readiness output is behind
   `listing-guard.fixes.enabled=false` by default; V20 stores fixes and readiness without changing `analysisVersion`.
   Contract: `docs/api/openapi.json`,
-  `docs/integration-guide.md`, `docs/input-schema.md`, ADR-005, ADR-007.
+  `docs/integration-guide.md`, `docs/input-schema.md`, ADR-005, ADR-007. **Ruleset limits**: `GET
+  /api/v1/rulesets/{marketplace}/limits?productType=` (`api/.../ruleset/RulesetLimits*`) is read only and needs an API key, stores
+  nothing and touches neither `PlanService` nor the quota. It returns the numeric limits of the active `listing-rules` ruleset as
+  the rules declare them (`field`, `ruleId`, `kind`, `value`, `unit`, `severity`, `sourceStatus`, `enabled`); a rule switched off is
+  listed with `enabled: false`; an unknown marketplace is `404 ruleset-not-found`; `ETag` and a five minute private cache. The
+  console editor's counters (`EditorLimits`) read the same `RulesetLimitsService`, so the page and the endpoint cannot differ (a
+  test holds it).
 - **Batch check** (`api/.../batch/`, `docs/batch-check.md`): the one-shot job `batch-check` (Spring profile and compose
   service of that name; no network, no HTTP, no new endpoint, no migration). It reads a listing CSV as a stream, maps the
   columns to the standard input with a YAML mapping (`batch/mappings/`, no version; every key but `id` and `csv` must be a
@@ -204,6 +210,12 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   an applied one. Hibernate runs with `ddl-auto=validate`.
 - Enums stored as strings with `CHECK` constraints in SQL; keep the Java enum and the constraint in sync.
 - A failing rule is logged and skipped by `RuleEngine`; it must not break the other rules.
+- **Rule limits**: a rule that has a number in its settings overrides `Rule.limits(settings)` and declares each one with the unit
+  its own `evaluate` counts (`Limit.maxLength` is code points, `maxBytes` UTF-8 bytes, `maxCount` items, `maxOccurrences`). The
+  value is read from the settings it is given (the category's, merged), never written in Java. `RuleEngine.limits` is the only
+  place that turns them into `RuleLimit`s; nothing outside a rule reads a rule's parameters by name or switches on a rule id to
+  find a limit (the endpoint and `EditorLimits` pick by field and kind). `LimitCoverageTest` fails when a shipped ruleset has a
+  `max_*` setting that its rule does not declare, so a new rule with a number must override `limits()`.
 - **Fix suggestions** (ADR-014): a suggestion is advice and is never applied. Nothing writes a proposed value back to a
   listing; `FixApplier` is package-private and works on a throwaway copy to verify a candidate. A fix only shortens a value
   at a word boundary or removes a repeated one; **no rule proposes replacement words**, and trademark findings

@@ -12,7 +12,9 @@ The request is always the same envelope; only the object under `listing` depends
 
 `marketplace` is `ETSY` or `AMAZON`, case-insensitive. `listing` must be a JSON object. The whole request body is at
 most 256 KB. What a check finds, and the limits it applies, are described by the findings in the response and by the
-versioned rulesets, not by this page: no limit is repeated here, so none can go out of date.
+versioned rulesets, not by this page: no limit is repeated here, so none can go out of date. The limits themselves, with the
+unit each is counted in, are read from `GET /api/v1/rulesets/{marketplace}/limits` (see the
+[integration guide](integration-guide.md#limits-for-a-character-counter)).
 
 ## Rules for every field
 
