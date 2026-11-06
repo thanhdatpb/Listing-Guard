@@ -119,6 +119,7 @@ and `language_tag`) is not accepted; convert to this format first.
 | `quantity` | number | A JSON number; a string is not accepted. A fractional part is dropped. |
 | `images` | array of strings | URLs. Blank entries, and entries that are objects or arrays, are dropped. |
 | `item_highlights` | string | The Amazon "Item Highlights" field. Optional: a listing without it is checked, and hashed, exactly as before the field existed. |
+| `customization` | object | Optional: `{"surfaces": [...]}`, the print surfaces of an Amazon Custom product with the inputs a buyer fills in (see [Amazon customization](#amazon-customization)). A listing without it is checked, and hashed, exactly as before the field existed. Not available in the batch job: a CSV cell cannot hold it. |
 
 Fields of the Etsy format, such as `tags`, are ignored for Amazon.
 
@@ -133,9 +134,67 @@ Fields of the Etsy format, such as `tags`, are ignored for Amazon.
   "price": {"amount": "89.99", "currency_code": "USD"},
   "quantity": 12,
   "images": ["https://example.com/suitcase-1.jpg"],
-  "item_highlights": "Hard shell, 360 degree spinner wheels, TSA-approved lock"
+  "item_highlights": "Hard shell, 360 degree spinner wheels, TSA-approved lock",
+  "customization": {
+    "surfaces": [
+      {
+        "name": "Front",
+        "text_inputs": [{"label": "Name to print", "max_chars": 20, "allowed_char_types": ["letters"]}],
+        "dropdowns": [{"label": "Font", "options": ["Serif", "Script"]}],
+        "image_inputs": [{"label": "Photo"}]
+      }
+    ]
+  }
 }
 ```
+
+## Amazon customization
+
+The optional `customization` block of an Amazon listing describes an Amazon Custom product: the print surfaces (for example the
+front and the back) and the inputs a buyer fills in for each. Each entry of `customization.surfaces` is an object; anything else in
+the array is dropped. Like every list, the arrays keep what was written: a surface or an input is never merged, reordered or
+corrected, and an empty `surfaces` array is the same as no `customization`. An entry of `text_inputs`, `dropdowns` or `image_inputs`
+that is not an object is dropped; an object with no field is kept, so that a rule can report it. In a finding, `surfaces[i]`,
+`text_inputs[j]`, `dropdowns[j]` and `options[k]` count the cleaned lists from zero.
+
+The `customization` object has one field:
+
+| Field | Type | Notes |
+|---|---|---|
+| `surfaces` | array of objects | The print surfaces of the product, in the order sent. |
+
+### Surfaces
+
+| Field | Type | Notes |
+|---|---|---|
+| `name` | string | The name of the surface, for example `Front`. Optional; a surface without one is named by its position in messages. |
+| `text_inputs` | array of objects | The text boxes the buyer types into (see below). |
+| `dropdowns` | array of objects | The dropdowns whose choices the seller sets (see below). |
+| `image_inputs` | array of objects | The places where the buyer uploads an image (see below). |
+
+### Text inputs
+
+| Field | Type | Notes |
+|---|---|---|
+| `label` | string | The label the buyer sees. |
+| `max_chars` | number | The longest text the seller allows. A JSON number; a string is not accepted. A fractional part is dropped. A text input without it is reported by a rule. |
+| `allowed_char_types` | array of strings | The kinds of characters the seller allows, for example `letters`. Kept as written; Listing Guard does not interpret them. |
+
+### Dropdowns
+
+| Field | Type | Notes |
+|---|---|---|
+| `label` | string | The label the buyer sees. |
+| `options` | array of strings | The choices, in the order sent. Duplicates are kept; blank entries are dropped. |
+
+### Image inputs
+
+| Field | Type | Notes |
+|---|---|---|
+| `label` | string | The label the buyer sees. |
+
+The limits that the rules apply to these arrays (the number of text inputs, of dropdown options and of image inputs) are read from
+`GET /api/v1/rulesets/AMAZON/limits`, like every other limit, and are not repeated here.
 
 ## Variation checks
 
@@ -209,7 +268,8 @@ An Etsy listing with two variation types:
 
 ## Checked by a test
 
-The two listing examples above are read out of this file by a test and run through the normalizers, and so are the two
-variation examples (through the variation normalizer and the rules), so this page cannot drift from the code without the
+The two listing examples above are read out of this file by a test and run through the normalizers (the Amazon example
+includes the `customization` block, and every field of the tables of [Amazon customization](#amazon-customization) is held to
+it), and so are the two variation examples (through the variation normalizer and the rules), so this page cannot drift from the code without the
 build failing. The machine-readable description of the request and response is
 [`docs/api/openapi.json`](api/openapi.json); how to call the API is in the [integration guide](integration-guide.md).

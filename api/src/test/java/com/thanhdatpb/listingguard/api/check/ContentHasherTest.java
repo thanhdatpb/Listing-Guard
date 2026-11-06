@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.api.check;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.thanhdatpb.listingguard.core.listing.CustomizationSurface;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.core.listing.Money;
 import com.thanhdatpb.listingguard.core.listing.PersonalizationQuestion;
@@ -113,6 +114,40 @@ class ContentHasherTest {
         assertThat(hasher.hash(amazon("Roadster", List.of("One"), "carry on", "LUGGAGE")))
                 .isEqualTo(hasher.hash(amazon("Roadster", List.of("One"), "carry on", "LUGGAGE")))
                 .matches("[0-9a-f]{64}");
+    }
+
+    private static Listing amazonWith(List<CustomizationSurface> surfaces) {
+        Listing base = pinnedAmazon();
+        return new Listing(base.title(), base.description(), base.tags(), base.price(), base.category(), base.materials(),
+                base.images(), base.quantity(), base.whoMade(), base.whenMade(), base.brand(), base.bulletPoints(),
+                base.searchTerms(), base.productType(), base.itemHighlights(), List.of(), surfaces);
+    }
+
+    private static CustomizationSurface surface(String name, Integer maxChars, List<String> options) {
+        return new CustomizationSurface(name, List.of(new CustomizationSurface.TextInput("Message", maxChars, List.of())),
+                List.of(new CustomizationSurface.Dropdown("Font", options)),
+                List.of(new CustomizationSurface.ImageInput("Photo")));
+    }
+
+    @Test
+    void noCustomizationSurfacesLeavesTheAmazonAndEtsyHashesUnchanged() {
+        assertThat(hasher.hash(amazonWith(List.of()))).isEqualTo(AMAZON_HASH);
+        assertThat(hasher.hash(amazonWith(null))).isEqualTo(AMAZON_HASH);
+        assertThat(hasher.hash(etsy())).isEqualTo(ETSY_HASH);
+    }
+
+    @Test
+    void customizationSurfacesChangeTheHashAndEveryPartOfASurfaceCountsInIt() {
+        String base = hasher.hash(amazonWith(List.of(surface("Front", 20, List.of("Serif", "Script")))));
+
+        assertThat(base).isNotEqualTo(AMAZON_HASH).matches("[0-9a-f]{64}");
+        assertThat(hasher.hash(amazonWith(List.of(surface("Front", 20, List.of("Serif", "Script")))))).isEqualTo(base);
+        assertThat(hasher.hash(amazonWith(List.of(surface("Back", 20, List.of("Serif", "Script")))))).isNotEqualTo(base);
+        assertThat(hasher.hash(amazonWith(List.of(surface("Front", 21, List.of("Serif", "Script")))))).isNotEqualTo(base);
+        assertThat(hasher.hash(amazonWith(List.of(surface("Front", null, List.of("Serif", "Script")))))).isNotEqualTo(base);
+        assertThat(hasher.hash(amazonWith(List.of(surface("Front", 20, List.of("Serif")))))).isNotEqualTo(base);
+        assertThat(hasher.hash(amazonWith(List.of(surface("Front", 20, List.of("Serif", "Script")),
+                surface("Back", 20, List.of("Serif")))))).isNotEqualTo(base);
     }
 
     private static Listing etsyWith(List<PersonalizationQuestion> questions) {
