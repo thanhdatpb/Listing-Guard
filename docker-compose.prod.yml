@@ -32,6 +32,8 @@ services:
       # refuses to start while the key is empty.
       LISTING_GUARD_EMBEDDING_PROVIDER: ${LISTING_GUARD_EMBEDDING_PROVIDER:-none}
       LISTING_GUARD_EMBEDDING_API_KEY: ${LISTING_GUARD_EMBEDDING_API_KEY:-}
+      # Trademark catalog version to serve (ADR-009), as the trademark-import job printed it. Empty: trademark checks off.
+      LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
       # Client plans and the monthly quota (ADR-013): off by default, so nothing about a plan is read or enforced.
       # Give every client its plan first: docker compose run --rm admin plan set <client> <plan>
       LISTING_GUARD_PLANS_ENABLED: ${LISTING_GUARD_PLANS_ENABLED:-false}
