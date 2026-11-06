@@ -61,6 +61,29 @@ It never edits a listing, never publishes, and does no SEO.
   (`listing-guard.variation.retention.*`) enforced on read and by a scheduled cleanup under the retention advisory lock, cache
   `(client, marketplace, pack, input hash, ruleset version, analysis version)` with `COMPLETE` results only, one unit per new
   `COMPLETE` result. No fix, no `batch-check` part, no console page, no `GET .../limits` entry.
+- **Personalization screening** (`personalization-screening/`, ADR-016, Proposed; implemented): pure Java (no Spring, database or
+  HTTP) checks of the text a **buyer typed** for a custom product, for the fulfillment/CS step before production, in a request
+  of its own (`marketplace`, `product_type`, `print_profile`, `values[]` of `label` and `text`; `docs/input-schema.md`
+  "Personalization screening"). Ruleset `rulesets/personalization-screening-2026-11.yaml` (pack `personalization-screening`,
+  registered for ETSY and AMAZON; character classes, print profiles with `allowed_chars`, `max_length`, `max_length_by_label` and
+  `allow_lowercase`, severities and every Vietnamese message are keys; a test pins its hash). Three character rules
+  (`unsupported_characters`, `too_long`, `whitespace_issue`) plus the **trademark scanner run on each value as
+  `personalization[i]`** (the adapter hands the values over as the items of `tags`, renames the field back and shifts the
+  offsets; `trademark-scanner` and its ruleset are untouched and a test holds that the shipped one scans `tags`). **Every
+  source is `unverified` and the loader refuses any other, so no finding is ERROR; the shipped profiles `latin_basic` (default)
+  and `latin_extended` are placeholders with invented numbers, not the real workshop's.** The normalizer does **not trim the
+  buyer's text** (spaces are what `whitespace_issue` reports; NFC only). A catalog that is DISABLED or REFUSED is **not a 503**
+  here: the character rules run, `trademark.status` is `NOT_CONFIGURED` with `riskLevel` `UNKNOWN` (never LOW) and the result
+  is `INCOMPLETE` (not reused, not charged). API: `POST /api/v1/personalization-screenings` and
+  `GET /api/v1/personalization-screenings/{id}` (`api/.../personalization/`), `400 unknown-print-profile` for an undeclared
+  profile, V24 (plan pack `personalization-screening` for SELLER and PRO) and V25 (`personalization_screening`,
+  `personalization_screening_finding`). **The buyer's text is personal data: only the canonical input hash and bounded
+  evidence are stored (the label, the offsets, at most `evidence.max_value_chars` offending characters, the catalog mark), and an
+  answer never repeats it (no snippet; trademark messages are this pack's own templates).** 30-day retention
+  (`listing-guard.personalization.retention.*`) enforced on read and by a scheduled cleanup under the shared retention advisory
+  lock; cache `(client, marketplace, pack, input hash, ruleset version, analysis version)` with `COMPLETE` results only, the
+  analysis version includes the trademark scan's fingerprint; one unit per new `COMPLETE` result. No fix, no `batch-check` part,
+  no console page, no `GET .../limits` entry.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Optional ADR-014 fix/readiness output is behind
@@ -92,8 +115,8 @@ It never edits a listing, never publishes, and does no SEO.
   `plan`, with their packs in `plan_pack` and the monthly quota, NULL = unlimited, seeded in V19) and `client_usage` counts
   results per client and UTC month. **Off by default** (`listing-guard.plans.enabled=false`): `PlanService` then returns at
   once without a query, so a self-hosted deployment is unchanged. One unit is one new result that is stored, per endpoint
-  (a full check of one listing is two, three with a variation family); cached results, `GET`s, `GET /api/v1/usage` and
-  `INCOMPLETE` trademark and variation results cost
+  (a full check of one listing is two, three with a variation family, and each order screened is one more); cached results,
+  `GET`s, `GET /api/v1/usage` and `INCOMPLETE` trademark, variation and personalization results cost
   nothing. Order in `CheckService` and `TrademarkCheckService`: `requirePack` the pack (403 `plan-not-allowed`), cache, `requireQuota`
   (429 `quota-exceeded`, no `Retry-After`), analysis, `charge` inside the transaction that stores the result. `batch-check`
   needs the `batch` pack, stops at once with `quota-exceeded` when no unit is left, and marks rows `QUOTA_EXCEEDED` when the
@@ -127,7 +150,7 @@ It never edits a listing, never publishes, and does no SEO.
   the banner and the editor's trademark panel repeats it.
 - Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the variation checks (ADR-015), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
+  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12b.yaml`): simple input format (`title`, `brand`,
@@ -180,6 +203,11 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
    themes, the two pages that answered 403, the unit cost, the cleanup lock). Next, if wanted: `height_type`, a synthetic
    evaluation, a console page, a `batch-check` part.
 
+9. Personalization screening (ADR-016, Proposed): done as one PR (`feat/personalization-screening-pack`: module, ruleset, V24,
+   V25, endpoint, cleanup, plan pack, docs). Open questions the maintainer decides are at the end of the ADR (the workshop's real
+   print profile above all, the unit cost, counting characters, capitals-only profiles). Next, if wanted: the real profile as a
+   new ruleset version, a `batch-check` part for a file of orders, a console page.
+
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
 
@@ -192,7 +220,7 @@ JUnit 5 + Testcontainers. Root package `com.thanhdatpb.listingguard`.
 
 ```bash
 ./mvnw -B verify                 # build + all tests (needs Docker for Testcontainers)
-./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks verify   # fast: no Docker needed
+./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening verify   # fast: no Docker needed
 docker compose up --build        # postgres + api (override ports: POSTGRES_PORT, API_PORT)
 ```
 
@@ -301,7 +329,7 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   alone. Only a `COMPLETE` result is cached (partial unique index); an `INCOMPLETE` one is stored for GET and never
   reused. Replacing an expired result deletes it and inserts in one transaction; only the unique violation of
   `uq_trademark_check_cache` counts as a cache race. The advisory-lock key pair `(1279746628, 1380271182)` is reserved for
-  retention cleanup (trademark and variation results, ADR-010, ADR-015): no other kind of query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
+  retention cleanup (trademark, variation and personalization results, ADR-010, ADR-015, ADR-016): no other kind of query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
 - Ingest, eval, admin, trademark-import and batch-check are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`,
   `trademark-import`, `batch-check`), not HTTP endpoints.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
@@ -340,6 +368,18 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   (`CanonicalInput`) are part of the analysis fingerprint: changing either needs a new `AlgorithmVersions` constant. The
   normalizer only trims and drops blanks, and the submitted family is never stored (only its hash and bounded evidence).
   Tests read themes, product types, attribute names, lists and limits from the ruleset and use synthetic SKUs and titles.
+- **Personalization screening** (ADR-016): the ruleset is immutable (a test pins its hash; a change is a new file and version)
+  and every block has a `source` that must be `unverified` (the loader refuses any other status and any ERROR). Never present a
+  profile as the real printer's until the maintainer supplies it; never add a character class, limit or profile without saying it is
+  `unverified`. **The buyer's text is personal data: never store it, never log it, never copy it into a response, a message or an
+  exception**: store only the canonical input hash and bounded evidence (label, offsets, a few offending characters made
+  printable, the catalog mark). Do not trim the text in the normalizer (`whitespace_issue` needs it). Messages and suggestions are
+  in the ruleset (including the wording of the trademark findings, which never use the scanner's snippet or token), Vietnamese,
+  with the real characters, positions and numbers, and never propose a replacement or claim a text is allowed. How characters are
+  classified and counted (`Texts`), how findings are ordered, the canonical input (`CanonicalInput`) and the hand-over to the
+  trademark scanner (`TrademarkAdapter`) are part of the analysis fingerprint: changing one needs a new `AlgorithmVersions`
+  constant. Nothing in `trademark-scanner` or its ruleset changes for this pack. Tests read classes, profiles, limits and
+  templates from the ruleset and use invented names (the DEMO catalog's, never a real mark).
 - **Fix suggestions and readiness** (ADR-014): `listing-guard.fixes.enabled` defaults to false. Off means `/checks`
   uses `RuleEngine.run()` and its response and batch report keep their current shape. On, API/batch use `runDetailed()`
   and readiness covers only `listing-rules`; clients must show trademark results separately. V20 persists fix/readiness

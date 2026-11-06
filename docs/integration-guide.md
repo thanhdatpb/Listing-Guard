@@ -61,11 +61,13 @@ operator of the deployment you call whether plans are on. The operator sets your
 
 What counts: **one unit is one new result that is stored, per endpoint.** A full check of one listing, that is
 `POST /api/v1/checks` and `POST /api/v1/trademark-checks` for the same listing, is two units; a variation family sent to
-`POST /api/v1/variation-checks` (`SELLER` and `PRO` plans) is one more. What does not count:
+`POST /api/v1/variation-checks` (`SELLER` and `PRO` plans) is one more, and so is each order sent to
+`POST /api/v1/personalization-screenings` (`SELLER` and `PRO` plans). What does not count:
 
 - a result answered from the cache (`"cached": true`), also when you are at the limit;
-- `GET /api/v1/checks/{id}`, `GET /api/v1/trademark-checks/{id}`, `GET /api/v1/variation-checks/{id}` and `GET /api/v1/usage`;
-- a trademark or variation result that is `INCOMPLETE` (it is stored for `GET` and never reused);
+- `GET /api/v1/checks/{id}`, `GET /api/v1/trademark-checks/{id}`, `GET /api/v1/variation-checks/{id}`,
+  `GET /api/v1/personalization-screenings/{id}` and `GET /api/v1/usage`;
+- a trademark, variation or personalization result that is `INCOMPLETE` (it is stored for `GET` and never reused);
 - a request that is refused or fails (`400`, `401`, `403`, `413`, `429`, `503`).
 
 Repeating a request is therefore safe for your quota: the second identical request is answered from the cache and costs
@@ -84,7 +86,7 @@ The month is the calendar month in UTC; the counter resets at 00:00 UTC on the f
   "remaining": 958,
   "periodStart": "2026-11-01",
   "resetAt": "2026-12-01T00:00:00Z",
-  "packs": ["batch", "listing-rules", "sheet-connector", "trademark-risk", "variation-checks"]
+  "packs": ["batch", "listing-rules", "personalization-screening", "sheet-connector", "trademark-risk", "variation-checks"]
 }
 ```
 
@@ -780,6 +782,133 @@ same client (same marketplace, same cleaned family, same `analysisVersion`) retu
 reads your results, and a `checkId` of another client answers `404` exactly like one that does not exist. Where plans are on, the
 pack `variation-checks` must be in your plan (`403 plan-not-allowed` otherwise) and a new `COMPLETE` result costs one unit.
 
+## Personalization screening
+
+`POST /api/v1/personalization-screenings` checks the text a **buyer typed** for a custom product (a name and a number on a
+jersey, a first name on a mug). That text is not in the listing, so nothing you run before publishing sees it. Call it at the
+step where an order is about to go into production (the fulfillment or customer-service check), once per order. It is a
+separate check with its own request, endpoint, result and retention; `/checks`, `/trademark-checks` and `/variation-checks` do
+not change and do not depend on it. It never edits the text, never corrects a name and **proposes no replacement**: a finding
+says what is wrong, and what to ask the buyer is your decision.
+
+It gives two independent answers; show both, and show neither without the other:
+
+- `findings`: the **character rules**. `unsupported_characters` (a character the print profile cannot print: an emoji, a symbol,
+  a letter with a mark the profile does not allow), `too_long` (more characters than the profile allows for that field) and
+  `whitespace_issue` (spaces at the start or end, or several in a row). They depend on the **print profile**, which describes one
+  printer or workshop. The profiles in the shipped ruleset are placeholders with invented numbers, not a real workshop's
+  profile; ask the operator of the deployment which profile matches your printer.
+- `trademark`: the trademark scan of the same text with the catalog the deployment serves, as for `/trademark-checks`: a
+  `riskLevel` of `LOW`, `MEDIUM`, `HIGH` or `UNKNOWN` (never `LOW` when the risk could not be determined) and the findings that
+  explain it. A match is a reference warning, not a legal conclusion. The scan finds registered marks in the catalog; it says
+  nothing about the names of people.
+
+Every result is a **reference warning**: the rules are an internal print policy and a catalog, nothing in them is `verified`
+and no finding is an `ERROR`, and the response carries a `disclaimer` to show with it.
+
+### Request
+
+`Content-Type: application/json`, body at most 256 KB. The fields are at the top level (not in a `listing` object); they and
+their cleaning are the public contract in [`docs/input-schema.md`](input-schema.md#personalization-screening). In short:
+`marketplace` (`ETSY` or `AMAZON`), optional `print_profile` and `product_type`, and `values`, one object per field of the order
+with a `label` (for example `name`) and the `text` the buyer typed. **The `text` is not trimmed**, because stray spaces are
+reported; send it exactly as the buyer typed it.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/personalization-screenings \
+  -H 'X-API-Key: <key>' -H 'Content-Type: application/json' \
+  -d '{"marketplace":"ETSY","product_type":"jersey","print_profile":"latin_basic",
+       "values":[{"label":"name","text":"Đạt"},{"label":"number","text":"1234"}]}'
+```
+
+### Response
+
+`200`, new or stored (`cached`). The example has two character findings; the trademark scan ran and found nothing in the
+catalog:
+
+```json
+{
+  "checkId": "5e1b7d90-2c4f-4a8e-b3d6-9f0a1c2e4b58",
+  "marketplace": "ETSY",
+  "rulesetVersion": "personalization-screening-2026-11",
+  "analysisVersion": "9a4e1c7d03b85f26e1d0c9b8a7f6e5d4c3b2a19087766554433221100ffeeddc",
+  "cached": false,
+  "printProfile": "latin_basic",
+  "completeness": "COMPLETE",
+  "failedRuleIds": [],
+  "disclaimer": "Kết quả chỉ là cảnh báo tham khảo theo hồ sơ in nội bộ và danh mục nhãn hiệu tham chiếu, không phải kết luận của xưởng in, của sàn hay kết luận pháp lý. Không có cảnh báo chỉ có nghĩa là các quy tắc này không phát hiện gì.",
+  "createdAt": "2026-11-06T09:15:30.123456Z",
+  "expiresAt": "2026-12-06T09:15:30.123456Z",
+  "summary": {"errors": 0, "warnings": 2, "infos": 0},
+  "findings": [
+    {"ruleId": "unsupported_characters", "kind": "character_not_allowed", "severity": "WARNING",
+     "sourceStatus": "UNVERIFIED", "field": "personalization[0]", "label": "name", "start": 0, "end": 2,
+     "value": "Đạ",
+     "message": "personalization[0] (name): ký tự 'Đạ' (U+0110 U+1EA1) từ ký tự thứ 1 nằm ngoài tập ký tự của hồ sơ in 'latin_basic'.",
+     "suggestion": "Hỏi lại khách về nội dung này hoặc đối chiếu với xưởng trước khi đưa đơn vào sản xuất. Hệ thống không tự sửa nội dung."},
+    {"ruleId": "too_long", "kind": "too_long", "severity": "WARNING",
+     "sourceStatus": "UNVERIFIED", "field": "personalization[1]", "label": "number", "start": 3, "end": 4,
+     "value": null,
+     "message": "personalization[1] (number) dài 4 ký tự, vượt giới hạn 3 của hồ sơ in 'latin_basic' (1 ký tự cuối, từ ký tự thứ 4).",
+     "suggestion": "Hỏi lại khách hoặc xưởng xem nội dung có vừa vùng in không. Hệ thống không tự rút gọn nội dung."}
+  ],
+  "trademark": {
+    "status": "COMPLETE",
+    "riskLevel": "LOW",
+    "catalogVersion": "demo-2026-11-0a1b2c3d4e5f",
+    "rulesetVersion": "trademark-risk-2026-11",
+    "failedRuleIds": [],
+    "findings": []
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `checkId` | Identifier of the stored result; `GET /api/v1/personalization-screenings/{id}` until `expiresAt`. |
+| `rulesetVersion`, `analysisVersion` | What produced the result (the analysis version includes the trademark ruleset and catalog). Opaque strings: compare for equality, do not parse. |
+| `printProfile` | The profile that was used; the default one when your request named none. |
+| `cached` | `true` when the stored result of an identical earlier request is returned. |
+| `completeness` | `COMPLETE`, or `INCOMPLETE` when a character rule failed, the trademark scan failed, or **no trademark catalog is served** (`trademark.status` is `NOT_CONFIGURED`). The findings that were established are kept. **An `INCOMPLETE` result is not a clean result**; it is stored so it can be read with GET, is never returned for another request and costs no quota. |
+| `summary` | Number of character findings per severity. |
+| `disclaimer` | The statement that the result is a reference warning. Show it with the result. |
+| `createdAt`, `expiresAt` | When the result was stored and when it stops being readable (UTC). |
+
+A character finding:
+
+| Field | Meaning |
+|---|---|
+| `ruleId`, `kind` | The rule (`unsupported_characters`, `too_long`, `whitespace_issue`) and the case inside it (`character_not_allowed`, `lowercase_not_printed`, `too_long`, `leading_space`, `trailing_space`, `repeated_space`). Both are stable: branch on them, not on the text. |
+| `severity` | `WARNING` (worth a look before production) or `INFO` (a note: stray spaces, lowercase letters a capitals-only profile will print as capitals). No `ERROR`. |
+| `sourceStatus` | `UNVERIFIED` today: the rules are an internal print policy. |
+| `field`, `label` | Which value: `personalization[i]`, i being the zero-based index in the **cleaned** list (an entry without text is dropped), and the label you sent for it, or `null`. |
+| `start`, `end` | The span in the `text` as you sent it, in UTF-16 code units, `end` exclusive. Use them to highlight the text; the answer does not repeat it. |
+| `value` | The offending characters, at most a few (the ruleset limits them), or `null` when no text is kept (too long, spaces). |
+| `message`, `suggestion` | Human text, currently Vietnamese, with the real characters, positions and numbers. A suggestion never offers a replacement. |
+
+The `trademark` object:
+
+| Field | Meaning |
+|---|---|
+| `status` | `COMPLETE`; `INCOMPLETE` (a trademark rule failed: the findings that were found are kept); `NOT_CONFIGURED` (the deployment serves no trademark catalog, so the scan **did not run**). Unlike `/trademark-checks`, a missing catalog is not a `503` here: the character rules still run. |
+| `riskLevel` | `LOW`, `MEDIUM`, `HIGH` or `UNKNOWN`. `UNKNOWN` means the risk could not be determined (no catalog, or an incomplete scan without a MEDIUM or HIGH finding) and is **never** shown as `LOW`. |
+| `catalogVersion`, `rulesetVersion` | What the scan used; `null` when it did not run. |
+| `failedRuleIds` | Trademark rules that failed; empty when none did. |
+| `findings` | Each has `ruleId`, `risk`, `field`, `label`, `start`, `end`, `matchType`, `mark` (the catalog's mark, not your text), `score`, `insideColorPhrase`, `otherRuleIds`, `sourceIds`, `message`, `suggestion`. **The text the buyer typed is not in it**, only where the match is and which catalog mark it resembles. |
+
+### Caching, retention and quota
+
+The text the buyer typed is personal data and is **never stored**: only a hash of the request and each finding's short evidence
+(the field, the label, the offsets, at most a few offending characters, the catalog mark, the message) are, for 30 days
+(`expiresAt`; an operational setting, not a guarantee). The result cannot be shown again with the text highlighted by the
+service; you hold the text and the offsets. After the retention `GET` answers `404` whether or not the server's cleanup has run,
+and the same order sent again is analysed again and gets a new `checkId`. An identical request of the same client (same
+marketplace, same cleaned values and print profile, same `analysisVersion`) returns the stored `COMPLETE` result with
+`cached: true`; a different ruleset, a new trademark catalog or a different code version changes `analysisVersion` and with it
+the cache. Another client never reads your results, and a `checkId` of another client answers `404` exactly like one that does
+not exist. Where plans are on, the pack `personalization-screening` must be in your plan (`403 plan-not-allowed` otherwise) and
+a new `COMPLETE` result costs one unit; a result without a trademark catalog is `INCOMPLETE` and costs none.
+
 ## Errors
 
 Errors are `application/problem+json` (RFC 7807) with these members: `type` (`urn:listing-guard:problem:<code>`),
@@ -790,11 +919,13 @@ validation. Branch on `code`, not on `detail`.
 |---|---|---|---|
 | 400 | `invalid-request` | Body missing, not JSON, or `marketplace` / `listing` missing; `listing` not an object. | Fix the request. Do not retry unchanged. |
 | 400 | `unknown-marketplace` | The marketplace code is not known. | Fix the code. `detail` lists the supported ones. |
+| 400 | `unknown-print-profile` | `POST /api/v1/personalization-screenings`: `print_profile` names a profile the ruleset does not declare. `known` lists the declared codes. | Fix the code, or leave it out for the default profile. |
 | 401 | `unauthorized` | Missing or invalid `X-API-Key`. | Check the key. Do not retry in a loop. |
 | 403 | `plan-not-allowed` | Only where plans are on (see "Plans and monthly quota"). Your client's plan does not include the pack of the endpoint; `plan` and `pack` say which. | Do not retry. Ask the operator for a plan that includes the pack. |
 | 404 | `check-not-found` | No check with that id for your client. A check of another client gives this same answer. | The id is wrong, or it is not yours. |
 | 404 | `trademark-check-not-found` | `GET /api/v1/trademark-checks/{id}`: no retained trademark check with that id for your client. A check of another client, an id that never existed and an expired check give this same answer. | The id is wrong, not yours, or past its retention: send the listing again. |
 | 404 | `variation-check-not-found` | `GET /api/v1/variation-checks/{id}`: no retained variation check with that id for your client. A check of another client, an id that never existed and an expired check give this same answer. | The id is wrong, not yours, or past its retention: send the family again. |
+| 404 | `personalization-screening-not-found` | `GET /api/v1/personalization-screenings/{id}`: no retained screening with that id for your client. A screening of another client, an id that never existed and an expired screening give this same answer. | The id is wrong, not yours, or past its retention: send the order again. |
 | 404 | `ruleset-not-found` | `GET /api/v1/rulesets/{marketplace}/limits`: no ruleset is active for the marketplace. `detail` lists the supported ones. | Fix the marketplace code. |
 | 404 | `not-found` | Unknown route. | Check the URL. |
 | 405 | `method-not-allowed` | Wrong HTTP method. | |

@@ -19,6 +19,11 @@ edit or publish anything, and it does not do SEO.
   (Amazon: the parent, its theme and the attributes of its children, apparel size attributes; Etsy: the variation types)
   and repeated combinations and SKUs, in a request of its own. It is built on secondary sources and internal heuristics
   (nothing in its ruleset is `verified`, so nothing is an `ERROR`), proposes no fix, and does not change `/checks`.
+- **Personalization screening** (`POST /api/v1/personalization-screenings`): checks the text a **buyer typed** for a custom
+  product (a name and a number on a jersey), which no check before publishing sees, at the step where an order goes into
+  production. Character rules against a print profile (characters the printer cannot print, too long, stray spaces) and the
+  trademark scan of the same text, shown side by side. The buyer's text is never stored or repeated in an answer. The print
+  profiles shipped are placeholders; it is a reference warning and does not change any other endpoint.
 - **Ruleset limits** (`GET /api/v1/rulesets/{marketplace}/limits`): the numeric limits of the loaded rulesets (title length,
   number and length of tags, Amazon search terms in bytes, ...), each with the field, the unit it is counted in, its severity
   and how well it is sourced, read from the same rules and ruleset the check uses. A client shows a character counter from it
@@ -47,6 +52,13 @@ Working end to end:
   only a hash of the family and short evidence are stored, for 30 days. It is a reference warning: **nothing in its ruleset
   is `verified`** (see [Rulesets](#rulesets)), so every finding is a `WARNING` or `INFO`, and it never proposes a value. It
   is in the `SELLER` and `PRO` plans and costs one unit per new result where plans are on.
+- The personalization screening. `POST /api/v1/personalization-screenings` takes the values a buyer typed for one order and a
+  print profile in a request of its own and returns the character findings and the trademark scan side by side. **Nothing in
+  its ruleset is `verified`** and the shipped print profiles are placeholders with invented numbers, so every finding is a
+  `WARNING` or `INFO`. A deployment with no trademark catalog still gets the character findings; the trademark part is then
+  `NOT_CONFIGURED` with an `UNKNOWN` risk and the result is `INCOMPLETE` (not reused, not charged). Only a hash of the request and
+  short evidence are stored, for 30 days, never the text. It is in the `SELLER` and `PRO` plans and costs one unit per new
+  complete result where plans are on.
 - The `batch-check` job, which calls the same services as the two endpoints.
 - Client API keys, per-client rate limits and per-client isolation; see the
   [integration guide](docs/integration-guide.md).
@@ -99,6 +111,7 @@ Client backend -- X-API-Key --> Listing Guard API (Spring Boot)
    POST /api/v1/checks               |
    POST /api/v1/trademark-checks     |
    POST /api/v1/variation-checks     |   (its own request: a parent and its children; pack `variation-checks`)
+   POST /api/v1/personalization-screenings |   (its own request: what a buyer typed; pack `personalization-screening`)
    GET  /api/v1/rulesets/{m}/limits  |   (read only: the limits of the rules below)
                          API key --> authenticated client
                          rate limit per client
@@ -148,8 +161,9 @@ Modules:
 | `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
 | `trademark-scanner/` | Trademark risk scanner core (ADR-009): versioned ruleset, canonical input hash, normalization with offsets, the `TrademarkCatalog` port with an in-memory catalog, exact/phrase/fuzzy matching, color and place context rules, risk aggregation, the pack fingerprint, and the catalog manifest and data file reader. No Spring, no database. |
 | `variation-checks/` | Variation checks core (ADR-015): the input of a parent and its children, its canonical hash, a strict ruleset loader, `variation-checks-2026-11.yaml` and the seven rules, the pack fingerprint, and `INCOMPLETE` when a rule fails. No Spring, no database. |
+| `personalization-screening/` | Personalization screening core (ADR-016): the input of the text a buyer typed, its canonical hash, a strict ruleset loader, `personalization-screening-2026-11.yaml` (character classes and print profiles), the three character rules, the adapter that runs the trademark scanner on each value, the pack fingerprint, and `INCOMPLETE` when a rule fails or no catalog is served. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, hashing for tests), `PolicyRetriever`, retrieval metrics, and the `LlmProvider` contract with a scripted test provider and a `CitationVerifier` (no call to a real model is implemented). No Spring. |
-| `api/` | Spring Boot REST app and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks`, `/trademark-checks` and `/variation-checks` endpoints with their retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
+| `api/` | Spring Boot REST app and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks`, `/trademark-checks`, `/variation-checks` and `/personalization-screenings` endpoints with their retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
 | `batch/` | `mappings/` (example column mappings, committed); `input/` and `out/` (your exports and the reports, git-ignored) |
@@ -463,6 +477,18 @@ brief. The product types and themes it knows are few on purpose (one apparel pro
 | `children_differ_outside_theme` (titles that look like different products) | WARNING, never ERROR | unverified: a heuristic |
 | `etsy_variation_limits` (at most 2 variation types, `Holiday` and `Occasion` cannot vary, only 10 variations take a photo) | WARNING; INFO for the photo limit | secondary: alura.io |
 
+`personalization-screening-2026-11.yaml` (in `personalization-screening/`) is the ruleset of the personalization screening
+([ADR-016](docs/adr/ADR-016-personalization-screening.md)): character classes, print profiles, the three character rules and
+the Vietnamese wording of the trademark findings. It is the maintainer's internal print policy, not a marketplace or legal rule,
+so **every source is `unverified`**, no finding is an `ERROR`, and **the two shipped profiles (`latin_basic`, the default, and
+`latin_extended`) are placeholders with invented numbers**: the real workshop's profile replaces them in a new ruleset version.
+
+| Rule | Severity | Source status |
+|---|---|---|
+| `unsupported_characters` (a character outside the profile's classes: emoji, symbols, letters with marks the profile does not allow; with a capitals-only profile, lowercase letters) | WARNING; INFO for lowercase on a capitals-only profile | unverified |
+| `too_long` (more characters than the profile allows for the field, by label or the default) | WARNING | unverified |
+| `whitespace_issue` (space at the start or end, several in a row; nothing is removed) | INFO | unverified |
+
 To change a threshold or a severity, create a new ruleset file with a new `version`: the API refuses to
 start if a registered version has different content (see [ADR-002](docs/adr/ADR-002-ruleset-versioning.md)).
 `etsy-2026-10.yaml`, `etsy-2026-11.yaml`, `amazon-2026-11.yaml` and `amazon-2026-12.yaml` are kept unchanged as history (a test pins their hashes) and are no longer loaded.
@@ -485,7 +511,8 @@ enforcement of `policy-analyzer` are not part of it), and the Listing Workspace 
 ([ADR-014](docs/adr/ADR-014-listing-workspace.md); off by default, V20), and the optional console with its sign-in,
 dashboard, Check listing editor and API keys page ([ADR-014](docs/adr/ADR-014-listing-workspace.md) part B, V21; off by
 default), and the variation checks ([ADR-015](docs/adr/ADR-015-variation-checks.md); the plan pack in V22 and the result
-tables in V23).
+tables in V23), and the personalization screening ([ADR-016](docs/adr/ADR-016-personalization-screening.md); the plan pack
+in V24 and the result tables in V25).
 What follows, in this order, is **not built yet**:
 
 1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
@@ -503,7 +530,11 @@ What follows, in this order, is **not built yet**:
    returned `403` and the product types and themes the ruleset knows (it has one apparel product type), `height_type`, and
    a synthetic evaluation like the trademark one if numbers are wanted. The `batch-check` job does not check variation
    families (a CSV row is a listing), and there is no console page for them.
-6. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)): the console, its dashboard, the Check listing
+6. Personalization screening ([ADR-016](docs/adr/ADR-016-personalization-screening.md)), what remains: the real
+   workshop's print profile (the shipped ones are placeholders), and the questions at the end of the ADR (the unit cost,
+   counting characters, capitals-only profiles). It adds no `batch-check` part and no console page, and it says nothing about
+   the right of publicity (it finds registered marks, not the names of people).
+7. Listing Workspace ([ADR-014](docs/adr/ADR-014-listing-workspace.md)): the console, its dashboard, the Check listing
    editor and the API keys page are implemented (part B, V21; off by default). What remains is saved listings and history;
    any page that shows readiness must always show the trademark result alongside it. Plan-based gating of API keys, a plan
    comparison page and billing are deferred. The Etsy rule `tag_count_underused` is still planned: it needs a fix
@@ -530,6 +561,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-012: Embeddings default to an external API](docs/adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)
 - [ADR-013: Client plans and monthly quota](docs/adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
 - [ADR-015: Variation checks](docs/adr/ADR-015-variation-checks.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; it ends with the questions the maintainer has to decide)
+- [ADR-016: Personalization screening](docs/adr/ADR-016-personalization-screening.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; the print profiles are placeholders; it ends with the questions the maintainer has to decide)
 - [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor and API keys page are implemented, all off by default; saved listings and history are not designed yet)
 
 ## License
