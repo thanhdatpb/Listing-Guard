@@ -6,6 +6,8 @@ import com.thanhdatpb.listingguard.api.check.UnknownMarketplaceException;
 import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
 import com.thanhdatpb.listingguard.api.plan.QuotaExceededException;
 import com.thanhdatpb.listingguard.api.policy.CorpusModelMismatchException;
+import com.thanhdatpb.listingguard.api.report.InvalidReportPeriodException;
+import com.thanhdatpb.listingguard.api.report.ReportPeriodTooLongException;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
@@ -119,6 +121,21 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setProperty("quota", e.quota());
         problem.setProperty("used", e.used());
         problem.setProperty("resetAt", e.resetAt().toString());
+        return problem;
+    }
+
+    /** The period of a report is missing, malformed or reversed (ADR-018). */
+    @ExceptionHandler(InvalidReportPeriodException.class)
+    public ProblemDetail invalidReportPeriod(InvalidReportPeriodException e) {
+        return Problems.of(HttpStatus.BAD_REQUEST, InvalidReportPeriodException.CODE, e.getMessage());
+    }
+
+    /** The period of a report is longer than the deployment allows; the limit and the request are in the members (ADR-018). */
+    @ExceptionHandler(ReportPeriodTooLongException.class)
+    public ProblemDetail reportPeriodTooLong(ReportPeriodTooLongException e) {
+        ProblemDetail problem = Problems.of(HttpStatus.BAD_REQUEST, ReportPeriodTooLongException.CODE, e.getMessage());
+        problem.setProperty("maxDays", e.maxDays());
+        problem.setProperty("requestedDays", e.requestedDays());
         return problem;
     }
 
