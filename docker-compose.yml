@@ -201,6 +201,29 @@ services:
     volumes:
       - ./batch:/batch
 
+  # Writes the listing health report (ADR-018): counts of the stored results of one client, or of every active client, over a
+  # period, to health-report/out/<UTC timestamp>/report.html and report.json. Local files and the database only: no network, no
+  # embedding provider, and it writes nothing to the database. Without --from and --to the period is the 7 complete UTC days
+  # before today, so a run on a Monday reports the previous ISO week.
+  #   docker compose run --rm health-report --client=<client name|client id|all> [--from=YYYY-MM-DD --to=YYYY-MM-DD] [--marketplace=ETSY|AMAZON]
+  # A client that is not active is refused; `all` is every active client.
+  health-report:
+    image: listing-guard-api:dev
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: health-report
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
+      DB_USER: ${POSTGRES_USER:-listingguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+      # The same setting as the api: the report names the trademark catalog this deployment serves.
+      LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      HEALTH_REPORT_DIR: /health-report
+    volumes:
+      - ./health-report:/health-report
+
   # Runs eval/retrieval/queries.yaml against the ingested corpus and writes eval/retrieval/results.md.
   # Needs an embedding provider (EMBEDDING_PROVIDER=api or ollama); with the default `none` it fails at once and says so.
   # With `api` the evaluation questions are sent to Google too. It fails if the corpus was embedded with another
