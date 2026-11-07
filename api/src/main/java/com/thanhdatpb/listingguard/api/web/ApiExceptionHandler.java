@@ -9,7 +9,9 @@ import com.thanhdatpb.listingguard.api.policy.CorpusModelMismatchException;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
+import com.thanhdatpb.listingguard.api.personalization.PersonalizationScreeningNotFoundException;
 import com.thanhdatpb.listingguard.api.variation.VariationCheckNotFoundException;
+import com.thanhdatpb.listingguard.personalization.config.UnknownPrintProfileException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingNotConfiguredException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -72,6 +74,23 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(VariationCheckNotFoundException.class)
     public ProblemDetail variationCheckNotFound(VariationCheckNotFoundException e) {
         return Problems.of(HttpStatus.NOT_FOUND, "variation-check-not-found", e.getMessage());
+    }
+
+    /** A screening of another client, an unknown one and an expired one all answer alike (ADR-007, ADR-016). */
+    @ExceptionHandler(PersonalizationScreeningNotFoundException.class)
+    public ProblemDetail personalizationScreeningNotFound(PersonalizationScreeningNotFoundException e) {
+        return Problems.of(HttpStatus.NOT_FOUND, "personalization-screening-not-found", e.getMessage());
+    }
+
+    /**
+     * The request named a print profile that the ruleset does not declare (ADR-016). It is never replaced by the default,
+     * because the answer would then describe a printer the client did not name; the declared codes are in {@code known}.
+     */
+    @ExceptionHandler(UnknownPrintProfileException.class)
+    public ProblemDetail unknownPrintProfile(UnknownPrintProfileException e) {
+        ProblemDetail problem = Problems.of(HttpStatus.BAD_REQUEST, "unknown-print-profile", e.getMessage());
+        problem.setProperty("known", e.known());
+        return problem;
     }
 
     /** No trademark catalog is served (not configured, or refused); only trademark checks are affected, not /checks (ADR-009). */

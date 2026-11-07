@@ -507,6 +507,119 @@ public final class ApiExamples {
             }
             """;
 
+    // ---- personalization screening (ADR-016); synthetic names and numbers only, and the answer never repeats the buyer's text
+
+    public static final String PERSONALIZATION_REQUEST = """
+            {
+              "marketplace": "ETSY",
+              "product_type": "jersey",
+              "print_profile": "latin_basic",
+              "values": [
+                {"label": "name", "text": "Đạt"},
+                {"label": "number", "text": "1234"}
+              ]
+            }
+            """;
+
+    public static final String PERSONALIZATION_RESULT = """
+            {
+              "checkId": "5e1b7d90-2c4f-4a8e-b3d6-9f0a1c2e4b58",
+              "marketplace": "ETSY",
+              "rulesetVersion": "personalization-screening-2026-11",
+              "analysisVersion": "9a4e1c7d03b85f26e1d0c9b8a7f6e5d4c3b2a19087766554433221100ffeeddc",
+              "cached": false,
+              "printProfile": "latin_basic",
+              "completeness": "COMPLETE",
+              "failedRuleIds": [],
+              "disclaimer": "Kết quả chỉ là cảnh báo tham khảo theo hồ sơ in nội bộ và danh mục nhãn hiệu tham chiếu, không phải kết luận của xưởng in, của sàn hay kết luận pháp lý. Không có cảnh báo chỉ có nghĩa là các quy tắc này không phát hiện gì.",
+              "createdAt": "2026-11-06T09:15:30.123456Z",
+              "expiresAt": "2026-12-06T09:15:30.123456Z",
+              "summary": {"errors": 0, "warnings": 2, "infos": 0},
+              "findings": [
+                {"ruleId": "unsupported_characters", "kind": "character_not_allowed", "severity": "WARNING",
+                 "sourceStatus": "UNVERIFIED", "field": "personalization[0]", "label": "name", "start": 0, "end": 2,
+                 "value": "Đạ",
+                 "message": "personalization[0] (name): ký tự 'Đạ' (U+0110 U+1EA1) từ ký tự thứ 1 nằm ngoài tập ký tự của hồ sơ in 'latin_basic'.",
+                 "suggestion": "Hỏi lại khách về nội dung này hoặc đối chiếu với xưởng trước khi đưa đơn vào sản xuất. Hệ thống không tự sửa nội dung."},
+                {"ruleId": "too_long", "kind": "too_long", "severity": "WARNING",
+                 "sourceStatus": "UNVERIFIED", "field": "personalization[1]", "label": "number", "start": 3, "end": 4,
+                 "value": null,
+                 "message": "personalization[1] (number) dài 4 ký tự, vượt giới hạn 3 của hồ sơ in 'latin_basic' (1 ký tự cuối, từ ký tự thứ 4).",
+                 "suggestion": "Hỏi lại khách hoặc xưởng xem nội dung có vừa vùng in không. Hệ thống không tự rút gọn nội dung."}
+              ],
+              "trademark": {
+                "status": "COMPLETE",
+                "riskLevel": "LOW",
+                "catalogVersion": "demo-2026-11-0a1b2c3d4e5f",
+                "rulesetVersion": "trademark-risk-2026-11",
+                "failedRuleIds": [],
+                "findings": []
+              }
+            }
+            """;
+
+    public static final String PERSONALIZATION_RESULT_CACHED = """
+            {
+              "checkId": "5e1b7d90-2c4f-4a8e-b3d6-9f0a1c2e4b58",
+              "marketplace": "ETSY",
+              "rulesetVersion": "personalization-screening-2026-11",
+              "analysisVersion": "9a4e1c7d03b85f26e1d0c9b8a7f6e5d4c3b2a19087766554433221100ffeeddc",
+              "cached": true,
+              "printProfile": "latin_basic",
+              "completeness": "COMPLETE",
+              "failedRuleIds": [],
+              "disclaimer": "Kết quả chỉ là cảnh báo tham khảo theo hồ sơ in nội bộ và danh mục nhãn hiệu tham chiếu, không phải kết luận của xưởng in, của sàn hay kết luận pháp lý. Không có cảnh báo chỉ có nghĩa là các quy tắc này không phát hiện gì.",
+              "createdAt": "2026-11-06T09:15:30.123456Z",
+              "expiresAt": "2026-12-06T09:15:30.123456Z",
+              "summary": {"errors": 0, "warnings": 2, "infos": 0},
+              "findings": [
+                {"ruleId": "unsupported_characters", "kind": "character_not_allowed", "severity": "WARNING",
+                 "sourceStatus": "UNVERIFIED", "field": "personalization[0]", "label": "name", "start": 0, "end": 2,
+                 "value": "Đạ",
+                 "message": "personalization[0] (name): ký tự 'Đạ' (U+0110 U+1EA1) từ ký tự thứ 1 nằm ngoài tập ký tự của hồ sơ in 'latin_basic'.",
+                 "suggestion": "Hỏi lại khách về nội dung này hoặc đối chiếu với xưởng trước khi đưa đơn vào sản xuất. Hệ thống không tự sửa nội dung."},
+                {"ruleId": "too_long", "kind": "too_long", "severity": "WARNING",
+                 "sourceStatus": "UNVERIFIED", "field": "personalization[1]", "label": "number", "start": 3, "end": 4,
+                 "value": null,
+                 "message": "personalization[1] (number) dài 4 ký tự, vượt giới hạn 3 của hồ sơ in 'latin_basic' (1 ký tự cuối, từ ký tự thứ 4).",
+                 "suggestion": "Hỏi lại khách hoặc xưởng xem nội dung có vừa vùng in không. Hệ thống không tự rút gọn nội dung."}
+              ],
+              "trademark": {
+                "status": "COMPLETE",
+                "riskLevel": "LOW",
+                "catalogVersion": "demo-2026-11-0a1b2c3d4e5f",
+                "rulesetVersion": "trademark-risk-2026-11",
+                "failedRuleIds": [],
+                "findings": []
+              }
+            }
+            """;
+
+    public static final String PROBLEM_PERSONALIZATION_NOT_FOUND = """
+            {
+              "type": "urn:listing-guard:problem:personalization-screening-not-found",
+              "title": "Not Found",
+              "status": 404,
+              "detail": "No personalization screening with id 5e1b7d90-2c4f-4a8e-b3d6-9f0a1c2e4b58 was found for this client.",
+              "instance": "/api/v1/personalization-screenings/5e1b7d90-2c4f-4a8e-b3d6-9f0a1c2e4b58",
+              "code": "personalization-screening-not-found",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
+    public static final String PROBLEM_UNKNOWN_PRINT_PROFILE = """
+            {
+              "type": "urn:listing-guard:problem:unknown-print-profile",
+              "title": "Bad Request",
+              "status": 400,
+              "detail": "Unknown print profile 'latin_fancy'; declared profiles: [latin_basic, latin_extended]",
+              "instance": "/api/v1/personalization-screenings",
+              "known": ["latin_basic", "latin_extended"],
+              "code": "unknown-print-profile",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
     public static final String USAGE_RESULT = """
             {
               "enforced": true,
@@ -516,7 +629,7 @@ public final class ApiExamples {
               "remaining": 958,
               "periodStart": "2026-11-01",
               "resetAt": "2026-12-01T00:00:00Z",
-              "packs": ["batch", "listing-rules", "sheet-connector", "trademark-risk", "variation-checks"]
+              "packs": ["batch", "listing-rules", "personalization-screening", "sheet-connector", "trademark-risk", "variation-checks"]
             }
             """;
 

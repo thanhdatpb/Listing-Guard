@@ -266,10 +266,60 @@ An Etsy listing with two variation types:
 }
 ```
 
+## Personalization screening
+
+The request of `POST /api/v1/personalization-screenings` (pack `personalization-screening`,
+[ADR-016](adr/ADR-016-personalization-screening.md)): the text a **buyer typed** for a custom product (a name and a number
+on a jersey, a first name on a mug), checked at the moment an order is about to go into production. It is **not** the
+`{"marketplace": ..., "listing": {...}}` envelope: that text is not in the listing, and the input of `/checks` is not
+changed. The fields are at the top level of the body. The rules above hold here too: unknown fields are ignored, a number or
+boolean is read as its text, an object or array where a text is expected is absent, and a value that is not an array where an
+array is expected is an empty list. Nothing is deduplicated, shortened, corrected or reordered.
+
+**One difference, on purpose: the `text` of a value is not trimmed.** Leading, trailing and repeated spaces are what the
+checks report, so the text is read exactly as the buyer typed it, after Unicode NFC (so a letter typed as a base letter plus
+a combining mark and the same letter typed as one character are one input). `product_type`, `print_profile` and `label` are
+trimmed, and a blank one is absent.
+
+| Field | Type | Notes |
+|---|---|---|
+| `marketplace` | string | `ETSY` or `AMAZON`, case-insensitive. Part of the cache identity; the rules are the same for both. |
+| `product_type` | string | Optional free text, for example `jersey`. It is hashed and no rule reads it yet. |
+| `print_profile` | string | Optional. The code of a print profile declared in the ruleset; absent means the ruleset's default. A code the ruleset does not declare is `400 unknown-print-profile`, never replaced by the default. |
+| `values` | array of objects | What the buyer typed, one entry per field of the order, in the order sent. An entry that is not an object, or has no `text` or an empty one, is dropped, so `personalization[i]` in a finding counts the cleaned list. A `text` of only spaces is kept. |
+
+Each entry of `values` has these fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| `label` | string | Optional name of the field the buyer filled, for example `name` or `number`. Compared ignoring case to select a per-field limit of the profile; returned in findings (cut to 64 characters). |
+| `text` | string | What the buyer typed. Not trimmed; never stored (only a hash of it is); never repeated in an answer. |
+
+Positions in a finding are **UTF-16 code units** in the `text` as it was read (`start` inclusive, `end` exclusive), the same
+unit as the trademark check; a character outside the Basic Multilingual Plane, such as an emoji, takes two. The messages count
+characters instead ("ký tự thứ 5"). The characters a profile prints, its length limits and whether it prints capitals only are
+in the versioned ruleset `personalization-screening-2026-11` (each profile with its source, always `unverified`); they are
+not repeated here, so none can go out of date.
+
+An order with a name and a number:
+
+```json personalization-order
+{
+  "marketplace": "ETSY",
+  "product_type": "jersey",
+  "print_profile": "latin_basic",
+  "values": [
+    {"label": "name", "text": "MAX"},
+    {"label": "number", "text": "10"}
+  ]
+}
+```
+
 ## Checked by a test
 
 The two listing examples above are read out of this file by a test and run through the normalizers (the Amazon example
 includes the `customization` block, and every field of the tables of [Amazon customization](#amazon-customization) is held to
-it), and so are the two variation examples (through the variation normalizer and the rules), so this page cannot drift from the code without the
-build failing. The machine-readable description of the request and response is
+it), and so are the two variation examples (through the variation normalizer and the rules) and the personalization example
+(through its normalizer and rules), so this page cannot drift from the code without the build failing. The machine-readable
+description of the request and response is
 [`docs/api/openapi.json`](api/openapi.json); how to call the API is in the [integration guide](integration-guide.md).

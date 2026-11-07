@@ -558,6 +558,62 @@ The ruleset `variation-checks-2026-11` is registered at start-up for `ETSY` and 
 refuses to start if that version is already registered with other content: a published ruleset is never edited, a change is a new
 file and a new version. Nothing in it is `verified`; see ADR-015 for the sources.
 
+## Personalization screening results, their retention and the plan pack (ADR-016)
+
+Two migrations, both additive. **V24** replaces the `CHECK` of `plan_pack` (V19 and V22 are not edited) so that it keeps every
+pack V22 accepted and also accepts `personalization-screening`, and gives the pack to `SELLER` and `PRO`; a row an operator
+already removed is not put back, and a missing plan row does not stop the migration. **V25** creates `personalization_screening`
+and `personalization_screening_finding`. Neither touches an existing row, both apply on any database, and nothing changes for a
+deployment while `listing-guard.plans.enabled` is false. To give or take the pack away from a plan by hand:
+`INSERT INTO plan_pack (plan_code, pack_id) VALUES ('FREE', 'personalization-screening')` or the matching `DELETE` (the change
+applies at once). Rolling back is `DROP TABLE personalization_screening_finding, personalization_screening;` and, after every
+instance runs a version without the pack, restoring the previous `CHECK` (V24 does not undo itself).
+
+**The text a buyer typed is personal data and is never stored.** A result holds a hash of the request, the result, and short
+evidence: the field index, the client's label of the field (up to 64 characters), the offsets, at most
+`evidence.max_value_chars` of the ruleset characters of what was typed that the print profile cannot print, and the catalog mark of
+a trademark match (catalog data). Nothing else of the text; it is not in any log either. Results are kept for
+`listing-guard.personalization.retention.period` (30 days by default; `LISTING_GUARD_PERSONALIZATION_RETENTION_PERIOD=30d`) and
+`GET` and the cache treat a result past it as absent even if nothing has deleted it. The cleanup has the same settings as the
+others (`listing-guard.personalization.retention.cleanup-enabled`, `cleanup-interval` 1h, `cleanup-initial-delay` 3m,
+`cleanup-batch-size` 500) and takes the **same advisory lock**, so one batch of any of the three runs at a time and a skipped
+run is tried again at the next interval.
+
+The ruleset `personalization-screening-2026-11` is registered at start-up for `ETSY` and `AMAZON` under the pack
+`personalization-screening`. The API refuses to start if that version is already registered with other content: a published
+ruleset is never edited, a change is a new file and a new version. **Its print profiles are placeholders with invented numbers**
+(ADR-016, Open question 1): put your workshop's real profile in a new ruleset version before relying on the character findings.
+The trademark half of a screening uses the catalog named by `listing-guard.trademark.catalog-version`; without one the character
+rules still run and the result is `INCOMPLETE` (never reused, never charged), and `/trademark-checks` keeps answering 503.
+
+## Personalization screening results, their retention and the plan pack (ADR-016)
+
+Two migrations, both additive. **V24** replaces the `CHECK` of `plan_pack` (V19 and V22 are not edited) so that it keeps every
+pack V22 accepted and also accepts `personalization-screening`, and gives the pack to `SELLER` and `PRO`; a row an operator
+already removed is not put back, and a missing plan row does not stop the migration. **V25** creates `personalization_screening`
+and `personalization_screening_finding`. Neither touches an existing row, both apply on any database, and nothing changes for a
+deployment while `listing-guard.plans.enabled` is false. To give or take the pack away from a plan by hand:
+`INSERT INTO plan_pack (plan_code, pack_id) VALUES ('FREE', 'personalization-screening')` or the matching `DELETE` (the change
+applies at once). Rolling back is `DROP TABLE personalization_screening_finding, personalization_screening;` and, after every
+instance runs a version without the pack, restoring the previous `CHECK` (V24 does not undo itself).
+
+**The text a buyer typed is personal data and is never stored.** A result holds a hash of the request, the result, and short
+evidence: the field index, the client's label of the field (up to 64 characters), the offsets, at most
+`evidence.max_value_chars` of the ruleset characters of what was typed that the print profile cannot print, and the catalog mark of
+a trademark match (catalog data). Nothing else of the text; it is not in any log either. Results are kept for
+`listing-guard.personalization.retention.period` (30 days by default; `LISTING_GUARD_PERSONALIZATION_RETENTION_PERIOD=30d`) and
+`GET` and the cache treat a result past it as absent even if nothing has deleted it. The cleanup has the same settings as the
+others (`listing-guard.personalization.retention.cleanup-enabled`, `cleanup-interval` 1h, `cleanup-initial-delay` 3m,
+`cleanup-batch-size` 500) and takes the **same advisory lock**, so one batch of any of the three runs at a time and a skipped
+run is tried again at the next interval.
+
+The ruleset `personalization-screening-2026-11` is registered at start-up for `ETSY` and `AMAZON` under the pack
+`personalization-screening`. The API refuses to start if that version is already registered with other content: a published
+ruleset is never edited, a change is a new file and a new version. **Its print profiles are placeholders with invented numbers**
+(ADR-016, Open question 1): put your workshop's real profile in a new ruleset version before relying on the character findings.
+The trademark half of a screening uses the catalog named by `listing-guard.trademark.catalog-version`; without one the character
+rules still run and the result is `INCOMPLETE` (never reused, never charged), and `/trademark-checks` keeps answering 503.
+
 ## Client plans and the monthly quota (ADR-013)
 
 Migration V19 creates `plan`, `plan_pack` and `client_usage` and adds `client.plan_code` (`NOT NULL DEFAULT 'FREE'`, a
@@ -587,7 +643,7 @@ UPDATE plan SET monthly_quota = 2000 WHERE code = 'SELLER';      -- NULL means u
 ```
 
 A change applies at once to every client on that plan and keeps this month's `used`. The codes (`FREE`, `SELLER`, `PRO`
-and the six pack ids, `variation-checks` since V22) are fixed by `CHECK` constraints and the Java enums, so a new plan or pack
+and the seven pack ids, `variation-checks` since V22 and `personalization-screening` since V24) are fixed by `CHECK` constraints and the Java enums, so a new plan or pack
 needs a migration.
 `policy-analyzer` and `sheet-connector` are in the seed but **nothing enforces them yet** (ADR-011 PR 5 and phase 4b).
 
