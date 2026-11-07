@@ -11,6 +11,7 @@ COPY trademark-scanner trademark-scanner
 COPY variation-checks variation-checks
 COPY personalization-screening personalization-screening
 COPY api api
+COPY mcp-server mcp-server
 RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw -B -q -DskipTests -pl api -am package
 
