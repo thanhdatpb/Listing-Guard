@@ -1,6 +1,6 @@
 # ADR-015: Variation checks
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-06
 - Depends on: [ADR-010](ADR-010-pack-identity-and-analysis-version.md) (pack identity, cache identity, result storage),
   [ADR-013](ADR-013-client-plans-and-monthly-quota.md) (plans and quota; this record adds one pack and amends the seed),
@@ -373,3 +373,8 @@ earlier ADR, but 5 and 7 touch a decision of one and need an answer before this 
    marketplace, `duplicate_sku` and `child_parent_sku_mismatch` should compare ignoring case.
 10. **Etsy "combinations".** The photo reminder counts the children sent, one per combination. A client that sends only the
     property names and not the children gets no reminder.
+
+## Decisions (2026-11-07)
+
+- Accepted after the implementing pull request was merged on 2026-11-06. The open questions above remain for future
+  evaluation and do not change the behavior of the shipped pack.

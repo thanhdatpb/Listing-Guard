@@ -1,7 +1,7 @@
 # ADR-016: Personalization screening
 
-- Status: Proposed
-- Date: 2026-11-06
+- Status: Accepted
+- Date: 2026-11-07
 - Depends on: [ADR-010](ADR-010-pack-identity-and-analysis-version.md) (pack identity, cache identity, result storage),
   [ADR-009](ADR-009-trademark-risk-scanner.md) (the scanner this pack runs, the shape it follows, "Data, privacy and
   retention"), [ADR-013](ADR-013-client-plans-and-monthly-quota.md) (plans and quota; this record adds one pack and amends the
@@ -304,3 +304,8 @@ Written as questions, not decided here; each says what this record assumed meanw
 7. **Personality rights.** The trademark catalog finds registered marks, not the names of people. A list of public figures
    would be data about people and is not added; the pack says nothing about the right of publicity. Is a separate,
    maintainer-supplied list wanted later?
+
+## Decisions (2026-11-07)
+
+- Accepted after the implementing pull request was merged. Open question 1 remains open: the shipped print profiles are
+  placeholders with invented values; a real workshop profile must be established before relying on character findings.

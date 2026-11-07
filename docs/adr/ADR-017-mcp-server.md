@@ -1,6 +1,6 @@
 # ADR-017: MCP server for AI agents
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-07
 - Depends on: [ADR-005](ADR-005-api-auth-rate-limit-and-result-cache.md) (API key, rate limit, errors),
   [ADR-007](ADR-007-multi-client-model.md) (a key belongs to one client; data, cache and limits are per client),
@@ -274,3 +274,18 @@ Written as questions, not decided here; each says what this record assumed meanw
    acceptable.
 8. **Spring AI later.** When the repository moves to Spring Boot 4, the Spring AI starter becomes an option and would replace
    only the wiring of this module, not the tools or the client.
+
+## Decisions (2026-11-07)
+
+- Accepted after the implementing pull request was merged.
+- The four check tools (`check_listing`, `check_trademark`, `check_variations` and `screen_personalization`) use
+  `readOnlyHint: false`, because checks store results and may use quota.
+- STDIO remains the default. Optional HTTP is off by default, has no authentication, and binds only to loopback or a
+  private-network address; wildcard and public addresses are refused. Operators should use loopback. Token-based
+  transport authentication is deferred; add it before allowing other machines on a private network to connect.
+- One process uses one API key and represents one client.
+- The shaded jar is distributed as a manually attached GitHub Release asset named
+  `listing-guard-mcp-<version>.jar`. For v0.6.0, the maintainer attaches `listing-guard-mcp-0.6.0.jar`; the
+  `release-image` workflow publishes container images only. Automating jar attachment is deferred to a later PR.
+- A non-loopback API base URL must use HTTPS unless `LISTING_GUARD_MCP_ALLOW_INSECURE_HTTP=true` is explicitly set
+  for a trusted private network.
