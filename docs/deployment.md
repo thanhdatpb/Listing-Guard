@@ -326,6 +326,9 @@ Duplicates are not a cause: V8 already blocks duplicate ruleset identities, and 
 old one, so it cannot meet duplicates. A build that failed was cancelled, timed out or waited too long for a lock.
 Never accept an invalid or missing index.
 
+The same holds for the four plain indexes of V26 (`idx_listing_check_client_created` and its three siblings, for the health
+report, ADR-018); V27 stops while one is missing or invalid. Drop the invalid one, clear the failed history row and start again.
+
 ## Trademark catalog (ADR-009, PR A2)
 
 Migration V15 creates the `pg_trgm` extension and the catalog tables. **The database role that runs Flyway must be
@@ -445,7 +448,8 @@ affected by any of these states. Importing needs the database but no network and
 
 ### Importing a catalog with the production compose file
 
-`docker-compose.prod.yml` has the jobs `trademark-import`, `uspto-convert` and `batch-check` in the `tools` profile. They
+`docker-compose.prod.yml` has the jobs `trademark-import`, `uspto-convert`, `batch-check` and `health-report` (see "Weekly health
+report") in the `tools` profile. They
 never start with `--profile prod up`, they use the release image (`LISTING_GUARD_VERSION`), and they need the database
 but no network and no model. Run them with both profiles, like `admin`: `--profile tools` alone fails because
 PostgreSQL belongs to the `prod` profile. `run` starts the database and the job, never the API.
@@ -613,6 +617,64 @@ ruleset is never edited, a change is a new file and a new version. **Its print p
 (ADR-016, Open question 1): put your workshop's real profile in a new ruleset version before relying on the character findings.
 The trademark half of a screening uses the catalog named by `listing-guard.trademark.catalog-version`; without one the character
 rules still run and the result is `INCOMPLETE` (never reused, never charged), and `/trademark-checks` keeps answering 503.
+
+## Weekly health report (ADR-018)
+
+The listing health report adds up the results a client has stored: `GET /api/v1/reports/summary` for the client of an API key, the
+`/console/report` page for the signed-in account (only when the console is on), and the `health-report` job for the operator, who
+names the client. All three call one service, so they show the same numbers. It stores nothing new, writes nothing to the database,
+needs no plan pack and costs no unit.
+
+**Migrations V26 and V27.** The report reads a client's results by `created_at`, so V26 adds `(client_id, created_at)` indexes to
+`listing_check`, `trademark_check`, `variation_check` and `personalization_screening` with `CREATE INDEX CONCURRENTLY`, outside a
+transaction (it waits for open transactions, so it can take a moment on a busy database but does not block writes), and V27 stops
+the upgrade if one of the four is missing or invalid. A build that failed is handled as in "An index build that failed": drop the
+invalid index (`idx_listing_check_client_created`, `idx_trademark_check_client_created`, `idx_variation_check_client_created` or
+`idx_personalization_screening_client_created`), clear the failed history row and start again. Nothing in V26 or V27 changes data.
+
+**Settings** (`listing-guard.reports.*`, environment variables in the usual form, for example `LISTING_GUARD_REPORTS_MAX_DAYS`):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `max-days` | 92 | The longest period a report may cover, both ends counted; a longer one is `400 report-period-too-long`. |
+| `top-rules`, `top-marks` | 10 | How many rules and trademark marks a ranked list holds (1 to 50). |
+| `default-days` | 7 | The period of the job and the console page when none is named: this many complete UTC days before today. |
+
+A value outside its range stops the start-up. The report counts `trademark-risk`, `variation-checks` and
+`personalization-screening` results only while they are still stored, and `coverageNote` is computed from their retention settings
+(`listing-guard.trademark.retention.period`, `listing-guard.variation.retention.period`,
+`listing-guard.personalization.retention.period`). **If you changed one for the API, set the same value for the job**, or its
+`coverageNote` will describe the default (the counts themselves do not depend on it: expiry is read from each row).
+
+**Running the job.** Without `--from` and `--to` it reports the 7 complete UTC days before today, so a run on a Monday reports the
+previous ISO week:
+
+```bash
+# development
+docker compose run --rm health-report --client=all
+docker compose run --rm health-report --client=<client name or id> --from=2026-11-02 --to=2026-11-08 [--marketplace=ETSY|AMAZON]
+# production (the release image; both profiles, as for admin and batch-check)
+docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --client=all
+```
+
+- `--client=all` is every **active** client, by name; a client that is not active is refused when named, and a client named `all`
+  is reached by its id (`admin client list` prints it). `--from` and `--to` come together or not at all.
+- It writes `health-report/out/<UTC timestamp, for example 20261109T030000Z>/report.json` and `report.html`, one entry for each
+  client. All the reports are computed before anything is written, so a refusal leaves no half report; a directory that already
+  exists is an error and is never overwritten. The process ends non-zero on any refusal. `health-report/out/` is git-ignored.
+- **The folder must be writable by uid `10001`**, the user of the image, as `catalogs/raw/` is for `uspto-convert`:
+  `mkdir -p health-report/out && chown 10001 health-report/out` (or `chmod 777` on a machine only you use).
+- `report.html` is one file with its style inline, no script, no link and no external address, and a `Content-Security-Policy` meta
+  that allows nothing else: open it in a browser, mail it or archive it. It is in Vietnamese. `report.json` holds the same numbers
+  as the endpoint, with `{generatedAt, period, marketplace, clients: [{client, clientId, report}]}`.
+- Set `TRADEMARK_CATALOG_VERSION` for the job as for the API (both compose services read it) so that the report names the catalog
+  you serve; without it the report says the catalog is `DISABLED`.
+
+**To run it every week** use the scheduler you already have (cron, a systemd timer, a CI job on a schedule) on the host that holds
+the compose file, for example on Mondays at 03:00 UTC:
+`0 3 * * 1 cd /srv/listing-guard && docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --client=all`.
+The job does not send the file anywhere. **Keep `report.json`**: the three retained packs delete their results after their retention
+period, so a trend older than that exists only in the files the job wrote.
 
 ## Client plans and the monthly quota (ADR-013)
 

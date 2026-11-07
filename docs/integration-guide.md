@@ -66,7 +66,8 @@ What counts: **one unit is one new result that is stored, per endpoint.** A full
 
 - a result answered from the cache (`"cached": true`), also when you are at the limit;
 - `GET /api/v1/checks/{id}`, `GET /api/v1/trademark-checks/{id}`, `GET /api/v1/variation-checks/{id}`,
-  `GET /api/v1/personalization-screenings/{id}` and `GET /api/v1/usage`;
+  `GET /api/v1/personalization-screenings/{id}`, `GET /api/v1/usage` and `GET /api/v1/reports/summary` (the health report, which
+  needs no pack either);
 - a trademark, variation or personalization result that is `INCOMPLETE` (it is stored for `GET` and never reused);
 - a request that is refused or fails (`400`, `401`, `403`, `413`, `429`, `503`).
 
@@ -909,6 +910,107 @@ the cache. Another client never reads your results, and a `checkId` of another c
 not exist. Where plans are on, the pack `personalization-screening` must be in your plan (`403 plan-not-allowed` otherwise) and
 a new `COMPLETE` result costs one unit; a result without a trademark catalog is `INCOMPLETE` and costs none.
 
+## Health report
+
+`GET /api/v1/reports/summary?from=YYYY-MM-DD&to=YYYY-MM-DD[&marketplace=ETSY|AMAZON]` adds up what your client has stored over a
+period, so that a lead can see which rules fail again and again, how trademark risk is moving and whether this week was better
+than the last, without opening results one by one. It **counts**: the answer has no listing text, no tag, no text a buyer typed and
+no `checkId`, only counts, severities, risk levels, rule ids, catalog marks and version strings. It is **read only, needs no plan
+pack and costs no unit** (also where plans are on), and it is never cached (`Cache-Control: no-store`). As every endpoint it answers
+for the client that owns the `X-API-Key`; there is no parameter that names another client.
+
+### Request
+
+- `from` and `to`: UTC dates written `YYYY-MM-DD`, both included, both required. The longest period is set by the deployment
+  (`listing-guard.reports.max-days`, 92 by default, both ends counted). A period with no data, or in the future, is a `200` with zeros.
+- `marketplace` (optional, any case): count one marketplace only. Without it every marketplace is counted.
+- Errors (see "Errors"): `400 invalid-report-period` (a date is missing, malformed or `from` is after `to`),
+  `400 report-period-too-long` (members `maxDays` and `requestedDays`: ask for a shorter period), `400 unknown-marketplace`,
+  `422 marketplace-not-yet-supported`.
+
+### Response
+
+```json
+{
+  "period": {"from": "2026-11-02", "to": "2026-11-08", "days": 7},
+  "marketplace": null,
+  "generatedAt": "2026-11-09T03:00:00Z",
+  "versions": {
+    "rulesets": [{"pack": "listing-rules", "marketplace": "ETSY", "version": "etsy-2026-12"}],
+    "trademarkCatalog": {"state": "READY", "version": "synthetic-2026-11-0123456789ab"}
+  },
+  "packs": {
+    "listingRules": {
+      "pack": "listing-rules", "checks": 12, "statuses": {"COMPLETED": 12, "FAILED": 0, "PENDING": 0},
+      "findings": [{"severity": "ERROR", "findings": 4, "checksAffected": 3}, {"severity": "WARNING", "findings": 6, "checksAffected": 5},
+                   {"severity": "INFO", "findings": 2, "checksAffected": 2}],
+      "readiness": {"checksWithReadiness": 8, "scoredChecks": 8, "incompleteChecks": 0, "readyChecks": 5, "readyRate": 0.625,
+                    "averageScore": 78.5, "checksWithoutReadiness": 4, "versions": ["readiness-2026-11"]},
+      "topRules": {"limit": 10, "distinctRules": 3,
+                   "items": [{"ruleId": "title_length", "severity": "ERROR", "findings": 3, "checksAffected": 3}]}
+    },
+    "trademarkRisk": {
+      "pack": "trademark-risk", "checks": 9, "completeness": {"COMPLETE": 8, "INCOMPLETE": 1},
+      "riskLevels": {"HIGH": 1, "MEDIUM": 2, "LOW": 5, "UNKNOWN": 1},
+      "topMarks": {"limit": 10, "distinctMarks": 2,
+                   "items": [{"mark": "ZORVEX", "findings": 3, "checksAffected": 2, "highestRisk": "HIGH"}]}
+    },
+    "variationChecks": {"pack": "variation-checks", "checks": 4, "completeness": {"...": "..."}, "findings": ["..."], "topRules": {"...": "..."}},
+    "personalizationScreening": {"pack": "personalization-screening", "checks": 6, "completeness": {"...": "..."},
+                                 "trademarkStatus": {"...": "..."}, "trademarkRiskLevels": {"...": "..."}, "findings": ["..."], "topRules": {"...": "..."}}
+  },
+  "byWeek": [{"isoWeek": "2026-W45", "from": "2026-11-02", "to": "2026-11-08", "partial": false,
+              "listingRules": {"checks": 12, "...": "the same numbers, without topRules"}, "trademarkRisk": {"...": "..."},
+              "variationChecks": {"...": "..."}, "personalizationScreening": {"...": "..."}}],
+  "coverageNote": {"complete": true, "text": "Every pack covers the whole period. ...",
+                   "retention": [{"pack": "trademark-risk", "period": "P30D", "coveredFrom": "2026-10-11"}]}
+}
+```
+
+The `"..."` entries stand for the same members as above; `docs/api/openapi.json` lists every field, and the example in the spec
+shows them all.
+
+What the numbers are, and are not:
+
+- **A check is a stored result, not a request.** An answer from the cache creates no row, so a listing checked again with the same
+  analysis is counted once, and there is **no cache-hit number** (nothing records one). `checks` is therefore "distinct results
+  for distinct content and analysis versions", which is what "listings that had a problem" means; it is not a usage meter (use
+  `GET /api/v1/usage` for that).
+- **`statuses`** is the status `listing-rules` stores; the other packs report **`completeness`** (`COMPLETE`, `INCOMPLETE`). The
+  words differ because the stored values differ. Every key is always present, zero when there is none, so you can read
+  `riskLevels.HIGH` without a null check.
+- **`findings`** counts findings per severity (`ERROR`, `WARNING`, `INFO`) and `checksAffected` the results that have at least one.
+  **`topRules`** ranks `(ruleId, severity)` by findings, then by results affected, then by rule id; `distinctRules` is the number of
+  groups before the list was cut to `limit`. A rule stored at two severities appears twice.
+- **`riskLevels`** are the stored risk levels of the trademark results. **`UNKNOWN` is its own level and is never added to `LOW`**:
+  it means the risk could not be determined. **`topMarks`** are marks of the trademark catalog (the catalog's own text, never text
+  from a listing), ranked the same way, with the highest risk found for each. The personalization block lists no marks, because a
+  mark that matched what a buyer typed says something about that text; its `findings` and `topRules` are the character rules only
+  and its trademark side is `trademarkStatus` and `trademarkRiskLevels`.
+- **`readiness`** reads the readiness stored with a `listing-rules` result (ADR-014). It is stored only when the deployment has fix
+  suggestions on, or when the result came from the console editor, so a result without it is **skipped and counted** in
+  `checksWithoutReadiness`, never counted as zero. `averageScore` is the mean of the scored results (one decimal) and `readyRate` is
+  `readyChecks / checksWithReadiness` (an `INCOMPLETE` readiness is stored as not ready). Both are `null` when there is nothing to
+  average. `versions` lists the readiness versions found: a mean over two versions is not a trend.
+- **`byWeek`** has one entry per ISO week that touches the period, in order, with no gaps (a week with no result is all zeros). The first
+  and last week are clipped to the period and marked `"partial": true` when the ISO week reaches beyond it: a partial week has fewer
+  results, so compare rates and scores, not counts. The numbers of the period are the sum of its weeks.
+- **`versions`** is what runs now: the active ruleset of each pack for each marketplace, and the state of the trademark catalog
+  (`READY` with its version, `DISABLED`, or `REFUSED`). Results of the period may have been made with older versions.
+
+### Retention: what a long period cannot show
+
+`trademark-risk`, `variation-checks` and `personalization-screening` delete their results after a retention period (30 days by
+default, `listing-guard.<pack>.retention.period`) and the report counts only what is still stored, whether or not the cleanup has run.
+`listing-rules` results are not deleted. A period that starts before the retention allows therefore has holes for those three
+packs and none for `listing-rules`. **`coverageNote` says so from the deployment's own settings**: for each such pack its `period`
+and `coveredFrom`, the first day whose results are all still there, and `complete` is false when the period starts earlier. Read
+`coverageNote.complete` before you compare a long period with a short one. Ask the operator to run the weekly `health-report` job
+and keep its `report.json`: that is the record that outlives the retention (see [deployment.md](deployment.md)).
+
+The same numbers are in the console (`/console/report`, when the operator turns the console on) and in the `health-report` job, from
+the same service, so the three always agree.
+
 ## Errors
 
 Errors are `application/problem+json` (RFC 7807) with these members: `type` (`urn:listing-guard:problem:<code>`),
@@ -920,6 +1022,8 @@ validation. Branch on `code`, not on `detail`.
 | 400 | `invalid-request` | Body missing, not JSON, or `marketplace` / `listing` missing; `listing` not an object. | Fix the request. Do not retry unchanged. |
 | 400 | `unknown-marketplace` | The marketplace code is not known. | Fix the code. `detail` lists the supported ones. |
 | 400 | `unknown-print-profile` | `POST /api/v1/personalization-screenings`: `print_profile` names a profile the ruleset does not declare. `known` lists the declared codes. | Fix the code, or leave it out for the default profile. |
+| 400 | `invalid-report-period` | `GET /api/v1/reports/summary`: `from` or `to` is missing, is not a date written `YYYY-MM-DD`, or `from` is after `to`. | Fix the dates. |
+| 400 | `report-period-too-long` | `GET /api/v1/reports/summary`: the period covers more days than the deployment allows (92 by default, both ends counted). `maxDays` and `requestedDays` say how many. | Ask for a shorter period, or several. |
 | 401 | `unauthorized` | Missing or invalid `X-API-Key`. | Check the key. Do not retry in a loop. |
 | 403 | `plan-not-allowed` | Only where plans are on (see "Plans and monthly quota"). Your client's plan does not include the pack of the endpoint; `plan` and `pack` say which. | Do not retry. Ask the operator for a plan that includes the pack. |
 | 404 | `check-not-found` | No check with that id for your client. A check of another client gives this same answer. | The id is wrong, or it is not yours. |

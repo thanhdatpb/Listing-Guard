@@ -130,6 +130,21 @@ It never edits a listing, never publishes, and does no SEO.
   columns and `summary.html` adds listing-rules-only readiness metrics; otherwise both retain their existing shape.
   `--label-column` adds a small-set measurement (flagged = MEDIUM or HIGH), never "accuracy". The example mappings
   carry column names nobody has verified, so each says `# unverified`.
+- **Listing health report** (`api/.../report/`, ADR-018, Proposed; implemented): counts of the results a client has stored over a
+  period, for a lead. `GET /api/v1/reports/summary?from=&to=[&marketplace=]` (an API key; the client is the key's, there is no client
+  parameter; `from` and `to` are required UTC dates, both included, at most `listing-guard.reports.max-days` = 92; `400
+  invalid-report-period`, `400 report-period-too-long`), the `health-report` job (profile and compose service of that name, in the `tools`
+  profile of both compose files; `--client=<name|id|all> [--from --to] [--marketplace]`; writes `<dir>/out/<UTC timestamp>/report.json` and a
+  self-contained Vietnamese `report.html`; default period: the 7 complete UTC days before today) and the console page `/console/report`
+  (read only, the signed-in account's client; no route with the console off) all call **one service**, `HealthReportService`; none has
+  a query of its own. **SQL aggregates only** (`HealthReportQueries`, `GROUP BY`, no row loaded) in one read-only `REPEATABLE READ`
+  transaction; the period totals are the sum of the weekly rows. V26 (`CREATE INDEX CONCURRENTLY`, non-transactional) and V27 (verify)
+  add `(client_id, created_at)` indexes. **It counts and never reads or exports what a client typed**: no `value`, `message`,
+  `suggestion`, `field`, snippet, label, input hash or check id is selected, and the personalization pack lists no marks (a test puts a
+  secret in each column and holds that it is in no JSON, HTML or page). A check is a stored result, not a request: there is no
+  cache-hit figure. The retained packs (trademark, variation, personalization) are counted only while `expires_at` is after the report's
+  clock and `coverageNote` comes from their retention settings; `listing-rules` has no retention. **No plan pack, no quota, no write.**
+  `UNKNOWN` is never folded into `LOW`; readiness that was not stored is skipped and counted, never zero.
 - Listing Guard is an independent product that many clients call over the API (ADR-007). There is no code or data
   for any single company in this repo; a client's own listing format is mapped to the standard input
   (`docs/input-schema.md`) on the client's side.
@@ -172,7 +187,7 @@ It never edits a listing, never publishes, and does no SEO.
   the banner and the editor's trademark panel repeats it.
 - Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
+  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the listing health report (ADR-018), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12b.yaml`): simple input format (`title`, `brand`,
@@ -235,6 +250,11 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     key per session, a tool that reads a stored result, how the jar is distributed, cleartext on a private network). Not planned: a
     tool that writes, a Docker image or compose service, authentication on the HTTP transport.
 
+11. Listing health report (ADR-018, Proposed): done as one PR (`feat/listing-health-report`: ADR, V26/V27, `HealthReportService`, the
+    endpoint, the `health-report` job, the console page, docs). Open questions the maintainer decides are at the end of the ADR (plan
+    gating, history beyond the retention, one language for the job and the console, `--client=all`, the default period, `top` as a
+    parameter, personalization marks). Not planned: a rollup table, e-mailing the report, a cache-hit counter.
+
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
 
@@ -275,6 +295,13 @@ Batch check (see `docs/batch-check.md`; the client must exist and be active, tra
 docker compose run --rm batch-check --input=/batch/input/<file.csv> --mapping=/batch/mappings/<mapping.yaml> \
   --client=<client name> --marketplace=ETSY|AMAZON [--out=/batch/out/<dir>] [--max-rows=<n>] [--label-column=<column>]
 # ./batch is mounted at /batch; reports: findings.csv, listings.csv, summary.html (profile `batch-check`; no network, no model)
+```
+
+Health report (see `docs/deployment.md`; reads the database, writes `health-report/out/<UTC timestamp>/report.json` and `report.html`):
+
+```bash
+docker compose run --rm health-report --client=<name|id|all> [--from=YYYY-MM-DD --to=YYYY-MM-DD] [--marketplace=ETSY|AMAZON]
+# profile `health-report`; no network, no model, writes nothing to the database; ./health-report is mounted at /health-report
 ```
 
 On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
@@ -358,8 +385,8 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   reused. Replacing an expired result deletes it and inserts in one transaction; only the unique violation of
   `uq_trademark_check_cache` counts as a cache race. The advisory-lock key pair `(1279746628, 1380271182)` is reserved for
   retention cleanup (trademark, variation and personalization results, ADR-010, ADR-015, ADR-016): no other kind of query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
-- Ingest, eval, admin, trademark-import and batch-check are one-shot jobs (profiles `ingest`, `eval-retrieval`, `admin`,
-  `trademark-import`, `batch-check`), not HTTP endpoints.
+- Ingest, eval, admin, trademark-import, batch-check and health-report are one-shot jobs (profiles `ingest`, `eval-retrieval`,
+  `admin`, `trademark-import`, `batch-check`, `health-report`), not HTTP endpoints.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
   with the default `none`, `admin` does not (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
@@ -374,6 +401,16 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   The plan is read from the database at each use, never cached. While plans are off no plan code may query or write.
   `Pack` and `PlanCode` equal the `CHECK` constraints of V19 (a test holds them): a new pack or plan is a migration, never
   an edit of V19. The tests read quotas from the `plan` table instead of repeating the numbers.
+- **Health report** (ADR-018): it counts and never reads or exports what a client typed. A query selects counts, enumerations, rule ids,
+  the catalog `matched_mark` and versions only, never `value`, `message`, `suggestion`, `field`, `snippet`, `label`, `input_hash` or a
+  check id, and the personalization pack shows no marks (buyer text is personal data, ADR-016). Every statement starts with
+  `client_id = ?` and is an aggregate (`GROUP BY`, no row loaded); the endpoint, the job and the console page call `HealthReportService`
+  and have no query of their own, so they cannot differ (a test compares them). The retained packs are counted only while `expires_at`
+  is after the report's own clock (never left to the cleanup) and `coverageNote` is computed from the retention settings, not from a
+  constant. It takes no `requirePack`, `requireQuota` or `charge` and writes nothing. The fixed keys (severities, risk levels,
+  completeness, trademark statuses) equal the Java enums (`ReportKeysTest`). `report.html` has no script, no link and no external
+  address and every string goes through `HtmlUtils.htmlEscape`; the console page uses `th:text` only. A change to a field of the answer
+  updates `ApiExamples.REPORT_SUMMARY`, `docs/api/openapi.json` and `docs/integration-guide.md`.
 - **API contract** (ADR-005, ADR-007): Errors are RFC 7807 problems with a
   stable `code` and `requestId`; never return a bare error body or a stack trace. Cache identity is
   `(client, marketplace, contentHash, analysisVersion)`; a change to anything that decides findings must change

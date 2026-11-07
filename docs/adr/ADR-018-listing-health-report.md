@@ -115,7 +115,7 @@ four trademark risk levels, the statuses a pack can store), so a client can read
   "byWeek": [{"isoWeek": "2026-W45", "from": "2026-11-02", "to": "2026-11-08", "partial": false,
               "listingRules": {"...": "the same numbers, without topRules"}, "trademarkRisk": {"...": "..."},
               "variationChecks": {"...": "..."}, "personalizationScreening": {"...": "..."}}],
-  "coverageNote": {"complete": true, "text": "...", "retention": [{"pack": "trademark-risk", "period": "P30D", "coveredFrom": "2026-10-10"}]}
+  "coverageNote": {"complete": true, "text": "...", "retention": [{"pack": "trademark-risk", "period": "P30D", "coveredFrom": "2026-10-11"}]}
 }
 ```
 
@@ -164,7 +164,8 @@ answer for a GET.
 
 So a period longer than the retention has holes for those three packs, and not for `listing-rules`. `coverageNote` says so,
 **from the configuration, never from a constant**: for each pack with retention, its `period` (an ISO-8601 duration) and
-`coveredFrom`, the first day for which its numbers can still be complete (`generatedAt` minus the period, as a date); `complete`
+`coveredFrom`, the first day for which every result can still be there (the day after the date of `generatedAt` minus the period:
+a result made at `t` is stored at `now` only when `t + period > now`, so the early rows of the boundary day are gone); `complete`
 is false when the period starts before the earliest `coveredFrom`. `text` is one English sentence built from those values.
 The Vietnamese report of the job writes its own sentence from the same structure. A day before `coveredFrom` has *at least* the
 rows that were retained, never a guess at the rest.
@@ -249,15 +250,15 @@ reads its report and `client_usage` does not change. If reports ever become a pa
 2. **Empty and fixed shape**: a period with no data answers `200` with zeros, every fixed key present, no top items and a
    zero-filled `byWeek`; the same for a period in the future.
 3. **Period**: `from` after `to`, a missing or malformed date are `400 invalid-report-period`; 93 days is `400
-   report-period-too-long` with `maxDays` and `requestedDays`, 92 days passes; the limit is read from a setting (a context with
-   a smaller one); an unknown marketplace is `400`, a planned one `422`.
+   report-period-too-long` with `maxDays` and `requestedDays`, 92 days passes; the limit is a setting (`ReportQuery.parse` with
+   another value, and `ReportsProperties` refuses a value that makes no sense); an unknown marketplace is `400`, a planned one `422`.
 4. **Top rules**: the right order and counts for a built data set, ties by name, `checksAffected` distinct, `distinctRules` before
    the cut, a rule at two severities twice, a finding without `rule_id` left out, `limit` from the setting.
 5. **Weeks**: a result at `23:59:59.999Z` on a Sunday is in that week and one at `00:00:00Z` on the Monday in the next; a period
    across the year end has `2026-W53`; the first and last weeks are `partial` and clipped; the sum of the weeks equals the totals.
 6. **Retention**: expired trademark, variation and personalization rows are present in the table and not counted, while a
-   `listing_check` of the same age is; `coverageNote` carries the periods and dates computed from the settings (a context with
-   other periods), and `complete` follows the period.
+   `listing_check` of the same age is; `coverageNote` carries the periods and dates computed from the settings (`ReportCoverage`
+   with other periods, a boundary at midnight included), and `complete` follows the period.
 7. **Readiness**: rows without `readiness_*` are skipped and counted in `checksWithoutReadiness`; the mean uses `SCORED` rows only;
    `readyRate`; the versions found.
 8. **Trademark**: `UNKNOWN` is not folded into `LOW`; a finding with no mark is not in `topMarks`; `highestRisk`.
