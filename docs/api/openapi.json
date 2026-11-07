@@ -1,6 +1,20 @@
 {
   "components" : {
     "schemas" : {
+      "CatalogView" : {
+        "properties" : {
+          "state" : {
+            "description" : "`READY`, `DISABLED` (no catalog is configured) or `REFUSED` (the configured one cannot be served).",
+            "example" : "READY",
+            "type" : "string"
+          },
+          "version" : {
+            "description" : "The catalog version, only while the state is `READY`.",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
       "CharacterFindingView" : {
         "properties" : {
           "end" : {
@@ -141,6 +155,26 @@
         },
         "type" : "object"
       },
+      "CoverageView" : {
+        "properties" : {
+          "complete" : {
+            "description" : "True when every pack that deletes results can still show every day of the period.",
+            "type" : "boolean"
+          },
+          "retention" : {
+            "description" : "The packs that delete their results; `listing-rules` is not among them: its results are not deleted.",
+            "items" : {
+              "$ref" : "#/components/schemas/RetentionView"
+            },
+            "type" : "array"
+          },
+          "text" : {
+            "description" : "A sentence that says it in words.",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "FindingView" : {
         "properties" : {
           "field" : {
@@ -200,6 +234,45 @@
         },
         "type" : "object"
       },
+      "HealthReport" : {
+        "properties" : {
+          "byWeek" : {
+            "description" : "The same numbers per ISO week, in order, without gaps (a week with no result is all zeros). The first and the last week are clipped to the period and marked `partial` when the ISO week is longer.",
+            "items" : {
+              "$ref" : "#/components/schemas/WeekView"
+            },
+            "type" : "array"
+          },
+          "coverageNote" : {
+            "$ref" : "#/components/schemas/CoverageView",
+            "description" : "Which packs delete their results, after how long, and so from which day their numbers are complete."
+          },
+          "generatedAt" : {
+            "description" : "When the report was computed. A result of a pack that deletes results is counted only if it was still stored at this instant.",
+            "example" : "2026-11-09T03:00:00Z",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "marketplace" : {
+            "description" : "The marketplace the counts are limited to (`ETSY` or `AMAZON`), or null for all.",
+            "example" : "ETSY",
+            "type" : [ "string", "null" ]
+          },
+          "packs" : {
+            "$ref" : "#/components/schemas/PacksView",
+            "description" : "The numbers of each pack over the whole period."
+          },
+          "period" : {
+            "$ref" : "#/components/schemas/PeriodView",
+            "description" : "The days counted, in UTC, both ends included."
+          },
+          "versions" : {
+            "$ref" : "#/components/schemas/VersionsView",
+            "description" : "What runs now. Results of the period may have been made under older versions."
+          }
+        },
+        "type" : "object"
+      },
       "JsonNode" : { },
       "LimitView" : {
         "properties" : {
@@ -247,6 +320,138 @@
             "example" : 140,
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ListingRulesView" : {
+        "description" : "Results of `POST /api/v1/checks`. A result is a stored one: a cached answer creates no row, so a listing checked again with the same analysis is counted once.",
+        "properties" : {
+          "checks" : {
+            "description" : "Stored results created in the period.",
+            "example" : 120,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "findings" : {
+            "description" : "Findings per severity; the three severities are always present.",
+            "items" : {
+              "$ref" : "#/components/schemas/SeverityCountView"
+            },
+            "type" : "array"
+          },
+          "pack" : {
+            "description" : "The pack id; present on the period totals only.",
+            "example" : "listing-rules",
+            "type" : "string"
+          },
+          "readiness" : {
+            "$ref" : "#/components/schemas/ReadinessSummaryView",
+            "description" : "The publish readiness stored with the results (ADR-014)."
+          },
+          "statuses" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per stored status; every status is present.",
+            "example" : {
+              "COMPLETED" : 120,
+              "FAILED" : 0,
+              "PENDING" : 0
+            },
+            "type" : "object"
+          },
+          "topRules" : {
+            "$ref" : "#/components/schemas/RuleRankingView",
+            "description" : "The rules with the most findings; present on the period totals only."
+          }
+        },
+        "type" : "object"
+      },
+      "MarkCountView" : {
+        "description" : "A mark of the trademark catalog (the catalog's own display text, never text from a listing).",
+        "properties" : {
+          "checksAffected" : {
+            "description" : "Results with at least one finding for this mark.",
+            "example" : 5,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "findings" : {
+            "example" : 6,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "highestRisk" : {
+            "description" : "The highest risk among the findings for this mark.",
+            "example" : "HIGH",
+            "type" : "string"
+          },
+          "mark" : {
+            "description" : "The catalog's display mark.",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MarkRankingView" : {
+        "properties" : {
+          "distinctMarks" : {
+            "description" : "Every different mark in the period, before the list is cut.",
+            "example" : 5,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "items" : {
+            "description" : "Most findings first, then most results affected, then the mark by code point.",
+            "items" : {
+              "$ref" : "#/components/schemas/MarkCountView"
+            },
+            "type" : "array"
+          },
+          "limit" : {
+            "example" : 10,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PacksView" : {
+        "properties" : {
+          "listingRules" : {
+            "$ref" : "#/components/schemas/ListingRulesView"
+          },
+          "personalizationScreening" : {
+            "$ref" : "#/components/schemas/PersonalizationView"
+          },
+          "trademarkRisk" : {
+            "$ref" : "#/components/schemas/TrademarkRiskView"
+          },
+          "variationChecks" : {
+            "$ref" : "#/components/schemas/VariationChecksView"
+          }
+        },
+        "type" : "object"
+      },
+      "PeriodView" : {
+        "properties" : {
+          "days" : {
+            "description" : "Days covered, both ends counted.",
+            "example" : 7,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "from" : {
+            "example" : "2026-11-02",
+            "format" : "date",
+            "type" : "string"
+          },
+          "to" : {
+            "example" : "2026-11-08",
+            "format" : "date",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -353,6 +558,57 @@
         },
         "type" : "object"
       },
+      "PersonalizationView" : {
+        "description" : "Results of `POST /api/v1/personalization-screenings` that are still retained. `findings` and `topRules` are the character rules only; what the trademark scan found is in `trademarkRiskLevels`. No mark is listed: it would say something about what a buyer typed.",
+        "properties" : {
+          "checks" : {
+            "example" : 25,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "completeness" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per completeness; both values are present.",
+            "type" : "object"
+          },
+          "findings" : {
+            "description" : "Character-rule findings per severity; the three severities are always present.",
+            "items" : {
+              "$ref" : "#/components/schemas/SeverityCountView"
+            },
+            "type" : "array"
+          },
+          "pack" : {
+            "description" : "The pack id; present on the period totals only.",
+            "example" : "personalization-screening",
+            "type" : "string"
+          },
+          "topRules" : {
+            "$ref" : "#/components/schemas/RuleRankingView",
+            "description" : "The character rules with the most findings; present on the period totals only."
+          },
+          "trademarkRiskLevels" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per risk level of their trademark scan; `UNKNOWN` is never counted as `LOW`.",
+            "type" : "object"
+          },
+          "trademarkStatus" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per state of their trademark scan: `COMPLETE`, `INCOMPLETE` or `NOT_CONFIGURED` (no catalog was served).",
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
       "ProblemDetail" : {
         "properties" : {
           "detail" : {
@@ -380,6 +636,61 @@
         },
         "type" : "object"
       },
+      "ReadinessSummaryView" : {
+        "description" : "Only results stored with a readiness count here: it is written when `listing-guard.fixes.enabled` is on or by the console editor. The others are in `checksWithoutReadiness` and are skipped, never counted as zero.",
+        "properties" : {
+          "averageScore" : {
+            "description" : "The mean score of the scored results, one decimal; null when there are none.",
+            "example" : 82.4,
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "checksWithReadiness" : {
+            "description" : "Results with a readiness: scored plus incomplete.",
+            "example" : 40,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "checksWithoutReadiness" : {
+            "description" : "Results with no readiness stored.",
+            "example" : 80,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "incompleteChecks" : {
+            "description" : "Results whose readiness is `INCOMPLETE` (a rule failed): stored as not ready, with no score.",
+            "example" : 2,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "readyChecks" : {
+            "description" : "Results that are ready.",
+            "example" : 30,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "readyRate" : {
+            "description" : "`readyChecks / checksWithReadiness`, four decimals; null when there is no readiness.",
+            "example" : 0.75,
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "scoredChecks" : {
+            "description" : "Results with a score.",
+            "example" : 38,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "versions" : {
+            "description" : "The readiness versions found in the period; present on the period totals only. A mean over two versions is not a trend.",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
       "ReadinessView" : {
         "properties" : {
           "ready" : {
@@ -395,6 +706,75 @@
           },
           "version" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RetentionView" : {
+        "properties" : {
+          "coveredFrom" : {
+            "description" : "The first day for which every result of the pack is still stored.",
+            "example" : "2026-10-11",
+            "format" : "date",
+            "type" : "string"
+          },
+          "pack" : {
+            "example" : "trademark-risk",
+            "type" : "string"
+          },
+          "period" : {
+            "description" : "How long a result is kept, as an ISO-8601 duration, from the configuration.",
+            "example" : "P30D",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RuleCountView" : {
+        "properties" : {
+          "checksAffected" : {
+            "description" : "Results with at least one such finding.",
+            "example" : 12,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "findings" : {
+            "example" : 12,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "ruleId" : {
+            "example" : "title_length",
+            "type" : "string"
+          },
+          "severity" : {
+            "description" : "A rule stored at two severities appears twice.",
+            "example" : "ERROR",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RuleRankingView" : {
+        "properties" : {
+          "distinctRules" : {
+            "description" : "Every different rule and severity in the period, before the list is cut.",
+            "example" : 14,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "items" : {
+            "description" : "Most findings first, then most results affected, then the rule id by code point, then the severity.",
+            "items" : {
+              "$ref" : "#/components/schemas/RuleCountView"
+            },
+            "type" : "array"
+          },
+          "limit" : {
+            "description" : "The most items the list holds.",
+            "example" : 10,
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -421,6 +801,44 @@
           "rulesetVersion" : {
             "description" : "The version of the ruleset the limits come from; the same value as `rulesetVersion` of a check. Opaque: compare for equality, do not parse.",
             "example" : "etsy-2026-12",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RulesetView" : {
+        "properties" : {
+          "marketplace" : {
+            "example" : "ETSY",
+            "type" : "string"
+          },
+          "pack" : {
+            "example" : "listing-rules",
+            "type" : "string"
+          },
+          "version" : {
+            "example" : "etsy-2026-12",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SeverityCountView" : {
+        "properties" : {
+          "checksAffected" : {
+            "description" : "Results with at least one finding of this severity.",
+            "example" : 18,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "findings" : {
+            "description" : "Findings of this severity.",
+            "example" : 30,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "severity" : {
+            "example" : "ERROR",
             "type" : "string"
           }
         },
@@ -592,6 +1010,52 @@
           "suggestion" : {
             "description" : "Human text, currently Vietnamese. Never proposes a replacement value.",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkRiskView" : {
+        "description" : "Results of `POST /api/v1/trademark-checks` that are still retained. `UNKNOWN` is its own level and is never counted as `LOW`.",
+        "properties" : {
+          "checks" : {
+            "example" : 90,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "completeness" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per completeness; both values are present.",
+            "example" : {
+              "COMPLETE" : 88,
+              "INCOMPLETE" : 2
+            },
+            "type" : "object"
+          },
+          "pack" : {
+            "description" : "The pack id; present on the period totals only.",
+            "example" : "trademark-risk",
+            "type" : "string"
+          },
+          "riskLevels" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per stored risk level; the four levels are always present.",
+            "example" : {
+              "HIGH" : 4,
+              "LOW" : 70,
+              "MEDIUM" : 9,
+              "UNKNOWN" : 7
+            },
+            "type" : "object"
+          },
+          "topMarks" : {
+            "$ref" : "#/components/schemas/MarkRankingView",
+            "description" : "The catalog marks matched most often; present on the period totals only."
           }
         },
         "type" : "object"
@@ -771,6 +1235,95 @@
           },
           "summary" : {
             "$ref" : "#/components/schemas/Summary"
+          }
+        },
+        "type" : "object"
+      },
+      "VariationChecksView" : {
+        "description" : "Results of `POST /api/v1/variation-checks` that are still retained.",
+        "properties" : {
+          "checks" : {
+            "example" : 30,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "completeness" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per completeness; both values are present.",
+            "type" : "object"
+          },
+          "findings" : {
+            "description" : "Findings per severity; the three severities are always present.",
+            "items" : {
+              "$ref" : "#/components/schemas/SeverityCountView"
+            },
+            "type" : "array"
+          },
+          "pack" : {
+            "description" : "The pack id; present on the period totals only.",
+            "example" : "variation-checks",
+            "type" : "string"
+          },
+          "topRules" : {
+            "$ref" : "#/components/schemas/RuleRankingView",
+            "description" : "The rules with the most findings; present on the period totals only."
+          }
+        },
+        "type" : "object"
+      },
+      "VersionsView" : {
+        "properties" : {
+          "rulesets" : {
+            "description" : "The active ruleset of each pack for each marketplace.",
+            "items" : {
+              "$ref" : "#/components/schemas/RulesetView"
+            },
+            "type" : "array"
+          },
+          "trademarkCatalog" : {
+            "$ref" : "#/components/schemas/CatalogView",
+            "description" : "The trademark catalog this deployment serves."
+          }
+        },
+        "type" : "object"
+      },
+      "WeekView" : {
+        "properties" : {
+          "from" : {
+            "description" : "The first day of the week that is inside the period.",
+            "example" : "2026-11-02",
+            "format" : "date",
+            "type" : "string"
+          },
+          "isoWeek" : {
+            "description" : "The ISO week.",
+            "example" : "2026-W45",
+            "type" : "string"
+          },
+          "listingRules" : {
+            "$ref" : "#/components/schemas/ListingRulesView"
+          },
+          "partial" : {
+            "description" : "True when the ISO week reaches beyond the period, so it has fewer results: compare rates, not counts.",
+            "type" : "boolean"
+          },
+          "personalizationScreening" : {
+            "$ref" : "#/components/schemas/PersonalizationView"
+          },
+          "to" : {
+            "description" : "The last day of the week that is inside the period.",
+            "example" : "2026-11-08",
+            "format" : "date",
+            "type" : "string"
+          },
+          "trademarkRisk" : {
+            "$ref" : "#/components/schemas/TrademarkRiskView"
+          },
+          "variationChecks" : {
+            "$ref" : "#/components/schemas/VariationChecksView"
           }
         },
         "type" : "object"
@@ -1787,6 +2340,449 @@
         },
         "summary" : "Read a stored personalization screening",
         "tags" : [ "Personalization screening" ]
+      }
+    },
+    "/api/v1/reports/summary" : {
+      "get" : {
+        "description" : "Adds up what the client has stored: results per pack, the rules with the most findings, the trademark risk levels and the catalog marks matched most often, and the same numbers per ISO week. It counts; it never returns or reads text a client typed (a listing, a tag, a buyer's text): only counts, enumerations, rule ids, catalog marks and version strings.\n\n`from` and `to` are UTC dates, both included, and both are required. The longest period is set by the deployment (92 days by default). A period with no data is a `200` with zeros.\n\nA \"check\" is a stored result: a cached answer creates no row, so a listing checked again with the same analysis is counted once, and there is no cache-hit number. The packs `trademark-risk`, `variation-checks` and `personalization-screening` delete their results after a retention period and count only what is still stored; `coverageNote` says from which day their numbers are complete. `listing-rules` results are not deleted.\n\nIt is read only, needs no plan pack, costs no unit of the quota and is never cached (`Cache-Control: no-store`).",
+        "operationId" : "getReportSummary",
+        "parameters" : [ {
+          "description" : "The first day, a UTC date written as `YYYY-MM-DD`.",
+          "example" : "2026-11-02",
+          "in" : "query",
+          "name" : "from",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "The last day, included, a UTC date written as `YYYY-MM-DD`.",
+          "example" : "2026-11-08",
+          "in" : "query",
+          "name" : "to",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "`ETSY` or `AMAZON`, case-insensitive. Optional: without it every marketplace is counted.",
+          "example" : "ETSY",
+          "in" : "query",
+          "name" : "marketplace",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "week-report" : {
+                    "description" : "week-report",
+                    "summary" : "A week",
+                    "value" : {
+                      "byWeek" : [ {
+                        "from" : "2026-11-02",
+                        "isoWeek" : "2026-W45",
+                        "listingRules" : {
+                          "checks" : 12,
+                          "findings" : [ {
+                            "checksAffected" : 3,
+                            "findings" : 4,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 5,
+                            "findings" : 6,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 2,
+                            "severity" : "INFO"
+                          } ],
+                          "readiness" : {
+                            "averageScore" : 78.5,
+                            "checksWithReadiness" : 8,
+                            "checksWithoutReadiness" : 4,
+                            "incompleteChecks" : 0,
+                            "readyChecks" : 5,
+                            "readyRate" : 0.625,
+                            "scoredChecks" : 8
+                          },
+                          "statuses" : {
+                            "COMPLETED" : 12,
+                            "FAILED" : 0,
+                            "PENDING" : 0
+                          }
+                        },
+                        "partial" : false,
+                        "personalizationScreening" : {
+                          "checks" : 6,
+                          "completeness" : {
+                            "COMPLETE" : 5,
+                            "INCOMPLETE" : 1
+                          },
+                          "findings" : [ {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 3,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "INFO"
+                          } ],
+                          "trademarkRiskLevels" : {
+                            "HIGH" : 0,
+                            "LOW" : 5,
+                            "MEDIUM" : 0,
+                            "UNKNOWN" : 1
+                          },
+                          "trademarkStatus" : {
+                            "COMPLETE" : 5,
+                            "INCOMPLETE" : 0,
+                            "NOT_CONFIGURED" : 1
+                          }
+                        },
+                        "to" : "2026-11-08",
+                        "trademarkRisk" : {
+                          "checks" : 9,
+                          "completeness" : {
+                            "COMPLETE" : 8,
+                            "INCOMPLETE" : 1
+                          },
+                          "riskLevels" : {
+                            "HIGH" : 1,
+                            "LOW" : 5,
+                            "MEDIUM" : 2,
+                            "UNKNOWN" : 1
+                          }
+                        },
+                        "variationChecks" : {
+                          "checks" : 4,
+                          "completeness" : {
+                            "COMPLETE" : 4,
+                            "INCOMPLETE" : 0
+                          },
+                          "findings" : [ {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 2,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 1,
+                            "findings" : 1,
+                            "severity" : "INFO"
+                          } ]
+                        }
+                      } ],
+                      "coverageNote" : {
+                        "complete" : true,
+                        "retention" : [ {
+                          "coveredFrom" : "2026-10-11",
+                          "pack" : "trademark-risk",
+                          "period" : "P30D"
+                        }, {
+                          "coveredFrom" : "2026-10-11",
+                          "pack" : "variation-checks",
+                          "period" : "P30D"
+                        }, {
+                          "coveredFrom" : "2026-10-11",
+                          "pack" : "personalization-screening",
+                          "period" : "P30D"
+                        } ],
+                        "text" : "Every pack covers the whole period. Results of trademark-risk (kept P30D), variation-checks (kept P30D), personalization-screening (kept P30D) are deleted after the time in brackets; listing-rules results are not deleted."
+                      },
+                      "generatedAt" : "2026-11-09T03:00:00Z",
+                      "marketplace" : null,
+                      "packs" : {
+                        "listingRules" : {
+                          "checks" : 12,
+                          "findings" : [ {
+                            "checksAffected" : 3,
+                            "findings" : 4,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 5,
+                            "findings" : 6,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 2,
+                            "severity" : "INFO"
+                          } ],
+                          "pack" : "listing-rules",
+                          "readiness" : {
+                            "averageScore" : 78.5,
+                            "checksWithReadiness" : 8,
+                            "checksWithoutReadiness" : 4,
+                            "incompleteChecks" : 0,
+                            "readyChecks" : 5,
+                            "readyRate" : 0.625,
+                            "scoredChecks" : 8,
+                            "versions" : [ "readiness-2026-11" ]
+                          },
+                          "statuses" : {
+                            "COMPLETED" : 12,
+                            "FAILED" : 0,
+                            "PENDING" : 0
+                          },
+                          "topRules" : {
+                            "distinctRules" : 3,
+                            "items" : [ {
+                              "checksAffected" : 3,
+                              "findings" : 3,
+                              "ruleId" : "title_length",
+                              "severity" : "ERROR"
+                            } ],
+                            "limit" : 10
+                          }
+                        },
+                        "personalizationScreening" : {
+                          "checks" : 6,
+                          "completeness" : {
+                            "COMPLETE" : 5,
+                            "INCOMPLETE" : 1
+                          },
+                          "findings" : [ {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 3,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "INFO"
+                          } ],
+                          "pack" : "personalization-screening",
+                          "topRules" : {
+                            "distinctRules" : 1,
+                            "items" : [ {
+                              "checksAffected" : 2,
+                              "findings" : 3,
+                              "ruleId" : "unsupported_characters",
+                              "severity" : "WARNING"
+                            } ],
+                            "limit" : 10
+                          },
+                          "trademarkRiskLevels" : {
+                            "HIGH" : 0,
+                            "LOW" : 5,
+                            "MEDIUM" : 0,
+                            "UNKNOWN" : 1
+                          },
+                          "trademarkStatus" : {
+                            "COMPLETE" : 5,
+                            "INCOMPLETE" : 0,
+                            "NOT_CONFIGURED" : 1
+                          }
+                        },
+                        "trademarkRisk" : {
+                          "checks" : 9,
+                          "completeness" : {
+                            "COMPLETE" : 8,
+                            "INCOMPLETE" : 1
+                          },
+                          "pack" : "trademark-risk",
+                          "riskLevels" : {
+                            "HIGH" : 1,
+                            "LOW" : 5,
+                            "MEDIUM" : 2,
+                            "UNKNOWN" : 1
+                          },
+                          "topMarks" : {
+                            "distinctMarks" : 2,
+                            "items" : [ {
+                              "checksAffected" : 2,
+                              "findings" : 3,
+                              "highestRisk" : "HIGH",
+                              "mark" : "ZORVEX"
+                            } ],
+                            "limit" : 10
+                          }
+                        },
+                        "variationChecks" : {
+                          "checks" : 4,
+                          "completeness" : {
+                            "COMPLETE" : 4,
+                            "INCOMPLETE" : 0
+                          },
+                          "findings" : [ {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 2,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 1,
+                            "findings" : 1,
+                            "severity" : "INFO"
+                          } ],
+                          "pack" : "variation-checks",
+                          "topRules" : {
+                            "distinctRules" : 2,
+                            "items" : [ {
+                              "checksAffected" : 2,
+                              "findings" : 2,
+                              "ruleId" : "duplicate_sku",
+                              "severity" : "WARNING"
+                            } ],
+                            "limit" : 10
+                          }
+                        }
+                      },
+                      "period" : {
+                        "days" : 7,
+                        "from" : "2026-11-02",
+                        "to" : "2026-11-08"
+                      },
+                      "versions" : {
+                        "rulesets" : [ {
+                          "marketplace" : "ETSY",
+                          "pack" : "listing-rules",
+                          "version" : "etsy-2026-12"
+                        }, {
+                          "marketplace" : "ETSY",
+                          "pack" : "trademark-risk",
+                          "version" : "trademark-risk-2026-11"
+                        } ],
+                        "trademarkCatalog" : {
+                          "state" : "READY",
+                          "version" : "synthetic-2026-11-0123456789ab"
+                        }
+                      }
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthReport"
+                }
+              }
+            },
+            "description" : "The report."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-report-period" : {
+                    "description" : "invalid-report-period",
+                    "value" : {
+                      "code" : "invalid-report-period",
+                      "detail" : "from must not be after to.",
+                      "instance" : "/api/v1/reports/summary",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-report-period"
+                    }
+                  },
+                  "report-period-too-long" : {
+                    "description" : "report-period-too-long",
+                    "value" : {
+                      "code" : "report-period-too-long",
+                      "detail" : "The period covers 120 days, more than the 92 a report may cover (both ends count). Ask for a shorter period.",
+                      "instance" : "/api/v1/reports/summary",
+                      "maxDays" : 92,
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "requestedDays" : 120,
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:report-period-too-long"
+                    }
+                  },
+                  "unknown-marketplace" : {
+                    "description" : "unknown-marketplace",
+                    "value" : {
+                      "code" : "unknown-marketplace",
+                      "detail" : "Unknown marketplace: NOPE. Supported: AMAZON, ETSY.",
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:unknown-marketplace"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "`from` or `to` is missing, malformed or reversed (code `invalid-report-period`), the period is longer than the limit (code `report-period-too-long`, with `maxDays` and `requestedDays`), or the marketplace is unknown (code `unknown-marketplace`)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "marketplace-not-yet-supported",
+                  "detail" : "Marketplace WALMART is planned but not supported yet. Supported: AMAZON, ETSY.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 422,
+                  "title" : "Unprocessable Entity",
+                  "type" : "urn:listing-guard:problem:marketplace-not-yet-supported"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`)."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read the health report of the calling client over a period",
+        "tags" : [ "Reports" ]
       }
     },
     "/api/v1/rulesets/{marketplace}/limits" : {
@@ -3053,6 +4049,9 @@
   "tags" : [ {
     "description" : "Possible trademark references in a listing's text, as a reference warning.",
     "name" : "Trademark checks"
+  }, {
+    "description" : "Counts of the calling client's stored results over a period.",
+    "name" : "Reports"
   }, {
     "description" : "Structure of a listing's parent/child variations, as a reference warning.",
     "name" : "Variation checks"

@@ -729,4 +729,154 @@ public final class ApiExamples {
               "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
             }
             """;
+
+    /**
+     * A week of the listing health report (ADR-018) with every pack and one entry in each list, so it shows every field. The
+     * mark is the invented one of the synthetic catalog. A test holds its fields equal to what the endpoint answers.
+     */
+    public static final String REPORT_SUMMARY = """
+            {
+              "period": {"from": "2026-11-02", "to": "2026-11-08", "days": 7},
+              "marketplace": null,
+              "generatedAt": "2026-11-09T03:00:00Z",
+              "versions": {
+                "rulesets": [
+                  {"pack": "listing-rules", "marketplace": "ETSY", "version": "etsy-2026-12"},
+                  {"pack": "trademark-risk", "marketplace": "ETSY", "version": "trademark-risk-2026-11"}
+                ],
+                "trademarkCatalog": {"state": "READY", "version": "synthetic-2026-11-0123456789ab"}
+              },
+              "packs": {
+                "listingRules": {
+                  "pack": "listing-rules",
+                  "checks": 12,
+                  "statuses": {"COMPLETED": 12, "FAILED": 0, "PENDING": 0},
+                  "findings": [
+                    {"severity": "ERROR", "findings": 4, "checksAffected": 3},
+                    {"severity": "WARNING", "findings": 6, "checksAffected": 5},
+                    {"severity": "INFO", "findings": 2, "checksAffected": 2}
+                  ],
+                  "readiness": {"checksWithReadiness": 8, "scoredChecks": 8, "incompleteChecks": 0, "readyChecks": 5,
+                                "readyRate": 0.625, "averageScore": 78.5, "checksWithoutReadiness": 4,
+                                "versions": ["readiness-2026-11"]},
+                  "topRules": {"limit": 10, "distinctRules": 3, "items": [
+                    {"ruleId": "title_length", "severity": "ERROR", "findings": 3, "checksAffected": 3}
+                  ]}
+                },
+                "trademarkRisk": {
+                  "pack": "trademark-risk",
+                  "checks": 9,
+                  "completeness": {"COMPLETE": 8, "INCOMPLETE": 1},
+                  "riskLevels": {"HIGH": 1, "MEDIUM": 2, "LOW": 5, "UNKNOWN": 1},
+                  "topMarks": {"limit": 10, "distinctMarks": 2, "items": [
+                    {"mark": "ZORVEX", "findings": 3, "checksAffected": 2, "highestRisk": "HIGH"}
+                  ]}
+                },
+                "variationChecks": {
+                  "pack": "variation-checks",
+                  "checks": 4,
+                  "completeness": {"COMPLETE": 4, "INCOMPLETE": 0},
+                  "findings": [
+                    {"severity": "ERROR", "findings": 0, "checksAffected": 0},
+                    {"severity": "WARNING", "findings": 2, "checksAffected": 2},
+                    {"severity": "INFO", "findings": 1, "checksAffected": 1}
+                  ],
+                  "topRules": {"limit": 10, "distinctRules": 2, "items": [
+                    {"ruleId": "duplicate_sku", "severity": "WARNING", "findings": 2, "checksAffected": 2}
+                  ]}
+                },
+                "personalizationScreening": {
+                  "pack": "personalization-screening",
+                  "checks": 6,
+                  "completeness": {"COMPLETE": 5, "INCOMPLETE": 1},
+                  "trademarkStatus": {"COMPLETE": 5, "INCOMPLETE": 0, "NOT_CONFIGURED": 1},
+                  "trademarkRiskLevels": {"HIGH": 0, "MEDIUM": 0, "LOW": 5, "UNKNOWN": 1},
+                  "findings": [
+                    {"severity": "ERROR", "findings": 0, "checksAffected": 0},
+                    {"severity": "WARNING", "findings": 3, "checksAffected": 2},
+                    {"severity": "INFO", "findings": 0, "checksAffected": 0}
+                  ],
+                  "topRules": {"limit": 10, "distinctRules": 1, "items": [
+                    {"ruleId": "unsupported_characters", "severity": "WARNING", "findings": 3, "checksAffected": 2}
+                  ]}
+                }
+              },
+              "byWeek": [
+                {
+                  "isoWeek": "2026-W45", "from": "2026-11-02", "to": "2026-11-08", "partial": false,
+                  "listingRules": {
+                    "checks": 12,
+                    "statuses": {"COMPLETED": 12, "FAILED": 0, "PENDING": 0},
+                    "findings": [
+                      {"severity": "ERROR", "findings": 4, "checksAffected": 3},
+                      {"severity": "WARNING", "findings": 6, "checksAffected": 5},
+                      {"severity": "INFO", "findings": 2, "checksAffected": 2}
+                    ],
+                    "readiness": {"checksWithReadiness": 8, "scoredChecks": 8, "incompleteChecks": 0, "readyChecks": 5,
+                                  "readyRate": 0.625, "averageScore": 78.5, "checksWithoutReadiness": 4}
+                  },
+                  "trademarkRisk": {
+                    "checks": 9,
+                    "completeness": {"COMPLETE": 8, "INCOMPLETE": 1},
+                    "riskLevels": {"HIGH": 1, "MEDIUM": 2, "LOW": 5, "UNKNOWN": 1}
+                  },
+                  "variationChecks": {
+                    "checks": 4,
+                    "completeness": {"COMPLETE": 4, "INCOMPLETE": 0},
+                    "findings": [
+                      {"severity": "ERROR", "findings": 0, "checksAffected": 0},
+                      {"severity": "WARNING", "findings": 2, "checksAffected": 2},
+                      {"severity": "INFO", "findings": 1, "checksAffected": 1}
+                    ]
+                  },
+                  "personalizationScreening": {
+                    "checks": 6,
+                    "completeness": {"COMPLETE": 5, "INCOMPLETE": 1},
+                    "trademarkStatus": {"COMPLETE": 5, "INCOMPLETE": 0, "NOT_CONFIGURED": 1},
+                    "trademarkRiskLevels": {"HIGH": 0, "MEDIUM": 0, "LOW": 5, "UNKNOWN": 1},
+                    "findings": [
+                      {"severity": "ERROR", "findings": 0, "checksAffected": 0},
+                      {"severity": "WARNING", "findings": 3, "checksAffected": 2},
+                      {"severity": "INFO", "findings": 0, "checksAffected": 0}
+                    ]
+                  }
+                }
+              ],
+              "coverageNote": {
+                "complete": true,
+                "text": "Every pack covers the whole period. Results of trademark-risk (kept P30D), variation-checks (kept P30D), personalization-screening (kept P30D) are deleted after the time in brackets; listing-rules results are not deleted.",
+                "retention": [
+                  {"pack": "trademark-risk", "period": "P30D", "coveredFrom": "2026-10-11"},
+                  {"pack": "variation-checks", "period": "P30D", "coveredFrom": "2026-10-11"},
+                  {"pack": "personalization-screening", "period": "P30D", "coveredFrom": "2026-10-11"}
+                ]
+              }
+            }
+            """;
+
+    public static final String PROBLEM_INVALID_REPORT_PERIOD = """
+            {
+              "type": "urn:listing-guard:problem:invalid-report-period",
+              "title": "Bad Request",
+              "status": 400,
+              "detail": "from must not be after to.",
+              "instance": "/api/v1/reports/summary",
+              "code": "invalid-report-period",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
+    public static final String PROBLEM_REPORT_PERIOD_TOO_LONG = """
+            {
+              "type": "urn:listing-guard:problem:report-period-too-long",
+              "title": "Bad Request",
+              "status": 400,
+              "detail": "The period covers 120 days, more than the 92 a report may cover (both ends count). Ask for a shorter period.",
+              "instance": "/api/v1/reports/summary",
+              "code": "report-period-too-long",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+              "maxDays": 92,
+              "requestedDays": 120
+            }
+            """;
 }

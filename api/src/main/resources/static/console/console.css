@@ -46,6 +46,15 @@ a.button, button.danger {
 }
 a.button.danger, button.danger { border-color: var(--error); color: var(--error); font-weight: 600; }
 .confirm-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-top: 1rem; }
+/* the report page (ADR-018): wider than the other pages, because the weekly table has many columns */
+.page.wide { max-width: 72rem; }
+form.report-form { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: end; margin: 1rem 0; }
+form.report-form .field { margin: 0; }
+table.report { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; }
+table.report th, table.report td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+table.report th { font-size: 0.875rem; color: var(--muted); font-weight: 600; }
+table.report td.n, table.report th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.report-scroll { overflow-x: auto; }
 dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 1rem 0; }
 dl.facts dt { color: var(--muted); }
 dl.facts dd { margin: 0; overflow-wrap: anywhere; }

@@ -53,6 +53,9 @@ batch/input/*
 !batch/input/.gitkeep
 batch/out/
 
+# Health report (ADR-018): the reports a run of the health-report job writes are never committed (they name clients and counts)
+health-report/out/
+
 # Claude Code local state
 .claude/
 

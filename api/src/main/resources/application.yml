@@ -104,6 +104,18 @@ listing-guard:
   batch:
     # The batch-check job (docs/batch-check.md): mappings, inputs and reports; the reports go to <dir>/out by default.
     dir: ${BATCH_DIR:batch}
+  reports:
+    # The listing health report (ADR-018): GET /api/v1/reports/summary, the health-report job and the console page.
+    # The longest period a report may cover, in days counting both ends.
+    max-days: 92
+    # How many rules, and how many trademark marks, a ranked list holds (1 to 50).
+    top-rules: 10
+    top-marks: 10
+    # The period of the job and the console page when none is named: this many complete UTC days before today.
+    default-days: 7
+  health-report:
+    # The health-report job (docs/deployment.md): it writes <dir>/out/<UTC timestamp>/report.html and report.json.
+    dir: ${HEALTH_REPORT_DIR:health-report}
   policies:
     dir: ${POLICIES_DIR:policies}
     chunking:

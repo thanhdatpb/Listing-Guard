@@ -30,6 +30,10 @@ edit or publish anything, and it does not do SEO.
   instead of copying the numbers into its own code.
 - **Batch check** (the `batch-check` job): checks a whole export file (an Etsy CSV, an Amazon flat file) with both
   checks and writes CSV and HTML reports, without an integration.
+- **Listing health report** (`GET /api/v1/reports/summary`, the `health-report` job and the console page `/console/report`):
+  counts of the results a client has stored over a period, so a lead sees which rules fail again and again, the trademark
+  risk levels and the marks matched most often, and the same numbers per ISO week. It only counts: it reads and shows no
+  listing text, needs no plan pack and costs no unit.
 - **Multi-client REST API**: every API key belongs to a client; results, cache and rate limit are per client.
 - **Plans and a monthly quota** (optional, off by default): each client has a plan (`FREE`, `SELLER` or `PRO`) that sets
   the packs it may use and how many new results it may store per month; `GET /api/v1/usage` shows it. Hosting the code
@@ -60,6 +64,12 @@ Working end to end:
   short evidence are stored, for 30 days, never the text. It is in the `SELLER` and `PRO` plans and costs one unit per new
   complete result where plans are on.
 - The `batch-check` job, which calls the same services as the two endpoints.
+- The listing health report ([ADR-018](docs/adr/ADR-018-listing-health-report.md)). `GET /api/v1/reports/summary?from=&to=` adds up
+  the stored results of the calling client (at most 92 days, from the settings): results per pack, the rules with the most
+  findings, trademark risk levels and catalog marks, readiness, and the same numbers per ISO week, with a `coverageNote` that says
+  from which day the packs that delete their results (30 days by default) are complete. SQL aggregates only, read only, no
+  quota. The `health-report` job writes it for one client or all of them as `report.json` and `report.html`; the console shows it
+  at `/console/report`. All three use one service, so they show the same numbers.
 - Client API keys, per-client rate limits and per-client isolation; see the
   [integration guide](docs/integration-guide.md).
 - Client plans and a monthly quota ([ADR-013](docs/adr/ADR-013-client-plans-and-monthly-quota.md)), **off by default**
@@ -273,6 +283,24 @@ manager). A row that cannot be read is reported with its line and the batch goes
 rules run and the reports say so. With `--label-column` (a true/false column such as "was taken down") the summary also
 shows how often the trademark check flagged those listings, as a **measurement on a small set, not an accuracy**. See
 [docs/batch-check.md](docs/batch-check.md): preparing the file, writing the mapping, reading the reports, labelling.
+
+### A weekly health report
+
+To see, per client, which rules fail again and again, how trademark risk is moving and whether this week was better than the
+last, run the `health-report` job: a one-shot job on the database and local files, with no network and no model, that writes
+nothing to the database. Without dates it reports the 7 complete UTC days before today (run on a Monday, the previous ISO week):
+
+```bash
+docker compose run --rm health-report --client=all                       # every active client
+docker compose run --rm health-report --client=demo-client --from=2026-11-02 --to=2026-11-08 --marketplace=ETSY
+# production: docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --client=all
+```
+
+It writes `health-report/out/<UTC timestamp>/report.json` and `report.html` (git-ignored; one self-contained page in Vietnamese,
+with no script and no link, one section per client). The numbers are those of `GET /api/v1/reports/summary`: results are counted as
+stored, and `trademark-risk`, `variation-checks` and `personalization-screening` delete their results after their retention
+period, so keep the files if you want a trend older than that. See the [integration guide](docs/integration-guide.md#health-report)
+for what each number means and [deployment.md](docs/deployment.md#weekly-health-report-adr-018) for running it.
 
 ### Use the checks from an AI agent (MCP)
 
@@ -576,6 +604,9 @@ What follows, in this order, is **not built yet**:
 8. MCP server ([ADR-017](docs/adr/ADR-017-mcp-server.md)), what remains: the questions at the end of the ADR (the annotations
    of the check tools, a token on the HTTP transport, a key per session, reading a stored result, how to distribute the jar).
    It has no Docker image, no compose service and no tool that writes, and it adds no authentication to the HTTP transport.
+9. Listing health report ([ADR-018](docs/adr/ADR-018-listing-health-report.md)), what remains: the questions at the end of the ADR
+   (plan gating, history beyond the retention, one language, `--client=all`, the default period). It stores nothing new and writes
+   nothing; the endpoint, the job and the console page are implemented.
 
 ## Documentation
 
@@ -601,6 +632,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-015: Variation checks](docs/adr/ADR-015-variation-checks.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; it ends with the questions the maintainer has to decide)
 - [ADR-016: Personalization screening](docs/adr/ADR-016-personalization-screening.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; the print profiles are placeholders; it ends with the questions the maintainer has to decide)
 - [ADR-017: MCP server for AI agents](docs/adr/ADR-017-mcp-server.md) (Proposed; implemented: a separate module that only calls the API, six tools that never write, STDIO by default; it ends with the questions the maintainer has to decide)
+- [ADR-018: Listing health report](docs/adr/ADR-018-listing-health-report.md) (Proposed; implemented: an endpoint, a weekly job and a console page that add up stored counts per client, never listing text; it ends with the questions the maintainer has to decide)
 - [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor and API keys page are implemented, all off by default; saved listings and history are not designed yet)
 
 ## License
