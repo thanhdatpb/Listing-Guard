@@ -1,6 +1,6 @@
 # ADR-018: Listing health report: counts per client over a period
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-07
 - Depends on: [ADR-005](ADR-005-api-auth-rate-limit-and-result-cache.md) (API key, rate limit, RFC 7807 errors),
   [ADR-007](ADR-007-multi-client-model.md) (a key belongs to one client; any query for client data filters by `client_id`),
@@ -300,3 +300,17 @@ Written as questions, not decided here; each says what this record assumed meanw
    match enough, which is what `trademarkRiskLevels` gives?
 9. **Scheduling and delivery.** The job is run by hand and writes files. E-mailing it or running it from cron is not done here.
 10. **Period of 92 days.** Counted with both ends. Is "92 days from `from`" (exclusive) the intended reading?
+
+## Decisions (2026-11-07)
+
+- Accepted after the implementing pull request was merged.
+- The report is free on every plan. The job's `report.json` is the saved report; there is no database rollup table,
+  and cache hits are not counted.
+- The console and job report will use Vietnamese consistently in a later PR; the shipped console is currently English
+  and the job report Vietnamese.
+- Use `--all-clients` to select all active clients; retain `--client=<name|id>` for one client.
+- The default period is the seven complete UTC days before today, excluding today. Reports are limited to 92 days,
+  counting both endpoints.
+- A future PR may add a `top` request parameter capped at 50; the current ranked-list sizes remain settings.
+- Personalization results do not list matched marks. Schedule the job with server-side cron; the job itself does not
+  schedule or deliver reports.
