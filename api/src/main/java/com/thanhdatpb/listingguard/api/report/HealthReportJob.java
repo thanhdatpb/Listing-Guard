@@ -79,7 +79,7 @@ public final class HealthReportJob {
         ReportQuery query = options.from() == null
                 ? service.defaultQuery(options.marketplace())
                 : service.query(options.from(), options.to(), options.marketplace());
-        List<Client> selected = select(options.client());
+        List<Client> selected = select(options.client(), options.allClients());
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
 
         List<ClientEntry> entries = new ArrayList<>();
@@ -106,9 +106,9 @@ public final class HealthReportJob {
         return new Result(dir, entries.size(), query);
     }
 
-    /** {@code all} is every active client (a client named {@code all} is reached by its id), else one client by id or name. */
-    private List<Client> select(String selector) {
-        if (selector.equals("all")) {
+    /** Selects every active client only for the explicit flag; otherwise resolves the supplied name or id. */
+    private List<Client> select(String selector, boolean allClients) {
+        if (allClients) {
             List<Client> active = clients.findAllByOrderByNameAsc().stream().filter(Client::isActive).toList();
             if (active.isEmpty()) {
                 throw new IllegalArgumentException("There is no active client. Create one with: docker compose run --rm admin client create <name>");

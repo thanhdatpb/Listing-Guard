@@ -205,8 +205,8 @@ services:
   # period, to health-report/out/<UTC timestamp>/report.html and report.json. Local files and the database only: no network, no
   # embedding provider, and it writes nothing to the database. Without --from and --to the period is the 7 complete UTC days
   # before today, so a run on a Monday reports the previous ISO week.
-  #   docker compose run --rm health-report --client=<client name|client id|all> [--from=YYYY-MM-DD --to=YYYY-MM-DD] [--marketplace=ETSY|AMAZON]
-  # A client that is not active is refused; `all` is every active client.
+  #   docker compose run --rm health-report (--client=<client name|id> | --all-clients) [--from=YYYY-MM-DD --to=YYYY-MM-DD] [--marketplace=ETSY|AMAZON]
+  # A client that is not active is refused; --all-clients selects every active client.
   health-report:
     image: listing-guard-api:dev
     profiles: ["tools"]

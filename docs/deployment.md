@@ -3,6 +3,11 @@
 The production image is published to `ghcr.io/thanhdatpb/listing-guard`. Deployments use the published
 image; they do not need a JDK, Maven, or a source build.
 Pushing a Git tag such as `v1.2.3` runs `mvnw verify` before publishing image tags `1.2.3` and `latest`.
+Images published through `v0.5.0` are `linux/amd64` only; use a newer release for an ARM64 host. New releases
+publish `linux/amd64` and `linux/arm64` manifests after the amd64 image passes Trivy scanning.
+
+For an Oracle Cloud Always Free Ampere A1 deployment behind Cloudflare Tunnel, follow
+[Deploy on Oracle Cloud A1](deploy-oracle.md); it includes the host bootstrap, Cloudflare Access, backup and recovery steps.
 
 ## Requirements
 
@@ -590,34 +595,6 @@ ruleset is never edited, a change is a new file and a new version. **Its print p
 The trademark half of a screening uses the catalog named by `listing-guard.trademark.catalog-version`; without one the character
 rules still run and the result is `INCOMPLETE` (never reused, never charged), and `/trademark-checks` keeps answering 503.
 
-## Personalization screening results, their retention and the plan pack (ADR-016)
-
-Two migrations, both additive. **V24** replaces the `CHECK` of `plan_pack` (V19 and V22 are not edited) so that it keeps every
-pack V22 accepted and also accepts `personalization-screening`, and gives the pack to `SELLER` and `PRO`; a row an operator
-already removed is not put back, and a missing plan row does not stop the migration. **V25** creates `personalization_screening`
-and `personalization_screening_finding`. Neither touches an existing row, both apply on any database, and nothing changes for a
-deployment while `listing-guard.plans.enabled` is false. To give or take the pack away from a plan by hand:
-`INSERT INTO plan_pack (plan_code, pack_id) VALUES ('FREE', 'personalization-screening')` or the matching `DELETE` (the change
-applies at once). Rolling back is `DROP TABLE personalization_screening_finding, personalization_screening;` and, after every
-instance runs a version without the pack, restoring the previous `CHECK` (V24 does not undo itself).
-
-**The text a buyer typed is personal data and is never stored.** A result holds a hash of the request, the result, and short
-evidence: the field index, the client's label of the field (up to 64 characters), the offsets, at most
-`evidence.max_value_chars` of the ruleset characters of what was typed that the print profile cannot print, and the catalog mark of
-a trademark match (catalog data). Nothing else of the text; it is not in any log either. Results are kept for
-`listing-guard.personalization.retention.period` (30 days by default; `LISTING_GUARD_PERSONALIZATION_RETENTION_PERIOD=30d`) and
-`GET` and the cache treat a result past it as absent even if nothing has deleted it. The cleanup has the same settings as the
-others (`listing-guard.personalization.retention.cleanup-enabled`, `cleanup-interval` 1h, `cleanup-initial-delay` 3m,
-`cleanup-batch-size` 500) and takes the **same advisory lock**, so one batch of any of the three runs at a time and a skipped
-run is tried again at the next interval.
-
-The ruleset `personalization-screening-2026-11` is registered at start-up for `ETSY` and `AMAZON` under the pack
-`personalization-screening`. The API refuses to start if that version is already registered with other content: a published
-ruleset is never edited, a change is a new file and a new version. **Its print profiles are placeholders with invented numbers**
-(ADR-016, Open question 1): put your workshop's real profile in a new ruleset version before relying on the character findings.
-The trademark half of a screening uses the catalog named by `listing-guard.trademark.catalog-version`; without one the character
-rules still run and the result is `INCOMPLETE` (never reused, never charged), and `/trademark-checks` keeps answering 503.
-
 ## Weekly health report (ADR-018)
 
 The listing health report adds up the results a client has stored: `GET /api/v1/reports/summary` for the client of an API key, the
@@ -651,14 +628,14 @@ previous ISO week:
 
 ```bash
 # development
-docker compose run --rm health-report --client=all
+docker compose run --rm health-report --all-clients
 docker compose run --rm health-report --client=<client name or id> --from=2026-11-02 --to=2026-11-08 [--marketplace=ETSY|AMAZON]
 # production (the release image; both profiles, as for admin and batch-check)
-docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --client=all
+docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --all-clients
 ```
 
-- `--client=all` is every **active** client, by name; a client that is not active is refused when named, and a client named `all`
-  is reached by its id (`admin client list` prints it). `--from` and `--to` come together or not at all.
+- `--all-clients` selects every **active** client; a client that is not active is refused when named. Use `--client=<name|id>`
+  for one client; `--from` and `--to` come together or not at all.
 - It writes `health-report/out/<UTC timestamp, for example 20261109T030000Z>/report.json` and `report.html`, one entry for each
   client. All the reports are computed before anything is written, so a refusal leaves no half report; a directory that already
   exists is an error and is never overwritten. The process ends non-zero on any refusal. `health-report/out/` is git-ignored.
@@ -672,7 +649,7 @@ docker compose -f docker-compose.prod.yml --profile prod --profile tools run --r
 
 **To run it every week** use the scheduler you already have (cron, a systemd timer, a CI job on a schedule) on the host that holds
 the compose file, for example on Mondays at 03:00 UTC:
-`0 3 * * 1 cd /srv/listing-guard && docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --client=all`.
+`0 3 * * 1 cd /srv/listing-guard && docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --all-clients`.
 The job does not send the file anywhere. **Keep `report.json`**: the three retained packs delete their results after their retention
 period, so a trend older than that exists only in the files the job wrote.
 

@@ -134,7 +134,7 @@ It never edits a listing, never publishes, and does no SEO.
   period, for a lead. `GET /api/v1/reports/summary?from=&to=[&marketplace=]` (an API key; the client is the key's, there is no client
   parameter; `from` and `to` are required UTC dates, both included, at most `listing-guard.reports.max-days` = 92; `400
   invalid-report-period`, `400 report-period-too-long`), the `health-report` job (profile and compose service of that name, in the `tools`
-  profile of both compose files; `--client=<name|id|all> [--from --to] [--marketplace]`; writes `<dir>/out/<UTC timestamp>/report.json` and a
+  profile of both compose files; `(--client=<name|id> | --all-clients) [--from --to] [--marketplace]`; writes `<dir>/out/<UTC timestamp>/report.json` and a
   self-contained Vietnamese `report.html`; default period: the 7 complete UTC days before today) and the console page `/console/report`
   (read only, the signed-in account's client; no route with the console off) all call **one service**, `HealthReportService`; none has
   a query of its own. **SQL aggregates only** (`HealthReportQueries`, `GROUP BY`, no row loaded) in one read-only `REPEATABLE READ`
@@ -252,7 +252,7 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
 
 11. Listing health report (ADR-018, Proposed): done as one PR (`feat/listing-health-report`: ADR, V26/V27, `HealthReportService`, the
     endpoint, the `health-report` job, the console page, docs). Open questions the maintainer decides are at the end of the ADR (plan
-    gating, history beyond the retention, one language for the job and the console, `--client=all`, the default period, `top` as a
+    gating, history beyond the retention, one language for the job and the console, the default period, `top` as a
     parameter, personalization marks). Not planned: a rollup table, e-mailing the report, a cache-hit counter.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
@@ -300,7 +300,7 @@ docker compose run --rm batch-check --input=/batch/input/<file.csv> --mapping=/b
 Health report (see `docs/deployment.md`; reads the database, writes `health-report/out/<UTC timestamp>/report.json` and `report.html`):
 
 ```bash
-docker compose run --rm health-report --client=<name|id|all> [--from=YYYY-MM-DD --to=YYYY-MM-DD] [--marketplace=ETSY|AMAZON]
+docker compose run --rm health-report (--client=<name|id> | --all-clients) [--from=YYYY-MM-DD --to=YYYY-MM-DD] [--marketplace=ETSY|AMAZON]
 # profile `health-report`; no network, no model, writes nothing to the database; ./health-report is mounted at /health-report
 ```
 
