@@ -1,8 +1,24 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
     profiles: ["prod"]
     restart: unless-stopped
+    mem_limit: ${POSTGRES_MEM_LIMIT:-4g}
+    logging: *default-logging
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-2GB}
+      - -c
+      - work_mem=${POSTGRES_WORK_MEM:-16MB}
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-50}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
@@ -20,6 +36,8 @@ services:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["prod"]
     restart: unless-stopped
+    mem_limit: ${API_MEM_LIMIT:-2g}
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -28,6 +46,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75.0}
       # Embeddings (ADR-012): none by default, so no model and no key are needed. With provider `api` the application
       # refuses to start while the key is empty.
       LISTING_GUARD_EMBEDDING_PROVIDER: ${LISTING_GUARD_EMBEDDING_PROVIDER:-none}
@@ -57,10 +76,17 @@ services:
       LISTING_GUARD_POLICIES_SEARCHENDPOINT_ENABLED: "false"
     ports:
       - "127.0.0.1:${API_PORT:?Set API_PORT in .env}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   admin:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["admin"]
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,6 +109,7 @@ services:
   trademark-import:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +129,7 @@ services:
   uspto-convert:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -124,6 +152,7 @@ services:
   batch-check:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -145,10 +174,11 @@ services:
   # only. The folder it writes to must be writable by uid 10001 (docs/deployment.md). Set TRADEMARK_CATALOG_VERSION as for the
   # api, so that the report names the catalog this deployment serves.
   #   docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report \
-  #     --client=<client name|client id|all> [--from=YYYY-MM-DD --to=YYYY-MM-DD] [--marketplace=ETSY|AMAZON]
+  #     (--client=<client name|id> | --all-clients) [--from=YYYY-MM-DD --to=YYYY-MM-DD] [--marketplace=ETSY|AMAZON]
   health-report:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
