@@ -84,6 +84,12 @@ Working end to end:
   secret is shown once; at most `listing-guard.console.max-active-keys`, default 5, active keys; no plan check and no
   migration), and while the trademark catalog is the fictional DEMO one every page carries a banner that says so.
   Production requires HTTPS and SMTP; development can log links. Saved listings and history remain planned.
+- The optional MCP server ([ADR-017](docs/adr/ADR-017-mcp-server.md), `mcp-server/`): a separate jar that lets an AI agent
+  (Claude Code, Claude Desktop, your own agent) call the checks as six read-and-check tools over the Model Context Protocol.
+  It is only an HTTP client of the API with a client's `X-API-Key` (no database, no internal service, no migration), so keys,
+  rate limits, plans and the quota apply unchanged. The answer of the API reaches the agent verbatim with its disclaimer,
+  versions and completeness: the model never decides. STDIO is the default; Streamable HTTP is optional and for loopback or a
+  private network only (it has no login). No tool writes, applies a fix or publishes. See [docs/mcp.md](docs/mcp.md).
 
 Before you rely on it:
 
@@ -147,6 +153,10 @@ Client backend -- X-API-Key --> Listing Guard API (Spring Boot)
        -> CheckService + TrademarkCheckService (the same services as the endpoints)
        -> findings.csv, listings.csv, summary.html
 
+  MCP server (its own jar, `mcp-server/`; optional; no database, no internal service)
+  AI agent -- STDIO (default) or Streamable HTTP on loopback only --> six tools
+       -> HTTP calls with X-API-Key to the Listing Guard API above; its answers come back unchanged
+
   Policy ingest job (profile `ingest`)
   policies/manifest.yaml + policies/raw/<marketplace>/*.html|pdf
        -> parse -> structural chunks -> embeddings -> pgvector
@@ -164,6 +174,7 @@ Modules:
 | `personalization-screening/` | Personalization screening core (ADR-016): the input of the text a buyer typed, its canonical hash, a strict ruleset loader, `personalization-screening-2026-11.yaml` (character classes and print profiles), the three character rules, the adapter that runs the trademark scanner on each value, the pack fingerprint, and `INCOMPLETE` when a rule fails or no catalog is served. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, hashing for tests), `PolicyRetriever`, retrieval metrics, and the `LlmProvider` contract with a scripted test provider and a `CitationVerifier` (no call to a real model is implemented). No Spring. |
 | `api/` | Spring Boot REST app and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks`, `/trademark-checks`, `/variation-checks` and `/personalization-screenings` endpoints with their retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
+| `mcp-server/` | MCP server for AI agents (ADR-017): six tools that call the REST API with a client's key and return its answers unchanged; STDIO by default, optional Streamable HTTP on loopback. The official MCP Java SDK (no Spring), a JDK HTTP client, no database, no dependency on another module. |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
 | `batch/` | `mappings/` (example column mappings, committed); `input/` and `out/` (your exports and the reports, git-ignored) |
@@ -172,6 +183,7 @@ Modules:
 | `docs/api/` | `openapi.json`, the committed API contract (a test fails when it drifts from the code) |
 | `docs/integration-guide.md` | How a backend calls the API: auth, flow, field paths, errors |
 | `docs/batch-check.md` | How to check an export file and read the reports |
+| `docs/mcp.md` | How to use the checks from an AI agent: Claude Code and Claude Desktop setup, the six tools, errors, limits |
 | `docs/deployment.md` | Production deployment, upgrades, and the migration notes |
 | `docs/releases/` | Release notes, one file per version |
 
@@ -261,6 +273,27 @@ manager). A row that cannot be read is reported with its line and the batch goes
 rules run and the reports say so. With `--label-column` (a true/false column such as "was taken down") the summary also
 shows how often the trademark check flagged those listings, as a **measurement on a small set, not an accuracy**. See
 [docs/batch-check.md](docs/batch-check.md): preparing the file, writing the mapping, reading the reports, labelling.
+
+### Use the checks from an AI agent (MCP)
+
+An AI agent can call the checks through the Model Context Protocol with the `mcp-server` jar (ADR-017). It is a client of the
+API above, not part of it: it needs a running API and the key of one client, and nothing else. The jar is not published; build it
+and point the agent's host at it (this needs JDK 21 and no Docker):
+
+```bash
+./mvnw -B -pl mcp-server package        # -> mcp-server/target/listing-guard-mcp.jar
+claude mcp add listing-guard \
+  --env LISTING_GUARD_MCP_API_KEY=<a client key> --env LISTING_GUARD_MCP_BASE_URL=http://localhost:8080 \
+  -- java -jar /absolute/path/to/mcp-server/target/listing-guard-mcp.jar
+```
+
+The tools are `check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits` and `get_usage`.
+They only read and check. **The model does not decide**: each result is the API's answer, unchanged, with its disclaimer,
+versions and `completeness` (`INCOMPLETE` is not clean, an `UNKNOWN` risk is not `LOW`); a deployment with no trademark catalog
+gives `check_trademark` a result with an unknown risk, not an error. The server does not start without
+`LISTING_GUARD_MCP_API_KEY` and `LISTING_GUARD_MCP_BASE_URL`. The optional Streamable HTTP transport is off by default, binds
+loopback or a private address only and has no authentication: **never expose it to the internet**. Claude Desktop setup, example
+questions, the errors and the limits are in [docs/mcp.md](docs/mcp.md). `docker-compose` has no MCP service.
 
 ## Policy corpus and retrieval
 
@@ -512,7 +545,8 @@ enforcement of `policy-analyzer` are not part of it), and the Listing Workspace 
 dashboard, Check listing editor and API keys page ([ADR-014](docs/adr/ADR-014-listing-workspace.md) part B, V21; off by
 default), and the variation checks ([ADR-015](docs/adr/ADR-015-variation-checks.md); the plan pack in V22 and the result
 tables in V23), and the personalization screening ([ADR-016](docs/adr/ADR-016-personalization-screening.md); the plan pack
-in V24 and the result tables in V25).
+in V24 and the result tables in V25), and the MCP server ([ADR-017](docs/adr/ADR-017-mcp-server.md); a separate module that
+only calls the API, no migration).
 What follows, in this order, is **not built yet**:
 
 1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
@@ -539,12 +573,16 @@ What follows, in this order, is **not built yet**:
    any page that shows readiness must always show the trademark result alongside it. Plan-based gating of API keys, a plan
    comparison page and billing are deferred. The Etsy rule `tag_count_underused` is still planned: it needs a fix
    action that adds a value, so `etsy-2026-12` shipped without it and it will come with a later Etsy ruleset version.
+8. MCP server ([ADR-017](docs/adr/ADR-017-mcp-server.md)), what remains: the questions at the end of the ADR (the annotations
+   of the check tools, a token on the HTTP transport, a key per session, reading a stored result, how to distribute the jar).
+   It has no Docker image, no compose service and no tool that writes, and it adds no authentication to the HTTP transport.
 
 ## Documentation
 
 - [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, plans and quota, the ruleset limits for a character counter, and client isolation.
 - [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields, and the request of the variation checks.
 - [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
+- [MCP server](docs/mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the six tools, errors and limits.
 - [Deployment](docs/deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
 - [Release notes](docs/releases/v0.5.0.md): what changed in each version and what to do when upgrading.
 - [ADR-001: Rule configuration](docs/adr/ADR-001-rule-config.md)
@@ -562,6 +600,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-013: Client plans and monthly quota](docs/adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
 - [ADR-015: Variation checks](docs/adr/ADR-015-variation-checks.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; it ends with the questions the maintainer has to decide)
 - [ADR-016: Personalization screening](docs/adr/ADR-016-personalization-screening.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; the print profiles are placeholders; it ends with the questions the maintainer has to decide)
+- [ADR-017: MCP server for AI agents](docs/adr/ADR-017-mcp-server.md) (Proposed; implemented: a separate module that only calls the API, six tools that never write, STDIO by default; it ends with the questions the maintainer has to decide)
 - [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor and API keys page are implemented, all off by default; saved listings and history are not designed yet)
 
 ## License

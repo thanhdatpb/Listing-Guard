@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Standard output carries the MCP protocol on the stdio transport: one stray line there corrupts the session.
+  Everything is logged to standard error. The pattern prints the message only (never an exception's stack trace or
+  message: the code logs tool name, status, request id and timing, never an argument or the API key; ADR-017).
+-->
+<configuration>
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level %logger{24} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="io.modelcontextprotocol" level="WARN"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDERR"/>
+    </root>
+</configuration>

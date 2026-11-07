@@ -19,6 +19,7 @@
         <module>variation-checks</module>
         <module>personalization-screening</module>
         <module>api</module>
+        <module>mcp-server</module>
     </modules>
 
     <properties>
