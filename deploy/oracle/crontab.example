@@ -2,6 +2,9 @@
 # Daily custom-format PostgreSQL backup; local retention is controlled by BACKUP_RETENTION_COUNT.
 15 2 * * * cd /opt/listing-guard && ./deploy/oracle/backup.sh
 
+# Weekly off-host recovery point under the R2 `weekly/` prefix (set the matching lifecycle rule to 28 days).
+45 2 * * 0 cd /opt/listing-guard && BACKUP_S3_TIER=weekly ./deploy/oracle/backup.sh
+
 # Weekly report for every active client, saved under health-report/out/.
 0 3 * * 1 cd /opt/listing-guard && docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --all-clients
 

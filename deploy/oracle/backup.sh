@@ -84,15 +84,19 @@ if [[ -n $bucket ]]; then
   endpoint=$(read_env BACKUP_S3_ENDPOINT)
   prefix=$(read_env BACKUP_S3_PREFIX)
   session_token=$(read_env BACKUP_S3_SESSION_TOKEN)
+  tier=${BACKUP_S3_TIER:-daily}
+  if [[ $tier != daily && $tier != weekly ]]; then
+    printf 'BACKUP_S3_TIER must be daily or weekly.\n' >&2
+    exit 1
+  fi
   if [[ -z $access_key || -z $secret_key || -z $region ]]; then
     printf 'S3 upload needs BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY, and BACKUP_S3_REGION.\n' >&2
     exit 1
   fi
-  destination="s3://$bucket"
-  if [[ -n $prefix ]]; then
-    destination+="/${prefix#/}"
-  fi
-  destination+="/$(basename -- "$backup_file")"
+  prefix=${prefix#/}
+  prefix=${prefix%/}
+  prefix=${prefix:+$prefix/}$tier
+  destination="s3://$bucket/$prefix/$(basename -- "$backup_file")"
   aws_args=(s3 cp "$backup_file" "$destination" --only-show-errors --region "$region")
   if [[ -n $endpoint ]]; then
     aws_args+=(--endpoint-url "$endpoint")
