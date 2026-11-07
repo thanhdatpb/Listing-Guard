@@ -104,7 +104,11 @@ class HealthReportJobIntegrationTest {
     }
 
     private HealthReportOptions options(String client, String from, String to, String marketplace) {
-        return new HealthReportOptions(client, from, to, marketplace);
+        return new HealthReportOptions(client, false, from, to, marketplace);
+    }
+
+    private HealthReportOptions allClients(String from, String to, String marketplace) {
+        return new HealthReportOptions(null, true, from, to, marketplace);
     }
 
     private void populate(TestClient client) {
@@ -194,7 +198,7 @@ class HealthReportJobIntegrationTest {
         populate(a);
         jdbc.update("UPDATE client SET active = FALSE WHERE id = ?", off.id());
 
-        JsonNode file = json(job().run(options("all", FROM, TO, null)).dir());
+        JsonNode file = json(job().run(allClients(FROM, TO, null)).dir());
 
         List<String> names = new ArrayList<>();
         file.at("/clients").forEach(entry -> names.add(entry.get("client").asText()));

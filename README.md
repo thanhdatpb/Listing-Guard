@@ -291,9 +291,9 @@ last, run the `health-report` job: a one-shot job on the database and local file
 nothing to the database. Without dates it reports the 7 complete UTC days before today (run on a Monday, the previous ISO week):
 
 ```bash
-docker compose run --rm health-report --client=all                       # every active client
+docker compose run --rm health-report --all-clients                      # every active client
 docker compose run --rm health-report --client=demo-client --from=2026-11-02 --to=2026-11-08 --marketplace=ETSY
-# production: docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --client=all
+# production: docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --all-clients
 ```
 
 It writes `health-report/out/<UTC timestamp>/report.json` and `report.html` (git-ignored; one self-contained page in Vietnamese,
@@ -605,8 +605,8 @@ What follows, in this order, is **not built yet**:
    of the check tools, a token on the HTTP transport, a key per session, reading a stored result, how to distribute the jar).
    It has no Docker image, no compose service and no tool that writes, and it adds no authentication to the HTTP transport.
 9. Listing health report ([ADR-018](docs/adr/ADR-018-listing-health-report.md)), what remains: the questions at the end of the ADR
-   (plan gating, history beyond the retention, one language, `--client=all`, the default period). It stores nothing new and writes
-   nothing; the endpoint, the job and the console page are implemented.
+   (plan gating, history beyond the retention, one language, the default period). The job uses `--all-clients` for the
+   all-client report. It stores nothing new and writes nothing; the endpoint, the job and the console page are implemented.
 
 ## Documentation
 
@@ -615,6 +615,7 @@ What follows, in this order, is **not built yet**:
 - [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
 - [MCP server](docs/mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the six tools, errors and limits.
 - [Deployment](docs/deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
+- [Oracle ARM deployment](docs/deploy-oracle.md): deploy the production API and PostgreSQL on an Oracle Cloud Ampere A1 VM behind Cloudflare Tunnel.
 - [Release notes](docs/releases/v0.5.0.md): what changed in each version and what to do when upgrading.
 - [ADR-001: Rule configuration](docs/adr/ADR-001-rule-config.md)
 - [ADR-002: Ruleset versioning](docs/adr/ADR-002-ruleset-versioning.md)
@@ -633,6 +634,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-016: Personalization screening](docs/adr/ADR-016-personalization-screening.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; the print profiles are placeholders; it ends with the questions the maintainer has to decide)
 - [ADR-017: MCP server for AI agents](docs/adr/ADR-017-mcp-server.md) (Proposed; implemented: a separate module that only calls the API, six tools that never write, STDIO by default; it ends with the questions the maintainer has to decide)
 - [ADR-018: Listing health report](docs/adr/ADR-018-listing-health-report.md) (Proposed; implemented: an endpoint, a weekly job and a console page that add up stored counts per client, never listing text; it ends with the questions the maintainer has to decide)
+- [ADR-019: Oracle A1 deployment behind Cloudflare Tunnel](docs/adr/ADR-019-oracle-a1-cloudflare-tunnel.md) (Proposed)
 - [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor and API keys page are implemented, all off by default; saved listings and history are not designed yet)
 
 ## License

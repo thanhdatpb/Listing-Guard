@@ -84,7 +84,16 @@ jobs:
         if: steps.trivy.outcome == 'failure'
         run: exit 1
 
-      - name: Push clean release image
-        run: |
-          docker push "ghcr.io/thanhdatpb/listing-guard:${GITHUB_REF_NAME#v}"
-          docker push ghcr.io/thanhdatpb/listing-guard:latest
+      - name: Set up QEMU
+        if: steps.trivy.outcome == 'success'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build and push multi-platform release image
+        if: steps.trivy.outcome == 'success'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}

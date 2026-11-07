@@ -10,7 +10,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
- * One-shot job: {@code --spring.profiles.active=health-report --client=<name|id|all> [--from=... --to=...] [--marketplace=...]}
+ * One-shot job: {@code --spring.profiles.active=health-report (--client=<name|id> | --all-clients) [--from=... --to=...]
+ * [--marketplace=...]}
  * writes {@code report.json} and {@code report.html} (see {@link HealthReportJob} and ADR-018) and the application exits (the
  * profile turns the web server off). It reads the database and writes local files only; it makes no network call, calls no
  * model and writes nothing to the database. A refused option or period makes the process exit with a non-zero code.

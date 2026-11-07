@@ -193,7 +193,7 @@ A one-shot job like `batch-check` and `admin`: Spring profile `health-report`, n
 profile of `docker-compose.yml` and `docker-compose.prod.yml` (`--profile prod --profile tools run --rm health-report ...`), no
 network, no model, no endpoint. Local files and the database only.
 
-- `--client=<name|id|all>` (required). `all` is every **active** client, by name; a client named `all` is reached by its id. A
+- Exactly one of `--client=<name|id>` or `--all-clients` is required. The flag selects every **active** client; a
   named client must exist and be active, as in `batch-check`. `--marketplace=` is optional.
 - `--from=` and `--to=` come together or not at all. Without them the period is the **7 complete UTC days before today**
   (`listing-guard.reports.default-days`): a run on a Monday reports the previous ISO week exactly. The same limits and errors
@@ -292,7 +292,8 @@ Written as questions, not decided here; each says what this record assumed meanw
    job's files are the record.
 3. **Cache hits and usage.** Not stored, so not reported. Is a counter wanted, knowing it is a write on every request?
 4. **Language.** The job's HTML is Vietnamese and the console page English. One language for both?
-5. **`--client=all`.** It makes a client named `all` reachable only by id. Is a separate `--all-clients` flag better?
+5. **All-client selection.** The job uses an explicit `--all-clients` flag, so the client name `all` remains available to
+   `--client=all`.
 6. **Default period.** "7 complete days before today" excludes today. Is "the last 7 days including today" preferred for the job?
 7. **`top` as a request parameter.** The size of the ranked lists is a setting, not a parameter. Should a caller choose it?
 8. **Personalization marks.** Left out because they describe what a buyer typed. Is a count of screenings with any trademark

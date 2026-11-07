@@ -71,8 +71,9 @@ class HealthReportJobProfileTest {
     @Test
     void runsAsAJobWritesUnderTheConfiguredDirectoryAndRefusesWhatItCannotUse() throws IOException, SQLException {
         // the first start applies the migrations, and it ends on the missing option
-        assertThatThrownBy(() -> runJob()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Missing --client")
-                .hasMessageContaining("--client=<client name|client id|all>");
+        assertThatThrownBy(() -> runJob()).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Pass exactly one of --client")
+                .hasMessageContaining("--all-clients");
 
         sql("INSERT INTO client (name) VALUES ('report-client')");
         sql("INSERT INTO client (name) VALUES ('report-other')");
@@ -117,17 +118,32 @@ class HealthReportJobProfileTest {
         sql("INSERT INTO client (name) VALUES ('all-a')");
         sql("INSERT INTO client (name) VALUES ('all-b')");
         sql("INSERT INTO client (name, active) VALUES ('all-off', false)");
+        sql("INSERT INTO client (name) VALUES ('all') ON CONFLICT (name) DO NOTHING");
 
-        runJob("--client=all", "--from=2026-11-02", "--to=2026-11-08", "--marketplace=etsy");
+        runJob("--all-clients", "--from=2026-11-02", "--to=2026-11-08", "--marketplace=etsy");
 
         List<Path> runs = runDirectories();
         assertThat(runs).hasSize(1);
         JsonNode file = new ObjectMapper().readTree(Files.readString(runs.get(0).resolve("report.json"), StandardCharsets.UTF_8));
         List<String> names = new java.util.ArrayList<>();
         file.at("/clients").forEach(entry -> names.add(entry.get("client").asText()));
-        assertThat(names).contains("all-a", "all-b").doesNotContain("all-off");
+        assertThat(names).contains("all-a", "all-b", "all").doesNotContain("all-off");
         assertThat(file.at("/marketplace").asText()).isEqualTo("ETSY");
         assertThat(file.at("/period/from").asText()).isEqualTo("2026-11-02");
         assertThat(file.at("/period/to").asText()).isEqualTo("2026-11-08");
+    }
+
+    @Test
+    void aClientNamedAllCanBeSelectedByName() throws IOException, SQLException {
+        assertThatThrownBy(() -> runJob("--client=not-created")).isInstanceOf(IllegalArgumentException.class);
+        sql("INSERT INTO client (name) VALUES ('all') ON CONFLICT (name) DO NOTHING");
+
+        runJob("--client=all");
+
+        List<Path> runs = runDirectories();
+        assertThat(runs).hasSize(1);
+        JsonNode file = new ObjectMapper().readTree(Files.readString(runs.get(0).resolve("report.json"), StandardCharsets.UTF_8));
+        assertThat(file.at("/clients")).hasSize(1);
+        assertThat(file.at("/clients/0/client").asText()).isEqualTo("all");
     }
 }
