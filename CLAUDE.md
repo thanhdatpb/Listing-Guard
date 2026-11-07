@@ -84,6 +84,28 @@ It never edits a listing, never publishes, and does no SEO.
   lock; cache `(client, marketplace, pack, input hash, ruleset version, analysis version)` with `COMPLETE` results only, the
   analysis version includes the trademark scan's fingerprint; one unit per new `COMPLETE` result. No fix, no `batch-check` part,
   no console page, no `GET .../limits` entry.
+- **MCP server** (`mcp-server/`, ADR-017, Proposed; implemented, `docs/mcp.md`): a jar of its own for AI agents (Claude Code,
+  Claude Desktop, a department's agent) over the Model Context Protocol. **It is only an HTTP client of the REST API**
+  (`X-API-Key` from `LISTING_GUARD_MCP_API_KEY`, base URL from `LISTING_GUARD_MCP_BASE_URL`; it does not start without them and
+  never prints a value): no database, no internal service, no dependency on another module, no migration, no change to the API or
+  `docs/api/openapi.json`, so keys, rate limit, plans and quota (ADR-005, ADR-007, ADR-013) apply unchanged. Official MCP Java SDK
+  `io.modelcontextprotocol.sdk` **2.1.0** pinned exactly (`mcp-core` + `mcp-json-jackson2`; the aggregate `mcp` pulls Jackson 3;
+  2.2.0-M2 is a milestone and is not used), **no Spring** (the Spring AI starter needs Spring Boot 4; Spring Boot stays 3.5), the JDK
+  `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Six tools
+  (`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`; `Endpoint` is the
+  closed list of API calls, only `GET` and `POST`, no tool takes a path or a URL); **none writes, applies a fix or publishes**.
+  **The model does not decide**: a `2xx` answer is returned verbatim (exact body as text, the same object as structured content,
+  no `outputSchema`, nothing removed or summarized, `INCOMPLETE` and `UNKNOWN` never turned into anything else). API problems
+  become tool errors (`isError`) with `code`, `status`, `requestId`, `retryable`, `hint` from a fixed member list (a `quota-exceeded`
+  is never retryable and gets no invented wait); `503 trademark-not-configured` on `check_trademark` is the one result the server
+  builds itself (`NOT_CONFIGURED`, `UNKNOWN`, no `findings`, `derivedFrom`); own codes are `api-unreachable`, `api-timeout`,
+  `api-invalid-response`, `invalid-arguments`, `internal-error`. STDIO is the default (stdout carries only protocol, logs go to stderr);
+  Streamable HTTP is optional, loopback or private-network bind only (a wildcard or public address stops the start), Host/Origin
+  validated, **no authentication, never exposed to the internet**. The key goes only in the header, never in a log, result or message
+  (an echo of it in an answer is replaced), redirects are not followed, cleartext `http` only to localhost unless
+  `LISTING_GUARD_MCP_ALLOW_INSECURE_HTTP=true`. **No argument is ever logged** (a listing is client data, the buyer's text is personal
+  data). Tests use the JDK `HttpServer` as the API stub (no Docker, no WireMock) and the SDK's own client over stdio (a child process)
+  and HTTP. No compose service, `docs/releases` untouched.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Optional ADR-014 fix/readiness output is behind
@@ -150,7 +172,7 @@ It never edits a listing, never publishes, and does no SEO.
   the banner and the editor's trademark panel repeats it.
 - Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
+  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12b.yaml`): simple input format (`title`, `brand`,
@@ -208,6 +230,11 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
    print profile above all, the unit cost, counting characters, capitals-only profiles). Next, if wanted: the real profile as a
    new ruleset version, a `batch-check` part for a file of orders, a console page.
 
+10. MCP server (ADR-017, Proposed): done as one PR (`feat/mcp-server`: ADR, module, tests, `docs/mcp.md`, README, this file). Open
+    questions the maintainer decides are at the end of the ADR (the annotations of the check tools, a token on the HTTP transport, a
+    key per session, a tool that reads a stored result, how the jar is distributed, cleartext on a private network). Not planned: a
+    tool that writes, a Docker image or compose service, authentication on the HTTP transport.
+
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
 
@@ -220,7 +247,8 @@ JUnit 5 + Testcontainers. Root package `com.thanhdatpb.listingguard`.
 
 ```bash
 ./mvnw -B verify                 # build + all tests (needs Docker for Testcontainers)
-./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening verify   # fast: no Docker needed
+./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening,mcp-server verify   # fast: no Docker needed
+./mvnw -B -pl mcp-server package # -> mcp-server/target/listing-guard-mcp.jar (the MCP server; see docs/mcp.md)
 docker compose up --build        # postgres + api (override ports: POSTGRES_PORT, API_PORT)
 ```
 
@@ -380,6 +408,15 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   trademark scanner (`TrademarkAdapter`) are part of the analysis fingerprint: changing one needs a new `AlgorithmVersions`
   constant. Nothing in `trademark-scanner` or its ruleset changes for this pack. Tests read classes, profiles, limits and
   templates from the ruleset and use invented names (the DEMO catalog's, never a real mark).
+- **MCP server** (ADR-017): `mcp-server` stays a client of the REST API and depends on no other module (a test reads its POM and its
+  imports: no database, no Spring, no `core`, no `api`). A new tool means a new `Endpoint` entry, a `ToolSpec` with a schema that
+  `ArgumentChecker` enforces, and a test of its method, path and header; **never a tool that writes, never a tool that takes a URL
+  or a path**, and a new HTTP method needs an ADR. Do not decide, reword, summarize or "improve" an answer of the API in the server:
+  the one object it builds itself is the `trademark-not-configured` result, and it says so (`derivedFrom`). Never put a value in a
+  `ConfigException` message, the API key anywhere but the `X-API-Key` header, or an argument in a log line. Nothing is written to
+  standard output but protocol messages on stdio. The SDK version is pinned exactly and is never a milestone; a version change
+  re-runs the transport tests (stdio child process, Streamable HTTP, Origin/Host refusal). Tests stub the API with the JDK
+  `HttpServer`; no real API, no Docker.
 - **Fix suggestions and readiness** (ADR-014): `listing-guard.fixes.enabled` defaults to false. Off means `/checks`
   uses `RuleEngine.run()` and its response and batch report keep their current shape. On, API/batch use `runDetailed()`
   and readiness covers only `listing-rules`; clients must show trademark results separately. V20 persists fix/readiness
