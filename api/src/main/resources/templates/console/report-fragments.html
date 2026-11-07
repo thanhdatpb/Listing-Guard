@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- Parts of the report page (ADR-018) that repeat for each pack. This file is never served on its own; console/report includes
+     the fragments below. Every value goes through th:text. -->
+
+<!-- Findings per severity: a list of SeverityCountView. -->
+<table class="report" th:fragment="severities(list)">
+    <thead>
+    <tr>
+        <th scope="col">Severity</th>
+        <th scope="col" class="n">Findings</th>
+        <th scope="col" class="n">Results affected</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="s : ${list}">
+        <td th:text="${s.severity}"></td>
+        <td class="n" th:text="${s.findings}"></td>
+        <td class="n" th:text="${s.checksAffected}"></td>
+    </tr>
+    </tbody>
+</table>
+
+<!-- A ranking of rules: a RuleRankingView. -->
+<div th:fragment="rules(ranking)">
+    <p th:if="${ranking.items.isEmpty()}">No findings.</p>
+    <th:block th:unless="${ranking.items.isEmpty()}">
+        <div class="report-scroll">
+            <table class="report">
+                <thead>
+                <tr>
+                    <th scope="col">Rule</th>
+                    <th scope="col">Severity</th>
+                    <th scope="col" class="n">Findings</th>
+                    <th scope="col" class="n">Results affected</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${ranking.items}">
+                    <td th:text="${item.ruleId}"></td>
+                    <td th:text="${item.severity}"></td>
+                    <td class="n" th:text="${item.findings}"></td>
+                    <td class="n" th:text="${item.checksAffected}"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="muted small">
+            <span th:text="${ranking.items.size()}"></span> of <span th:text="${ranking.distinctRules}"></span> different rules (and
+            severities), most findings first.
+        </p>
+    </th:block>
+</div>
+</body>
+</html>

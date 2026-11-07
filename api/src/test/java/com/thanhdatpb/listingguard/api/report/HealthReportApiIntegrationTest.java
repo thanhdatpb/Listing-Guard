@@ -585,6 +585,15 @@ class HealthReportApiIntegrationTest {
         }
     }
 
+    @Test
+    void withTheConsoleOffThereIsNoReportPage() throws Exception {
+        TestClient c = client();
+
+        // the console of this context is off (the default): the page has no route, with or without a key
+        mvc.perform(MockMvcRequestBuilders.get("/console/report").header(HEADER, c.key())).andExpect(status().isNotFound());
+        mvc.perform(MockMvcRequestBuilders.get("/console/report")).andExpect(status().isUnauthorized());
+    }
+
     // ---- the contract
 
     @Test
