@@ -1,0 +1,8 @@
+# Spring Framework 6.2 OSS has no patched release for these two advisories (the fix is 7.0.9, and
+# 6.2.19 is the last 6.2.x on Maven Central). The app does not configure XsltView/XsltViewResolver
+# or a catch-all view-rendering route, and exposes no SSE endpoints. Reassess after the separate
+# Spring Boot 4 migration planned for v0.7.0.
+# The expiry has to follow the ID on the same line: Trivy ignores a comment line, so a
+# "# exp:" comment would leave the exception permanent.
+CVE-2026-47884 exp:2027-01-31
+CVE-2026-47890 exp:2027-01-31
