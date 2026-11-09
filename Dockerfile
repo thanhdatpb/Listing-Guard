@@ -17,6 +17,7 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 FROM --platform=$TARGETPLATFORM eclipse-temurin:25-jre
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --uid 10001 --no-create-home app
