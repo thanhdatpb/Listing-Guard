@@ -72,6 +72,7 @@ jobs:
           trivyignores: .trivyignore
           vuln-type: os,library
           severity: CRITICAL
+          limit-severities-for-sarif: true
           exit-code: "1"
 
       - name: Upload Trivy results to GitHub Security
