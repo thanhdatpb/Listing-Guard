@@ -15,7 +15,7 @@
     <description>Policy corpus ingestion, chunking, embeddings and retrieval for RAG. No Spring.</description>
 
     <properties>
-        <jsoup.version>1.23.2</jsoup.version>
+        <jsoup.version>1.24.1</jsoup.version>
         <pdfbox.version>3.0.8</pdfbox.version>
     </properties>
 

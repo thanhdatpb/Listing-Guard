@@ -281,6 +281,17 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     gating, history beyond the retention, one language for the job and the console, the default period, `top` as a
     parameter, personalization marks). Not planned: a rollup table, e-mailing the report, a cache-hit counter.
 
+12. Enforcement signal (ADR-021, Proposed): **documentation only so far (`docs/adr-enforcement-signal`); no code, data or migration.** An
+    offline, operator-loaded, versioned, append-only catalog of court cases (US federal, the "Schedule A" kind among them) linked to marks
+    **only by a reviewed link (registration source id or mark text), never by a party's name**, that adds `enforcement` evidence (case count,
+    latest filing date, case refs) to a trademark finding and raises its level by a separate versioned policy YAML (all `unverified`) when
+    configured; `listing-guard.enforcement.catalog-version` unset changes nothing (same response, level and fingerprint). No party name,
+    caption or court text is stored; an answer never says "no lawsuit". Of the four candidate sources only PACER and CourtListener/RECAP
+    hold lawsuits; WIPO's terms forbid automated use and bulk storage, and the terms of PACER (storage and reuse), CourtListener
+    (`/terms/` answered 403) and EUIPO are **chưa kiểm chứng**: never fetch around a block, the ADR lists the pages the maintainer saves. Nothing
+    is built before the maintainer answers questions 1 to 3 and 6 at the end of the ADR (raise the level or a separate signal, the source and its
+    terms, commercial use of CourtListener, the initial thresholds).
+
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
 

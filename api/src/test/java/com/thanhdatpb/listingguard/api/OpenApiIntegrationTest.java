@@ -195,6 +195,14 @@ class OpenApiIntegrationTest {
         assertThat(spec.at("/components/schemas/TrademarkCheckRequest/properties/product_type").isMissingNode()).isFalse();
         assertThat(spec.at("/components/schemas/TrademarkCheckRequest/required").toString())
                 .doesNotContain("product_type");
+        assertThat(spec.at("/components/schemas/TrademarkCheckResult/properties/findings/items/$ref").asText())
+                .as("its own finding schema: springdoc merges nested records of one simple name, which gave it the /checks finding")
+                .isEqualTo("#/components/schemas/TrademarkCheckFindingView");
+        assertThat(fieldNames(spec.at("/components/schemas/TrademarkCheckFindingView/properties"))).containsExactlyInAnyOrder(
+                "ruleId", "risk", "field", "start", "end", "snippet", "mark", "matchType", "score", "insideColorPhrase",
+                "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "message", "suggestion");
+        assertThat(spec.at("/components/schemas/CheckResult/properties/findings/items/$ref").asText())
+                .as("/checks keeps its own finding schema").isEqualTo("#/components/schemas/FindingView");
         assertThat(spec.at("/components/schemas/CheckResult/properties/readiness/anyOf/0/$ref").asText())
                 .isEqualTo("#/components/schemas/ReadinessView");
         assertThat(spec.at("/components/schemas/CheckResult/properties/readiness/anyOf/1/type").asText())
