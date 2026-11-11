@@ -59,6 +59,9 @@ health-report/out/
 # Claude Code local state
 .claude/
 
+# Serena local state
+.serena/
+
 # JVM crash and replay dumps
 hs_err_pid*.log
 replay_pid*.log
