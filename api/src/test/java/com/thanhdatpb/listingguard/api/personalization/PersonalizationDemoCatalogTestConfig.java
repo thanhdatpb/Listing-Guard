@@ -44,7 +44,7 @@ public class PersonalizationDemoCatalogTestConfig {
     private static TrademarkRuleset ruleset() {
         try {
             return TrademarkRulesetLoader.parse(
-                    new ClassPathResource("rulesets/trademark-risk-2026-11.yaml").getContentAsString(StandardCharsets.UTF_8));
+                    new ClassPathResource("rulesets/trademark-risk-2026-11b.yaml").getContentAsString(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }

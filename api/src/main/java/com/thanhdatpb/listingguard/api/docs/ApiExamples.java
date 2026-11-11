@@ -269,7 +269,8 @@ public final class ApiExamples {
             {
               "checkId": "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
               "marketplace": "ETSY",
-              "rulesetVersion": "trademark-risk-2026-11",
+              "productType": null,
+              "rulesetVersion": "trademark-risk-2026-11b",
               "catalogVersion": "synthetic-2026-11-0123456789ab",
               "analysisVersion": "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
               "cached": false,
@@ -293,6 +294,8 @@ public final class ApiExamples {
                   "insideColorPhrase": false,
                   "otherRuleIds": [],
                   "sourceIds": ["S-001", "S-002"],
+                  "sourceLinks": [],
+                  "riskAdjustments": [],
                   "message": "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
                   "suggestion": "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                 },
@@ -309,6 +312,8 @@ public final class ApiExamples {
                   "insideColorPhrase": false,
                   "otherRuleIds": [],
                   "sourceIds": [],
+                  "sourceLinks": [],
+                  "riskAdjustments": [],
                   "message": "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
                   "suggestion": "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                 },
@@ -325,6 +330,8 @@ public final class ApiExamples {
                   "insideColorPhrase": false,
                   "otherRuleIds": [],
                   "sourceIds": [],
+                  "sourceLinks": [],
+                  "riskAdjustments": [],
                   "message": "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
                   "suggestion": "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
                 }
@@ -336,7 +343,8 @@ public final class ApiExamples {
             {
               "checkId": "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
               "marketplace": "ETSY",
-              "rulesetVersion": "trademark-risk-2026-11",
+              "productType": null,
+              "rulesetVersion": "trademark-risk-2026-11b",
               "catalogVersion": "synthetic-2026-11-0123456789ab",
               "analysisVersion": "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
               "cached": true,
@@ -360,6 +368,8 @@ public final class ApiExamples {
                   "insideColorPhrase": false,
                   "otherRuleIds": [],
                   "sourceIds": ["S-001", "S-002"],
+                  "sourceLinks": [],
+                  "riskAdjustments": [],
                   "message": "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
                   "suggestion": "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                 },
@@ -376,6 +386,8 @@ public final class ApiExamples {
                   "insideColorPhrase": false,
                   "otherRuleIds": [],
                   "sourceIds": [],
+                  "sourceLinks": [],
+                  "riskAdjustments": [],
                   "message": "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
                   "suggestion": "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                 },
@@ -392,10 +404,83 @@ public final class ApiExamples {
                   "insideColorPhrase": false,
                   "otherRuleIds": [],
                   "sourceIds": [],
+                  "sourceLinks": [],
+                  "riskAdjustments": [],
                   "message": "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
                   "suggestion": "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
                 }
               ]
+            }
+            """;
+
+    /** The same envelope with a {@code product_type}: a mark outside the product type's Nice classes is reported one level lower. */
+    public static final String TRADEMARK_REQUEST_PRODUCT_TYPE = """
+            {
+              "marketplace": "ETSY",
+              "product_type": "mug",
+              "listing": {
+                "title": "Zorvex Ceramic Coffee Mug",
+                "description": "A plain ceramic mug.",
+                "tags": ["mug", "gift"]
+              }
+            }
+            """;
+
+    public static final String TRADEMARK_RESULT_PRODUCT_TYPE = """
+            {
+              "checkId": "5d2e8a17-3c4b-4f69-8b0e-6a1c9d7f2e35",
+              "marketplace": "ETSY",
+              "productType": "mug",
+              "rulesetVersion": "trademark-risk-2026-11b",
+              "catalogVersion": "synthetic-2026-11-0123456789ab",
+              "analysisVersion": "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+              "cached": false,
+              "completeness": "COMPLETE",
+              "riskLevel": "MEDIUM",
+              "failedRuleIds": [],
+              "disclaimer": "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+              "createdAt": "2026-11-11T09:15:30.123456Z",
+              "expiresAt": "2026-12-11T09:15:30.123456Z",
+              "findings": [
+                {
+                  "ruleId": "catalog_exact",
+                  "risk": "MEDIUM",
+                  "field": "title",
+                  "start": 0,
+                  "end": 6,
+                  "snippet": "Zorvex",
+                  "mark": "ZORVEX",
+                  "matchType": "EXACT",
+                  "score": 1.0,
+                  "insideColorPhrase": false,
+                  "otherRuleIds": [],
+                  "sourceIds": ["S-001", "S-002"],
+                  "sourceLinks": [],
+                  "riskAdjustments": [
+                    {
+                      "reason": "outside_product_classes",
+                      "from": "HIGH",
+                      "to": "MEDIUM",
+                      "note": "Nhãn hiệu 'ZORVEX' đăng ký ở nhóm Nice 25, 35, không nhóm nào nằm trong các nhóm 21 của loại sản phẩm 'mug', nên mức rủi ro hạ từ HIGH xuống MEDIUM. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                    }
+                  ],
+                  "message": "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu. Nhãn hiệu 'ZORVEX' đăng ký ở nhóm Nice 25, 35, không nhóm nào nằm trong các nhóm 21 của loại sản phẩm 'mug', nên mức rủi ro hạ từ HIGH xuống MEDIUM. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                  "suggestion": "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                }
+              ]
+            }
+            """;
+
+    public static final String PROBLEM_UNKNOWN_PRODUCT_TYPE = """
+            {
+              "type": "urn:listing-guard:problem:unknown-product-type",
+              "title": "Bad Request",
+              "status": 400,
+              "detail": "Unknown product type 'spaceship'; declared product types: [apparel, mug, poster, sticker, phone_case, jewelry, bag, furniture_decor, fabric, toy]",
+              "instance": "/api/v1/trademark-checks",
+              "known": ["apparel", "mug", "poster", "sticker", "phone_case", "jewelry", "bag", "furniture_decor", "fabric", "toy"],
+              "code": "unknown-product-type",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
             }
             """;
 
@@ -742,7 +827,7 @@ public final class ApiExamples {
               "versions": {
                 "rulesets": [
                   {"pack": "listing-rules", "marketplace": "ETSY", "version": "etsy-2026-12"},
-                  {"pack": "trademark-risk", "marketplace": "ETSY", "version": "trademark-risk-2026-11"}
+                  {"pack": "trademark-risk", "marketplace": "ETSY", "version": "trademark-risk-2026-11b"}
                 ],
                 "trademarkCatalog": {"state": "READY", "version": "synthetic-2026-11-0123456789ab"}
               },

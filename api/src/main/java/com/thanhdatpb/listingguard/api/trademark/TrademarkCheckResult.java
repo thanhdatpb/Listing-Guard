@@ -14,14 +14,17 @@ import java.util.UUID;
  * {@code GET /api/v1/trademark-checks/{id}} (ADR-009). It is a reference warning, never a legal conclusion; the
  * {@code disclaimer} says so. It is a pack-specific DTO and shares nothing with the {@code /checks} response.
  */
-@JsonPropertyOrder({"checkId", "marketplace", "rulesetVersion", "catalogVersion", "analysisVersion", "cached", "completeness",
-        "riskLevel", "failedRuleIds", "disclaimer", "createdAt", "expiresAt", "findings"})
+@JsonPropertyOrder({"checkId", "marketplace", "productType", "rulesetVersion", "catalogVersion", "analysisVersion", "cached",
+        "completeness", "riskLevel", "failedRuleIds", "disclaimer", "createdAt", "expiresAt", "findings"})
 public record TrademarkCheckResult(
         @Schema(description = "Identifier of the stored check; use it with GET /api/v1/trademark-checks/{id} until expiresAt.")
         UUID checkId,
         @Schema(description = "Marketplace code, upper case.", example = "ETSY")
         String marketplace,
-        @Schema(description = "Version of the trademark ruleset that produced the result.", example = "trademark-risk-2026-11")
+        @Schema(description = "The `product_type` the request named, as the ruleset declares it; null when the request named none "
+                + "(and for a result stored before product types existed).", example = "apparel", nullable = true)
+        String productType,
+        @Schema(description = "Version of the trademark ruleset that produced the result.", example = "trademark-risk-2026-11b")
         String rulesetVersion,
         @Schema(description = "Version of the trademark catalog the text was compared with. Opaque.",
                 example = "synthetic-2026-11-0123456789ab")
@@ -51,13 +54,22 @@ public record TrademarkCheckResult(
         Instant expiresAt,
         List<FindingView> findings) {
 
+    /** A result with no product type. */
+    public TrademarkCheckResult(UUID checkId, String marketplace, String rulesetVersion, String catalogVersion,
+                                String analysisVersion, boolean cached, Completeness completeness, RiskLevel riskLevel,
+                                List<String> failedRuleIds, String disclaimer, Instant createdAt, Instant expiresAt,
+                                List<FindingView> findings) {
+        this(checkId, marketplace, null, rulesetVersion, catalogVersion, analysisVersion, cached, completeness, riskLevel,
+                failedRuleIds, disclaimer, createdAt, expiresAt, findings);
+    }
+
     /**
      * One possible reference. {@code field}, {@code start} and {@code end} locate it in the text the API worked on: the
      * field's value after trimming and Unicode NFC, with {@code start} inclusive and {@code end} exclusive, counted in
      * UTF-16 code units (JavaScript and Java string indexes).
      */
     @JsonPropertyOrder({"ruleId", "risk", "field", "start", "end", "snippet", "mark", "matchType", "score", "insideColorPhrase",
-            "otherRuleIds", "sourceIds", "message", "suggestion"})
+            "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "message", "suggestion"})
     public record FindingView(
             @Schema(example = "catalog_exact") String ruleId,
             @Schema(description = "Level of this finding: LOW (informational), MEDIUM or HIGH.") RiskLevel risk,
@@ -77,7 +89,43 @@ public record TrademarkCheckResult(
             @Schema(description = "Other rules that matched an overlapping span of the same field and lost to this finding.")
             List<String> otherRuleIds,
             @Schema(description = "Ids of the source records of the catalog mark; empty when there is no mark.") List<String> sourceIds,
+            @Schema(description = "Public look-up pages for the source records, one per source id the ruleset has an address for "
+                    + "(today an id `uspto:<serial number>` links to its USPTO TSDR page); empty when none has. A link is built "
+                    + "from the ruleset and is not checked: open it to read the record, and treat it as unverified.")
+            List<SourceLinkView> sourceLinks,
+            @Schema(description = "Why `risk` is lower than the level the rule assigned; empty when it is not lower. Each entry says "
+                    + "the original level (`from`) and the level that reason alone gives (`to`); `risk` is the lowest `to`.")
+            List<RiskAdjustmentView> riskAdjustments,
             @Schema(description = "Human text, currently Vietnamese.") String message,
             @Schema(description = "Human text, currently Vietnamese.") String suggestion) {
+
+        /** A finding with no source link and no adjustment. */
+        public FindingView(String ruleId, RiskLevel risk, String field, int start, int end, String snippet, String mark,
+                           MatchType matchType, Double score, boolean insideColorPhrase, List<String> otherRuleIds,
+                           List<String> sourceIds, String message, String suggestion) {
+            this(ruleId, risk, field, start, end, snippet, mark, matchType, score, insideColorPhrase, otherRuleIds, sourceIds,
+                    List.of(), List.of(), message, suggestion);
+        }
+    }
+
+    /** One reason a finding is reported lower than the level its rule assigned. */
+    @JsonPropertyOrder({"reason", "from", "to", "note"})
+    public record RiskAdjustmentView(
+            @Schema(description = "`outside_product_classes`: the request named a product type and none of the mark's Nice classes is "
+                    + "one of the product type's. `common_word`: the mark is an ordinary word of the ruleset's list and the match is "
+                    + "not an exact or phrase match in a brand field.", example = "outside_product_classes") String reason,
+            @Schema(description = "The level the rule assigned before any adjustment.") RiskLevel from,
+            @Schema(description = "The level this reason alone gives; lower than `from`.") RiskLevel to,
+            @Schema(description = "Human text, currently Vietnamese.") String note) {
+    }
+
+    /** A public look-up page for the source record of a catalog mark. */
+    @JsonPropertyOrder({"sourceId", "label", "url"})
+    public record SourceLinkView(
+            @Schema(description = "The source id the link was built from.", example = "uspto:12345678") String sourceId,
+            @Schema(description = "What the page is.", example = "USPTO TSDR") String label,
+            @Schema(description = "The address. Built from a template of the ruleset, only for a source the ruleset names.",
+                    example = "https://tsdr.uspto.gov/#caseNumber=12345678&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch")
+            String url) {
     }
 }

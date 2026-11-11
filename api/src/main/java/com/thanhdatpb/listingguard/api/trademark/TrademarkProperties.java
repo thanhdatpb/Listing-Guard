@@ -17,7 +17,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "listing-guard.trademark")
 public record TrademarkProperties(
-        @DefaultValue("classpath:rulesets/trademark-risk-2026-11.yaml") String ruleset,
+        @DefaultValue("classpath:rulesets/trademark-risk-2026-11b.yaml") String ruleset,
         @DefaultValue({"ETSY", "AMAZON"}) List<String> marketplaces,
         @DefaultValue("") String catalogVersion,
         @DefaultValue("catalogs") String catalogsDir) {

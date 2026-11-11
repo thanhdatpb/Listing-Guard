@@ -8,11 +8,13 @@ import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_TOO_LARGE
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_TRADEMARK_NOT_CONFIGURED;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_TRADEMARK_NOT_FOUND;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_UNAUTHORIZED;
+import static com.thanhdatpb.listingguard.api.docs.ApiExamples.PROBLEM_UNKNOWN_PRODUCT_TYPE;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.TRADEMARK_REQUEST;
+import static com.thanhdatpb.listingguard.api.docs.ApiExamples.TRADEMARK_REQUEST_PRODUCT_TYPE;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.TRADEMARK_RESULT;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.TRADEMARK_RESULT_CACHED;
+import static com.thanhdatpb.listingguard.api.docs.ApiExamples.TRADEMARK_RESULT_PRODUCT_TYPE;
 
-import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.client.AuthenticatedClient;
 import com.thanhdatpb.listingguard.api.security.ApiKeyFilter;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,31 +53,43 @@ public class TrademarkCheckController {
     @Operation(
             summary = "Check a listing for possible trademark references",
             description = """
-                    Takes the same request as `POST /api/v1/checks` (`marketplace` and `listing` in the marketplace's own \
-                    format), so a client can send one JSON to both endpoints. Compares the listing's text with the \
+                    Takes the request of `POST /api/v1/checks` (`marketplace` and `listing` in the marketplace's own \
+                    format) and an optional `product_type`, so a client can send one JSON to both endpoints (`/checks` ignores \
+                    `product_type`). Compares the listing's text with the \
                     configured trademark catalog and returns findings with evidence: the field, the span in the text the API \
-                    worked on (after trimming and Unicode NFC, UTF-16 offsets), the matched mark and how it matched. The \
+                    worked on (after trimming and Unicode NFC, UTF-16 offsets), the matched mark and how it matched. With a \
+                    `product_type`, a mark whose Nice classes are not the product type's is reported one level lower, and \
+                    `riskAdjustments` says why and from which level; a mark that is an ordinary word of the ruleset's list is \
+                    capped the same way unless it is the brand. `sourceLinks` gives a public look-up page for the source \
+                    records the ruleset has an address for. The \
                     result is a reference warning, not a legal conclusion; show the `disclaimer` with it. If the same client \
-                    already sent the same listing text with the same analysisVersion and the stored result is complete and \
+                    already sent the same listing text and product type with the same analysisVersion and the stored result is complete and \
                     still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so \
                     its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's \
                     monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time \
                     (`expiresAt`); only the listing's hash and the result are stored, not the listing text.""",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = CheckRequest.class),
-                            examples = @ExampleObject(name = "etsy-listing", summary = "An Etsy listing (synthetic names)",
-                                    value = TRADEMARK_REQUEST))),
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = TrademarkCheckRequest.class),
+                            examples = {
+                                    @ExampleObject(name = "etsy-listing", summary = "An Etsy listing (synthetic names)",
+                                            value = TRADEMARK_REQUEST),
+                                    @ExampleObject(name = "with-product-type", summary = "The same envelope with a product type",
+                                            value = TRADEMARK_REQUEST_PRODUCT_TYPE)})),
             responses = {
                     @ApiResponse(responseCode = "200", description = "The trademark check result.",
                             content = @Content(mediaType = "application/json", schema = @Schema(implementation = TrademarkCheckResult.class),
                                     examples = {
                                             @ExampleObject(name = "findings", summary = "A fresh check with findings", value = TRADEMARK_RESULT),
                                             @ExampleObject(name = "cached", summary = "The same listing again: the stored result",
-                                                    value = TRADEMARK_RESULT_CACHED)})),
-                    @ApiResponse(responseCode = "400", description = "Invalid request (code `invalid-request`) or unknown marketplace (`unknown-marketplace`).",
+                                                    value = TRADEMARK_RESULT_CACHED),
+                                            @ExampleObject(name = "product-type", summary = "With a product type: a lower level, and why",
+                                                    value = TRADEMARK_RESULT_PRODUCT_TYPE)})),
+                    @ApiResponse(responseCode = "400", description = "Invalid request (code `invalid-request`), unknown marketplace (`unknown-marketplace`) or a `product_type` the ruleset does not declare (`unknown-product-type`; the declared ones are in `known`). A product type is never ignored: the request is refused before anything is stored or counted.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
-                                    examples = @ExampleObject(name = "invalid-request", value = PROBLEM_INVALID_REQUEST))),
+                                    examples = {
+                                            @ExampleObject(name = "invalid-request", value = PROBLEM_INVALID_REQUEST),
+                                            @ExampleObject(name = "unknown-product-type", value = PROBLEM_UNKNOWN_PRODUCT_TYPE)})),
                     @ApiResponse(responseCode = "401", description = "Missing or invalid API key.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_UNAUTHORIZED))),
@@ -98,7 +112,7 @@ public class TrademarkCheckController {
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_TRADEMARK_NOT_CONFIGURED)))})
     public TrademarkCheckResult check(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
-                                      @Valid @RequestBody CheckRequest request) {
+                                      @Valid @RequestBody TrademarkCheckRequest request) {
         return service.check(client.id(), request);
     }
 

@@ -63,13 +63,29 @@ public class TrademarkCheckService {
      * @throws com.thanhdatpb.listingguard.api.plan.QuotaExceededException  if the answer is not stored yet and the month's quota is used up
      */
     public TrademarkCheckResult check(UUID clientId, CheckRequest request) {
+        return check(clientId, request, null);
+    }
+
+    /** The request of {@code POST /api/v1/trademark-checks}: the {@code /checks} envelope and an optional product type. */
+    public TrademarkCheckResult check(UUID clientId, TrademarkCheckRequest request) {
+        return check(clientId, new CheckRequest(request.marketplace(), request.listing()), request.productType());
+    }
+
+    /**
+     * @param requestedProductType a product type the ruleset declares, or null or blank for none (ADR-009)
+     * @throws com.thanhdatpb.listingguard.trademark.config.UnknownProductTypeException if the ruleset does not declare it;
+     *         the request is refused before the cache, the quota or any work, and before the catalog is looked at
+     */
+    public TrademarkCheckResult check(UUID clientId, CheckRequest request, String requestedProductType) {
         PlanService.Admission admission = plans.requirePack(clientId, Pack.TRADEMARK_RISK);
         Normalizer normalizer = normalizers.get(request.marketplace());
         Listing listing = normalizer.normalize(request.listing());
         String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
+        // an undeclared product type is the client's mistake: refuse it, never scan as if none had been named
+        String productType = productType(requestedProductType);
         TrademarkCatalogRuntime.Serving serving = runtime.serving(marketplace);
 
-        TrademarkCheckInput input = input(listing);
+        TrademarkCheckInput input = input(listing, productType);
         TrademarkCheckStore.Identity identity = new TrademarkCheckStore.Identity(clientId, marketplace,
                 serving.scanner().ruleset().packId(), CanonicalInput.of(input).hash(),
                 rulesets.rulesetVersionId(marketplace), serving.fingerprint().value());
@@ -88,7 +104,7 @@ public class TrademarkCheckService {
                 if (result.completeness() == Completeness.COMPLETE) {
                     plans.charge(admission);
                 }
-                UUID id = store.insert(identity, serving.catalogVersionId(), result);
+                UUID id = store.insert(identity, serving.catalogVersionId(), result, productType);
                 return store.find(clientId, id).orElseThrow();
             });
         } catch (DataIntegrityViolationException e) {
@@ -115,8 +131,26 @@ public class TrademarkCheckService {
      * The shop name is not in the standard input (docs/input-schema.md), so it is null.
      */
     static TrademarkCheckInput input(Listing listing) {
+        return input(listing, null);
+    }
+
+    /**
+     * The same with the request's product type (ADR-009), which is not the listing's own {@code productType}: that one is the
+     * Amazon product type, only hashed as the category.
+     */
+    static TrademarkCheckInput input(Listing listing, String productType) {
         String category = listing.category() != null ? listing.category() : listing.productType();
         return new TrademarkCheckInput(listing.title(), listing.tags(), listing.bulletPoints(), listing.description(),
-                listing.brand(), null, listing.searchTerms(), category);
+                listing.brand(), null, listing.searchTerms(), category, productType);
+    }
+
+    /** The product type as the ruleset keys it (stripped), null for none; a type the ruleset does not declare is refused. */
+    private String productType(String requested) {
+        if (requested == null || requested.isBlank()) {
+            return null;
+        }
+        String type = requested.strip();
+        rulesets.ruleset().productClasses().classesOf(type);
+        return type;
     }
 }

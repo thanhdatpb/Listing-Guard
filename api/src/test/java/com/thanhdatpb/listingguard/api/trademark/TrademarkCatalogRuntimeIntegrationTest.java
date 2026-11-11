@@ -52,7 +52,7 @@ class TrademarkCatalogRuntimeIntegrationTest {
     Path dir;
 
     private TrademarkCatalogRuntime runtimeFor(String catalogVersion) {
-        return new TrademarkCatalogRuntime(new TrademarkProperties("classpath:rulesets/trademark-risk-2026-11.yaml",
+        return new TrademarkCatalogRuntime(new TrademarkProperties("classpath:rulesets/trademark-risk-2026-11b.yaml",
                 List.of("ETSY", "AMAZON"), catalogVersion, "catalogs"), jdbc, transactions, rulesets);
     }
 
@@ -116,7 +116,7 @@ class TrademarkCatalogRuntimeIntegrationTest {
 
     @Test
     void aCatalogNormalizedWithOtherNormalizationSettingsIsRefused() throws Exception {
-        String yaml = new ClassPathResource("rulesets/trademark-risk-2026-11.yaml")
+        String yaml = new ClassPathResource("rulesets/trademark-risk-2026-11b.yaml")
                 .getContentAsString(StandardCharsets.UTF_8);
         TrademarkRuleset otherMapping = TrademarkRulesetLoader.parse(yaml.replace("\"0\": \"o\"", "\"0\": \"q\""));
         CatalogHeader prepared = importSynthetic(NormalizationIdentity.of(otherMapping),
@@ -148,10 +148,10 @@ class TrademarkCatalogRuntimeIntegrationTest {
     @Test
     void aRulesetThatOnlyChangesThresholdsOrWordListsStillServesTheCatalog() throws Exception {
         CatalogHeader prepared = importWithActiveRuleset();
-        String yaml = new ClassPathResource("rulesets/trademark-risk-2026-11.yaml")
+        String yaml = new ClassPathResource("rulesets/trademark-risk-2026-11b.yaml")
                 .getContentAsString(StandardCharsets.UTF_8);
         // a new ruleset version that changes a threshold and a word list but not the normalization settings
-        byte[] newerYaml = yaml.replace("version: trademark-risk-2026-11", "version: trademark-risk-2099-01")
+        byte[] newerYaml = yaml.replace("version: trademark-risk-2026-11b", "version: trademark-risk-2099-01")
                 .replace("final_threshold: 0.80", "final_threshold: 0.85").replace("    - Northvale\n", "    - Northvael\n")
                 .getBytes(StandardCharsets.UTF_8);
         TrademarkRulesets newer = new TrademarkRulesets(new TrademarkProperties("classpath:ignored.yaml",
@@ -166,7 +166,7 @@ class TrademarkCatalogRuntimeIntegrationTest {
                 .isEqualTo(rulesets.ruleset().normalization().canonicalHash());
 
         TrademarkCatalogRuntime runtime = new TrademarkCatalogRuntime(new TrademarkProperties(
-                "classpath:rulesets/trademark-risk-2026-11.yaml", List.of("ETSY"), prepared.version(), "catalogs"),
+                "classpath:rulesets/trademark-risk-2026-11b.yaml", List.of("ETSY"), prepared.version(), "catalogs"),
                 jdbc, transactions, newer);
 
         assertThat(newer.ruleset().version()).isEqualTo("trademark-risk-2099-01");

@@ -16,6 +16,7 @@ import com.thanhdatpb.listingguard.api.variation.VariationCheckNotFoundException
 import com.thanhdatpb.listingguard.personalization.config.UnknownPrintProfileException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingNotConfiguredException;
+import com.thanhdatpb.listingguard.trademark.config.UnknownProductTypeException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
@@ -91,6 +92,17 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(UnknownPrintProfileException.class)
     public ProblemDetail unknownPrintProfile(UnknownPrintProfileException e) {
         ProblemDetail problem = Problems.of(HttpStatus.BAD_REQUEST, "unknown-print-profile", e.getMessage());
+        problem.setProperty("known", e.known());
+        return problem;
+    }
+
+    /**
+     * The request named a {@code product_type} that the trademark ruleset does not declare (ADR-009). It is never ignored or
+     * guessed, because the answer would then not be the one the client asked for; the declared keys are in {@code known}.
+     */
+    @ExceptionHandler(UnknownProductTypeException.class)
+    public ProblemDetail unknownProductType(UnknownProductTypeException e) {
+        ProblemDetail problem = Problems.of(HttpStatus.BAD_REQUEST, "unknown-product-type", e.getMessage());
         problem.setProperty("known", e.known());
         return problem;
     }

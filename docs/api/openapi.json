@@ -861,6 +861,30 @@
         },
         "type" : "object"
       },
+      "TrademarkCheckRequest" : {
+        "properties" : {
+          "listing" : {
+            "$ref" : "#/components/schemas/JsonNode",
+            "description" : "The listing in the marketplace's own JSON format, exactly as for POST /api/v1/checks. Must be a JSON object.",
+            "type" : "object"
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, case-insensitive. Supported: ETSY, AMAZON.",
+            "example" : "ETSY",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "product_type" : {
+            "description" : "Optional. What kind of product the listing sells: one of the product types the active trademark ruleset declares (see the integration guide), written exactly as declared. When it is given, a catalog match whose mark has Nice classes, none of them one of the product type's classes, is reported one level lower and the finding says so in `riskAdjustments`; a mark with no Nice class is never lowered. A value the ruleset does not declare is refused with 400 `unknown-product-type`, never ignored. Leave it out to get the result without product classes. It is not the Amazon `product_type` of the listing, and it is part of what makes two requests identical for the cache.",
+            "example" : "apparel",
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "listing", "marketplace" ],
+        "type" : "object"
+      },
       "TrademarkCheckResult" : {
         "properties" : {
           "analysisVersion" : {
@@ -920,6 +944,11 @@
             "example" : "ETSY",
             "type" : "string"
           },
+          "productType" : {
+            "description" : "The `product_type` the request named, as the ruleset declares it; null when the request named none (and for a result stored before product types existed).",
+            "example" : "apparel",
+            "type" : [ "string", "null" ]
+          },
           "riskLevel" : {
             "description" : "The highest level among the findings (LOW when a complete check found nothing above LOW). UNKNOWN means the risk could not be determined because the check is INCOMPLETE; it is never reported as LOW.",
             "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
@@ -927,7 +956,7 @@
           },
           "rulesetVersion" : {
             "description" : "Version of the trademark ruleset that produced the result.",
-            "example" : "trademark-risk-2026-11",
+            "example" : "trademark-risk-2026-11b",
             "type" : "string"
           }
         },
@@ -2656,7 +2685,7 @@
                         }, {
                           "marketplace" : "ETSY",
                           "pack" : "trademark-risk",
-                          "version" : "trademark-risk-2026-11"
+                          "version" : "trademark-risk-2026-11b"
                         } ],
                         "trademarkCatalog" : {
                           "state" : "READY",
@@ -3021,7 +3050,7 @@
     },
     "/api/v1/trademark-checks" : {
       "post" : {
-        "description" : "Takes the same request as `POST /api/v1/checks` (`marketplace` and `listing` in the marketplace's own format), so a client can send one JSON to both endpoints. Compares the listing's text with the configured trademark catalog and returns findings with evidence: the field, the span in the text the API worked on (after trimming and Unicode NFC, UTF-16 offsets), the matched mark and how it matched. The result is a reference warning, not a legal conclusion; show the `disclaimer` with it. If the same client already sent the same listing text with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time (`expiresAt`); only the listing's hash and the result are stored, not the listing text.",
+        "description" : "Takes the request of `POST /api/v1/checks` (`marketplace` and `listing` in the marketplace's own format) and an optional `product_type`, so a client can send one JSON to both endpoints (`/checks` ignores `product_type`). Compares the listing's text with the configured trademark catalog and returns findings with evidence: the field, the span in the text the API worked on (after trimming and Unicode NFC, UTF-16 offsets), the matched mark and how it matched. With a `product_type`, a mark whose Nice classes are not the product type's is reported one level lower, and `riskAdjustments` says why and from which level; a mark that is an ordinary word of the ruleset's list is capped the same way unless it is the brand. `sourceLinks` gives a public look-up page for the source records the ruleset has an address for. The result is a reference warning, not a legal conclusion; show the `disclaimer` with it. If the same client already sent the same listing text and product type with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time (`expiresAt`); only the listing's hash and the result are stored, not the listing text.",
         "operationId" : "check_1",
         "requestBody" : {
           "content" : {
@@ -3044,10 +3073,23 @@
                     },
                     "marketplace" : "ETSY"
                   }
+                },
+                "with-product-type" : {
+                  "description" : "with-product-type",
+                  "summary" : "The same envelope with a product type",
+                  "value" : {
+                    "listing" : {
+                      "description" : "A plain ceramic mug.",
+                      "tags" : [ "mug", "gift" ],
+                      "title" : "Zorvex Ceramic Coffee Mug"
+                    },
+                    "marketplace" : "ETSY",
+                    "product_type" : "mug"
+                  }
                 }
               },
               "schema" : {
-                "$ref" : "#/components/schemas/CheckRequest"
+                "$ref" : "#/components/schemas/TrademarkCheckRequest"
               }
             }
           },
@@ -3080,10 +3122,12 @@
                         "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
                         "otherRuleIds" : [ ],
                         "risk" : "HIGH",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "catalog_exact",
                         "score" : 1.0,
                         "snippet" : "Zorvex",
                         "sourceIds" : [ "S-001", "S-002" ],
+                        "sourceLinks" : [ ],
                         "start" : 0,
                         "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                       }, {
@@ -3095,10 +3139,12 @@
                         "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
                         "otherRuleIds" : [ ],
                         "risk" : "MEDIUM",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "geo_sport_combination",
                         "score" : null,
                         "snippet" : "Northvale Baseball",
                         "sourceIds" : [ ],
+                        "sourceLinks" : [ ],
                         "start" : 13,
                         "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                       }, {
@@ -3110,16 +3156,19 @@
                         "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
                         "otherRuleIds" : [ ],
                         "risk" : "LOW",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "pure_color_description",
                         "score" : null,
                         "snippet" : "royal blue white pinstripe",
                         "sourceIds" : [ ],
+                        "sourceLinks" : [ ],
                         "start" : 0,
                         "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
                       } ],
                       "marketplace" : "ETSY",
+                      "productType" : null,
                       "riskLevel" : "HIGH",
-                      "rulesetVersion" : "trademark-risk-2026-11"
+                      "rulesetVersion" : "trademark-risk-2026-11b"
                     }
                   },
                   "findings" : {
@@ -3144,10 +3193,12 @@
                         "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
                         "otherRuleIds" : [ ],
                         "risk" : "HIGH",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "catalog_exact",
                         "score" : 1.0,
                         "snippet" : "Zorvex",
                         "sourceIds" : [ "S-001", "S-002" ],
+                        "sourceLinks" : [ ],
                         "start" : 0,
                         "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                       }, {
@@ -3159,10 +3210,12 @@
                         "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
                         "otherRuleIds" : [ ],
                         "risk" : "MEDIUM",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "geo_sport_combination",
                         "score" : null,
                         "snippet" : "Northvale Baseball",
                         "sourceIds" : [ ],
+                        "sourceLinks" : [ ],
                         "start" : 13,
                         "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                       }, {
@@ -3174,16 +3227,61 @@
                         "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
                         "otherRuleIds" : [ ],
                         "risk" : "LOW",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "pure_color_description",
                         "score" : null,
                         "snippet" : "royal blue white pinstripe",
                         "sourceIds" : [ ],
+                        "sourceLinks" : [ ],
                         "start" : 0,
                         "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
                       } ],
                       "marketplace" : "ETSY",
+                      "productType" : null,
                       "riskLevel" : "HIGH",
-                      "rulesetVersion" : "trademark-risk-2026-11"
+                      "rulesetVersion" : "trademark-risk-2026-11b"
+                    }
+                  },
+                  "product-type" : {
+                    "description" : "product-type",
+                    "summary" : "With a product type: a lower level, and why",
+                    "value" : {
+                      "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+                      "cached" : false,
+                      "catalogVersion" : "synthetic-2026-11-0123456789ab",
+                      "checkId" : "5d2e8a17-3c4b-4f69-8b0e-6a1c9d7f2e35",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-11-11T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+                      "expiresAt" : "2026-12-11T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "end" : 6,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : "ZORVEX",
+                        "matchType" : "EXACT",
+                        "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu. Nhãn hiệu 'ZORVEX' đăng ký ở nhóm Nice 25, 35, không nhóm nào nằm trong các nhóm 21 của loại sản phẩm 'mug', nên mức rủi ro hạ từ HIGH xuống MEDIUM. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "MEDIUM",
+                        "riskAdjustments" : [ {
+                          "from" : "HIGH",
+                          "note" : "Nhãn hiệu 'ZORVEX' đăng ký ở nhóm Nice 25, 35, không nhóm nào nằm trong các nhóm 21 của loại sản phẩm 'mug', nên mức rủi ro hạ từ HIGH xuống MEDIUM. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                          "reason" : "outside_product_classes",
+                          "to" : "MEDIUM"
+                        } ],
+                        "ruleId" : "catalog_exact",
+                        "score" : 1.0,
+                        "snippet" : "Zorvex",
+                        "sourceIds" : [ "S-001", "S-002" ],
+                        "sourceLinks" : [ ],
+                        "start" : 0,
+                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                      } ],
+                      "marketplace" : "ETSY",
+                      "productType" : "mug",
+                      "riskLevel" : "MEDIUM",
+                      "rulesetVersion" : "trademark-risk-2026-11b"
                     }
                   }
                 },
@@ -3213,6 +3311,19 @@
                       "title" : "Bad Request",
                       "type" : "urn:listing-guard:problem:invalid-request"
                     }
+                  },
+                  "unknown-product-type" : {
+                    "description" : "unknown-product-type",
+                    "value" : {
+                      "code" : "unknown-product-type",
+                      "detail" : "Unknown product type 'spaceship'; declared product types: [apparel, mug, poster, sticker, phone_case, jewelry, bag, furniture_decor, fabric, toy]",
+                      "instance" : "/api/v1/trademark-checks",
+                      "known" : [ "apparel", "mug", "poster", "sticker", "phone_case", "jewelry", "bag", "furniture_decor", "fabric", "toy" ],
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:unknown-product-type"
+                    }
                   }
                 },
                 "schema" : {
@@ -3220,7 +3331,7 @@
                 }
               }
             },
-            "description" : "Invalid request (code `invalid-request`) or unknown marketplace (`unknown-marketplace`)."
+            "description" : "Invalid request (code `invalid-request`), unknown marketplace (`unknown-marketplace`) or a `product_type` the ruleset does not declare (`unknown-product-type`; the declared ones are in `known`). A product type is never ignored: the request is refused before anything is stored or counted."
           },
           "401" : {
             "content" : {
@@ -3402,10 +3513,12 @@
                     "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
                     "otherRuleIds" : [ ],
                     "risk" : "HIGH",
+                    "riskAdjustments" : [ ],
                     "ruleId" : "catalog_exact",
                     "score" : 1.0,
                     "snippet" : "Zorvex",
                     "sourceIds" : [ "S-001", "S-002" ],
+                    "sourceLinks" : [ ],
                     "start" : 0,
                     "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                   }, {
@@ -3417,10 +3530,12 @@
                     "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
                     "otherRuleIds" : [ ],
                     "risk" : "MEDIUM",
+                    "riskAdjustments" : [ ],
                     "ruleId" : "geo_sport_combination",
                     "score" : null,
                     "snippet" : "Northvale Baseball",
                     "sourceIds" : [ ],
+                    "sourceLinks" : [ ],
                     "start" : 13,
                     "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                   }, {
@@ -3432,16 +3547,19 @@
                     "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
                     "otherRuleIds" : [ ],
                     "risk" : "LOW",
+                    "riskAdjustments" : [ ],
                     "ruleId" : "pure_color_description",
                     "score" : null,
                     "snippet" : "royal blue white pinstripe",
                     "sourceIds" : [ ],
+                    "sourceLinks" : [ ],
                     "start" : 0,
                     "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
                   } ],
                   "marketplace" : "ETSY",
+                  "productType" : null,
                   "riskLevel" : "HIGH",
-                  "rulesetVersion" : "trademark-risk-2026-11"
+                  "rulesetVersion" : "trademark-risk-2026-11b"
                 },
                 "schema" : {
                   "$ref" : "#/components/schemas/TrademarkCheckResult"

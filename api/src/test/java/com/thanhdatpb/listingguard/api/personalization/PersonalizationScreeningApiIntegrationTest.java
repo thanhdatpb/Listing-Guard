@@ -124,7 +124,7 @@ class PersonalizationScreeningApiIntegrationTest {
         assertThat(trademark.get("status").asText()).isEqualTo("COMPLETE");
         assertThat(trademark.get("riskLevel").asText()).isEqualTo("HIGH");
         assertThat(trademark.get("catalogVersion").asText()).isEqualTo(PersonalizationDemoCatalogTestConfig.catalogVersion());
-        assertThat(trademark.get("rulesetVersion").asText()).isEqualTo("trademark-risk-2026-11");
+        assertThat(trademark.get("rulesetVersion").asText()).isEqualTo("trademark-risk-2026-11b");
         assertThat(trademark.get("findings")).hasSize(1);
         JsonNode hit = trademark.get("findings").get(0);
         assertThat(hit.get("ruleId").asText()).isEqualTo("catalog_exact");

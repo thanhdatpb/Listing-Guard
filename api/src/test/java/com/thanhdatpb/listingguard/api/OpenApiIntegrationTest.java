@@ -190,7 +190,11 @@ class OpenApiIntegrationTest {
         assertThat(spec.at("/paths/~1api~1v1~1variation-checks/post/operationId").asText()).isEqualTo("check");
         assertThat(spec.at("/paths/~1api~1v1~1variation-checks~1{id}/get/operationId").asText()).isEqualTo("get");
         assertThat(spec.at("/paths/~1api~1v1~1trademark-checks/post/requestBody/content/application~1json/schema/$ref").asText())
-                .as("the same request schema as /checks").isEqualTo(spec.at("/paths/~1api~1v1~1checks/post/requestBody/content/application~1json/schema/$ref").asText());
+                .as("the /checks envelope plus an optional product_type, in a schema of its own")
+                .isEqualTo("#/components/schemas/TrademarkCheckRequest");
+        assertThat(spec.at("/components/schemas/TrademarkCheckRequest/properties/product_type").isMissingNode()).isFalse();
+        assertThat(spec.at("/components/schemas/TrademarkCheckRequest/required").toString())
+                .doesNotContain("product_type");
         assertThat(spec.at("/components/schemas/CheckResult/properties/readiness/anyOf/0/$ref").asText())
                 .isEqualTo("#/components/schemas/ReadinessView");
         assertThat(spec.at("/components/schemas/CheckResult/properties/readiness/anyOf/1/type").asText())

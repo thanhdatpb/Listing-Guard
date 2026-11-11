@@ -285,8 +285,8 @@ class TrademarkCheckServiceIntegrationTest {
         CheckRequest request = request("Zorvex ruleset " + unique());
         TrademarkCheckResult original = service.check(clientA(), request);
 
-        String yaml = new ClassPathResource("rulesets/trademark-risk-2026-11.yaml").getContentAsString(StandardCharsets.UTF_8);
-        byte[] newerYaml = yaml.replace("version: trademark-risk-2026-11", "version: trademark-risk-2099-01")
+        String yaml = new ClassPathResource("rulesets/trademark-risk-2026-11b.yaml").getContentAsString(StandardCharsets.UTF_8);
+        byte[] newerYaml = yaml.replace("version: trademark-risk-2026-11b", "version: trademark-risk-2099-01")
                 .replace("final_threshold: 0.80", "final_threshold: 0.85").getBytes(StandardCharsets.UTF_8);
         TrademarkRulesets newer = new TrademarkRulesets(new TrademarkProperties("classpath:ignored.yaml",
                 List.of("ETSY", "AMAZON"), "", "catalogs"), new DefaultResourceLoader() {
