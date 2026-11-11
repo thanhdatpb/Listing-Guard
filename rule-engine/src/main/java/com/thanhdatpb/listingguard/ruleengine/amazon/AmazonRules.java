@@ -20,6 +20,7 @@ public final class AmazonRules {
                 new BulletCountRule(),
                 new BulletLengthRule(),
                 new ItemHighlightsLengthRule(),
+                new DescriptionLengthRule(),
                 new SearchTermsLengthRule(),
                 new ProhibitedContentRule(),
                 new CustomizationTextInputCountRule(),

@@ -113,6 +113,8 @@ machine. On Linux the container user (uid 10001) must be able to write `batch/ou
 | `--out` | the directory for the reports; default `batch/out` (`/batch/out` in the container) |
 | `--max-rows` | stop after this many data rows; the summary says so when the file has more |
 | `--label-column` | a column with a true/false label to measure against, see section 5 |
+| `--split-output` | also write `passed.csv` and `held.csv`, the review gate of section 4 (no value) |
+| `--hold-trademark-risk` | with `--split-output` only: the trademark level that holds a row back, `HIGH` (default), `MEDIUM` or `NONE` |
 
 To also get trademark results, serve a catalog as for the API: set `TRADEMARK_CATALOG_VERSION` in `.env`
 ([README, "Trademark catalog"](../README.md#trademark-catalog)). **Without one the rules still run** and the reports say
@@ -218,6 +220,48 @@ What does stop the job is a file that cannot be read at all: bytes that are not 
 unclosed quote. The reports written so far are completed, `summary.html` says in a red banner that the run is
 incomplete and why, and the job exits non-zero. Fix the file (or `csv.encoding`) and run again; what was already checked
 is not checked twice.
+
+### Review gate: `passed.csv` and `held.csv` (`--split-output`)
+
+Without the flag the output is exactly the three files above. With `--split-output` the job also copies **every row of the
+input file** into one of two more files, so that a person reviews only the held ones:
+
+```bash
+docker compose run --rm batch-check --input=/batch/input/etsy-export.csv --mapping=/batch/mappings/my-etsy-mapping.yaml \
+  --client=demo-client --marketplace=ETSY --split-output [--hold-trademark-risk=HIGH|MEDIUM|NONE]
+```
+
+- **`passed.csv`**: the rows with no `ERROR` finding from the rule check, no hold from the trademark check (below) and no read
+  error, in the order of the input file.
+- **`held.csv`**: the other rows, in the same order, with one more column, **`hold_reasons`**: `ruleId/SEVERITY` items separated
+  by `; `. An `ERROR` finding of the rule check is `<ruleId>/ERROR` (once per rule, however many fields it touched), for example
+  `required_fields/ERROR; price_quantity_positive/ERROR`. A trademark level that holds the row is `trademark/HIGH` or
+  `trademark/MEDIUM`.
+- **A row that was not checked is held, never passed**, because "no finding" would be a clean result nobody computed:
+  `unreadable_row` (the line is also in `listings.csv` with its message), `rules/CHECK_FAILED`, `rules/QUOTA_EXCEEDED`,
+  `trademark/CHECK_FAILED` and `trademark/QUOTA_EXCEEDED` (these two only while `--hold-trademark-risk` is not `NONE`), and
+  `trademark/UNKNOWN` for a trademark result that is `INCOMPLETE` or whose risk is `UNKNOWN` (`UNKNOWN` is never read as `LOW`).
+- **The trademark hold is your choice, not a legal conclusion.** `--hold-trademark-risk=HIGH` (the default) holds a row whose
+  trademark result is `HIGH`; `MEDIUM` holds `MEDIUM` and `HIGH`; `NONE` lets the trademark result hold nothing (a row is then
+  held only for the rule check and for a row that could not be read or checked). A trademark result is a reference warning, the
+  levels are made by an `unverified` ruleset, and a row in `passed.csv` is **not** a listing that a marketplace has accepted or
+  that is free of trademark problems: it only means that none of the holds you chose applied. The console says so when the job
+  ends. With a trademark catalog that is not served (`NOT_CONFIGURED`), no row is held for trademarks and the console prints
+  "Trademark checks were not run, so passed.csv says nothing about trademarks".
+- **The cells are copied as they were read**: the same columns in the same order (the header names are written trimmed, as the
+  job reads them), the same delimiter (`csv.delimiter`) and the same text encoding (`csv.encoding`), no byte order mark and no
+  change to any cell, so the files can be fed back to a tool. A row of another width than the header (an unreadable row) is padded
+  to the header's width, and `hold_reasons` comes after its last cell. Lines skipped with `csv.skip_lines` are not copied. Because the
+  cells are the input's, **nothing is prefixed against spreadsheet formulas** here (the three reports do that): open the two files
+  as you would open the input. `hold_reasons` itself is ASCII only.
+- **Nothing is edited and no fix is applied**: a held row is the row as it was sent, and `held.csv` holds no suggested value.
+  A suggested fix is advice shown by the console editor and the API; the batch never writes one into a file.
+- The files are written as the batch goes, with no row kept in memory. If the job stops midway because the file is damaged, they
+  cover the rows before the damage (the console says so; `summary.html` has the red banner). Files of an earlier run in `--out`
+  are removed first, also when the new run has no `--split-output`, so a directory never mixes two runs. The counts are printed
+  at the end: `Review gate (--split-output): N row(s) in passed.csv, M in held.csv`.
+- `--hold-trademark-risk` without `--split-output`, a value for `--split-output` or a level other than `HIGH`, `MEDIUM`, `NONE`
+  is refused before anything is checked.
 
 ## 5. Label listings to measure the check
 

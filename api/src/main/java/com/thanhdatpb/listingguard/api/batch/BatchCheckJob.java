@@ -109,7 +109,10 @@ public final class BatchCheckJob {
             String notReady = status.state() != TrademarkCatalogRuntime.State.READY
                     ? status.state() + ": " + status.detail() : planNote;
 
-            try (BatchReport report = new BatchReport(options.out(), fixes.enabled())) {
+            try (BatchReport report = new BatchReport(options.out(), fixes.enabled());
+                 SplitOutput split = options.splitOutput()
+                         ? new SplitOutput(options.out(), mapping.csv(), reader.header(), options.holdTrademarkRisk())
+                         : null) {
                 int rows = 0;
                 boolean stoppedAtMaxRows = false;
                 String abortReason = null;
@@ -121,7 +124,11 @@ public final class BatchCheckJob {
                             break;
                         }
                         abortedAfterLine = row.line();
-                        report.add(outcome(row, bound, client.getId(), marketplace, trademarkReady, notReady));
+                        ListingOutcome outcome = outcome(row, bound, client.getId(), marketplace, trademarkReady, notReady);
+                        report.add(outcome);
+                        if (split != null) {
+                            split.add(row, outcome);
+                        }
                         rows++;
                         if (rows % PROGRESS_EVERY == 0) {
                             log.info("Batch check: {} rows done", rows);
@@ -149,6 +156,9 @@ public final class BatchCheckJob {
                 if (!trademarkReady) {
                     out.println("Trademark checks were not run (" + notReady + "); the rule checks were.");
                 }
+                if (split != null) {
+                    printReviewGate(split.counts(), options, trademarkReady, abortReason != null);
+                }
                 if (abortReason != null) {
                     throw new IllegalStateException("The batch stopped after line " + abortedAfterLine + ": " + abortReason
                             + ". The reports in " + options.out() + " cover the rows before it and say so.");
@@ -156,6 +166,25 @@ public final class BatchCheckJob {
                 return new Result(totals.rows(), totals.unreadable(), totals.failed(), totals.quotaSkipped(), stoppedAtMaxRows,
                         options.out());
             }
+        }
+    }
+
+    /** What the review gate did, and what it does not say: the hold rule is the operator's, not a legal conclusion. */
+    private void printReviewGate(SplitOutput.Counts counts, BatchOptions options, boolean trademarkReady, boolean stopped) {
+        out.println("Review gate (--split-output): " + counts.passed() + " row(s) in " + SplitOutput.PASSED_FILE + ", "
+                + counts.held() + " in " + SplitOutput.HELD_FILE + " (column " + SplitOutput.HOLD_REASONS_COLUMN + "). A row "
+                + "is held for an ERROR finding of the rule check, for a trademark result at or above "
+                + options.holdTrademarkRisk() + " (--hold-trademark-risk, your choice) or because it could not be checked. "
+                + "This is the hold rule of the person who ran the batch, not a legal conclusion: a row in "
+                + SplitOutput.PASSED_FILE + " is not a listing the marketplace has accepted.");
+        if (options.holdTrademarkRisk() == SplitOutput.TrademarkHold.NONE) {
+            out.println("The trademark result holds no row (--hold-trademark-risk=NONE).");
+        } else if (!trademarkReady) {
+            out.println("Trademark checks were not run, so " + SplitOutput.PASSED_FILE + " says nothing about trademarks.");
+        }
+        if (stopped) {
+            out.println("The batch stopped early: " + SplitOutput.PASSED_FILE + " and " + SplitOutput.HELD_FILE
+                    + " cover only the rows before the damage.");
         }
     }
 

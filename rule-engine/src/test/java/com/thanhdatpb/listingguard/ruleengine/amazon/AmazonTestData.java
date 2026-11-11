@@ -11,7 +11,7 @@ import java.util.List;
 /** Shared fixtures. Limits are read from the real ruleset so tests never hard-code them. */
 final class AmazonTestData {
 
-    static final RulesetConfig CONFIG = RulesetLoader.loadClasspath("rulesets/amazon-2026-12b.yaml");
+    static final RulesetConfig CONFIG = RulesetLoader.loadClasspath("rulesets/amazon-2026-12c.yaml");
 
     private AmazonTestData() {
     }

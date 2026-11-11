@@ -26,12 +26,12 @@ class AmazonRulesetTest {
     @Test
     void loadsTheAmazonRuleset() {
         assertThat(CONFIG.marketplace()).isEqualTo("AMAZON");
-        assertThat(CONFIG.version()).isEqualTo("amazon-2026-12b");
-        assertThat(CONFIG.checkedAt()).isEqualTo(LocalDate.of(2026, 11, 6));
+        assertThat(CONFIG.version()).isEqualTo("amazon-2026-12c");
+        assertThat(CONFIG.checkedAt()).isEqualTo(LocalDate.of(2026, 11, 11));
         assertThat(CONFIG.contentHash()).matches("[0-9a-f]{64}");
         assertThat(CONFIG.rules()).containsOnlyKeys("required_fields", "title_length", "title_repeated_words",
-                "title_forbidden_chars", "bullet_count", "bullet_length", "item_highlights_length", "search_terms_length",
-                "prohibited_content", "customization_text_input_count", "customization_dropdown_options",
+                "title_forbidden_chars", "bullet_count", "bullet_length", "item_highlights_length", "description_length",
+                "search_terms_length", "prohibited_content", "customization_text_input_count", "customization_dropdown_options",
                 "customization_image_input_count", "customization_text_input_max_chars",
                 "customization_free_text_sensitive", "category_not_covered");
     }
@@ -64,6 +64,7 @@ class AmazonRulesetTest {
         assertRule("bullet_count", Severity.WARNING, SourceStatus.UNVERIFIED);
         assertRule("bullet_length", Severity.WARNING, SourceStatus.UNVERIFIED);
         assertRule("item_highlights_length", Severity.WARNING, SourceStatus.SECONDARY);
+        assertRule("description_length", Severity.WARNING, SourceStatus.UNVERIFIED);
         assertRule("search_terms_length", Severity.WARNING, SourceStatus.SECONDARY);
         assertRule("prohibited_content", Severity.WARNING, SourceStatus.SECONDARY);
         assertRule("customization_text_input_count", Severity.WARNING, SourceStatus.SECONDARY);
@@ -90,6 +91,16 @@ class AmazonRulesetTest {
         }
         assertThat(CONFIG.rule("title_length").source().note()).contains("June 10, 2026", "July 27, 2026", "75 characters");
         assertThat(CONFIG.rule("item_highlights_length").source().note()).contains("June 10, 2026", "July 27, 2026", "125");
+    }
+
+    @Test
+    void theDescriptionLimitIsUnverifiedAndSaysWhyAndNamesNoCommercialToolAsASource() {
+        // no official page was readable and no Amazon text names the number: only two seller posts do (never verified, never ERROR)
+        assertThat(CONFIG.rule("description_length").source().status()).isEqualTo(SourceStatus.UNVERIFIED);
+        assertThat(CONFIG.rule("description_length").source().urls()).hasSize(2)
+                .allSatisfy(url -> assertThat(url).startsWith("https://sellercentral").contains("/seller-forums/discussions/t/"));
+        assertThat(CONFIG.rule("description_length").source().note()).contains("Not confirmed by any Amazon document",
+                "ordinary sellers", "The unit is therefore unknown", "not used as a source");
     }
 
     @Test

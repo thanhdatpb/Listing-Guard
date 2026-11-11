@@ -92,6 +92,12 @@ rules:
     source:
       status: unverified
 
+  description_length:
+    severity: WARNING
+    max_length: 60
+    source:
+      status: unverified
+
   search_terms_length:
     severity: WARNING
     max_bytes: 20

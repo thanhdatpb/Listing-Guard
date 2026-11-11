@@ -281,7 +281,10 @@ docker compose run --rm batch-check --input=/batch/input/etsy-export.csv \
 writes `findings.csv` (one line per finding), `listings.csv` (one line per listing) and `summary.html` (one page for a
 manager). A row that cannot be read is reported with its line and the batch goes on. Without a trademark catalog only the
 rules run and the reports say so. With `--label-column` (a true/false column such as "was taken down") the summary also
-shows how often the trademark check flagged those listings, as a **measurement on a small set, not an accuracy**. See
+shows how often the trademark check flagged those listings, as a **measurement on a small set, not an accuracy**. With
+`--split-output` the job also copies the rows of your file into `passed.csv` and `held.csv` (with a `hold_reasons` column: the
+`ERROR` findings, and a trademark level you choose with `--hold-trademark-risk`, `HIGH` by default), so that a person reviews only
+the held rows; that hold rule is yours, not a legal conclusion, and a passed row is not a listing a marketplace has accepted. See
 [docs/batch-check.md](docs/batch-check.md): preparing the file, writing the mapping, reading the reports, labelling.
 
 ### A weekly health report
@@ -493,7 +496,7 @@ severity. Each rule records where its values come from:
 `etsy-2026-12` adds the optional `personalization` input block (see [input schema](docs/input-schema.md)): a listing that does not send it is
 hashed exactly as before. `tag_count_underused` is not in it (it needs a fix action that adds a value, ADR-014).
 
-`amazon-2026-12b.yaml` is the Amazon ruleset (`amazon-2026-11.yaml` and `amazon-2026-12.yaml` are kept unchanged as history, like
+`amazon-2026-12c.yaml` is the Amazon ruleset (`amazon-2026-11.yaml`, `amazon-2026-12.yaml` and `amazon-2026-12b.yaml` are kept unchanged as history, like
 `etsy-2026-10.yaml`; a test pins their hashes). It follows the Amazon announcement in the Seller Forums of June 10, 2026
 (effective July 27, 2026): a 75-character title and the new Item Highlights field. Amazon uses ERROR only for verified values, so most of its rules
 are WARNING (the sources are an Amazon announcement and forum replies; Seller Central help needs a login). A
@@ -503,7 +506,8 @@ overridden yet. See [ADR-006](docs/adr/ADR-006-category-rulesets-and-amazon-seve
 A change to a ruleset inside the same month gets a letter after the month (`amazon-2026-12b`, then `c`), so the next
 version of a month that is already taken keeps the `YYYY-MM` part. `amazon-2026-12b` adds the optional `customization` input block for Amazon
 Custom products (see [input schema](docs/input-schema.md)) and the five `customization_*` rules below; a listing that does not send the block is
-hashed exactly as before, and every other rule is copied unchanged from `amazon-2026-12`.
+hashed exactly as before, and every other rule is copied unchanged from `amazon-2026-12`. `amazon-2026-12c` adds one rule,
+`description_length`, whose number is `unverified` (see the table): it is a WARNING, never an ERROR, and has no fix suggestion.
 
 | Rule | Severity | Source status |
 |---|---|---|
@@ -514,6 +518,7 @@ hashed exactly as before, and every other rule is copied unchanged from `amazon-
 | `bullet_count` (max 5) | WARNING | unverified |
 | `bullet_length` | WARNING, **switched off** | unverified: sources disagree |
 | `item_highlights_length` (max 125 characters) | WARNING | secondary: same announcement; no fix suggestion |
+| `description_length` (max 2000 characters) | WARNING | **unverified**: no official page readable, no Amazon text names the number; two old Seller Forums posts by ordinary sellers say 2000 and the unit is not defined; no fix suggestion |
 | `search_terms_length` (max 249 bytes) | WARNING | secondary: Amazon staff, Seller Forums |
 | `prohibited_content` (web addresses, emails; title, description, bullets and `item_highlights`) | WARNING | secondary; scanning `item_highlights` is our extension of the same ban |
 | `customization_text_input_count` (max 10 text inputs, all surfaces together) | WARNING | secondary: two articles on Amazon Custom (ecomcrew, sellersnap); the Seller Central page needs a login |

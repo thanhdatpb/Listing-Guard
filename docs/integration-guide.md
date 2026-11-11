@@ -458,6 +458,7 @@ bullet at zero-based position `i` in the cleaned list; blank bullets are dropped
 | `title_forbidden_chars` | `title` | the character (one finding per character; allowed when the `brand` contains it) | WARNING | secondary |
 | `bullet_count` | `bullet_points` | the count, as text | WARNING | unverified |
 | `item_highlights_length` | `item_highlights` | the Item Highlights text (optional field; no fix suggestion) | WARNING | secondary |
+| `description_length` | `description` | the description (optional field; characters, no fix suggestion) | WARNING | **unverified** |
 | `search_terms_length` | `search_terms` | the search terms (limit in UTF-8 **bytes**, not characters) | WARNING | secondary |
 | `prohibited_content` | `title`, `description`, `bullet_points[i]`, `item_highlights` | the matched web address or email | WARNING | secondary |
 | `customization_text_input_count` | `customization.surfaces[].text_inputs` (all surfaces together) | `null` | WARNING | secondary |
@@ -468,8 +469,20 @@ bullet at zero-based position `i` in the cleaned list; blank bullets are dropped
 | `category_not_covered` | `product_type` | the product type as sent | INFO | not an Amazon rule; only reported once the ruleset overrides at least one product type |
 
 `bullet_length` is in the ruleset but switched off: the sources disagree on the limit. Amazon uses ERROR only
-for verified values; everything else is WARNING (see ADR-006). The limits are in `amazon-2026-12b.yaml`, each with
+for verified values; everything else is WARNING (see ADR-006). The limits are in `amazon-2026-12c.yaml`, each with
 its source and status. Numbers in the messages are the real limits and the real counts.
+
+**What changed with `amazon-2026-12c`.** One new rule, `description_length`: a description longer than the limit in the ruleset
+(2000 characters, counted as code points) gets a WARNING with the real count and the number of characters to cut. A listing without
+a description gets no finding from it. **The number is `unverified`**: no official Amazon page could be read (Seller Central help
+needs a seller login, and the Product Type Definitions API, which carries the real limit per product type, needs seller
+credentials), no Amazon text names it, and the only places that state 2000 are two old Seller Forums posts by ordinary sellers,
+one of which says the unit "isn't defined". So treat the finding as a hint to check your category's limit, not as Amazon's
+verdict; it is never an ERROR and has **no fix suggestion** (cutting a description drops text you wrote, and the number is not
+confirmed). Every other rule is exactly as in `amazon-2026-12b`. The `analysisVersion` of Amazon checks is now `amazon-2026-12c`, so
+an Amazon listing that was checked before is checked again; a listing without a description has the same content hash as before.
+`GET /api/v1/rulesets/AMAZON/limits` lists the new limit (`field` `description`, `kind` `MAX_LENGTH`, `unit` `CODE_POINTS`,
+`sourceStatus` `UNVERIFIED`) with no change to the endpoint.
 
 **What changed with `amazon-2026-12b`.** The optional input block `customization` (Amazon Custom products; see
 [`input-schema.md`](input-schema.md#amazon-customization)) is checked by the five `customization_*` rules above; every other rule is
@@ -493,7 +506,7 @@ listing that was checked before is checked again. A listing that does not send `
 `secondary`, never `verified`, and the trademark check does not read `item_highlights` yet.
 
 **Product types.** Some Amazon limits depend on the product type. The ruleset can override a rule per product
-type, but `amazon-2026-12b` overrides none, so every listing is checked with the same limits and nothing is
+type, but `amazon-2026-12c` overrides none, so every listing is checked with the same limits and nothing is
 reported about product types. Once a ruleset overrides some product types, a listing whose product type has no
 override gets one `INFO` finding, `category_not_covered`, to say that category-specific limits were not checked;
 it needs no change in the listing. A listing without `product_type` gets the `required_fields` ERROR instead. The
