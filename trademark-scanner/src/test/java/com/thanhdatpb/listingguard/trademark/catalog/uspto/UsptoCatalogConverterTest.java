@@ -1,17 +1,22 @@
 package com.thanhdatpb.listingguard.trademark.catalog.uspto;
 
+import static com.thanhdatpb.listingguard.trademark.catalog.uspto.UsptoTestXml.caseFile;
+import static com.thanhdatpb.listingguard.trademark.catalog.uspto.UsptoTestXml.caseFileOn;
+import static com.thanhdatpb.listingguard.trademark.catalog.uspto.UsptoTestXml.caseFileWith;
+import static com.thanhdatpb.listingguard.trademark.catalog.uspto.UsptoTestXml.file;
+import static com.thanhdatpb.listingguard.trademark.catalog.uspto.UsptoTestXml.fileVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.TestRulesets;
 import com.thanhdatpb.listingguard.trademark.catalog.MarkStatus;
 import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogImport;
 import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogManifest;
 import com.thanhdatpb.listingguard.trademark.normalize.TextNormalizer;
 import java.io.BufferedWriter;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -33,80 +38,35 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * The USPTO Trademark Applications Daily converter (ADR-009, PR A2b). Every file here is small synthetic XML written
- * by hand to follow the public DTD V2.0; marks are invented. Nothing was checked against a real USPTO file.
+ * The USPTO Trademark Applications Daily converter, one file at a time (ADR-009, PRs A2b and A2c): the reading of a
+ * record, what is dropped and counted, the bad files, and the bookkeeping. The order of records across files is
+ * {@link UsptoLatestWinsTest}. Every file here is small synthetic XML written by hand to follow the public DTD V2.0;
+ * marks are invented. Nothing was checked against a real USPTO file. The filters are the permissive ones of
+ * {@link UsptoTestXml}, so only the logic under test acts.
  */
-class UsptoDailyConverterTest {
+class UsptoCatalogConverterTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String NAME = "daily-20241101.xml";
 
-    private final UsptoStatusMap statusMap = UsptoStatusMap.loadClasspath("uspto/uspto-status-map-2026-11.yaml");
+    private final UsptoStatusMap statusMap = UsptoTestXml.statusMap();
+    private final UsptoConvertFilters filters = UsptoTestXml.permissive(statusMap);
     private final TextNormalizer normalizer = new TextNormalizer(TestRulesets.shipped().normalization());
 
     @TempDir
     Path dir;
 
-    // --- synthetic XML following the DTD ---
-
-    private static String esc(String text) {
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-    }
-
-    private static String element(String name, String value) {
-        return value == null ? "" : "<" + name + ">" + esc(value) + "</" + name + ">";
-    }
-
-    /** A case-file in the order of the DTD; a null value leaves the element out. */
-    private static String caseFile(String serial, String mark, String drawing, String status, String... classes) {
-        String classification = "<classification><international-code-total-no>" + classes.length
-                + "</international-code-total-no>"
-                + java.util.Arrays.stream(classes).map(c -> element("international-code", c)).collect(Collectors.joining())
-                // the status of the class: a decoy, the header status is the one that counts
-                + "<status-code>6</status-code><status-date>20200101</status-date></classification>";
-        return caseFileWith(serial, mark, drawing, status, "<classifications>" + classification + "</classifications>");
-    }
-
-    private static String caseFileWith(String serial, String mark, String drawing, String status, String classifications) {
-        return "<case-file>" + element("serial-number", serial)
-                + "<registration-number>0000000</registration-number><transaction-date>20241101</transaction-date>"
-                + "<case-file-header><filing-date>20200101</filing-date><registration-date>00000000</registration-date>"
-                + element("status-code", status) + "<status-date>20240101</status-date>"
-                + element("mark-identification", mark) + element("mark-drawing-code", drawing)
-                + "</case-file-header>"
-                + "<case-file-statements><case-file-statement><type-code>GS0251</type-code><text>Clothing</text>"
-                + "</case-file-statement></case-file-statements>"
-                + "<foreign-applications><foreign-application><filing-date>20190101</filing-date>"
-                + "<country>XX</country><registration-number>9999999</registration-number>"
-                + "</foreign-application></foreign-applications>"
-                + classifications
-                + "<case-file-owners><case-file-owner><party-name>Example Owner</party-name><country>XX</country>"
-                + "</case-file-owner></case-file-owners></case-file>";
-    }
-
-    private static String fileVersion(String versionNo, String versionDate, String... caseFiles) {
-        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<trademark-applications-daily>"
-                + "<version><version-no>" + versionNo + "</version-no><version-date>" + versionDate
-                + "</version-date></version><application-information><file-segments>"
-                + "<file-segment>TRMK</file-segment><action-keys><action-key>NA</action-key>"
-                + String.join("", caseFiles) + "</action-keys></file-segments></application-information>"
-                + "</trademark-applications-daily>";
-    }
-
-    private static String file(String... caseFiles) {
-        return fileVersion("2.0", "20041108", caseFiles);
-    }
-
     private record Converted(ConversionReport report, List<JsonNode> records, String output) {
     }
 
     private Converted convert(String xml) throws IOException {
-        return convert(xml, false);
+        return convert(xml, UsptoCatalogConverter.Options.defaults());
     }
 
-    private Converted convert(String xml, boolean allowOtherVersion) throws IOException {
+    private Converted convert(String xml, UsptoCatalogConverter.Options options) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ConversionReport report = new UsptoDailyConverter(statusMap, normalizer, allowOtherVersion)
-                .convert(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)), out);
+        ConversionReport report = new UsptoCatalogConverter(statusMap, filters, normalizer, options)
+                .convert(List.of(UsptoTestXml.source(NAME, xml)), out);
         String output = out.toString(StandardCharsets.UTF_8);
         List<JsonNode> records = new ArrayList<>();
         for (String line : output.split("\n")) {
@@ -131,12 +91,19 @@ class UsptoDailyConverterTest {
                 "{\"mark\":\"Zorvex\",\"status\":\"REGISTERED\",\"nice_classes\":[25],\"source_id\":\"97000001\"}\n");
         assertThat(c.report().recordsRead()).isEqualTo(1);
         assertThat(c.report().recordsWritten()).isEqualTo(1);
-        assertThat(c.report().dropped()).isEmpty();
-        assertThat(c.report().versionNo()).isEqualTo("2.0");
-        assertThat(c.report().versionDate()).isEqualTo("20041108");
-        assertThat(c.report().dataAvailable()).isTrue();
+        assertThat(c.report().filtered()).isEmpty();
+        assertThat(c.report().completeness()).isEqualTo(Completeness.COMPLETE);
+        assertThat(c.report().files()).hasSize(1);
+        ConversionReport.FileReport report = c.report().files().get(0);
+        assertThat(report.name()).isEqualTo(NAME);
+        assertThat(report.versionNo()).isEqualTo("2.0");
+        assertThat(report.versionDate()).isEqualTo("20041108");
+        assertThat(report.dataAvailable()).isTrue();
+        assertThat(report.status()).isEqualTo(ConversionReport.FileStatus.OK);
         assertThat(c.report().statusMapVersion()).isEqualTo(statusMap.version());
         assertThat(c.report().statusMapHash()).isEqualTo(statusMap.contentHash());
+        assertThat(c.report().filtersVersion()).isEqualTo(filters.version());
+        assertThat(c.report().filtersHash()).isEqualTo(filters.contentHash());
     }
 
     @Test
@@ -157,7 +124,7 @@ class UsptoDailyConverterTest {
                 + "<classification><international-code>009</international-code><international-code>025</international-code>"
                 + "</classification></classifications>";
 
-        Converted c = convert(file(caseFileWith("97000003", "Quillfeather", "4000", "700", classifications)));
+        Converted c = convert(file(caseFileWith("97000003", "20241101", "Quillfeather", "4000", "700", classifications)));
 
         assertThat(c.records().get(0).get("nice_classes")).extracting(JsonNode::asInt).containsExactly(9, 25, 35);
     }
@@ -174,22 +141,22 @@ class UsptoDailyConverterTest {
         Converted dropped = convert(file(caseFile("97000005", "Zorvex", "4000", "700", "A", "200")));
 
         assertThat(dropped.records()).isEmpty();
-        assertThat(dropped.report().dropped()).containsOnly(Map.entry(UsptoDailyConverter.NO_VALID_NICE_CLASS, 1L));
+        assertThat(dropped.report().filtered()).containsOnly(Map.entry(UsptoCatalogConverter.NO_VALID_NICE_CLASS, 1L));
         assertThat(dropped.report().ignoredClassCodes()).as("only the codes of written records").isZero();
     }
 
     @Test
     void aRecordWithoutAnyClassificationIsDropped() throws IOException {
-        Converted c = convert(file(caseFileWith("97000006", "Zorvex", "4000", "700", "")));
+        Converted c = convert(file(caseFileWith("97000006", "20241101", "Zorvex", "4000", "700", "")));
 
-        assertThat(c.report().dropped()).containsOnly(Map.entry(UsptoDailyConverter.NO_VALID_NICE_CLASS, 1L));
+        assertThat(c.report().filtered()).containsOnly(Map.entry(UsptoCatalogConverter.NO_VALID_NICE_CLASS, 1L));
     }
 
     @Test
     void readsTextWithEntitiesAndCdata() throws IOException {
         Converted c = convert(file(
                 caseFile("97000007", "Quill & Thorn", "4000", "700", "025"),
-                caseFileWith("97000008", null, "4000", "700", "<classifications><classification>"
+                caseFileWith("97000008", "20241101", null, "4000", "700", "<classifications><classification>"
                         + "<international-code>025</international-code></classification></classifications>")
                         .replace("<case-file-header>", "<case-file-header><mark-identification><![CDATA[Brask <One>]]>"
                                 + "</mark-identification>")));
@@ -213,11 +180,11 @@ class UsptoDailyConverterTest {
                 caseFile("97000019", "Iii", "  ", "700", "025")));
 
         assertThat(c.records()).extracting(r -> r.get("mark").asText()).containsExactly("Aaa", "Bbb", "Ccc", "Ddd");
-        assertThat(c.report().dropped()).containsOnly(
-                Map.entry(UsptoDailyConverter.LOGO_ONLY, 1L),
-                Map.entry(UsptoDailyConverter.NO_DRAWING, 1L),
-                Map.entry(UsptoDailyConverter.UNKNOWN_DRAWING_CODE, 1L),
-                Map.entry(UsptoDailyConverter.MISSING_DRAWING_CODE, 2L));
+        assertThat(c.report().filtered()).containsOnly(
+                Map.entry(UsptoCatalogConverter.LOGO_ONLY, 1L),
+                Map.entry(UsptoCatalogConverter.NO_DRAWING, 1L),
+                Map.entry(UsptoCatalogConverter.UNKNOWN_DRAWING_CODE, 1L),
+                Map.entry(UsptoCatalogConverter.MISSING_DRAWING_CODE, 2L));
     }
 
     @Test
@@ -228,7 +195,7 @@ class UsptoDailyConverterTest {
                 caseFile("97000023", null, "3000", "700", "025")));
 
         assertThat(c.records()).hasSize(1);
-        assertThat(c.report().dropped()).containsOnly(Map.entry(UsptoDailyConverter.BLANK_MARK, 2L));
+        assertThat(c.report().filtered()).containsOnly(Map.entry(UsptoCatalogConverter.BLANK_MARK, 2L));
     }
 
     // --- marks the import would refuse ---
@@ -243,7 +210,7 @@ class UsptoDailyConverterTest {
                 caseFile("97000032", overLimit, "4000", "700", "025")));
 
         assertThat(c.records()).hasSize(1);
-        assertThat(c.report().dropped()).containsOnly(Map.entry(UsptoDailyConverter.MARK_TOO_LONG, 1L));
+        assertThat(c.report().filtered()).containsOnly(Map.entry(UsptoCatalogConverter.MARK_TOO_LONG, 1L));
     }
 
     @Test
@@ -251,7 +218,7 @@ class UsptoDailyConverterTest {
         Converted c = convert(file(caseFile("97000033", "z".repeat(200_000), "4000", "700", "025")));
 
         assertThat(c.records()).isEmpty();
-        assertThat(c.report().dropped()).containsOnly(Map.entry(UsptoDailyConverter.MARK_TOO_LONG, 1L));
+        assertThat(c.report().filtered()).containsOnly(Map.entry(UsptoCatalogConverter.MARK_TOO_LONG, 1L));
     }
 
     @Test
@@ -263,9 +230,9 @@ class UsptoDailyConverterTest {
                 caseFile("97000036", "Zorvex", "4000", "700", "025")));
 
         assertThat(c.records()).extracting(r -> r.get("mark").asText()).containsExactly("Zorvex");
-        assertThat(c.report().dropped()).containsOnly(
-                Map.entry(UsptoDailyConverter.MARK_EMPTY_AFTER_NORMALIZATION, 1L),
-                Map.entry(UsptoDailyConverter.MARK_TOO_LONG_AFTER_NORMALIZATION, 1L));
+        assertThat(c.report().filtered()).containsOnly(
+                Map.entry(UsptoCatalogConverter.MARK_EMPTY_AFTER_NORMALIZATION, 1L),
+                Map.entry(UsptoCatalogConverter.MARK_TOO_LONG_AFTER_NORMALIZATION, 1L));
     }
 
     // --- status ---
@@ -282,7 +249,7 @@ class UsptoDailyConverterTest {
 
         assertThat(c.records()).extracting(r -> r.get("status").asText())
                 .containsExactly("REGISTERED", "EXPIRED", "CANCELLED", "PENDING", "CANCELLED", "PENDING");
-        assertThat(c.report().dropped()).isEmpty();
+        assertThat(c.report().filtered()).isEmpty();
     }
 
     @Test
@@ -297,7 +264,7 @@ class UsptoDailyConverterTest {
                 caseFile("97000057", "Ggg", "4000", "7", "025")));
 
         assertThat(c.records()).isEmpty();
-        assertThat(c.report().dropped()).containsOnly(
+        assertThat(c.report().filtered()).containsOnly(
                 Map.entry("status_dropped:000", 1L),
                 Map.entry("status_dropped:973", 2L),
                 Map.entry("status_unmapped:999", 1L),
@@ -319,68 +286,106 @@ class UsptoDailyConverterTest {
                 .filter(e -> e.target() == UsptoStatusMap.Target.DROP).count();
         assertThat(c.report().recordsRead()).isEqualTo(149);
         assertThat(c.report().recordsWritten()).isEqualTo(149 - dropCodes);
-        assertThat(c.report().droppedTotal()).isEqualTo(dropCodes);
+        assertThat(c.report().filteredTotal()).isEqualTo(dropCodes);
     }
 
-    // --- serial number, order, repeats ---
+    // --- required fields ---
 
     @Test
-    void dropsARecordWithoutAValidSerialNumber() throws IOException {
+    void aRecordWithoutARealSerialNumberOrDateIsAnErrorWithItsPlace() throws IOException {
         Converted c = convert(file(
                 caseFile(null, "Aaa", "4000", "700", "025"),
                 caseFile("  ", "Bbb", "4000", "700", "025"),
                 caseFile("123", "Ccc", "4000", "700", "025"),
                 caseFile("9700000A", "Ddd", "4000", "700", "025"),
-                caseFile(" 97000061 ", "Eee", "4000", "700", "025")));
+                caseFile(" 97000061 ", "Eee", "4000", "700", "025"),
+                caseFileOn("97000062", null, "Fff", "4000", "700", "025"),
+                caseFileOn("97000063", "00000000", "Ggg", "4000", "700", "025"),
+                caseFileOn("97000064", "20241341", "Hhh", "4000", "700", "025"),
+                caseFileOn("97000065", "2024-11-01", "Iii", "4000", "700", "025")));
 
         assertThat(c.records()).extracting(r -> r.get("source_id").asText()).containsExactly("97000061");
-        assertThat(c.report().dropped()).containsOnly(
-                Map.entry(UsptoDailyConverter.MISSING_SERIAL, 2L), Map.entry(UsptoDailyConverter.INVALID_SERIAL, 2L));
+        assertThat(c.report().errors()).containsOnly(
+                Map.entry(UsptoCatalogConverter.MISSING_SERIAL, 2L),
+                Map.entry(UsptoCatalogConverter.INVALID_SERIAL, 2L),
+                Map.entry(UsptoCatalogConverter.MISSING_TRANSACTION_DATE, 1L),
+                Map.entry(UsptoCatalogConverter.INVALID_TRANSACTION_DATE, 3L));
+        assertThat(c.report().recordErrors()).isEqualTo(8);
+        assertThat(c.report().completeness()).isEqualTo(Completeness.INCOMPLETE);
+        assertThat(c.report().errorDetails()).extracting(ConversionReport.RecordError::record)
+                .containsExactly(1L, 2L, 3L, 4L, 6L, 7L, 8L, 9L);
+        assertThat(c.report().errorDetails()).allSatisfy(e -> {
+            assertThat(e.file()).isEqualTo(NAME);
+            assertThat(e.line()).isPositive();
+            assertThat(e.column()).isPositive();
+        });
+        assertThat(c.report().errorDetails().get(0).code()).isEqualTo(UsptoCatalogConverter.MISSING_SERIAL);
     }
 
     @Test
-    void keepsTheOrderAndEveryRecordOfARepeatedSerialNumber() throws IOException {
-        // a daily file holds changes: the same serial can come twice. There is no "latest wins" yet (ADR-009, A2c).
-        Converted c = convert(file(
-                caseFile("97000071", "Zorvex", "4000", "686", "025"),
-                caseFile("97000072", "Brask", "4000", "700", "035"),
-                caseFile("97000071", "Zorvex", "4000", "710", "025")));
+    void strictStopsAtTheFirstRecordErrorAndNamesTheFileAndThePlace() {
+        String xml = file(caseFile("97000066", "Aaa", "4000", "700", "025"),
+                caseFileOn("97000067", null, "Secretmark", "4000", "700", "025"));
 
-        assertThat(c.records()).extracting(r -> r.get("status").asText()).containsExactly("PENDING", "REGISTERED", "CANCELLED");
-        assertThat(c.records()).extracting(r -> r.get("source_id").asText())
-                .containsExactly("97000071", "97000072", "97000071");
+        assertThatThrownBy(() -> convert(xml, new UsptoCatalogConverter.Options(false, true, 1000)))
+                .isInstanceOf(UsptoConversionException.class)
+                .hasMessageStartingWith(NAME + ": record 2 (line ")
+                .hasMessageContaining("column").hasMessageContaining("transaction-date")
+                .hasMessageContaining(UsptoCatalogConverter.MISSING_TRANSACTION_DATE)
+                .hasMessageNotContaining("Secretmark").hasMessageNotContaining("97000067");
     }
 
     @Test
-    void aRecordIsCountedUnderTheFirstCheckItFailsAndTheCountsAddUp() throws IOException {
-        // a logo with an unmapped status and no class: only the drawing code is reported
-        Converted c = convert(file(
-                caseFile("97000081", "Aaa", "2000", "999"),
-                caseFile("97000082", "Bbb", "4000", "700", "025")));
+    void theErrorDetailsAreBoundedAndTheCountsAreNot() throws IOException {
+        int bad = ConversionReport.MAX_ERROR_DETAILS + 20;
+        String[] records = IntStream.range(0, bad).mapToObj(i -> caseFile(null, "Aaa", "4000", "700", "025"))
+                .toArray(String[]::new);
 
-        assertThat(c.report().dropped()).containsOnly(Map.entry(UsptoDailyConverter.LOGO_ONLY, 1L));
-        assertThat(c.report().recordsRead()).isEqualTo(c.report().recordsWritten() + c.report().droppedTotal());
+        Converted c = convert(file(records));
+
+        assertThat(c.report().recordErrors()).isEqualTo(bad);
+        assertThat(c.report().errors()).containsOnly(Map.entry(UsptoCatalogConverter.MISSING_SERIAL, (long) bad));
+        assertThat(c.report().errorDetails()).hasSize(ConversionReport.MAX_ERROR_DETAILS);
+    }
+
+    @Test
+    void aRecordIsCountedOnceUnderTheFirstCheckItFailsAndTheCountsAddUp() throws IOException {
+        Converted c = convert(file(
+                caseFile("97000081", "Aaa", "2000", "999"),                 // a logo with an unmapped status: the status
+                caseFile("97000082", "Bbb", "2000", "700", "025"),          // a logo
+                caseFile(null, "Ccc", "2000", "999"),                       // no serial: an error before anything else
+                caseFile("97000084", "Ddd", "4000", "700", "025")));
+
+        assertThat(c.report().filtered()).containsOnly(
+                Map.entry("status_unmapped:999", 1L), Map.entry(UsptoCatalogConverter.LOGO_ONLY, 1L));
+        assertThat(c.report().errors()).containsOnly(Map.entry(UsptoCatalogConverter.MISSING_SERIAL, 1L));
+        ConversionReport r = c.report();
+        assertThat(r.recordsRead()).isEqualTo(4).isEqualTo(
+                r.recordsWritten() + r.recordErrors() + r.superseded() + r.deadRemoved() + r.filteredTotal());
     }
 
     // --- the file ---
 
     @Test
     void stopsOnAnotherVersionAndNamesWhatItFound() {
-        assertThatThrownBy(() -> convert(fileVersion("1.0", "20050101", caseFile("97000091", "Zorvex", "4000", "700", "025"))))
-                .isInstanceOf(UsptoConversionException.class)
-                .hasMessageContaining("version-no '1.0'").hasMessageContaining("version-date '20050101'")
-                .hasMessageContaining("2.0").hasMessageContaining("allow-other-version")
-                .hasMessageNotContaining("Zorvex");
+        String xml = fileVersion("1.0", "20050101", caseFile("97000091", "Zorvex", "4000", "700", "025"));
+
+        assertThatThrownBy(() -> convert(xml)).isInstanceOf(UsptoConversionException.class)
+                .hasMessageContaining(NAME).hasMessageContaining("version-no '1.0'")
+                .hasMessageContaining("version-date '20050101'").hasMessageContaining("2.0")
+                .hasMessageContaining("allow-other-version").hasMessageNotContaining("Zorvex");
     }
 
     @Test
     void readsAnotherVersionOnlyWhenAllowedAndSaysSo() throws IOException {
-        Converted c = convert(fileVersion("2.1", "20240101", caseFile("97000092", "Zorvex", "4000", "700", "025")), true);
+        UsptoCatalogConverter.Options allow = new UsptoCatalogConverter.Options(true, false, 1000);
+
+        Converted c = convert(fileVersion("2.1", "20240101", caseFile("97000092", "Zorvex", "4000", "700", "025")), allow);
 
         assertThat(c.records()).hasSize(1);
-        assertThat(c.report().versionNo()).isEqualTo("2.1");
+        assertThat(c.report().files().get(0).versionNo()).isEqualTo("2.1");
         assertThat(c.report().otherVersionAllowed()).isTrue();
-        assertThat(convert(file(caseFile("97000093", "Zorvex", "4000", "700", "025")), true)
+        assertThat(convert(file(caseFile("97000093", "Zorvex", "4000", "700", "025")), allow)
                 .report().otherVersionAllowed()).isFalse();
     }
 
@@ -400,12 +405,12 @@ class UsptoDailyConverterTest {
     }
 
     @Test
-    void aFileThatIsNotWellFormedIsRefusedWithoutItsContent() {
+    void aFileThatIsNotWellFormedIsRefusedWithItsNameAndPlaceButWithoutItsContent() {
         String broken = file(caseFile("97000094", "Secretmark", "4000", "700", "025")).replace("</case-file-header>", "");
 
         assertThatThrownBy(() -> convert(broken)).isInstanceOf(UsptoConversionException.class)
-                .hasMessageContaining("not well-formed").hasMessageContaining("line")
-                .hasMessageNotContaining("Secretmark");
+                .hasMessageContaining(NAME).hasMessageContaining("not well-formed").hasMessageContaining("line")
+                .hasMessageContaining("column").hasMessageNotContaining("Secretmark");
     }
 
     @Test
@@ -415,8 +420,9 @@ class UsptoDailyConverterTest {
                 + "<data-available-code>N</data-available-code></application-information></trademark-applications-daily>");
 
         assertThat(c.output()).isEmpty();
-        assertThat(c.report().dataAvailable()).isFalse();
+        assertThat(c.report().files().get(0).dataAvailable()).isFalse();
         assertThat(c.report().recordsRead()).isZero();
+        assertThat(c.report().completeness()).isEqualTo(Completeness.COMPLETE);
     }
 
     @Test
@@ -424,7 +430,7 @@ class UsptoDailyConverterTest {
         Converted c = convert(file());
 
         assertThat(c.output()).isEmpty();
-        assertThat(c.report().dataAvailable()).isTrue();
+        assertThat(c.report().files().get(0).dataAvailable()).isTrue();
     }
 
     // --- safety ---
@@ -468,28 +474,33 @@ class UsptoDailyConverterTest {
         String xml = file(caseFile("97000111", "Zorvex", "4000", "700", "025"), caseFile("97000112", "Brask", "2000", "700", "025"));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
-        ConversionReport report = new UsptoDailyConverter(statusMap, normalizer, false)
-                .convert(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)), out);
+        ConversionReport report = new UsptoCatalogConverter(statusMap, filters, normalizer,
+                UsptoCatalogConverter.Options.defaults()).convert(List.of(UsptoTestXml.source(NAME, xml)), out);
 
-        assertThat(report.inputBytes()).isEqualTo(xml.getBytes(StandardCharsets.UTF_8).length);
-        assertThat(report.inputSha256()).isEqualTo(hash(xml.getBytes(StandardCharsets.UTF_8)));
+        byte[] bytes = xml.getBytes(StandardCharsets.UTF_8);
+        assertThat(report.files().get(0).bytes()).isEqualTo(bytes.length);
+        assertThat(report.files().get(0).sha256()).isEqualTo(hash(bytes));
         assertThat(report.outputBytes()).isEqualTo(out.size());
         assertThat(report.outputSha256()).isEqualTo(hash(out.toByteArray()));
     }
 
     @Test
-    void theReportAsJsonHoldsTheCountsAndNoMark() throws IOException {
+    void theReportAsJsonHoldsTheCountsAndNoMarkAndNoSerialNumber() throws IOException {
         Converted c = convert(file(caseFile("97000121", "Zorvex", "4000", "700", "025"),
                 caseFile("97000122", "Brask", "2000", "700", "025")));
 
         String json = c.report().toJson();
         JsonNode tree = JSON.readTree(json);
 
-        assertThat(tree.get("format").asText()).isEqualTo("listing-guard/uspto-convert-report/v1");
+        assertThat(tree.get("format").asText()).isEqualTo("listing-guard/uspto-convert-report/v2");
+        assertThat(tree.get("completeness").asText()).isEqualTo("COMPLETE");
         assertThat(tree.get("recordsRead").asInt()).isEqualTo(2);
         assertThat(tree.get("recordsWritten").asInt()).isEqualTo(1);
-        assertThat(tree.get("recordsDropped").asInt()).isEqualTo(1);
-        assertThat(tree.get("dropped").get("logo_only").asInt()).isEqualTo(1);
+        assertThat(tree.get("filteredTotal").asInt()).isEqualTo(1);
+        assertThat(tree.get("filtered").get("logo_only").asInt()).isEqualTo(1);
+        assertThat(tree.get("filtersVersion").asText()).isEqualTo(filters.version());
+        assertThat(tree.get("filesRead").asInt()).isEqualTo(1);
+        assertThat(tree.get("files").get(0).get("name").asText()).isEqualTo(NAME);
         assertThat(tree.get("outputSha256").asText()).hasSize(64);
         assertThat(json).doesNotContain("Zorvex").doesNotContain("Brask").doesNotContain("97000121").endsWith("\n");
     }
@@ -539,7 +550,7 @@ class UsptoDailyConverterTest {
             for (int i = 0; i < RECORDS; i++) {
                 String status = i % 5 == 0 ? "973" : "700";
                 String drawing = i % 7 == 0 ? "2000" : "4000";
-                out.write(caseFileWith(String.format("97%06d", i), "Brand " + letters(i), drawing, status,
+                out.write(caseFileWith(String.format("97%06d", i), "20241101", "Brand " + letters(i), drawing, status,
                         "<classifications><classification><international-code>025</international-code></classification>"
                                 + "</classifications>").replace("<text>Clothing</text>", "<text>" + filler + "</text>"));
             }
@@ -554,14 +565,14 @@ class UsptoDailyConverterTest {
         Process process = new ProcessBuilder(java, "-Xmx" + HEAP_MEGABYTES + "m", "-cp", classPath,
                 UsptoConvertMain.class.getName(), xml.toString(), jsonl.toString()).redirectErrorStream(true).start();
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        boolean finished = process.waitFor(180, TimeUnit.SECONDS);
+        boolean finished = process.waitFor(300, TimeUnit.SECONDS);
         if (!finished) {
             process.destroyForcibly();
         }
 
         assertThat(finished).as(output).isTrue();
         assertThat(process.exitValue()).as(output).isZero();
-        // i % 5 == 0 has status 973 (dropped); i % 7 == 0 is a logo (dropped, and counted before the status)
+        // i % 5 == 0 has status 973 (dropped); i % 7 == 0 is a logo (dropped)
         long expectedWritten = IntStream.range(0, RECORDS).filter(i -> i % 5 != 0 && i % 7 != 0).count();
         assertThat(output.trim()).isEqualTo("read=" + RECORDS + " written=" + expectedWritten);
         try (var lines = Files.lines(jsonl)) {

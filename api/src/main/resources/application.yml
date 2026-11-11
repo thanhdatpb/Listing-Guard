@@ -56,6 +56,16 @@ listing-guard:
       allow-other-version: false
       # USPTO status code to catalog status. A published version is immutable: a change is a new file.
       status-map: classpath:uspto/uspto-status-map-2026-11.yaml
+      # What the job keeps (ADR-009, PR A2c): the Nice classes, the status codes that are live, text-only marks, and how a
+      # date is read from a file name. Every value in the shipped file is unverified. A published version is immutable: copy
+      # it to a new file with a new version and name it here (classpath: or file:).
+      filters: classpath:uspto/uspto-convert-filters-2026-11.yaml
+      # true stops the job at the first problem (a file it cannot read, a record without a serial number or a transaction
+      # date) instead of leaving the file out and reporting INCOMPLETE. `--strict` on the job does the same.
+      strict: false
+      # The most distinct serial numbers the job holds in memory (about 17 to 34 bytes each) to decide the latest record of
+      # each. More stops the job with a message; raise it together with the heap.
+      max-distinct-serials: 12000000
     retention:
       # How long a trademark result, its input hash and its evidence are kept (ADR-009). An operational proposal, not a
       # legal guarantee. GET and the cache lookup treat a row past this as absent whether or not the cleanup has run.

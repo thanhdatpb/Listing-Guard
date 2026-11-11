@@ -51,8 +51,10 @@ class UsptoConvertEndToEndIntegrationTest {
     @TempDir
     Path dir;
 
-    private static String caseFile(String serial, String mark, String drawing, String status, String niceClass) {
+    private static String caseFile(String serial, String date, String mark, String drawing, String status,
+                                   String niceClass) {
         return "<case-file><serial-number>" + serial + "</serial-number><registration-number>0000000</registration-number>"
+                + "<transaction-date>" + date + "</transaction-date>"
                 + "<case-file-header><filing-date>20200101</filing-date><status-code>" + status + "</status-code>"
                 + "<mark-identification>" + mark + "</mark-identification><mark-drawing-code>" + drawing
                 + "</mark-drawing-code></case-file-header><classifications><classification>"
@@ -60,15 +62,28 @@ class UsptoConvertEndToEndIntegrationTest {
                 + "</case-file>";
     }
 
-    private static String dailyFile() {
+    private static String dailyFile(String... caseFiles) {
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<trademark-applications-daily><version>"
                 + "<version-no>2.0</version-no><version-date>20041108</version-date></version><application-information>"
                 + "<file-segments><file-segment>TRMK</file-segment><action-keys><action-key>NA</action-key>"
-                + caseFile("97000001", "Zorvex", "4000", "700", "025")        // kept: registered
-                + caseFile("97000002", "Brasktone", "5R12", "686", "035")     // kept: published for opposition
-                + caseFile("97000003", "Quillfeather", "2000", "700", "025")  // dropped: a logo without words
-                + caseFile("97000004", "Marlowick", "4000", "973", "025")     // dropped: no status of the mark
+                + String.join("", caseFiles)
                 + "</action-keys></file-segments></application-information></trademark-applications-daily>";
+    }
+
+    /** The first day: two marks are kept, a logo and a record with no status are not. */
+    private static String firstDay() {
+        return dailyFile(
+                caseFile("97000001", "20241101", "Zorvex", "4000", "700", "025"),        // kept: registered
+                caseFile("97000002", "20241101", "Brasktone", "5R12", "686", "021"),     // kept for now: published
+                caseFile("97000003", "20241101", "Quillfeather", "2000", "700", "025"),  // dropped: a logo without words
+                caseFile("97000004", "20241101", "Marlowick", "4000", "973", "025"));    // dropped: no status of the mark
+    }
+
+    /** The second day: Brasktone is cancelled (it leaves the catalog) and a new mark is filed. */
+    private static String secondDay() {
+        return dailyFile(
+                caseFile("97000002", "20241102", "Brasktone", "5R12", "710", "021"),     // cancelled: latest, dead
+                caseFile("97000005", "20241102", "Flintwave", "4000", "700", "016"));    // new and registered
     }
 
     private void runJob(String profile, String... arguments) {
@@ -122,19 +137,26 @@ class UsptoConvertEndToEndIntegrationTest {
     @Test
     void aConvertedFileImportsAndTheApiReportsItsMarks() throws Exception {
         Path raw = Files.createDirectories(dir.resolve("raw").resolve("uspto"));
-        Files.writeString(raw.resolve("daily-synthetic.xml"), dailyFile(), StandardCharsets.UTF_8);
+        Files.writeString(raw.resolve("apc241101.xml"), firstDay(), StandardCharsets.UTF_8);
+        Files.writeString(raw.resolve("apc241102.xml"), secondDay(), StandardCharsets.UTF_8);
 
-        // 1. convert
-        runJob("uspto-convert", "--input=uspto/daily-synthetic.xml", "--output=uspto-e2e.jsonl");
+        // 1. convert both days in one run, the later file first on the command line: the order does not matter
+        runJob("uspto-convert", "--input=uspto/apc241102.xml", "--input=uspto/apc241101.xml",
+                "--output=uspto-e2e.jsonl");
         Path jsonl = dir.resolve("raw").resolve("uspto-e2e.jsonl");
         assertThat(Files.readAllLines(jsonl)).containsExactly(
                 "{\"mark\":\"Zorvex\",\"status\":\"REGISTERED\",\"nice_classes\":[25],\"source_id\":\"97000001\"}",
-                "{\"mark\":\"Brasktone\",\"status\":\"PENDING\",\"nice_classes\":[35],\"source_id\":\"97000002\"}");
+                "{\"mark\":\"Flintwave\",\"status\":\"REGISTERED\",\"nice_classes\":[16],\"source_id\":\"97000005\"}");
         JsonNode report = JSON.readTree(Files.readString(dir.resolve("raw").resolve("uspto-e2e.jsonl.report.json")));
-        assertThat(report.get("recordsRead").asInt()).isEqualTo(4);
+        assertThat(report.get("completeness").asText()).isEqualTo("COMPLETE");
+        assertThat(report.get("filesRead").asInt()).isEqualTo(2);
+        assertThat(report.get("recordsRead").asInt()).isEqualTo(6);
         assertThat(report.get("recordsWritten").asInt()).isEqualTo(2);
-        assertThat(report.get("dropped").get("logo_only").asInt()).isEqualTo(1);
-        assertThat(report.get("dropped").get("status_dropped:973").asInt()).isEqualTo(1);
+        assertThat(report.get("superseded").asInt()).as("Brasktone of the first day").isEqualTo(1);
+        assertThat(report.get("deadRemoved").asInt()).as("Brasktone of the second day").isEqualTo(1);
+        assertThat(report.get("deadByStatus").get("710").asInt()).isEqualTo(1);
+        assertThat(report.get("filtered").get("logo_only").asInt()).isEqualTo(1);
+        assertThat(report.get("filtered").get("status_dropped:973").asInt()).isEqualTo(1);
         assertThat(scalar("SELECT count(*) FROM trademark_catalog_version")).as("the job writes no catalog").isEqualTo("0");
 
         // 2. import, with the sha256 the job printed
@@ -151,7 +173,7 @@ class UsptoConvertEndToEndIntegrationTest {
                         source_date: 2026-11-05
                         sha256: %s
                     filters:
-                      include_classes: [25, 35]
+                      include_classes: [16, 25]
                       include_status: [REGISTERED, PENDING]
                 """.formatted(report.get("outputSha256").asText()));
         runJob("trademark-import", "--catalog=uspto-e2e");
@@ -180,10 +202,13 @@ class UsptoConvertEndToEndIntegrationTest {
             exact.get("sourceIds").forEach(id -> sourceIds.add(id.asText()));
             assertThat(sourceIds).containsExactly("uspto:97000001");
 
-            // the records the converter dropped are not in the catalog
-            JsonNode dropped = check(client, port, "Quillfeather and Marlowick fabric collection");
+            // the records the converter dropped are not in the catalog, and neither is the mark whose latest record
+            // (the second day) says it is cancelled, although the first day's record was live
+            JsonNode dropped = check(client, port, "Quillfeather and Marlowick and Brasktone fabric collection");
             assertThat(finding(dropped, "Quillfeather")).isNull();
             assertThat(finding(dropped, "Marlowick")).isNull();
+            assertThat(finding(dropped, "Brasktone")).isNull();
+            assertThat(finding(check(client, port, "Handmade Flintwave poster for kids"), "Flintwave")).isNotNull();
         }
     }
 }

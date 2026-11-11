@@ -149,12 +149,17 @@ services:
     volumes:
       - ./catalogs:/catalogs:ro
 
-  # Converts one USPTO Trademark Applications Daily XML file (TDXF, DTD V2.0) in catalogs/raw/ to jsonl-1 in the same
-  # folder (ADR-009, PR A2b). Local files only: no network call, no catalog written (the application context still
-  # starts through the database, like the other jobs: it applies migrations and registers the ruleset). Prints the sha256 to put in catalogs/manifest.yaml, and writes
-  # <output>.report.json with the counts of the records written and dropped. UNVERIFIED against real data.
-  #   docker compose run --rm uspto-convert --input=uspto/<file.xml> [--output=<name>.jsonl] [--overwrite]
-  # Another version-no than 2.0 stops it; USPTO_ALLOW_OTHER_VERSION=true reads it anyway.
+  # Converts USPTO Trademark Applications Daily XML files (TDXF, DTD V2.0) in catalogs/raw/ to one jsonl-1 file in the same
+  # folder (ADR-009, PRs A2b and A2c): for each serial number only the record with the latest transaction date, and only
+  # the marks the filters keep (Nice classes, live status codes, text marks). Local files only: no network call, no catalog
+  # written (the application context still starts through the database, like the other jobs: it applies migrations and
+  # registers the ruleset). Prints the sha256 to put in catalogs/manifest.yaml, and writes <output>.report.json with the
+  # files and the counts. UNVERIFIED against real data.
+  #   docker compose run --rm uspto-convert --input=uspto/<file.xml> [--input=uspto/<file2.xml> ...] [--output=<name>.jsonl] [--overwrite] [--strict]
+  #   docker compose run --rm uspto-convert --input-dir=uspto --output=<name>.jsonl [--overwrite] [--strict]
+  # Another version-no than 2.0 stops it; USPTO_ALLOW_OTHER_VERSION=true reads it anyway. USPTO_STRICT=true is --strict.
+  # USPTO_FILTERS=file:/catalogs/raw/<my-filters>.yaml names a filters file of your own (a copy of the shipped one with a
+  # new version); the shipped one is the default.
   # You are responsible for checking that the terms of the data allow this use and storage.
   uspto-convert:
     image: listing-guard-api:dev
@@ -169,6 +174,8 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
       CATALOGS_DIR: /catalogs
       LISTING_GUARD_TRADEMARK_USPTO_ALLOW_OTHER_VERSION: ${USPTO_ALLOW_OTHER_VERSION:-false}
+      LISTING_GUARD_TRADEMARK_USPTO_STRICT: ${USPTO_STRICT:-false}
+      LISTING_GUARD_TRADEMARK_USPTO_FILTERS: ${USPTO_FILTERS:-classpath:uspto/uspto-convert-filters-2026-11.yaml}
     volumes:
       # only raw/ is mounted, and writable: the job reads the XML there and writes the jsonl-1 file and its report there
       - ./catalogs/raw:/catalogs/raw
