@@ -582,7 +582,7 @@ What follows, in this order, is **not built yet**:
    needs), and A4, the evaluation that would give the first measured numbers. The trademark pack does not scan the
    Amazon `item_highlights` field yet (the rule checks do): adding it is a change of the trademark ruleset and of its
    canonical input, so it is a separate step.
-2. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)). Deferred; nothing is implemented.
+2. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)). The Java-only analysis core and synthetic tests are implemented in `image-checker/`; the API, persistence, multipart staging and bounded decode operations are not part of this core change. Shipped Etsy/Amazon profiles leave marketplace thresholds unset, so those checks report `INCOMPLETE` until the maintainer saves and reviews official sources ([source URL list and maintainer steps](docs/image-checker-core.md)). No source pages or original images are stored here.
 3. After step 1: run the retrieval evaluation and record the measured results (this needs an embedding provider: an API
    key or Ollama), then build the policy analyzer ([ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md)). Only parts
    exist today (the `LlmProvider` contract, a scripted test provider and the citation verifier); there is no call to a
@@ -632,7 +632,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-005: API auth, rate limit, and result cache](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md)
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
-- [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Deferred: PR B after ADR-009)
+- [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Proposed; Java core implemented, API/storage remain)
 - [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3 and A2b are implemented; the USPTO converter is unverified against real data)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)

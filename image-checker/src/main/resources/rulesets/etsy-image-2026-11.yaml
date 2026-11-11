@@ -1,0 +1,50 @@
+# ADR-008 image profile. The official pages below have not been downloaded or reviewed in this repository.
+# The maintainer must save the source locally under policies/raw/etsy and update policies/manifest.yaml.
+# Every numerical policy threshold is intentionally null until reviewed source material is supplied.
+pack_id: image-compliance
+version: etsy-image-2026-11
+marketplace: ETSY
+checked_at: 2026-11-11
+disclaimer: Kết quả chỉ là cảnh báo tham khảo, không xác nhận ảnh được Etsy chấp nhận.
+supported_formats: [JPEG, PNG]
+# Operational decoder admission caps only; these are not Etsy policy limits.
+limits:
+  max_encoded_bytes: 25000000
+  max_decoded_pixels: 40000000
+profiles:
+  default:
+    image_count: {min: null, max: null}
+    width: {min: null, max: null}
+    height: {min: null, max: null}
+    aspect_ratio: {min: null, max: null}
+    main_background: {edge_rgb_tolerance: null, min_white_ratio: null}
+    occupancy: {min_ratio: null, white_rgb_tolerance: null}
+    blur: {min_laplacian_variance: null}
+rules:
+  image_count:
+    severity: WARNING
+    message: Chưa thể đối chiếu số lượng ảnh vì ruleset chưa có ngưỡng đã được maintainer duyệt.
+    source: {status: unverified, urls: ["https://help.etsy.com/hc/en-us/articles/115015663347-Requirements-and-Best-Practices-for-Images-in-Your-Etsy-Shop"], note: Official Requirements and Best Practices for Images; maintainer must save and review it locally.}
+  image_dimensions:
+    severity: WARNING
+    message: Chưa thể đối chiếu kích thước ảnh vì ruleset chưa có ngưỡng đã được maintainer duyệt.
+    source: {status: unverified, urls: ["https://help.etsy.com/hc/en-us/articles/115015663347-Requirements-and-Best-Practices-for-Images-in-Your-Etsy-Shop"], note: Official image requirements; maintainer must save and review it locally.}
+  aspect_ratio:
+    severity: WARNING
+    message: Chưa thể đối chiếu tỉ lệ ảnh vì ruleset chưa có ngưỡng đã được maintainer duyệt.
+    source: {status: unverified, urls: ["https://help.etsy.com/hc/en-us/articles/115015663347-Requirements-and-Best-Practices-for-Images-in-Your-Etsy-Shop"], note: Official image requirements; maintainer must save and review it locally.}
+  occupancy:
+    severity: INFO
+    message: Chưa thể đánh giá bố cục sản phẩm vì ruleset chưa có ngưỡng đã được maintainer duyệt.
+    source: {status: unverified, urls: ["https://help.etsy.com/hc/en-us/articles/115015663347-Requirements-and-Best-Practices-for-Images-in-Your-Etsy-Shop"], note: Internal visual signal; no marketplace threshold is asserted.}
+  blur:
+    severity: INFO
+    message: Chưa thể đánh giá độ mờ vì ruleset chưa có ngưỡng Laplacian đã được duyệt.
+    source: {status: unverified, urls: ["https://help.etsy.com/hc/en-us/articles/115015663347-Requirements-and-Best-Practices-for-Images-in-Your-Etsy-Shop"], note: Blur score is an internal signal and has no verified marketplace threshold.}
+  customer_content:
+    severity: WARNING
+    message: Ảnh do khách hàng cung cấp có thể chứa logo hoặc nhãn hiệu bên thứ ba; hãy kiểm tra thủ công trước khi dùng.
+    source: {status: unverified, urls: ["https://help.etsy.com/hc/en-us/articles/44297885802647-How-Do-Etsy-s-Listing-Image-Requirements-Apply-to-My-Listings"], note: Source is caller-declared; this rule does not inspect or recognize marks.}
+summary:
+  by_severity: {ERROR: BLOCK, WARNING: REVIEW, INFO: REVIEW, NONE: READY}
+  incomplete: INCOMPLETE

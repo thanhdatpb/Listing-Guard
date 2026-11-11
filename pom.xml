@@ -18,6 +18,7 @@
         <module>trademark-scanner</module>
         <module>variation-checks</module>
         <module>personalization-screening</module>
+        <module>image-checker</module>
         <module>api</module>
         <module>mcp-server</module>
     </modules>
@@ -81,6 +82,11 @@
             <dependency>
                 <groupId>com.thanhdatpb.listingguard</groupId>
                 <artifactId>personalization-screening</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thanhdatpb.listingguard</groupId>
+                <artifactId>image-checker</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

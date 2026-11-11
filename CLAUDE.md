@@ -46,6 +46,7 @@ It never edits a listing, never publishes, and does no SEO.
   follows the public DTD and documentation named in ADR-009 and has never read a real file. The next steps are PR A2c
   (the latest transaction of a serial number wins) and A4 (evaluation).
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`, `FixSuggestion`). No Spring.
+- **Image checker core** (`image-checker/`, ADR-008, Proposed): Java-only ImageIO module, independent image input and canonical byte/metadata hash, immutable Amazon/Etsy `image-compliance` rulesets, runtime-aware analysis fingerprint, EXIF orientation, embedded ICC-to-sRGB conversion, alpha compositing on white, dimensions/aspect ratio, image count, Amazon main-image edge whiteness, occupancy and Laplacian variance. No Spring, database, HTTP or original-image persistence. Both shipped marketplace rulesets keep policy thresholds null until the maintainer reviews saved official sources; affected checks return `INCOMPLETE`. Every shipped source is `unverified`, and findings are only WARNING/INFO. The CUSTOMER_CONTENT rule reads the caller-declared source only; there is no text/logo/watermark detection.
 - **Variation checks** (`variation-checks/`, ADR-015, Proposed; implemented): pure Java (no Spring, database or HTTP) checks
   of a parent/child variation family, in a request of its own (`parent`, `variation_properties`, `children[]`;
   `docs/input-schema.md` "Variation checks"; the normalizer only trims and drops blanks). Ruleset
@@ -185,7 +186,7 @@ It never edits a listing, never publishes, and does no SEO.
   operator keys too; the count and insert hold a row lock on the client. `ConsoleModelAdvice` sets `demoCatalog` when
   `listing-guard.trademark.catalog-version` starts with `demo-`: every console page (sign-in pages included, inline style) shows
   the banner and the editor's trademark panel repeats it.
-- Current scope: Etsy and Amazon rule engines, the multi-client API with optional plans and a monthly quota, optional
+- Current scope: Etsy and Amazon rule engines, the image-checker core (ADR-008; no endpoint yet), the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
   endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the listing health report (ADR-018), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
@@ -218,7 +219,7 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
    real data). Next are PR A2c (the latest transaction of a serial number wins, needed before a catalog made of daily
    files is trusted; `jsonl-1` is not changed by A2b) and A4 evaluation.
    ADR-009 "Pull requests" and "USPTO conversion and multi-source catalogs (PR A2b)" have the detail.
-3. PR B: image checker (ADR-008, currently Deferred).
+3. PR B: image checker (ADR-008, Proposed); this branch implements the Java core. The API endpoint, result storage, multipart staging and bounded decode service remain separate work.
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
    after PR A, in this order: run the retrieval evaluation and commit the real results, then PR 3 (`ApiLlmProvider`),
    PR 4 (profile and retrieval), PR 5 (endpoint) and PR 6 (analyzer evaluation).
