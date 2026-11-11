@@ -166,6 +166,14 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  http:
+    converters:
+      # ADR-020: Spring Boot 4 serializes request and response bodies with Jackson 3 (tools.jackson) when it is on the classpath,
+      # and it is (Spring Boot's own starter and Flyway bring it). The controllers and the problem responses use Jackson 2
+      # (com.fasterxml.jackson), so this keeps the web layer on the Jackson 2 ObjectMapper of spring-boot-jackson2. It is a
+      # deprecated value of a Boot property (see the 'spring.http.converters.preferred-json-mapper' metadata) and goes away with the
+      # move to Jackson 3.
+      preferred-json-mapper: jackson2
 
 server:
   tomcat:

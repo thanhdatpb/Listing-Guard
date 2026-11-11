@@ -26,10 +26,15 @@
         <java.version>21</java.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-boot.version>3.5.16</spring-boot.version>
-        <jackson-bom.version>2.21.8</jackson-bom.version>
-        <postgresql.version>42.7.14</postgresql.version>
-        <tomcat.version>10.1.61</tomcat.version>
+        <spring-boot.version>4.1.2</spring-boot.version>
+        <!--
+            Jackson 2 (com.fasterxml.jackson). Its BOM is imported before the Spring Boot BOM so that it wins over the
+            Boot BOM's jackson-2-bom (2.21.7 in Boot 4.1.2). Pinned to 2.21.8 for a security reason: the Trivy scan of the
+            v0.6.0 image (commit 4157547) reported findings that 2.21.8 fixes. Boot 4's own jackson-bom.version is
+            Jackson 3 (tools.jackson) and is not touched here. Drop this pin when the Boot BOM reaches 2.21.8 or the
+            repository moves to Jackson 3 (ADR-020).
+        -->
+        <jackson-2-bom.version>2.21.8</jackson-2-bom.version>
     </properties>
 
     <dependencyManagement>
@@ -37,7 +42,7 @@
             <dependency>
                 <groupId>com.fasterxml.jackson</groupId>
                 <artifactId>jackson-bom</artifactId>
-                <version>${jackson-bom.version}</version>
+                <version>${jackson-2-bom.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -47,31 +52,6 @@
                 <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.tomcat</groupId>
-                <artifactId>tomcat-annotations-api</artifactId>
-                <version>${tomcat.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.tomcat.embed</groupId>
-                <artifactId>tomcat-embed-core</artifactId>
-                <version>${tomcat.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.tomcat.embed</groupId>
-                <artifactId>tomcat-embed-el</artifactId>
-                <version>${tomcat.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.tomcat.embed</groupId>
-                <artifactId>tomcat-embed-websocket</artifactId>
-                <version>${tomcat.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.postgresql</groupId>
-                <artifactId>postgresql</artifactId>
-                <version>${postgresql.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.thanhdatpb.listingguard</groupId>
