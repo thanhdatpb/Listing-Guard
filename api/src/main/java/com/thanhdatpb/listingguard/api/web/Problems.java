@@ -55,8 +55,20 @@ public final class Problems {
         };
     }
 
-    private static String title(HttpStatusCode status) {
-        HttpStatus known = HttpStatus.resolve(status.value());
-        return known == null ? "Error" : known.getReasonPhrase();
+    /**
+     * The {@code title} of a problem. Spring Framework 7 renamed two reason phrases to the wording of RFC 9110 (413 "Payload Too
+     * Large" became "Content Too Large", 422 "Unprocessable Entity" became "Unprocessable Content"). The published contract
+     * ({@code ApiExamples}, {@code docs/api/openapi.json}) shows the earlier titles and the upgrade to Spring Boot 4 must not
+     * change a response (ADR-020), so these two keep them. A client branches on {@code code}, never on the title.
+     */
+    static String title(HttpStatusCode status) {
+        return switch (status.value()) {
+            case 413 -> "Payload Too Large";
+            case 422 -> "Unprocessable Entity";
+            default -> {
+                HttpStatus known = HttpStatus.resolve(status.value());
+                yield known == null ? "Error" : known.getReasonPhrase();
+            }
+        };
     }
 }

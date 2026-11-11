@@ -118,7 +118,7 @@ Before you rely on it:
   with an embedding provider.
 
 What is not built yet is listed in the [Roadmap](#roadmap). Changes between versions are in
-[docs/releases/v0.6.0.md](docs/releases/v0.6.0.md).
+[docs/releases/v0.7.0.md](docs/releases/v0.7.0.md).
 
 ## Architecture
 
@@ -183,7 +183,7 @@ Modules:
 | `variation-checks/` | Variation checks core (ADR-015): the input of a parent and its children, its canonical hash, a strict ruleset loader, `variation-checks-2026-11.yaml` and the seven rules, the pack fingerprint, and `INCOMPLETE` when a rule fails. No Spring, no database. |
 | `personalization-screening/` | Personalization screening core (ADR-016): the input of the text a buyer typed, its canonical hash, a strict ruleset loader, `personalization-screening-2026-11.yaml` (character classes and print profiles), the three character rules, the adapter that runs the trademark scanner on each value, the pack fingerprint, and `INCOMPLETE` when a rule fails or no catalog is served. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, hashing for tests), `PolicyRetriever`, retrieval metrics, and the `LlmProvider` contract with a scripted test provider and a `CitationVerifier` (no call to a real model is implemented). No Spring. |
-| `api/` | Spring Boot REST app and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks`, `/trademark-checks`, `/variation-checks` and `/personalization-screenings` endpoints with their retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
+| `api/` | Spring Boot 4.1 REST app (Java 21, Spring Framework 7, Hibernate 7, PostgreSQL 16) and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks`, `/trademark-checks`, `/variation-checks` and `/personalization-screenings` endpoints with their retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
 | `mcp-server/` | MCP server for AI agents (ADR-017): six tools that call the REST API with a client's key and return its answers unchanged; STDIO by default, optional Streamable HTTP on loopback. The official MCP Java SDK (no Spring), a JDK HTTP client, no database, no dependency on another module. |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
@@ -612,6 +612,14 @@ What follows, in this order, is **not built yet**:
 9. Listing health report ([ADR-018](docs/adr/ADR-018-listing-health-report.md)), what remains: the questions at the end of the ADR
    (plan gating, history beyond the retention, one language, the default period). The job uses `--all-clients` for the
    all-client report. It stores nothing new and writes nothing; the endpoint, the job and the console page are implemented.
+10. Jackson 3 migration ([ADR-020](docs/adr/ADR-020-spring-boot-4.md)). The repository runs on Spring Boot 4.1 but its code still
+    uses Jackson 2 (`com.fasterxml.jackson`), through the deprecated `spring-boot-jackson2` module. Spring Framework plans to disable
+    Jackson 2 auto-detection in 7.1 and remove it in 7.2, so this migration (`tools.jackson`, a pull request of its own) has to
+    be done before the repository moves to Spring Boot 4.2.
+11. Remove the `ProblemDetail` customizer ([ADR-020](docs/adr/ADR-020-spring-boot-4.md)). `OpenApiConfig.nullableProblemDetailMembers`
+    keeps four members of Spring's `ProblemDetail` nullable in `docs/api/openapi.json`, because Spring Framework 7 declares them with
+    the JSpecify `@Nullable` and springdoc-openapi 3.2.0 does not read it. When springdoc does, delete the customizer and run the
+    build: `OpenApiIntegrationTest` must still pass without it.
 
 ## Documentation
 
@@ -621,7 +629,7 @@ What follows, in this order, is **not built yet**:
 - [MCP server](docs/mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the six tools, errors and limits.
 - [Deployment](docs/deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
 - [Oracle ARM deployment](docs/deploy-oracle.md): deploy the production API and PostgreSQL on an Oracle Cloud Ampere A1 VM behind Cloudflare Tunnel.
-- [Release notes](docs/releases/v0.6.0.md): what changed in each version and what to do when upgrading.
+- [Release notes](docs/releases/v0.7.0.md): what changed in each version and what to do when upgrading.
 - [ADR-001: Rule configuration](docs/adr/ADR-001-rule-config.md)
 - [ADR-002: Ruleset versioning](docs/adr/ADR-002-ruleset-versioning.md)
 - [ADR-003: Chunking strategy](docs/adr/ADR-003-chunking-strategy.md)

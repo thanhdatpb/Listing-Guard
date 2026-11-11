@@ -39,7 +39,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -336,7 +336,7 @@ class VariationCheckApiIntegrationTest {
         perform(KEY_1, "{\"marketplace\":\"NOWHERE\",\"children\":[]}").andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("unknown-marketplace"));
         // the tests plan one marketplace (TestcontainersConfig): the same answer as the other endpoints give for it
-        perform(KEY_1, "{\"marketplace\":\"WALMART\",\"children\":[]}").andExpect(status().isUnprocessableEntity())
+        perform(KEY_1, "{\"marketplace\":\"WALMART\",\"children\":[]}").andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("marketplace-not-yet-supported"));
         perform(KEY_1, "{\"children\":[]}").andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("invalid-request"));

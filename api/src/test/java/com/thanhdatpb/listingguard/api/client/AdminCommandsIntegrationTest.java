@@ -25,7 +25,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -37,7 +37,7 @@ import org.testcontainers.utility.DockerImageName;
 class AdminCommandsIntegrationTest {
 
     @Container
-    static final PostgreSQLContainer<?> JOB_DATABASE = new PostgreSQLContainer<>(
+    static final PostgreSQLContainer JOB_DATABASE = new PostgreSQLContainer(
             DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
 
     @Autowired

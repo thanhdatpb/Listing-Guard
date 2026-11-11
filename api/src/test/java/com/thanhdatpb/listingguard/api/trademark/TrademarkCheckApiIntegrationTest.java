@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -538,7 +538,7 @@ class TrademarkCheckApiIntegrationTest {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("unknown-marketplace"));
         mvc.perform(post(TRADEMARK).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"marketplace\":\"WALMART\",\"listing\":{}}"))
-                .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("marketplace-not-yet-supported"));
+                .andExpect(status().isUnprocessableContent()).andExpect(jsonPath("$.code").value("marketplace-not-yet-supported"));
         mvc.perform(get(TRADEMARK + "/not-a-uuid").header(HEADER, KEY_1))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid-request"));
         mvc.perform(post(TRADEMARK).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isUnauthorized());

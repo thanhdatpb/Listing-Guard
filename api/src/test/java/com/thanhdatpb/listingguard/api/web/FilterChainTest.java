@@ -222,7 +222,7 @@ class FilterChainTest {
     @Test
     void aBodyOverTheLimitIs413BeforeItIsRead() throws Exception {
         mvc().perform(post("/api/v1/echo").header("X-API-Key", KEY_A).contentType(MediaType.TEXT_PLAIN).content("x".repeat(MAX_BODY + 1)))
-                .andExpect(status().isPayloadTooLarge())
+                .andExpect(status().isContentTooLarge())
                 .andExpect(jsonPath("$.code").value("payload-too-large"))
                 .andExpect(jsonPath("$.type").value("urn:listing-guard:problem:payload-too-large"));
     }
@@ -246,7 +246,7 @@ class FilterChainTest {
                     request.setContent("x".repeat(MAX_BODY + 1).getBytes(java.nio.charset.StandardCharsets.UTF_8));
                     return request;
                 })
-                .andExpect(status().isPayloadTooLarge())
+                .andExpect(status().isContentTooLarge())
                 .andExpect(jsonPath("$.code").value("payload-too-large"));
     }
 
