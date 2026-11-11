@@ -155,7 +155,9 @@ final class BatchReport implements AutoCloseable {
         this.readinessEnabled = readinessEnabled;
         try {
             Files.createDirectories(dir);
-            for (String name : List.of(FINDINGS_FILE, LISTINGS_FILE, SUMMARY_FILE)) {
+            // passed.csv and held.csv belong to --split-output; one of an earlier run must not sit next to this run's reports
+            for (String name : List.of(FINDINGS_FILE, LISTINGS_FILE, SUMMARY_FILE, SplitOutput.PASSED_FILE,
+                    SplitOutput.HELD_FILE)) {
                 Files.deleteIfExists(dir.resolve(name));
             }
             this.findings = open(FINDINGS_FILE, FINDINGS_HEADER);

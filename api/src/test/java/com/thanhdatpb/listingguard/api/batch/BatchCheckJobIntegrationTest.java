@@ -351,6 +351,80 @@ class BatchCheckJobIntegrationTest {
         assertThat(html).contains("<td class=\"n\">3</td><td>B-2</td>").contains("<td class=\"n\">4</td><td>B-3</td>");
     }
 
+    /** A CSV the batch wrote for feeding back to a tool: no byte order mark, the header names the columns. */
+    private static List<Map<String, String>> plainCsv(Path file) throws IOException {
+        byte[] bytes = Files.readAllBytes(file);
+        assertThat(bytes.length > 0 && bytes[0] == (byte) 0xEF).as("no byte order mark in " + file.getFileName()).isFalse();
+        List<Map<String, String>> rows = new ArrayList<>();
+        try (MappingIterator<Map<String, String>> it = new CsvMapper().readerFor(Map.class)
+                .with(CsvSchema.emptySchema().withHeader()).readValues(new String(bytes, StandardCharsets.UTF_8))) {
+            while (it.hasNext()) {
+                rows.add(it.next());
+            }
+        }
+        return rows;
+    }
+
+    @Test
+    void splitOutputSortsTheRowsIntoPassedAndHeldWithoutChangingTheOtherReports() throws Exception {
+        // Amazon: a listing needs only its product type, so a row without one is the row with an ERROR finding
+        String fine = "S-1," + unique() + ",Acme,a,b,c,k,LUGGAGE";
+        String broken = "S-2," + unique() + ",Acme,a,b,c,k,";
+        String unreadable = "S-3,short row";
+        Path input = file("split.csv", AMAZON_HEADER + "\n" + fine + "\n" + broken + "\n" + unreadable + "\n");
+        Path mapping = file("split.yaml", AMAZON_MAPPING);
+        ByteArrayOutputStream console = new ByteArrayOutputStream();
+
+        job(console, RUN_1).run(new BatchOptions(input, mapping, CLIENT_1, "AMAZON", dir.resolve("split-out"), null, null, true,
+                SplitOutput.TrademarkHold.HIGH));
+
+        Path out = dir.resolve("split-out");
+        List<Map<String, String>> passed = plainCsv(out.resolve("passed.csv"));
+        List<Map<String, String>> held = plainCsv(out.resolve("held.csv"));
+        assertThat(passed).as("held=" + held).extracting(row -> row.get("asin")).containsExactly("S-1");
+        assertThat(held).extracting(row -> row.get("asin")).containsExactly("S-2", "S-3");
+        // the columns of the input, in its order, and one more column on the held side
+        assertThat(passed.get(0).keySet()).containsExactlyElementsOf(List.of(AMAZON_HEADER.split(",")));
+        assertThat(held.get(0).keySet()).containsExactlyElementsOf(
+                java.util.stream.Stream.concat(java.util.stream.Stream.of(AMAZON_HEADER.split(",")),
+                        java.util.stream.Stream.of("hold_reasons")).toList());
+        // the reasons of a checked row are the ERROR findings of findings.csv, once per rule
+        List<String> errorRules = csv(out.resolve("findings.csv")).stream()
+                .filter(row -> row.get("id").equals("S-2") && row.get("check").equals("rules")
+                        && row.get("severityRisk").equals("ERROR"))
+                .map(row -> row.get("ruleId") + "/ERROR").distinct().toList();
+        assertThat(errorRules).as("the listing of S-2 has an ERROR finding").isNotEmpty();
+        assertThat(held.get(0).get("hold_reasons")).startsWith(String.join("; ", errorRules));
+        assertThat(held.get(1).get("hold_reasons")).isEqualTo("unreadable_row");
+        assertThat(passed.get(0).get("hold_reasons")).isNull();
+        // the three reports are still there, and the console says whose rule the gate is
+        assertThat(out.resolve("listings.csv")).exists();
+        assertThat(out.resolve("findings.csv")).exists();
+        assertThat(out.resolve("summary.html")).exists();
+        String text = console.toString(StandardCharsets.UTF_8);
+        assertThat(text).contains("Review gate (--split-output): 1 row(s) in passed.csv, 2 in held.csv")
+                .contains("not a legal conclusion").contains("--hold-trademark-risk");
+    }
+
+    @Test
+    void withoutTheFlagNoPassedOrHeldFileIsWrittenAndOnesOfAnEarlierRunAreRemoved() throws Exception {
+        Path input = file("noflag.csv", ETSY_HEADER + "\n"
+                + "N-1," + unique() + "," + q("Plain description " + unique()) + ",a,5,9.99,i_did,made_to_order,\n");
+        Path mapping = file("noflag.yaml", ETSY_MAPPING);
+        Path out = dir.resolve("noflag-out");
+        job().run(new BatchOptions(input, mapping, CLIENT_1, "ETSY", out, null, null, true, SplitOutput.TrademarkHold.HIGH));
+        assertThat(out.resolve("passed.csv")).exists();
+
+        job().run(options(CLIENT_1, "ETSY", input, mapping, "noflag-out", null, null));
+
+        assertThat(out.resolve("passed.csv")).doesNotExist();
+        assertThat(out.resolve("held.csv")).doesNotExist();
+        try (java.util.stream.Stream<Path> files = Files.list(out)) {
+            assertThat(files.map(path -> path.getFileName().toString()).sorted().toList())
+                    .containsExactly("findings.csv", "listings.csv", "summary.html");
+        }
+    }
+
     @Test
     void aFileThatIsDamagedMidwayCompletesTheReportsMarksThemUnfinishedAndFails() throws Exception {
         Path input = file("damaged.csv", ETSY_HEADER + "\n"
