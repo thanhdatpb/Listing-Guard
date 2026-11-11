@@ -1,6 +1,6 @@
-﻿# Unreleased changes
+# Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate and the capabilities endpoint with its MCP tool below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. Etsy, hashes and the request and response shapes of every existing endpoint are unchanged (`docs/api/openapi.json` differs in an example's version string and gains `GET /api/v1/capabilities`); there is no migration.
+Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate, the capabilities endpoint with its MCP tool and one OpenAPI schema fix below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. Etsy, hashes and the request and response shapes of every existing endpoint are unchanged (`docs/api/openapi.json` differs in an example's version string and in the schema of the trademark check's findings, see the last section below, and gains `GET /api/v1/capabilities`); there is no migration.
 
 ## What is new
 
@@ -18,9 +18,13 @@ A new read-only endpoint says what the deployment serves, the same for every cli
 
 The MCP server has a seventh tool, `get_capabilities`, read-only and without arguments, that calls it and returns the answer verbatim like the other tools. Authentication on the optional HTTP transport is still an open question of [ADR-017](../adr/ADR-017-mcp-server.md) and is not changed. See [the integration guide](../integration-guide.md#capabilities) and [docs/mcp.md](../mcp.md).
 
+### OpenAPI: the findings of a trademark check have their own schema
+
+In `docs/api/openapi.json`, `TrademarkCheckResult.findings` pointed at the schema `FindingView`, which is the finding of `POST /api/v1/checks` (with `fix`, no `snippet`, `mark` or `matchType`). It now points at the new schema `TrademarkCheckFindingView`: `ruleId`, `risk`, `field`, `start`, `end`, `snippet`, `mark`, `matchType`, `score`, `insideColorPhrase`, `otherRuleIds`, `sourceIds`, `message`, `suggestion`, which is what [the integration guide](../integration-guide.md#trademark-checks) and the example already showed. **The responses of the API do not change**, only the description of them: a client that generates code from the file gets a different type name and the right fields for this endpoint. The name `TrademarkFindingView` was not used because it already names the finding of the personalization screening (no `snippet`, a `label`). `OpenApiIntegrationTest` now holds the reference and the field list.
+
 ## Breaking changes
 
-None.
+None for the API. A client generated from `docs/api/openapi.json` should be generated again to get `TrademarkCheckFindingView`.
 
 ## Upgrade notes
 

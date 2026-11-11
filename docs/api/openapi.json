@@ -947,6 +947,83 @@
         },
         "type" : "object"
       },
+      "TrademarkCheckFindingView" : {
+        "properties" : {
+          "end" : {
+            "description" : "End of the span in the field text (UTF-16 code units, exclusive).",
+            "example" : 15,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "field" : {
+            "description" : "Field path: title, description, brand, search_terms, tags[i], bullet_points[i] (zero-based, in the cleaned list: blank entries are dropped).",
+            "example" : "bullet_points[1]",
+            "type" : "string"
+          },
+          "insideColorPhrase" : {
+            "description" : "The match lies inside a color description. This explains the finding and never lowers its level.",
+            "type" : "boolean"
+          },
+          "mark" : {
+            "description" : "The catalog mark that matched; null for a finding that has no mark.",
+            "example" : "Zorvex",
+            "type" : [ "string", "null" ]
+          },
+          "matchType" : {
+            "description" : "How it was found: EXACT, PHRASE, FUZZY (similar to a mark) or CONTEXT (a rule about place, sport or color).",
+            "enum" : [ "EXACT", "PHRASE", "FUZZY", "CONTEXT" ],
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "Human text, currently Vietnamese.",
+            "type" : "string"
+          },
+          "otherRuleIds" : {
+            "description" : "Other rules that matched an overlapping span of the same field and lost to this finding.",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "risk" : {
+            "description" : "Level of this finding: LOW (informational), MEDIUM or HIGH.",
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
+            "type" : "string"
+          },
+          "ruleId" : {
+            "example" : "catalog_exact",
+            "type" : "string"
+          },
+          "score" : {
+            "description" : "Similarity from 0 to 1: 1.0 for EXACT and PHRASE, the final score for FUZZY, null for CONTEXT.",
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "snippet" : {
+            "description" : "The text of the span, cut to a length limit.",
+            "example" : "Zorvex",
+            "type" : "string"
+          },
+          "sourceIds" : {
+            "description" : "Ids of the source records of the catalog mark; empty when there is no mark.",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "start" : {
+            "description" : "Start of the span in the field text (UTF-16 code units, inclusive).",
+            "example" : 9,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "suggestion" : {
+            "description" : "Human text, currently Vietnamese.",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "TrademarkCheckResult" : {
         "properties" : {
           "analysisVersion" : {
@@ -997,7 +1074,7 @@
           },
           "findings" : {
             "items" : {
-              "$ref" : "#/components/schemas/FindingView"
+              "$ref" : "#/components/schemas/TrademarkCheckFindingView"
             },
             "type" : "array"
           },
