@@ -40,7 +40,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -421,7 +421,7 @@ class PersonalizationScreeningApiIntegrationTest {
     void anUnknownMarketplaceAndAnUnreadableBodyAreBadRequests() throws Exception {
         perform(KEY_1, "{\"marketplace\":\"NOWHERE\",\"values\":[]}").andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("unknown-marketplace"));
-        perform(KEY_1, "{\"marketplace\":\"WALMART\",\"values\":[]}").andExpect(status().isUnprocessableEntity())
+        perform(KEY_1, "{\"marketplace\":\"WALMART\",\"values\":[]}").andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("marketplace-not-yet-supported"));
         perform(KEY_1, "{\"values\":[]}").andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("invalid-request"));
