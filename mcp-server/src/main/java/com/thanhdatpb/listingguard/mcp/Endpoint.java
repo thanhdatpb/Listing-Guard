@@ -10,7 +10,8 @@ enum Endpoint {
     VARIATION_CHECKS("POST", "/api/v1/variation-checks"),
     PERSONALIZATION_SCREENINGS("POST", "/api/v1/personalization-screenings"),
     RULESET_LIMITS("GET", "/api/v1/rulesets/{marketplace}/limits"),
-    USAGE("GET", "/api/v1/usage");
+    USAGE("GET", "/api/v1/usage"),
+    CAPABILITIES("GET", "/api/v1/capabilities");
 
     private final String method;
     private final String path;

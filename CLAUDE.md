@@ -101,12 +101,12 @@ It never edits a listing, never publishes, and does no SEO.
 - **MCP server** (`mcp-server/`, ADR-017, Proposed; implemented, `docs/mcp.md`): a jar of its own for AI agents (Claude Code,
   Claude Desktop, a department's agent) over the Model Context Protocol. **It is only an HTTP client of the REST API**
   (`X-API-Key` from `LISTING_GUARD_MCP_API_KEY`, base URL from `LISTING_GUARD_MCP_BASE_URL`; it does not start without them and
-  never prints a value): no database, no internal service, no dependency on another module, no migration, no change to the API or
-  `docs/api/openapi.json`, so keys, rate limit, plans and quota (ADR-005, ADR-007, ADR-013) apply unchanged. Official MCP Java SDK
+  never prints a value): no database, no internal service, no dependency on another module, no migration, no write and no logic of its own, so keys, rate limit, plans and quota (ADR-005, ADR-007, ADR-013) apply unchanged. Official MCP Java SDK
   `io.modelcontextprotocol.sdk` **2.1.0** pinned exactly (`mcp-core` + `mcp-json-jackson2`; the aggregate `mcp` pulls Jackson 3;
   2.2.0-M2 is a milestone and is not used), **no Spring** (the Spring AI starter needs Spring Boot 4 and is not used; the repository itself is on Boot 4.1, ADR-020), the JDK
-  `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Six tools
-  (`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`; `Endpoint` is the
+  `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Seven tools
+  (`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`, `get_capabilities`
+  (`GET /api/v1/capabilities`, no arguments, read only); `Endpoint` is the
   closed list of API calls, only `GET` and `POST`, no tool takes a path or a URL); **none writes, applies a fix or publishes**.
   **The model does not decide**: a `2xx` answer is returned verbatim (exact body as text, the same object as structured content,
   no `outputSchema`, nothing removed or summarized, `INCOMPLETE` and `UNKNOWN` never turned into anything else). API problems
@@ -119,7 +119,14 @@ It never edits a listing, never publishes, and does no SEO.
   (an echo of it in an answer is replaced), redirects are not followed, cleartext `http` only to localhost unless
   `LISTING_GUARD_MCP_ALLOW_INSECURE_HTTP=true`. **No argument is ever logged** (a listing is client data, the buyer's text is personal
   data). Tests use the JDK `HttpServer` as the API stub (no Docker, no WireMock) and the SDK's own client over stdio (a child process)
-  and HTTP. No compose service, `docs/releases` untouched.
+  and HTTP. No compose service. **`get_capabilities`** (ADR-017 amendment) reads `GET /api/v1/capabilities`, the one endpoint this
+  server needed that the API lacked (`api/.../capabilities/`; the same for every client, an API key, no plan pack, no quota, no
+  write, `ETag`): the packs served over HTTP with `available` and the ruleset version per marketplace, `trademarkCatalog.state`
+  (`READY`/`DISABLED`/`REFUSED`) and `demo`, `plans.enforced`, `fixes.enabled`. It reads the beans that serve the checks, never
+  `TrademarkCatalogRuntime.Status#detail()` (that text can name the configured catalog) and never a client row, so it shows no
+  catalog name, no secret setting and nothing about a client; a test holds the exact member list. `demo` comes from
+  `TrademarkProperties.isDemo`, the one definition the console banner uses too. A new member needs the DTO, `ApiExamples.CAPABILITIES`,
+  `docs/api/openapi.json` and `docs/integration-guide.md`.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Optional ADR-014 fix/readiness output is behind

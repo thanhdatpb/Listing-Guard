@@ -109,7 +109,7 @@ public record PersonalizationScreeningResult(
             RiskLevel riskLevel,
             @Schema(description = "The catalog version the scan used; null when it did not run.", nullable = true) String catalogVersion,
             @Schema(description = "Version of the trademark ruleset the scan used; null when it did not run.", nullable = true,
-                    example = "trademark-risk-2026-11") String rulesetVersion,
+                    example = "trademark-risk-2026-11b") String rulesetVersion,
             @Schema(description = "Trademark rules that failed; empty when none did.", example = "[]") List<String> failedRuleIds,
             List<TrademarkFindingView> findings) {
     }

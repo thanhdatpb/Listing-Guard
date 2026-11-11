@@ -164,8 +164,8 @@ What counts: **one unit is one new result that is stored, per endpoint.** A full
 
 - a result answered from the cache (`"cached": true`), also when you are at the limit;
 - `GET /api/v1/checks/{id}`, `GET /api/v1/trademark-checks/{id}`, `GET /api/v1/variation-checks/{id}`,
-  `GET /api/v1/personalization-screenings/{id}`, `GET /api/v1/usage` and `GET /api/v1/reports/summary` (the health report, which
-  needs no pack either);
+  `GET /api/v1/personalization-screenings/{id}`, `GET /api/v1/usage`, `GET /api/v1/capabilities` and
+  `GET /api/v1/reports/summary` (the health report, which needs no pack either);
 - a trademark, variation or personalization result that is `INCOMPLETE` (it is stored for `GET` and never reused);
 - a request that is refused or fails (`400`, `401`, `403`, `413`, `429`, `503`).
 
@@ -205,6 +205,43 @@ own client. Poll it before a large run, not before every call.
 
 The pack is checked first, then the cache, then the quota, so a client at its limit still gets every answer it has already
 paid for.
+
+## Capabilities
+
+`GET /api/v1/capabilities` says what this deployment serves. Call it once, from your backend, before you rely on a pack or on
+the trademark result; the answer is the same for every client.
+
+```json
+{
+  "packs": [
+    {"id": "listing-rules", "available": true, "rulesetVersions": {"AMAZON": "amazon-2026-12c", "ETSY": "etsy-2026-12"}},
+    {"id": "personalization-screening", "available": true, "rulesetVersions": {"AMAZON": "personalization-screening-2026-11", "ETSY": "personalization-screening-2026-11"}},
+    {"id": "trademark-risk", "available": false, "rulesetVersions": {"AMAZON": "trademark-risk-2026-11b", "ETSY": "trademark-risk-2026-11b"}},
+    {"id": "variation-checks", "available": true, "rulesetVersions": {"AMAZON": "variation-checks-2026-11", "ETSY": "variation-checks-2026-11"}}
+  ],
+  "trademarkCatalog": {"state": "DISABLED", "demo": false},
+  "plans": {"enforced": false},
+  "fixes": {"enabled": false}
+}
+```
+
+That is the answer of a default deployment. What each member means:
+
+- `packs[]`: the analysis packs served over HTTP, sorted by `id`. `rulesetVersions` is the version of the active ruleset per
+  marketplace, the `rulesetVersion` of a result. `available` is false only for `trademark-risk` while the catalog is not
+  `READY`: its endpoint then answers `503 trademark-not-configured`. `batch`, `policy-analyzer` and `sheet-connector` are not
+  listed because they have no endpoint.
+- `trademarkCatalog.state`: `READY`, `DISABLED` (no catalog is configured) or `REFUSED` (one is configured and cannot be
+  served). **In the last two the trademark risk of a listing is unknown, never low.** `demo` is true when the catalog is the DEMO
+  one of invented marks, whose results are not real. The catalog's name is never shown.
+- `plans.enforced`: whether plans and the monthly quota are applied (see "Plans and monthly quota"). Your own plan and quota
+  are in `GET /api/v1/usage`; this answer says nothing about the calling client.
+- `fixes.enabled`: whether `POST /api/v1/checks` returns verified fix suggestions and readiness (see "Optional fixes and
+  readiness").
+
+It needs an API key, is read only, costs no unit and needs no plan pack. It carries an `ETag` and may be cached for five
+minutes (it changes only when the deployment is restarted with other settings). It holds no secret setting and no information
+about any client.
 
 ## Create a check
 
@@ -1026,7 +1063,7 @@ catalog:
     "status": "COMPLETE",
     "riskLevel": "LOW",
     "catalogVersion": "demo-2026-11-0a1b2c3d4e5f",
-    "rulesetVersion": "trademark-risk-2026-11",
+    "rulesetVersion": "trademark-risk-2026-11b",
     "failedRuleIds": [],
     "findings": []
   }

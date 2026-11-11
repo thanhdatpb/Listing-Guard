@@ -636,7 +636,7 @@ public final class ApiExamples {
                 "status": "COMPLETE",
                 "riskLevel": "LOW",
                 "catalogVersion": "demo-2026-11-0a1b2c3d4e5f",
-                "rulesetVersion": "trademark-risk-2026-11",
+                "rulesetVersion": "trademark-risk-2026-11b",
                 "failedRuleIds": [],
                 "findings": []
               }
@@ -673,7 +673,7 @@ public final class ApiExamples {
                 "status": "COMPLETE",
                 "riskLevel": "LOW",
                 "catalogVersion": "demo-2026-11-0a1b2c3d4e5f",
-                "rulesetVersion": "trademark-risk-2026-11",
+                "rulesetVersion": "trademark-risk-2026-11b",
                 "failedRuleIds": [],
                 "findings": []
               }
@@ -715,6 +715,21 @@ public final class ApiExamples {
               "periodStart": "2026-11-01",
               "resetAt": "2026-12-01T00:00:00Z",
               "packs": ["batch", "listing-rules", "personalization-screening", "sheet-connector", "trademark-risk", "variation-checks"]
+            }
+            """;
+
+    /** The answer of a default deployment: no trademark catalog, plans off, fixes off. */
+    public static final String CAPABILITIES = """
+            {
+              "packs": [
+                {"id": "listing-rules", "available": true, "rulesetVersions": {"AMAZON": "amazon-2026-12c", "ETSY": "etsy-2026-12"}},
+                {"id": "personalization-screening", "available": true, "rulesetVersions": {"AMAZON": "personalization-screening-2026-11", "ETSY": "personalization-screening-2026-11"}},
+                {"id": "trademark-risk", "available": false, "rulesetVersions": {"AMAZON": "trademark-risk-2026-11b", "ETSY": "trademark-risk-2026-11b"}},
+                {"id": "variation-checks", "available": true, "rulesetVersions": {"AMAZON": "variation-checks-2026-11", "ETSY": "variation-checks-2026-11"}}
+              ],
+              "trademarkCatalog": {"state": "DISABLED", "demo": false},
+              "plans": {"enforced": false},
+              "fixes": {"enabled": false}
             }
             """;
 

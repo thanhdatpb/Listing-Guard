@@ -30,6 +30,10 @@ edit or publish anything, and it does not do SEO.
   number and length of tags, Amazon search terms in bytes, ...), each with the field, the unit it is counted in, its severity
   and how well it is sourced, read from the same rules and ruleset the check uses. A client shows a character counter from it
   instead of copying the numbers into its own code.
+- **Capabilities** (`GET /api/v1/capabilities`): what the deployment serves, the same for every client: the packs with the ruleset
+  version per marketplace, the state of the trademark catalog (`READY`, `DISABLED` or `REFUSED`, and whether it is the DEMO
+  catalog), whether plans and fix suggestions are on. It holds no secret setting, no catalog name and nothing about a client,
+  needs no plan pack and costs no unit. The MCP server's `get_capabilities` calls it.
 - **Batch check** (the `batch-check` job): checks a whole export file (an Etsy CSV, an Amazon flat file) with both
   checks and writes CSV and HTML reports, without an integration.
 - **Listing health report** (`GET /api/v1/reports/summary`, the `health-report` job and the console page `/console/report`):
@@ -97,7 +101,7 @@ Working end to end:
   migration), and while the trademark catalog is the fictional DEMO one every page carries a banner that says so.
   Production requires HTTPS and SMTP; development can log links. Saved listings and history remain planned.
 - The optional MCP server ([ADR-017](docs/adr/ADR-017-mcp-server.md), `mcp-server/`): a separate jar that lets an AI agent
-  (Claude Code, Claude Desktop, your own agent) call the checks as six read-and-check tools over the Model Context Protocol.
+  (Claude Code, Claude Desktop, your own agent) call the checks as seven read-and-check tools over the Model Context Protocol.
   It is only an HTTP client of the API with a client's `X-API-Key` (no database, no internal service, no migration), so keys,
   rate limits, plans and the quota apply unchanged. The answer of the API reaches the agent verbatim with its disclaimer,
   versions and completeness: the model never decides. STDIO is the default; Streamable HTTP is optional and for loopback or a
@@ -131,6 +135,7 @@ Client backend -- X-API-Key --> Listing Guard API (Spring Boot)
    POST /api/v1/variation-checks     |   (its own request: a parent and its children; pack `variation-checks`)
    POST /api/v1/personalization-screenings |   (its own request: what a buyer typed; pack `personalization-screening`)
    GET  /api/v1/rulesets/{m}/limits  |   (read only: the limits of the rules below)
+   GET  /api/v1/capabilities         |   (read only: the packs, versions and catalog state this deployment serves)
                          API key --> authenticated client
                          rate limit per client
                                      |
@@ -166,7 +171,7 @@ Client backend -- X-API-Key --> Listing Guard API (Spring Boot)
        -> findings.csv, listings.csv, summary.html
 
   MCP server (its own jar, `mcp-server/`; optional; no database, no internal service)
-  AI agent -- STDIO (default) or Streamable HTTP on loopback only --> six tools
+  AI agent -- STDIO (default) or Streamable HTTP on loopback only --> seven tools
        -> HTTP calls with X-API-Key to the Listing Guard API above; its answers come back unchanged
 
   Policy ingest job (profile `ingest`)
@@ -186,7 +191,7 @@ Modules:
 | `personalization-screening/` | Personalization screening core (ADR-016): the input of the text a buyer typed, its canonical hash, a strict ruleset loader, `personalization-screening-2026-11.yaml` (character classes and print profiles), the three character rules, the adapter that runs the trademark scanner on each value, the pack fingerprint, and `INCOMPLETE` when a rule fails or no catalog is served. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, hashing for tests), `PolicyRetriever`, retrieval metrics, and the `LlmProvider` contract with a scripted test provider and a `CitationVerifier` (no call to a real model is implemented). No Spring. |
 | `api/` | Spring Boot 4.1 REST app (Java 21, Spring Framework 7, Hibernate 7, PostgreSQL 16) and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks`, `/trademark-checks`, `/variation-checks` and `/personalization-screenings` endpoints with their retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
-| `mcp-server/` | MCP server for AI agents (ADR-017): six tools that call the REST API with a client's key and return its answers unchanged; STDIO by default, optional Streamable HTTP on loopback. The official MCP Java SDK (no Spring), a JDK HTTP client, no database, no dependency on another module. |
+| `mcp-server/` | MCP server for AI agents (ADR-017): seven tools that call the REST API with a client's key and return its answers unchanged; STDIO by default, optional Streamable HTTP on loopback. The official MCP Java SDK (no Spring), a JDK HTTP client, no database, no dependency on another module. |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
 | `batch/` | `mappings/` (example column mappings, committed); `input/` and `out/` (your exports and the reports, git-ignored) |
@@ -195,7 +200,7 @@ Modules:
 | `docs/api/` | `openapi.json`, the committed API contract (a test fails when it drifts from the code) |
 | `docs/integration-guide.md` | How a backend calls the API: auth, flow, field paths, errors |
 | `docs/batch-check.md` | How to check an export file and read the reports |
-| `docs/mcp.md` | How to use the checks from an AI agent: Claude Code and Claude Desktop setup, the six tools, errors, limits |
+| `docs/mcp.md` | How to use the checks from an AI agent: Claude Code and Claude Desktop setup, the seven tools, errors, limits |
 | `docs/deployment.md` | Production deployment, upgrades, and the migration notes |
 | `docs/releases/` | Release notes, one file per version |
 
@@ -320,8 +325,8 @@ claude mcp add listing-guard \
   -- java -jar /absolute/path/to/mcp-server/target/listing-guard-mcp.jar
 ```
 
-The tools are `check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits` and `get_usage`.
-They only read and check. **The model does not decide**: each result is the API's answer, unchanged, with its disclaimer,
+The tools are `check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage` and `get_capabilities` (what the deployment serves: packs, ruleset versions, the
+state of the trademark catalog, whether plans and fixes are on). They only read and check. **The model does not decide**: each result is the API's answer, unchanged, with its disclaimer,
 versions and `completeness` (`INCOMPLETE` is not clean, an `UNKNOWN` risk is not `LOW`); a deployment with no trademark catalog
 gives `check_trademark` a result with an unknown risk, not an error. The server does not start without
 `LISTING_GUARD_MCP_API_KEY` and `LISTING_GUARD_MCP_BASE_URL`. The optional Streamable HTTP transport is off by default, binds
@@ -635,7 +640,7 @@ What follows, in this order, is **not built yet**:
 - [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, plans and quota, the ruleset limits for a character counter, and client isolation.
 - [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields, and the request of the variation checks.
 - [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
-- [MCP server](docs/mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the six tools, errors and limits.
+- [MCP server](docs/mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the seven tools, errors and limits.
 - [Deployment](docs/deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
 - [Oracle ARM deployment](docs/deploy-oracle.md): deploy the production API and PostgreSQL on an Oracle Cloud Ampere A1 VM behind Cloudflare Tunnel.
 - [Release notes](docs/releases/v0.7.0.md): what changed in each version and what to do when upgrading.
@@ -654,7 +659,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-013: Client plans and monthly quota](docs/adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
 - [ADR-015: Variation checks](docs/adr/ADR-015-variation-checks.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; it ends with the questions the maintainer has to decide)
 - [ADR-016: Personalization screening](docs/adr/ADR-016-personalization-screening.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; the print profiles are placeholders; it ends with the questions the maintainer has to decide)
-- [ADR-017: MCP server for AI agents](docs/adr/ADR-017-mcp-server.md) (Proposed; implemented: a separate module that only calls the API, six tools that never write, STDIO by default; it ends with the questions the maintainer has to decide)
+- [ADR-017: MCP server for AI agents](docs/adr/ADR-017-mcp-server.md) (Proposed; implemented: a separate module that only calls the API, seven tools that never write, STDIO by default; it ends with the questions the maintainer has to decide)
 - [ADR-018: Listing health report](docs/adr/ADR-018-listing-health-report.md) (Proposed; implemented: an endpoint, a weekly job and a console page that add up stored counts per client, never listing text; it ends with the questions the maintainer has to decide)
 - [ADR-021: Enforcement signal for the trademark pack](docs/adr/ADR-021-enforcement-signal.md) (Proposed; a design only, nothing is implemented: an offline catalog of court cases linked by review to marks, the sources and their terms as far as they could be read, and the questions the maintainer has to decide)
 - [ADR-019: Oracle A1 deployment behind Cloudflare Tunnel](docs/adr/ADR-019-oracle-a1-cloudflare-tunnel.md) (Proposed)

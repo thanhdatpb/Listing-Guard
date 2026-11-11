@@ -17,16 +17,16 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 @ConditionalOnProperty(prefix = "listing-guard.console", name = "enabled", havingValue = "true")
 public class ConsoleModelAdvice {
 
-    static final String DEMO_PREFIX = "demo-";
+    static final String DEMO_PREFIX = TrademarkProperties.DEMO_PREFIX;
 
     private final boolean demoCatalog;
 
     public ConsoleModelAdvice(TrademarkProperties trademark) {
-        this.demoCatalog = isDemo(trademark.catalogVersion());
+        this.demoCatalog = trademark.demoCatalog();
     }
 
     static boolean isDemo(String catalogVersion) {
-        return catalogVersion != null && catalogVersion.startsWith(DEMO_PREFIX);
+        return TrademarkProperties.isDemo(catalogVersion);
     }
 
     @ModelAttribute("demoCatalog")

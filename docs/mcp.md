@@ -11,8 +11,8 @@ Listing Guard through the [Model Context Protocol](https://modelcontextprotocol.
 - **The model does not decide.** Every conclusion is the answer of the Listing Guard API, handed to the agent unchanged: its
   findings, its `disclaimer`, `rulesetVersion`, `catalogVersion`, `analysisVersion` and `completeness`. An `INCOMPLETE`
   result is not a clean result and an `UNKNOWN` risk is not `LOW`; the server never turns one into the other.
-- **It only checks.** Six tools, none writes: no tool edits a listing, applies a fix, publishes or changes a plan. It makes
-  `GET` and `POST` calls to six paths of the API and nothing else.
+- **It only checks.** Seven tools, none writes: no tool edits a listing, applies a fix, publishes or changes a plan. It makes
+  `GET` and `POST` calls to seven paths of the API and nothing else.
 - **It is a client of the API, nothing more.** It has no database and calls no internal service. It sends the client's
   `X-API-Key`, so key validity, the per-client rate limit, the plan and the monthly quota
   ([ADR-007](adr/ADR-007-multi-client-model.md), [ADR-013](adr/ADR-013-client-plans-and-monthly-quota.md)) apply exactly as
@@ -63,7 +63,7 @@ claude mcp add listing-guard \
 ```
 
 `claude mcp list` shows it and `/mcp` inside Claude Code shows its tools (`mcp__listing-guard__check_listing` and the other
-five). If you share the registration in a project's `.mcp.json`, take the key from the environment instead of writing it:
+six). If you share the registration in a project's `.mcp.json`, take the key from the environment instead of writing it:
 
 ```json
 {
@@ -82,11 +82,11 @@ five). If you share the registration in a project's `.mcp.json`, take the key fr
 
 **Allowing the tools.** The four check tools store a result in the client's scope and, where the deployment enforces plans, a
 new result can use one unit of the monthly quota, so the server marks them as not read-only and Claude Code asks before the
-first call. `get_limits` and `get_usage` are read-only. To allow tools on purpose, add them to `permissions.allow` in
-`.claude/settings.json`:
+first call. `get_limits`, `get_usage` and `get_capabilities` are read-only. To allow tools on purpose, add them to
+`permissions.allow` in `.claude/settings.json`:
 
 ```json
-{ "permissions": { "allow": ["mcp__listing-guard__get_usage", "mcp__listing-guard__get_limits"] } }
+{ "permissions": { "allow": ["mcp__listing-guard__get_usage", "mcp__listing-guard__get_limits", "mcp__listing-guard__get_capabilities"] } }
 ```
 
 Allow the check tools too only when you are comfortable with an agent spending units; the monthly quota is the limit.
@@ -146,8 +146,9 @@ Ask in your own words; the agent picks the tool and sends the listing in the mar
   (`screen_personalization`; the text is sent exactly as typed)
 - "What is the title length limit for Etsy, and how sure is the source?" (`get_limits`, which reports each rule's source status)
 - "How many units are left this month?" (`get_usage`)
+- "Does this deployment have a trademark catalog, and is it the demo one?" (`get_capabilities`)
 
-## The six tools
+## The seven tools
 
 | Tool | API call | Arguments | Counts against the quota (where plans are on) |
 |---|---|---|---|
@@ -157,6 +158,13 @@ Ask in your own words; the agent picks the tool and sends the listing in the mar
 | `screen_personalization` | `POST /api/v1/personalization-screenings` | `marketplace`, `values`, optional `print_profile`, `product_type` | one unit per new complete result |
 | `get_limits` | `GET /api/v1/rulesets/{marketplace}/limits` | `marketplace`, optional `product_type` | no |
 | `get_usage` | `GET /api/v1/usage` | none | no |
+| `get_capabilities` | `GET /api/v1/capabilities` | none | no |
+
+`get_capabilities` says what the deployment serves, the same for every client: the packs with the ruleset version per
+marketplace, the state of the trademark catalog (`READY`, `DISABLED` or `REFUSED`, and `demo` for the DEMO catalog), whether
+plans are on and whether checks return fix suggestions. It does not show the catalog's name, any secret setting or anything about
+your client (use `get_usage` for your plan and quota). Call it before a run to see which checks can answer: while the catalog is
+not `READY`, `check_trademark` gives an unknown risk, never a low one.
 
 Each tool's schema is sent to the agent with its description. The arguments are checked against it before anything is sent
 (an unknown argument, a missing one, a value of the wrong kind is `invalid-arguments`); what is inside `listing`, `values` and

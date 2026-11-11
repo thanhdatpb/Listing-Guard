@@ -101,7 +101,14 @@ class OpenApiIntegrationTest {
                 "/api/v1/trademark-checks", "/api/v1/trademark-checks/{id}", "/api/v1/usage",
                 "/api/v1/variation-checks", "/api/v1/variation-checks/{id}",
                 "/api/v1/personalization-screenings", "/api/v1/personalization-screenings/{id}",
-                "/api/v1/rulesets/{marketplace}/limits", "/api/v1/reports/summary", "/health");
+                "/api/v1/rulesets/{marketplace}/limits", "/api/v1/reports/summary", "/api/v1/capabilities", "/health");
+        // capabilities (ADR-017): read only, no plan pack, no quota, no 404 (it needs no marketplace)
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1capabilities"))).as("read only: no other method")
+                .containsExactly("get");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1capabilities/get/responses")))
+                .containsExactlyInAnyOrder("200", "304", "401", "429");
+        assertThat(fieldNames(spec.at("/components/schemas/Capabilities/properties")))
+                .containsExactlyInAnyOrder("packs", "trademarkCatalog", "plans", "fixes");
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1rulesets~1{marketplace}~1limits/get/responses")))
                 .containsExactlyInAnyOrder("200", "304", "401", "404", "429");
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1rulesets~1{marketplace}~1limits")))
