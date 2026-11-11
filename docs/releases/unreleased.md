@@ -1,6 +1,6 @@
 ﻿# Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate and the image checks endpoint below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. Etsy, hashes and the request and response shapes of the existing endpoints are unchanged; `docs/api/openapi.json` gains the image endpoints and `image-checks` in the `GET /api/v1/usage` pack list. There are two additive migrations (V28 and V29).
+Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate, the image checks endpoint and one OpenAPI schema fix below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. Etsy, hashes and the request and response shapes of the existing endpoints are unchanged. `docs/api/openapi.json` gains the image endpoints and `image-checks` in the `GET /api/v1/usage` pack list, and differs in an example's version string and in the schema of the trademark check's findings (see the last section below). There are two additive migrations (V28 and V29).
 
 ## What is new
 
@@ -16,9 +16,13 @@ A new rule for the Amazon description: more than 2000 characters (code points) i
 
 A new endpoint that checks the images of one listing against a marketplace image profile: file format, size, aspect ratio, how many images there are, the white background of an Amazon main image, how much of the frame the product fills and sharpness. It takes `multipart/form-data` (a `metadata` part and one `images` file part per image; never a URL or a path), answers with a result of its own and `GET /api/v1/image-checks/{id}` reads it back. An image that cannot be read is an `INCOMPLETE` image in a `200`, never a 500. **The shipped rulesets (`etsy-image-2026-11`, `amazon-image-2026-11`) hold no marketplace threshold yet, so every check against them is `INCOMPLETE`** (nothing is cached or charged, no finding is an `ERROR`, and a logo or text in a picture is not recognized); complete results need a reviewed ruleset version. **The images and their file names are never stored**: only a hash of the request, one hash and the decoder's metadata per image and the findings, for 30 days. New plan pack `image-checks` (`SELLER` and `PRO`), one unit per new complete result. **It is off by default** (`listing-guard.image.enabled`, `503 image-checks-not-configured`) and **not ready for an untrusted caller**: the bounded decode service, the private upload staging and the stuck-decoder health check of ADR-008 are not built yet. There is no MCP tool for it (ADR-017 allows none). See [the integration guide](../integration-guide.md#image-checks), [the input schema](../input-schema.md#image-checks), [deployment](../deployment.md#image-check-results-their-retention-and-the-plan-pack-adr-008) and [ADR-008](../adr/ADR-008-image-compliance-checker.md).
 
+### OpenAPI: the findings of a trademark check have their own schema
+
+In `docs/api/openapi.json`, `TrademarkCheckResult.findings` pointed at the schema `FindingView`, which is the finding of `POST /api/v1/checks` (with `fix`, no `snippet`, `mark` or `matchType`). It now points at the new schema `TrademarkCheckFindingView`: `ruleId`, `risk`, `field`, `start`, `end`, `snippet`, `mark`, `matchType`, `score`, `insideColorPhrase`, `otherRuleIds`, `sourceIds`, `message`, `suggestion`, which is what [the integration guide](../integration-guide.md#trademark-checks) and the example already showed. **The responses of the API do not change**, only the description of them: a client that generates code from the file gets a different type name and the right fields for this endpoint. The name `TrademarkFindingView` was not used because it already names the finding of the personalization screening (no `snippet`, a `label`). `OpenApiIntegrationTest` now holds the reference and the field list.
+
 ## Breaking changes
 
-None.
+None for the API. A client generated from `docs/api/openapi.json` should be generated again to get `TrademarkCheckFindingView`.
 
 ## Upgrade notes
 
