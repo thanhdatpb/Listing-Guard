@@ -55,7 +55,12 @@ public record TrademarkCheckResult(
      * One possible reference. {@code field}, {@code start} and {@code end} locate it in the text the API worked on: the
      * field's value after trimming and Unicode NFC, with {@code start} inclusive and {@code end} exclusive, counted in
      * UTF-16 code units (JavaScript and Java string indexes).
+     *
+     * <p>The schema has its own name: springdoc names a nested record by its simple name and merges two that share it, which
+     * gave this answer the {@code /checks} finding's shape. {@code TrademarkFindingView} is already the personalization
+     * screening's finding (no snippet, a label), so it cannot be used here either.
      */
+    @Schema(name = "TrademarkCheckFindingView")
     @JsonPropertyOrder({"ruleId", "risk", "field", "start", "end", "snippet", "mark", "matchType", "score", "insideColorPhrase",
             "otherRuleIds", "sourceIds", "message", "suggestion"})
     public record FindingView(
