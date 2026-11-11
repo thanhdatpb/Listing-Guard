@@ -620,6 +620,13 @@ What follows, in this order, is **not built yet**:
     keeps four members of Spring's `ProblemDetail` nullable in `docs/api/openapi.json`, because Spring Framework 7 declares them with
     the JSpecify `@Nullable` and springdoc-openapi 3.2.0 does not read it. When springdoc does, delete the customizer and run the
     build: `OpenApiIntegrationTest` must still pass without it.
+12. Enforcement signal ([ADR-021](docs/adr/ADR-021-enforcement-signal.md), Proposed, **a design only: no code, data or migration**): an
+    offline, operator-loaded catalog of US federal cases (the "Schedule A" kind among them) that would add the number of cases, the
+    date of the latest one and the case ids to a trademark finding and raise its level when the catalog is configured; with it off, nothing
+    changes. A case is linked to a mark only by a reviewed link (never by the name of a party) and no party name is stored. Of the four
+    candidate sources only PACER and CourtListener/RECAP hold lawsuits; WIPO's terms forbid automated use, and the terms of PACER (for
+    storing data), CourtListener and EUIPO are **not verified**. The ADR lists the pages the maintainer has to save and ends with the
+    questions to decide; nothing is built before they are answered.
 
 ## Documentation
 
@@ -647,6 +654,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-016: Personalization screening](docs/adr/ADR-016-personalization-screening.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; the print profiles are placeholders; it ends with the questions the maintainer has to decide)
 - [ADR-017: MCP server for AI agents](docs/adr/ADR-017-mcp-server.md) (Proposed; implemented: a separate module that only calls the API, six tools that never write, STDIO by default; it ends with the questions the maintainer has to decide)
 - [ADR-018: Listing health report](docs/adr/ADR-018-listing-health-report.md) (Proposed; implemented: an endpoint, a weekly job and a console page that add up stored counts per client, never listing text; it ends with the questions the maintainer has to decide)
+- [ADR-021: Enforcement signal for the trademark pack](docs/adr/ADR-021-enforcement-signal.md) (Proposed; a design only, nothing is implemented: an offline catalog of court cases linked by review to marks, the sources and their terms as far as they could be read, and the questions the maintainer has to decide)
 - [ADR-019: Oracle A1 deployment behind Cloudflare Tunnel](docs/adr/ADR-019-oracle-a1-cloudflare-tunnel.md) (Proposed)
 - [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor and API keys page are implemented, all off by default; saved listings and history are not designed yet)
 
