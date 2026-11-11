@@ -1,6 +1,6 @@
 # ADR-008: Image compliance checker
 
-- Status: Deferred: implemented as PR B after the trademark scanner (ADR-009, PR A).
+- Status: Proposed
 - Date: 2026-10-30
 - Depends on: [ADR-010](ADR-010-pack-identity-and-analysis-version.md)
 - Implementation order: PR B, after the trademark scanner ([ADR-009](ADR-009-trademark-risk-scanner.md)) is

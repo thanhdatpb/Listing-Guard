@@ -1,0 +1,54 @@
+# ADR-008 image profile. The official pages below have not been downloaded or reviewed in this repository.
+# The maintainer must save the source locally under policies/raw/amazon and update policies/manifest.yaml.
+# Every numerical policy threshold is intentionally null until reviewed source material is supplied.
+pack_id: image-compliance
+version: amazon-image-2026-11
+marketplace: AMAZON
+checked_at: 2026-11-11
+disclaimer: Kết quả chỉ là cảnh báo tham khảo, không xác nhận ảnh được Amazon chấp nhận.
+supported_formats: [JPEG, PNG]
+# Operational decoder admission caps only; these are not Amazon policy limits.
+limits:
+  max_encoded_bytes: 25000000
+  max_decoded_pixels: 40000000
+profiles:
+  default:
+    image_count: {min: null, max: null}
+    width: {min: null, max: null}
+    height: {min: null, max: null}
+    aspect_ratio: {min: null, max: null}
+    main_background: {edge_rgb_tolerance: null, min_white_ratio: null}
+    occupancy: {min_ratio: null, white_rgb_tolerance: null}
+    blur: {min_laplacian_variance: null}
+rules:
+  image_count:
+    severity: WARNING
+    message: Chưa thể đối chiếu số lượng ảnh vì ruleset chưa có ngưỡng đã được maintainer duyệt.
+    source: {status: unverified, urls: ["https://sellercentral.amazon.com/gp/help/external/G1881?language=en_US"], note: Official Product image guide; maintainer must save and review it locally.}
+  image_dimensions:
+    severity: WARNING
+    message: Chưa thể đối chiếu kích thước ảnh vì ruleset chưa có ngưỡng đã được maintainer duyệt.
+    source: {status: unverified, urls: ["https://sellercentral.amazon.com/gp/help/external/G1881?language=en_US"], note: Official Product image guide; maintainer must save and review it locally.}
+  aspect_ratio:
+    severity: WARNING
+    message: Chưa thể đối chiếu tỉ lệ ảnh vì ruleset chưa có ngưỡng đã được maintainer duyệt.
+    source: {status: unverified, urls: ["https://sellercentral.amazon.com/gp/help/external/G1881?language=en_US"], note: Official Product image guide; maintainer must save and review it locally.}
+  main_background:
+    severity: WARNING
+    message: Chưa thể đối chiếu nền trắng ảnh chính vì ruleset chưa có tolerance và tỉ lệ cạnh đã được duyệt.
+    source: {status: unverified, urls: ["https://sellercentral.amazon.com/gp/help/external/G1881?language=en_US", "https://sellercentral.amazon.com/help/hub/reference/external/G200216080?locale=en-US"], note: Official main-image guidance; maintainer must save and review it locally.}
+  occupancy:
+    severity: WARNING
+    message: Chưa thể đối chiếu diện tích sản phẩm trong khung vì ruleset chưa có ngưỡng đã được duyệt.
+    source: {status: unverified, urls: ["https://sellercentral.amazon.com/gp/help/external/G1881?language=en_US"], note: Official Product image guide; maintainer must save and review it locally.}
+  blur:
+    severity: INFO
+    message: Chưa thể đánh giá độ mờ vì ruleset chưa có ngưỡng Laplacian đã được duyệt.
+    source: {status: unverified, urls: ["https://sellercentral.amazon.com/gp/help/external/G1881?language=en_US"], note: Blur score is an internal signal and has no verified marketplace threshold.}
+  customer_content:
+    severity: WARNING
+    message: Ảnh do khách hàng cung cấp có thể chứa logo hoặc nhãn hiệu bên thứ ba; hãy kiểm tra thủ công trước khi dùng.
+    source: {status: unverified, urls: ["https://sellercentral.amazon.com/gp/help/external/G1881?language=en_US"], note: Source is caller-declared; this rule does not inspect or recognize marks.}
+summary:
+  by_severity: {ERROR: BLOCK, WARNING: REVIEW, INFO: REVIEW, NONE: READY}
+  incomplete: INCOMPLETE
