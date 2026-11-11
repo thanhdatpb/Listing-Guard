@@ -261,5 +261,5 @@ Taken by the maintainer after the implementation notes above were written:
   (springdoc reads JSpecify `@Nullable`); a test states that `docs/api/openapi.json` does not change. The README Roadmap lists
   "remove the `ProblemDetail` customizer" next to the Jackson 3 migration.
 - **The `Vary` headers that a `404` for an unknown route no longer carries are accepted** (open question 5): no CORS is configured.
-  `docs/releases/unreleased.md` says so in one line.
+  The release notes of v0.7.0 (`docs/releases/v0.7.0.md`, "Breaking changes") say so.
 - **The Jackson 2 pin stays at 2.21.8**, as it is (Decision 5).

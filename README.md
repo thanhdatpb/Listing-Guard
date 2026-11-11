@@ -118,7 +118,7 @@ Before you rely on it:
   with an embedding provider.
 
 What is not built yet is listed in the [Roadmap](#roadmap). Changes between versions are in
-[docs/releases/v0.6.0.md](docs/releases/v0.6.0.md).
+[docs/releases/v0.7.0.md](docs/releases/v0.7.0.md).
 
 ## Architecture
 
@@ -624,7 +624,7 @@ What follows, in this order, is **not built yet**:
 - [MCP server](docs/mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the six tools, errors and limits.
 - [Deployment](docs/deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
 - [Oracle ARM deployment](docs/deploy-oracle.md): deploy the production API and PostgreSQL on an Oracle Cloud Ampere A1 VM behind Cloudflare Tunnel.
-- [Release notes](docs/releases/v0.6.0.md): what changed in each version and what to do when upgrading.
+- [Release notes](docs/releases/v0.7.0.md): what changed in each version and what to do when upgrading.
 - [ADR-001: Rule configuration](docs/adr/ADR-001-rule-config.md)
 - [ADR-002: Ruleset versioning](docs/adr/ADR-002-ruleset-versioning.md)
 - [ADR-003: Chunking strategy](docs/adr/ADR-003-chunking-strategy.md)
