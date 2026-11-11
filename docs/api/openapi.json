@@ -1,6 +1,30 @@
 {
   "components" : {
     "schemas" : {
+      "Capabilities" : {
+        "properties" : {
+          "fixes" : {
+            "$ref" : "#/components/schemas/FixesCapability",
+            "description" : "Whether `POST /api/v1/checks` returns verified fix suggestions and readiness."
+          },
+          "packs" : {
+            "description" : "The analysis packs this deployment serves over HTTP, sorted by id. `batch`, `policy-analyzer` and `sheet-connector` are not listed: they have no endpoint here.",
+            "items" : {
+              "$ref" : "#/components/schemas/PackCapability"
+            },
+            "type" : "array"
+          },
+          "plans" : {
+            "$ref" : "#/components/schemas/PlansCapability",
+            "description" : "Whether plans and the monthly quota are applied in this deployment."
+          },
+          "trademarkCatalog" : {
+            "$ref" : "#/components/schemas/TrademarkCatalogCapability",
+            "description" : "The trademark catalog this deployment serves. Only its state, never its name."
+          }
+        },
+        "type" : "object"
+      },
       "CatalogView" : {
         "properties" : {
           "state" : {
@@ -234,6 +258,16 @@
         },
         "type" : "object"
       },
+      "FixesCapability" : {
+        "properties" : {
+          "enabled" : {
+            "description" : "True when `POST /api/v1/checks` adds verified fix suggestions and `listing-rules` readiness.",
+            "example" : false,
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "HealthReport" : {
         "properties" : {
           "byWeek" : {
@@ -414,6 +448,32 @@
             "example" : 10,
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PackCapability" : {
+        "properties" : {
+          "available" : {
+            "description" : "Whether the pack can answer now. False for `trademark-risk` while the catalog is not READY; the endpoint then answers `503 trademark-not-configured`.",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "id" : {
+            "description" : "The pack id (ADR-010).",
+            "example" : "listing-rules",
+            "type" : "string"
+          },
+          "rulesetVersions" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "The version of the active ruleset per marketplace (upper case, sorted): the `rulesetVersion` of a result.",
+            "example" : {
+              "AMAZON" : "amazon-2026-12c",
+              "ETSY" : "etsy-2026-12"
+            },
+            "type" : "object"
           }
         },
         "type" : "object"
@@ -605,6 +665,16 @@
             },
             "description" : "Results per state of their trademark scan: `COMPLETE`, `INCOMPLETE` or `NOT_CONFIGURED` (no catalog was served).",
             "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "PlansCapability" : {
+        "properties" : {
+          "enforced" : {
+            "description" : "True when plans are on: packs are limited by plan and new results count against a monthly quota (read `GET /api/v1/usage` for the calling client). False: nothing is limited.",
+            "example" : false,
+            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -857,6 +927,22 @@
           "warnings" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkCatalogCapability" : {
+        "properties" : {
+          "demo" : {
+            "description" : "True when the configured catalog is the DEMO catalog of invented marks: a trademark result is then not real.",
+            "example" : false,
+            "type" : "boolean"
+          },
+          "state" : {
+            "description" : "`READY`: trademark checks are served. `DISABLED`: no catalog is configured. `REFUSED`: a catalog is configured but cannot be served. In the last two the risk of a listing is unknown, never low.",
+            "enum" : [ "READY", "DISABLED", "REFUSED" ],
+            "example" : "READY",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -1345,6 +1431,115 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/v1/capabilities" : {
+      "get" : {
+        "description" : "Returns the analysis packs this deployment serves with the version of the active ruleset per marketplace, the state of the trademark catalog (`READY`, `DISABLED` or `REFUSED`, and whether it is the DEMO catalog), whether plans and the monthly quota are applied and whether checks return fix suggestions. When the trademark catalog is not `READY` the risk of a listing is unknown, never low. It says nothing about the calling client: use `GET /api/v1/usage` for its plan and quota. It holds no secret setting and no catalog name. The answer is the same for every client, carries an `ETag` and may be cached for five minutes; it costs no quota and needs no plan pack.",
+        "operationId" : "capabilities",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "fixes" : {
+                    "enabled" : false
+                  },
+                  "packs" : [ {
+                    "available" : true,
+                    "id" : "listing-rules",
+                    "rulesetVersions" : {
+                      "AMAZON" : "amazon-2026-12c",
+                      "ETSY" : "etsy-2026-12"
+                    }
+                  }, {
+                    "available" : true,
+                    "id" : "personalization-screening",
+                    "rulesetVersions" : {
+                      "AMAZON" : "personalization-screening-2026-11",
+                      "ETSY" : "personalization-screening-2026-11"
+                    }
+                  }, {
+                    "available" : false,
+                    "id" : "trademark-risk",
+                    "rulesetVersions" : {
+                      "AMAZON" : "trademark-risk-2026-11",
+                      "ETSY" : "trademark-risk-2026-11"
+                    }
+                  }, {
+                    "available" : true,
+                    "id" : "variation-checks",
+                    "rulesetVersions" : {
+                      "AMAZON" : "variation-checks-2026-11",
+                      "ETSY" : "variation-checks-2026-11"
+                    }
+                  } ],
+                  "plans" : {
+                    "enforced" : false
+                  },
+                  "trademarkCatalog" : {
+                    "demo" : false,
+                    "state" : "DISABLED"
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Capabilities"
+                }
+              }
+            },
+            "description" : "What the deployment serves."
+          },
+          "304" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Capabilities"
+                }
+              }
+            },
+            "description" : "The `If-None-Match` header matches the `ETag`: nothing changed, there is no body."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read what this deployment serves",
+        "tags" : [ "Capabilities" ]
+      }
+    },
     "/api/v1/checks" : {
       "post" : {
         "description" : "Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content was already checked by the calling client with the same analysisVersion, the stored result is returned instead and `cached` is true (no new check is created); results are never shared between clients. A new result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached one costs nothing. The listing is the marketplace's own format; for Etsy it is the Open API v3 style JSON with snake_case fields, for Amazon the simple format with title, brand, bullet_points, description, search_terms, product_type, price, quantity and images.",
@@ -4061,6 +4256,9 @@
   }, {
     "description" : "The text a buyer typed for a custom product: can it be printed, and does it look like a protected name.",
     "name" : "Personalization screening"
+  }, {
+    "description" : "What this deployment serves.",
+    "name" : "Capabilities"
   }, {
     "description" : "The limits of the rules that check a listing.",
     "name" : "Rulesets"
