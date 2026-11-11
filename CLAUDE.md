@@ -129,7 +129,13 @@ It never edits a listing, never publishes, and does no SEO.
   completes the reports as unfinished and fails. When `listing-guard.fixes.enabled=true`, `listings.csv` adds readiness
   columns and `summary.html` adds listing-rules-only readiness metrics; otherwise both retain their existing shape.
   `--label-column` adds a small-set measurement (flagged = MEDIUM or HIGH), never "accuracy". The example mappings
-  carry column names nobody has verified, so each says `# unverified`.
+  carry column names nobody has verified, so each says `# unverified`. **Review gate** (`--split-output`, `SplitOutput`): also
+  writes `passed.csv` and `held.csv` to `--out`, a copy of the input rows (same columns, order, delimiter and encoding, cells
+  unchanged, no BOM, no formula prefix) with `hold_reasons` (`ruleId/ERROR`, `trademark/HIGH`...) added on the held side; without
+  the flag the output is unchanged (files of an earlier run are removed either way). Held: an `ERROR` finding of the rule check, a
+  trademark level at or above `--hold-trademark-risk` (`HIGH` default, `MEDIUM`, `NONE`; the operator's choice, never a legal
+  conclusion), and every row that was not checked (unreadable, failed, quota, `trademark/UNKNOWN`): never passed. Nothing is
+  edited and no fix is applied.
 - **Listing health report** (`api/.../report/`, ADR-018, Proposed; implemented): counts of the results a client has stored over a
   period, for a lead. `GET /api/v1/reports/summary?from=&to=[&marketplace=]` (an API key; the client is the key's, there is no client
   parameter; `from` and `to` are required UTC dates, both included, at most `listing-guard.reports.max-days` = 92; `400
@@ -190,14 +196,20 @@ It never edits a listing, never publishes, and does no SEO.
   endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the listing health report (ADR-018), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
-- **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12b.yaml`): simple input format (`title`, `brand`,
+- **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12c.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, `item_highlights`, `customization`, ...), US store (English word
   rules; title limit 75 and `item_highlights_length` 125, both `secondary`, read from the Seller Forums announcement of
   2026-06-10 through ppc.land; `prohibited_content` scans `item_highlights` too, the trademark pack does not yet;
-  `amazon-2026-11` and `amazon-2026-12` are kept unchanged as history and a test pins each hash). Settings can
+  `amazon-2026-11`, `amazon-2026-12` and `amazon-2026-12b` are kept unchanged as history and a test pins each hash). Settings can
   be overridden per product type under a rule's `categories` and a rule can be `enabled: false` (ADR-006); a
   product type with no override gets the defaults, plus an INFO `category_not_covered` only when the ruleset has
-  at least one override (none yet in `amazon-2026-12b`, so it reports nothing today). **Amazon Custom** (`amazon-2026-12b`):
+  at least one override (none yet in `amazon-2026-12c`, so it reports nothing today). **`description_length`** (`amazon-2026-12c`,
+  `DescriptionLengthRule`): WARNING, 2000 characters (code points), **`unverified`**: no official page was readable (Seller Central
+  needs a login, the Product Type Definitions API needs credentials) and no Amazon text names the number; only two old Seller Forums
+  posts by ordinary sellers state it, one saying the unit is not defined, and commercial tools that quote it are not a source. No fix
+  (FixCoverageTest allows only `title_length` for Amazon; the number is unverified and a cut drops the seller's text); it declares its
+  `Rule.limits` (`description`, code points), so `GET .../limits` lists it. A later version should read the limit per product type
+  from the product type schemas. **Amazon Custom** (`amazon-2026-12b`):
   the optional `customization` block (`surfaces[]` with `text_inputs[]`, `dropdowns[]`, `image_inputs[]`; `docs/input-schema.md`
   "Amazon customization"; the normalizer only trims and drops blanks; `Listing.customizationSurfaces`, left out of the content hash
   while empty, a test pins the hash; not available in `batch-check`) and five rules in `ruleengine/amazon/Customization*Rule`:
@@ -314,7 +326,7 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   file with a new `version` and change that one. Old files stay (a test pins `etsy-2026-10`'s hash). The API
   fails at startup if a registered version has a different content hash. Every YAML key a rule needs must be
   read in that rule's `validate()` so mistakes fail at startup. A version is `<marketplace>-YYYY-MM`; a change inside a month
-  that already has one adds a letter (`amazon-2026-12b`, then `c`). The loader does not parse the format.
+  that already has one adds a letter (`amazon-2026-12b`, `amazon-2026-12c`, the next is `d`). The loader does not parse the format.
 - Every rule has a `source` with `status`: `verified` (official doc), `secondary` (official page not
   readable, consistent secondary sources) or `unverified`. Never mark a value `verified` without a URL, and
   never guess a limit: say it is unverified. Amazon rules are ERROR only when `verified`, else WARNING

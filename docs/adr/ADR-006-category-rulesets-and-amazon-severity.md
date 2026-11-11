@@ -121,3 +121,23 @@ version adds a letter after the month (`b`, `c`, ...), so the `YYYY-MM` part sta
   keywords in the YAML, matching shared in `SensitiveKeywords`.
 - The three numbers declare their `Rule.limits` (unit: items); the other two rules declare none. No rule proposes a fix, and the
   trademark pack does not read the block. The block cannot be sent through `batch-check`.
+
+## Update (2026-11-11): `amazon-2026-12c`, `description_length`
+
+`amazon-2026-12b` is kept unchanged as history (a test pins its hash) and `amazon-2026-12c` is loaded. It copies every rule of
+`12b` and adds one, `description_length` (WARNING, 2000 characters counted as code points, `Rule.limits` declared so
+`GET /api/v1/rulesets/AMAZON/limits` lists it). **Its source status is `unverified`, not `secondary`**: the search for a source
+followed the policy of this record and found none that qualifies.
+
+- *Official pages.* The Seller Central page "Product detail page rules" answered `200` but its readable text held no rule text (the
+  article body is not in what a fetch returns without a seller login); the Product Type Definitions API, which carries the real limit
+  per product type as `maxUtf8ByteLength`, needs seller credentials and the public meta-schema page redirected to another host and
+  was not followed; the June 10, 2026 announcement (read through ppc.land) does not mention the description.
+- *What does state 2000.* Two Seller Forums threads, written by ordinary sellers (no Amazon staff reply), "7 years ago" and "6 years
+  ago" on the page, neither linking an Amazon page; one says "assume this is characters but it isn't defined". That is less than
+  the "Amazon announcement or Amazon staff" this record asks of `secondary`. Commercial listing tools quote the same number; they
+  are not a source here.
+- *Consequences.* Never an ERROR. **No fix**: ADR-014 limits fixes to its table and `FixCoverageTest` allows only `title_length`
+  for Amazon; cutting a description drops text the seller wrote, and the number is not confirmed. Counting code points is the
+  reading that flags less for non-ASCII text if Amazon really counts bytes. A later ruleset should read the limit per product
+  type from the product type schemas and may then raise the status; that is a new version.
