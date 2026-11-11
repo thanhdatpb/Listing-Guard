@@ -64,14 +64,21 @@ public final class TrademarkScanner {
         return AnalysisFingerprint.of(ruleset, AlgorithmVersions.CURRENT, externalComponents);
     }
 
+    /**
+     * @throws com.thanhdatpb.listingguard.trademark.config.UnknownProductTypeException if the input names a product type
+     *         the ruleset does not declare. This is the caller's mistake and is raised before any work: the scan is
+     *         never run without the product type it was asked for, and it is never reported as {@code INCOMPLETE}.
+     */
     public TrademarkResult scan(TrademarkCheckInput input) {
         CanonicalInput canonical = CanonicalInput.of(input);
+        String productType = canonical.productType();
+        Set<Integer> productClasses = productType == null ? null : ruleset.productClasses().classesOf(productType);
         Set<String> failed = new LinkedHashSet<>();
         List<Candidate> candidates = new ArrayList<>();
         List<String> fieldOrder = new ArrayList<>();
         ScanContext context = null;
         try {
-            context = ScanContext.create(ruleset, catalog, normalizer, canonical);
+            context = ScanContext.create(ruleset, catalog, normalizer, canonical, productType, productClasses);
             context.fields().forEach(field -> fieldOrder.add(field.name()));
         } catch (RuntimeException e) {
             log.error("Trademark scan could not normalize the input; every rule is reported as failed", e);
@@ -113,11 +120,16 @@ public final class TrademarkScanner {
         if (candidate.insideColorPhrase()) {
             message = message + " " + ruleset.colorContainsMark().note();
         }
+        // a lowered level always says why, with the level the rule assigned
+        for (RiskAdjustment adjustment : candidate.riskAdjustments()) {
+            message = message + " " + adjustment.note();
+        }
         String suggestion = Templates.fill(messageTemplate(candidate.ruleId(), false), candidate.placeholders());
         Evidence evidence = new Evidence(candidate.field(), candidate.start(), candidate.end(),
                 context.snippet(field, candidate.start(), candidate.end()), candidate.normalizedToken(),
                 candidate.mark(), candidate.type(), candidate.score(), catalogVersion, candidate.ruleId(),
-                candidate.insideColorPhrase(), candidate.otherRuleIds(), candidate.sourceIds());
+                candidate.insideColorPhrase(), candidate.otherRuleIds(), candidate.sourceIds(),
+                candidate.riskAdjustments(), ruleset.sourceLinks().resolve(candidate.sourceIds()));
         return new TrademarkFinding(candidate.ruleId(), candidate.risk(), message, suggestion, evidence);
     }
 

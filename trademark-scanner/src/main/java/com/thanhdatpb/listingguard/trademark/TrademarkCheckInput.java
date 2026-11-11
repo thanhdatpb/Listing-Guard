@@ -7,13 +7,24 @@ import java.util.List;
  * are all optional. A null field is treated as empty. The marketplace is not
  * part of the input: it belongs to the cache identity, not to what the seller wrote. The category is hashed with the
  * rest but only scanned when the ruleset lists it in {@code matching.scan_fields}.
+ *
+ * <p>{@code productType} is optional (null or blank means none): the key of one of the ruleset's
+ * {@code product_classes.types}, which lowers the level of a catalog match outside that product type's Nice classes
+ * (ADR-009). It is hashed with the rest, never scanned, and a key the ruleset does not declare is refused by the scanner.
  */
 public record TrademarkCheckInput(String title, List<String> tags, List<String> bulletPoints, String description,
-                                  String brand, String shopName, String searchTerms, String category) {
+                                  String brand, String shopName, String searchTerms, String category,
+                                  String productType) {
 
     public TrademarkCheckInput {
         tags = tags == null ? List.of() : List.copyOf(tags);
         bulletPoints = bulletPoints == null ? List.of() : List.copyOf(bulletPoints);
+    }
+
+    /** A listing with no product type: scanned exactly as before product classes existed. */
+    public TrademarkCheckInput(String title, List<String> tags, List<String> bulletPoints, String description,
+                               String brand, String shopName, String searchTerms, String category) {
+        this(title, tags, bulletPoints, description, brand, shopName, searchTerms, category, null);
     }
 
     /** The fields every marketplace has; the Amazon bullet points and search terms are empty. */

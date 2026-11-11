@@ -18,7 +18,7 @@ class CanonicalInputTest {
 
     @Test
     void theHashOfAFixedInputIsPinned() {
-        assertThat(hash(SAMPLE)).isEqualTo("820ef8b4f1e93c61f6579b81ca9bc0b0bc31f7e006a82519e7b31d2e98ab1598");
+        assertThat(hash(SAMPLE)).isEqualTo("19c6eafde6e711ebd319bab68479c1633809f267e5f320eb10d12d1d418d9f93");
     }
 
     @Test
@@ -26,9 +26,48 @@ class CanonicalInputTest {
         CanonicalInput canonical = CanonicalInput.of(SAMPLE);
 
         assertThat(canonical.fields()).extracting(CanonicalInput.Field::name).containsExactly("title", "tags[0]",
-                "tags[1]", "description", "brand", "shop_name", "search_terms", "category");
+                "tags[1]", "description", "brand", "shop_name", "search_terms", "category", "product_type");
         assertThat(canonical.fields()).extracting(CanonicalInput.Field::text).containsExactly("Zorvex Mug", "gift",
-                "mug", "A plain mug", "Acme", "Acme Shop", "", "Home");
+                "mug", "A plain mug", "Acme", "Acme Shop", "", "Home", "");
+    }
+
+    @Test
+    void theHashFormatIsV2BecauseTheProductTypeJoinedTheInput() {
+        assertThat(CanonicalInput.HASH_FORMAT).isEqualTo("listing-guard/trademark-input/v2");
+    }
+
+    @Test
+    void theProductTypeTakesPartInTheHashAndIsNeverScanned() {
+        TrademarkCheckInput withType = new TrademarkCheckInput("Zorvex Mug", List.of("gift", "mug"), List.of(),
+                "A plain mug", "Acme", "Acme Shop", null, "Home", "mug");
+        TrademarkCheckInput otherType = new TrademarkCheckInput("Zorvex Mug", List.of("gift", "mug"), List.of(),
+                "A plain mug", "Acme", "Acme Shop", null, "Home", "toy");
+
+        assertThat(hash(withType)).isNotEqualTo(hash(SAMPLE)).isNotEqualTo(hash(otherType));
+        assertThat(CanonicalInput.of(withType).productType()).isEqualTo("mug");
+        assertThat(CanonicalInput.of(SAMPLE).productType()).isNull();
+    }
+
+    @Test
+    void aBlankProductTypeIsNoProductTypeAndANonBlankOneIsStripped() {
+        TrademarkCheckInput blank = new TrademarkCheckInput("t", List.of(), List.of(), null, null, null, null, null,
+                " \t ");
+        TrademarkCheckInput none = TrademarkCheckInput.ofTitle("t");
+        TrademarkCheckInput padded = new TrademarkCheckInput("t", List.of(), List.of(), null, null, null, null, null,
+                "  mug ");
+
+        assertThat(hash(blank)).isEqualTo(hash(none));
+        assertThat(CanonicalInput.of(blank).productType()).isNull();
+        assertThat(CanonicalInput.of(padded).productType()).isEqualTo("mug");
+        assertThat(hash(padded)).isEqualTo(hash(new TrademarkCheckInput("t", List.of(), List.of(), null, null, null,
+                null, null, "mug")));
+    }
+
+    @Test
+    void theProductTypeCannotImitateAnotherField() {
+        assertThat(hash(new TrademarkCheckInput("t", List.of(), List.of(), null, null, null, null, "mug", null)))
+                .isNotEqualTo(hash(new TrademarkCheckInput("t", List.of(), List.of(), null, null, null, null, null,
+                        "mug")));
     }
 
     @Test
@@ -126,9 +165,10 @@ class CanonicalInputTest {
         CanonicalInput canonical = CanonicalInput.of(AMAZON);
 
         assertThat(canonical.fields()).extracting(CanonicalInput.Field::name).containsExactly("title", "tags[0]",
-                "bullet_points[0]", "bullet_points[1]", "description", "brand", "shop_name", "search_terms", "category");
+                "bullet_points[0]", "bullet_points[1]", "description", "brand", "shop_name", "search_terms", "category",
+                "product_type");
         assertThat(canonical.fields()).extracting(CanonicalInput.Field::text).containsExactly("Title", "tag",
-                "first bullet", "second bullet", "Description", "Brand", "Shop", "search terms here", "Cat");
+                "first bullet", "second bullet", "Description", "Brand", "Shop", "search terms here", "Cat", "");
         CanonicalInput blank = CanonicalInput.of(new TrademarkCheckInput("t", List.of(), List.of("a", " ", "c"), null,
                 null, null, null, null));
         assertThat(blank.fields()).extracting(CanonicalInput.Field::name).contains("bullet_points[1]");

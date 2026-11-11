@@ -216,7 +216,7 @@ the trademark result; the answer is the same for every client.
   "packs": [
     {"id": "listing-rules", "available": true, "rulesetVersions": {"AMAZON": "amazon-2026-12c", "ETSY": "etsy-2026-12"}},
     {"id": "personalization-screening", "available": true, "rulesetVersions": {"AMAZON": "personalization-screening-2026-11", "ETSY": "personalization-screening-2026-11"}},
-    {"id": "trademark-risk", "available": false, "rulesetVersions": {"AMAZON": "trademark-risk-2026-11", "ETSY": "trademark-risk-2026-11"}},
+    {"id": "trademark-risk", "available": false, "rulesetVersions": {"AMAZON": "trademark-risk-2026-11b", "ETSY": "trademark-risk-2026-11b"}},
     {"id": "variation-checks", "available": true, "rulesetVersions": {"AMAZON": "variation-checks-2026-11", "ETSY": "variation-checks-2026-11"}}
   ],
   "trademarkCatalog": {"state": "DISABLED", "demo": false},
@@ -712,8 +712,8 @@ failure or a `503` of the trademark check must not hold back the rule findings o
 
 ### Request
 
-The body is exactly the one of `POST /api/v1/checks` (`marketplace` and `listing`, in the marketplace's standard input
-format, [`input-schema.md`](input-schema.md)); it goes through the same normalization. The text that is read:
+The body is the one of `POST /api/v1/checks` (`marketplace` and `listing`, in the marketplace's standard input
+format, plus the optional `product_type` below, [`input-schema.md`](input-schema.md)); it goes through the same normalization. The text that is read:
 
 | Marketplace | Fields read |
 |---|---|
@@ -722,6 +722,33 @@ format, [`input-schema.md`](input-schema.md)); it goes through the same normaliz
 
 The category (`category`, or `product_type` for Amazon) is part of the identity of the input but is not scanned. The standard
 input has no shop name, so none is read. Nothing is added to the input schema.
+
+#### `product_type` (optional)
+
+Next to `marketplace` and `listing` the body may carry `product_type`: what kind of product the listing sells. It is **not**
+the Amazon `product_type` inside `listing`, and `POST /api/v1/checks` ignores it, so one JSON can still go to both
+endpoints. It must be written exactly as the active ruleset declares it. `trademark-risk-2026-11b` declares (all
+`unverified`, the Nice classes are the maintainer's reading and have not been checked against the classification):
+
+| `product_type` | Nice classes | | `product_type` | Nice classes |
+|---|---|---|---|---|
+| `apparel` | 25 | | `jewelry` | 14 |
+| `mug` | 21 | | `bag` | 18 |
+| `poster` | 16 | | `furniture_decor` | 20 |
+| `sticker` | 16 | | `fabric` | 24 |
+| `phone_case` | 9 | | `toy` | 28 |
+
+When it is given, a catalog match whose mark **has Nice classes and none of them is one of the product type's** is reported
+**one level lower** (`HIGH` to `MEDIUM`, `MEDIUM` to `LOW`, never below `LOW`; the number of levels is a ruleset setting), and the
+finding's `riskAdjustments` says so with the original level (see below). A mark with no Nice class is never lowered. Without
+`product_type` nothing is lowered and the result is what it was before this field existed. A blank value counts as none. A
+value the ruleset does not declare (including a different case, `Apparel`) is **never ignored**: the answer is `400`
+`unknown-product-type` with the declared keys in `known`, and nothing is stored or counted. The product type is part of what
+makes two requests identical, so the same listing with and without it are two results, and the result carries it as
+`productType` (`null` when none was sent).
+
+A lowered level is advice about relevance, not a verdict: a mark registered in another class can still be a problem for a
+seller, which is why every lowered finding keeps its original level in the answer.
 
 ### Response
 
@@ -740,7 +767,8 @@ curl -X POST http://localhost:8080/api/v1/trademark-checks \
 {
   "checkId": "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
   "marketplace": "ETSY",
-  "rulesetVersion": "trademark-risk-2026-11",
+  "productType": null,
+  "rulesetVersion": "trademark-risk-2026-11b",
   "catalogVersion": "synthetic-2026-11-0123456789ab",
   "analysisVersion": "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
   "cached": false,
@@ -753,7 +781,7 @@ curl -X POST http://localhost:8080/api/v1/trademark-checks \
   "findings": [
     {"ruleId": "catalog_exact", "risk": "HIGH", "field": "title", "start": 0, "end": 6, "snippet": "Zorvex",
      "mark": "ZORVEX", "matchType": "EXACT", "score": 1.0, "insideColorPhrase": false, "otherRuleIds": [],
-     "sourceIds": ["S-001", "S-002"],
+     "sourceIds": ["S-001", "S-002"], "sourceLinks": [], "riskAdjustments": [],
      "message": "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
      "suggestion": "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."}
   ]
@@ -765,6 +793,7 @@ curl -X POST http://localhost:8080/api/v1/trademark-checks \
 | Field | Meaning |
 |---|---|
 | `checkId` | Identifier of the stored result; `GET /api/v1/trademark-checks/{id}` until `expiresAt`. |
+| `productType` | The `product_type` the request named, or `null`. |
 | `rulesetVersion`, `catalogVersion`, `analysisVersion` | What produced the result. Opaque strings: compare for equality, do not parse. |
 | `cached` | `true` when the stored result of an identical earlier request is returned. |
 | `completeness` | `COMPLETE`, or `INCOMPLETE` when a rule failed (see below). |
@@ -780,10 +809,39 @@ A finding: `ruleId` (`catalog_exact`, `catalog_phrase`, `catalog_fuzzy`, `geo_sp
 (`EXACT`, `PHRASE`, `FUZZY`, `CONTEXT`), `score` (1.0 for `EXACT` and `PHRASE`, the similarity for `FUZZY`, `null` for
 `CONTEXT`), `insideColorPhrase` (the match lies in a color description; this explains the finding and never lowers it),
 `otherRuleIds` (other rules that matched an overlapping span and lost to this one), `sourceIds` (ids of the source
-records of the mark), and `message` and `suggestion` (Vietnamese text). Branch on `ruleId`, `risk` and `field`, not on
+records of the mark), `sourceLinks` and `riskAdjustments` (below), and `message` and `suggestion` (Vietnamese text; a
+lowered level adds its explanation to the end of `message`). Branch on `ruleId`, `risk` and `field`, not on
 the text. `geo_sport_combination` (a place name next to a sport term) and `pure_color_description` (a phrase of only
 color and pattern words; always `LOW`, and it never raises `riskLevel`) need no catalog mark. A `LOW` finding is not a
 statement that anything is allowed.
+
+#### `riskAdjustments`: why a level is lower
+
+`risk` is the level the API reports. When it is lower than the level the rule assigned, `riskAdjustments` lists why, and
+**the original level is never hidden**: each entry has `reason`, `from` (the level the rule assigned), `to` (the level this
+reason alone gives) and `note` (Vietnamese text). `risk` is the lowest `to`; an empty list means the level was not lowered.
+
+| `reason` | When |
+|---|---|
+| `outside_product_classes` | The request named a `product_type`, the mark has Nice classes and none is the product type's. |
+| `common_word` | The mark is a word of the ruleset's `generic_words` list and the match is not an exact or phrase match in a brand field (`brand`, `shop_name`). A fuzzy match of such a mark is always capped. **`trademark-risk-2026-11b` lists no word, so this reason does not occur until the maintainer has reviewed the list.** |
+
+```json
+{"ruleId": "catalog_exact", "risk": "MEDIUM", "...": "...",
+ "riskAdjustments": [{"reason": "outside_product_classes", "from": "HIGH", "to": "MEDIUM",
+                      "note": "Nhãn hiệu 'ZORVEX' đăng ký ở nhóm Nice 25, 35, không nhóm nào nằm trong các nhóm 21 của loại sản phẩm 'mug', nên mức rủi ro hạ từ HIGH xuống MEDIUM. ..."}]}
+```
+
+#### `sourceLinks`: where to read the source record
+
+`sourceLinks` is a list of `{sourceId, label, url}`: a public look-up page for a source record of the mark, built from a
+template in the ruleset, only for a source the ruleset names and only from an id of the right shape. Today an id
+`uspto:<8-digit serial number>` (a catalog imported with `source_key: uspto`, see `catalogs/manifest.yaml`) gets a link to its USPTO TSDR
+page, for example `{"sourceId": "uspto:12345678", "label": "USPTO TSDR", "url":
+"https://tsdr.uspto.gov/#caseNumber=12345678&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch"}`. The
+list is empty for any other source (including a catalog imported in the one-file form, whose ids have no source key). **The
+address pattern is `unverified`**: it was seen in a USPTO document and in third-party exports, not in documentation, and the
+API never opens a link. Open one by hand before you rely on it, and read the register itself for the status of the mark.
 
 ### Highlighting a finding
 
@@ -825,7 +883,7 @@ A result is kept for **30 days** (`expiresAt`; an operational setting, not a gua
 /api/v1/trademark-checks/{id}` answers `404` whether or not the server's cleanup has run, an expired `checkId` never
 becomes readable again, and the same listing sent again is analysed again and gets a new `checkId`.
 
-An identical request of the same client (same marketplace, same text, same `analysisVersion`) returns the stored
+An identical request of the same client (same marketplace, same text, same `product_type`, same `analysisVersion`) returns the stored
 `COMPLETE` result with `cached: true`. The text counts as identical after Unicode NFC and trimming, before any matching
 normalization, so `ZORVEX` and `zorvex` are two different inputs. A new ruleset version, catalog, algorithm,
 PostgreSQL major version or `pg_trgm` version changes `analysisVersion` and with it the cache. Another client never
@@ -1005,7 +1063,7 @@ catalog:
     "status": "COMPLETE",
     "riskLevel": "LOW",
     "catalogVersion": "demo-2026-11-0a1b2c3d4e5f",
-    "rulesetVersion": "trademark-risk-2026-11",
+    "rulesetVersion": "trademark-risk-2026-11b",
     "failedRuleIds": [],
     "findings": []
   }
@@ -1170,6 +1228,7 @@ Cloudflare Access see "Calling through Cloudflare Access".
 |---|---|---|---|
 | 400 | `invalid-request` | Body missing, not JSON, or `marketplace` / `listing` missing; `listing` not an object. | Fix the request. Do not retry unchanged. |
 | 400 | `unknown-marketplace` | The marketplace code is not known. | Fix the code. `detail` lists the supported ones. |
+| 400 | `unknown-product-type` | `POST /api/v1/trademark-checks`: `product_type` names a product type the active trademark ruleset does not declare (the keys are exact, `Apparel` is not `apparel`). `known` lists the declared keys. Nothing is stored or counted. | Fix the key, or leave `product_type` out. |
 | 400 | `unknown-print-profile` | `POST /api/v1/personalization-screenings`: `print_profile` names a profile the ruleset does not declare. `known` lists the declared codes. | Fix the code, or leave it out for the default profile. |
 | 400 | `invalid-report-period` | `GET /api/v1/reports/summary`: `from` or `to` is missing, is not a date written `YYYY-MM-DD`, or `from` is after `to`. | Fix the dates. |
 | 400 | `report-period-too-long` | `GET /api/v1/reports/summary`: the period covers more days than the deployment allows (92 by default, both ends counted). `maxDays` and `requestedDays` say how many. | Ask for a shorter period, or several. |

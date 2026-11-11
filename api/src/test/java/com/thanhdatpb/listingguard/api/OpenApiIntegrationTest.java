@@ -197,13 +197,17 @@ class OpenApiIntegrationTest {
         assertThat(spec.at("/paths/~1api~1v1~1variation-checks/post/operationId").asText()).isEqualTo("check");
         assertThat(spec.at("/paths/~1api~1v1~1variation-checks~1{id}/get/operationId").asText()).isEqualTo("get");
         assertThat(spec.at("/paths/~1api~1v1~1trademark-checks/post/requestBody/content/application~1json/schema/$ref").asText())
-                .as("the same request schema as /checks").isEqualTo(spec.at("/paths/~1api~1v1~1checks/post/requestBody/content/application~1json/schema/$ref").asText());
+                .as("the /checks envelope plus an optional product_type, in a schema of its own")
+                .isEqualTo("#/components/schemas/TrademarkCheckRequest");
+        assertThat(spec.at("/components/schemas/TrademarkCheckRequest/properties/product_type").isMissingNode()).isFalse();
+        assertThat(spec.at("/components/schemas/TrademarkCheckRequest/required").toString())
+                .doesNotContain("product_type");
         assertThat(spec.at("/components/schemas/TrademarkCheckResult/properties/findings/items/$ref").asText())
                 .as("its own finding schema: springdoc merges nested records of one simple name, which gave it the /checks finding")
                 .isEqualTo("#/components/schemas/TrademarkCheckFindingView");
         assertThat(fieldNames(spec.at("/components/schemas/TrademarkCheckFindingView/properties"))).containsExactlyInAnyOrder(
                 "ruleId", "risk", "field", "start", "end", "snippet", "mark", "matchType", "score", "insideColorPhrase",
-                "otherRuleIds", "sourceIds", "message", "suggestion");
+                "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "message", "suggestion");
         assertThat(spec.at("/components/schemas/CheckResult/properties/findings/items/$ref").asText())
                 .as("/checks keeps its own finding schema").isEqualTo("#/components/schemas/FindingView");
         assertThat(spec.at("/components/schemas/CheckResult/properties/readiness/anyOf/0/$ref").asText())

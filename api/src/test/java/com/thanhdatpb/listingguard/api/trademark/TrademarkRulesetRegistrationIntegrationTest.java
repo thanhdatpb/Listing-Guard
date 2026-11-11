@@ -46,7 +46,7 @@ class TrademarkRulesetRegistrationIntegrationTest {
     MockMvc mvc;
 
     private static String yaml() throws Exception {
-        return new ClassPathResource("rulesets/trademark-risk-2026-11.yaml").getContentAsString(StandardCharsets.UTF_8);
+        return new ClassPathResource("rulesets/trademark-risk-2026-11b.yaml").getContentAsString(StandardCharsets.UTF_8);
     }
 
     @Test
@@ -55,7 +55,7 @@ class TrademarkRulesetRegistrationIntegrationTest {
 
         for (String marketplace : new String[]{"ETSY", "AMAZON"}) {
             RulesetVersion row = versions.findByPackIdAndMarketplaceCodeAndVersion("trademark-risk", marketplace,
-                    "trademark-risk-2026-11").orElseThrow();
+                    "trademark-risk-2026-11b").orElseThrow();
             assertThat(row.getContentHash()).isEqualTo(ruleset.contentHash());
             assertThat(row.getCheckedAt()).isEqualTo(ruleset.checkedAt());
             assertThat(trademark.rulesetVersionId(marketplace)).isEqualTo(row.getId());
@@ -86,20 +86,20 @@ class TrademarkRulesetRegistrationIntegrationTest {
         TrademarkRuleset edited = TrademarkRulesetLoader.parse(yaml() + "\n# edited without bumping the version\n");
 
         assertThatThrownBy(() -> trademark.register("AMAZON", edited)).isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("trademark-risk-2026-11").hasMessageContaining("bump its version");
+                .hasMessageContaining("trademark-risk-2026-11b").hasMessageContaining("bump its version");
     }
 
     @Test
     void aNewVersionIsANewRowAndLeavesTheOldOneAlone() throws Exception {
         String version = "trademark-risk-2099-" + UUID.randomUUID().toString().substring(0, 4);
-        TrademarkRuleset next = TrademarkRulesetLoader.parse(yaml().replace("version: trademark-risk-2026-11",
+        TrademarkRuleset next = TrademarkRulesetLoader.parse(yaml().replace("version: trademark-risk-2026-11b",
                 "version: " + version));
 
         long id = trademark.register("ETSY", next);
 
         assertThat(id).isNotEqualTo(trademark.rulesetVersionId("ETSY"));
         assertThat(versions.findByPackIdAndMarketplaceCodeAndVersion("trademark-risk", "ETSY", version)).isPresent();
-        assertThat(versions.findByPackIdAndMarketplaceCodeAndVersion("trademark-risk", "ETSY", "trademark-risk-2026-11"))
+        assertThat(versions.findByPackIdAndMarketplaceCodeAndVersion("trademark-risk", "ETSY", "trademark-risk-2026-11b"))
                 .isPresent();
     }
 

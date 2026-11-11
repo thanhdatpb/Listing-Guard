@@ -62,7 +62,7 @@ class EditorCheckServiceTest {
         trademarks = mock(TrademarkCheckService.class);
         jdbc = mock(JdbcTemplate.class);
         ruleset = TrademarkRulesetLoader.parse(
-                new ClassPathResource("rulesets/trademark-risk-2026-11.yaml").getContentAsString(StandardCharsets.UTF_8));
+                new ClassPathResource("rulesets/trademark-risk-2026-11b.yaml").getContentAsString(StandardCharsets.UTF_8));
         TrademarkRulesets rulesets = mock(TrademarkRulesets.class);
         when(rulesets.ruleset()).thenReturn(ruleset);
         NormalizerRegistry normalizers = mock(NormalizerRegistry.class);
@@ -88,7 +88,7 @@ class EditorCheckServiceTest {
 
     private TrademarkCheckResult trademark(Completeness completeness, RiskLevel risk,
                                            List<TrademarkCheckResult.FindingView> findings) {
-        return new TrademarkCheckResult(UUID.randomUUID(), "ETSY", "trademark-risk-2026-11", "catalog", "analysis", false,
+        return new TrademarkCheckResult(UUID.randomUUID(), "ETSY", "trademark-risk-2026-11b", "catalog", "analysis", false,
                 completeness, risk, completeness == Completeness.COMPLETE ? List.of() : List.of("catalog_fuzzy"),
                 ruleset.disclaimer(), NOVEMBER_15, NOVEMBER_15.plusSeconds(3600), findings);
     }

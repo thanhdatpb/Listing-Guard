@@ -45,7 +45,7 @@ class UsptoConvertJobTest {
     void setUp() throws IOException {
         UsptoStatusMap map = UsptoStatusMap.loadClasspath("uspto/uspto-status-map-2026-11.yaml");
         TextNormalizer normalizer = new TextNormalizer(
-                TrademarkRulesetLoader.loadClasspath("rulesets/trademark-risk-2026-11.yaml").normalization());
+                TrademarkRulesetLoader.loadClasspath("rulesets/trademark-risk-2026-11b.yaml").normalization());
         job = new UsptoConvertJob(map, normalizer, false);
         Files.createDirectories(raw.resolve("uspto"));
         Files.writeString(raw.resolve("uspto/daily-test.xml"), XML, StandardCharsets.UTF_8);
@@ -134,7 +134,7 @@ class UsptoConvertJobTest {
         Files.writeString(raw.resolve("uspto/v21.xml"), XML.replace("<version-no>2.0<", "<version-no>2.1<"));
         UsptoStatusMap map = UsptoStatusMap.loadClasspath("uspto/uspto-status-map-2026-11.yaml");
         TextNormalizer normalizer = new TextNormalizer(
-                TrademarkRulesetLoader.loadClasspath("rulesets/trademark-risk-2026-11.yaml").normalization());
+                TrademarkRulesetLoader.loadClasspath("rulesets/trademark-risk-2026-11b.yaml").normalization());
 
         UsptoConvertJob.Result result = new UsptoConvertJob(map, normalizer, true).run(raw, "uspto/v21.xml", null, false);
 

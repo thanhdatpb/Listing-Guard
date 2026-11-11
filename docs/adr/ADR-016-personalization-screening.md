@@ -140,6 +140,14 @@ position and the count.
 The trademark scanner of ADR-009 runs on the values, with the catalog the application serves (`TrademarkCatalogRuntime`), and
 **no change to `trademark-scanner` or its ruleset** (both are immutable and used by another endpoint).
 
+> Later change (ADR-009, "Product classes, source links and generic words"): the scanner gained an optional product type, generic
+> words and source links, and the API now serves `trademark-risk-2026-11b`. **This pack's behavior did not change**: it passes no
+> product type, names no brand field, and the shipped generic-word list is empty. A test (`TrademarkRulesetUnchangedTest`) runs the
+> same orders through a scanner on `2026-11` and on `2026-11b` and compares the whole screening except the trademark ruleset
+> version. The analysis fingerprint includes the scanner's, so cached screenings are recomputed once. If the maintainer ever lists a
+> generic word, a buyer who types it gets a capped hit here too (no brand field, so never "in context"); that is an open question of
+> ADR-009.
+
 - Each value is one field of its own, so words of different values are never combined (the geographic + sport rule needs one
   field). The scanner has a closed set of input fields and `trademark-risk-2026-11` scans `tags` item by item, so the adapter
   hands the values to the scanner as the **items of `tags`** and renames the field of every result from `tags[i]` to

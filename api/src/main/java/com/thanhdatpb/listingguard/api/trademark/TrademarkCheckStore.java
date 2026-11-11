@@ -1,5 +1,8 @@
 package com.thanhdatpb.listingguard.api.trademark;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.Evidence;
 import com.thanhdatpb.listingguard.trademark.MatchType;
@@ -43,11 +46,12 @@ public class TrademarkCheckStore {
     }
 
     private static final String SELECT = """
-            SELECT c.id, c.marketplace_code, r.version AS ruleset_version, v.version AS catalog_version,
+            SELECT c.id, c.marketplace_code, c.product_type, r.version AS ruleset_version, v.version AS catalog_version,
                    c.analysis_version, c.completeness, c.risk_level, c.failed_rule_ids, c.disclaimer, c.created_at,
                    c.expires_at,
                    f.rule_id, f.risk, f.field, f.span_start, f.span_end, f.snippet, f.matched_mark, f.match_type,
-                   f.score, f.inside_color_phrase, f.other_rule_ids, f.source_ids, f.message, f.suggestion
+                   f.score, f.inside_color_phrase, f.other_rule_ids, f.source_ids, f.source_links, f.risk_adjustments,
+                   f.message, f.suggestion
             FROM trademark_check c
             JOIN ruleset_version r ON r.id = c.ruleset_version_id
             JOIN trademark_catalog_version v ON v.id = c.catalog_version_id
@@ -60,8 +64,12 @@ public class TrademarkCheckStore {
 
     private static final String INSERT_FINDING = """
             INSERT INTO trademark_check_finding (check_id, position, rule_id, risk, field, span_start, span_end, snippet,
-                matched_mark, match_type, score, inside_color_phrase, other_rule_ids, source_ids, message, suggestion)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""";
+                matched_mark, match_type, score, inside_color_phrase, other_rule_ids, source_ids, source_links,
+                risk_adjustments, message, suggestion)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)""";
+
+    /** Writes and reads the two JSON columns of a finding; the views are plain records of strings and levels. */
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final JdbcTemplate jdbc;
     private final TrademarkRetentionProperties retention;
@@ -95,9 +103,10 @@ public class TrademarkCheckStore {
      * Two requests replacing the same expired row both reach the insert; the second one fails with a unique violation
      * on {@link #CACHE_INDEX}, which {@link #isCacheIdentityViolation} recognizes.
      *
+     * @param productType the product type the request named, null when it named none
      * @return the id of the new check
      */
-    public UUID insert(Identity identity, long catalogVersionId, TrademarkResult result) {
+    public UUID insert(Identity identity, long catalogVersionId, TrademarkResult result, String productType) {
         if (result.completeness() == Completeness.COMPLETE) {
             jdbc.update("DELETE FROM trademark_check c WHERE " + IDENTITY_FILTER + " AND c.expires_at <= now()",
                     identity.clientId(), identity.marketplace(), identity.packId(), identity.inputHash(),
@@ -108,8 +117,8 @@ public class TrademarkCheckStore {
         jdbc.update("""
                 INSERT INTO trademark_check (id, client_id, marketplace_code, pack_id, input_hash, ruleset_version_id,
                     catalog_version_id, analysis_version, completeness, risk_level, failed_rule_ids, disclaimer,
-                    created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now() + make_interval(secs => ?))""",
+                    product_type, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now() + make_interval(secs => ?))""",
                 ps -> {
                     ps.setObject(1, id);
                     ps.setObject(2, identity.clientId());
@@ -123,7 +132,8 @@ public class TrademarkCheckStore {
                     ps.setString(10, result.riskLevel().name());
                     ps.setArray(11, ps.getConnection().createArrayOf("text", result.failedRuleIds().toArray()));
                     ps.setString(12, result.disclaimer());
-                    ps.setDouble(13, retentionSeconds);
+                    ps.setString(13, productType);
+                    ps.setDouble(14, retentionSeconds);
                 });
         List<TrademarkFinding> findings = result.findings();
         if (!findings.isEmpty()) {
@@ -150,8 +160,13 @@ public class TrademarkCheckStore {
                     ps.setBoolean(12, evidence.insideColorPhrase());
                     ps.setArray(13, ps.getConnection().createArrayOf("text", evidence.otherRuleIds().toArray()));
                     ps.setArray(14, ps.getConnection().createArrayOf("text", evidence.sourceIds().toArray()));
-                    ps.setString(15, finding.message());
-                    ps.setString(16, finding.suggestion());
+                    ps.setString(15, json(evidence.sourceLinks().stream().map(link ->
+                            new TrademarkCheckResult.SourceLinkView(link.sourceId(), link.label(), link.url())).toList()));
+                    ps.setString(16, json(evidence.riskAdjustments().stream().map(adjustment ->
+                            new TrademarkCheckResult.RiskAdjustmentView(adjustment.reason().code(), adjustment.from(),
+                                    adjustment.to(), adjustment.note())).toList()));
+                    ps.setString(17, finding.message());
+                    ps.setString(18, finding.suggestion());
                 }
 
                 @Override
@@ -196,7 +211,8 @@ public class TrademarkCheckStore {
 
     private static TrademarkCheckResult header(ResultSet rs, boolean cached) throws SQLException {
         return new TrademarkCheckResult(rs.getObject("id", UUID.class), rs.getString("marketplace_code"),
-                rs.getString("ruleset_version"), rs.getString("catalog_version"), rs.getString("analysis_version").trim(),
+                rs.getString("product_type"), rs.getString("ruleset_version"), rs.getString("catalog_version"),
+                rs.getString("analysis_version").trim(),
                 cached, Completeness.valueOf(rs.getString("completeness")), RiskLevel.valueOf(rs.getString("risk_level")),
                 strings(rs.getArray("failed_rule_ids")), rs.getString("disclaimer"),
                 rs.getObject("created_at", OffsetDateTime.class).toInstant(),
@@ -205,8 +221,9 @@ public class TrademarkCheckStore {
 
     private static TrademarkCheckResult withFindings(TrademarkCheckResult result,
                                                      List<TrademarkCheckResult.FindingView> findings) {
-        return new TrademarkCheckResult(result.checkId(), result.marketplace(), result.rulesetVersion(),
-                result.catalogVersion(), result.analysisVersion(), result.cached(), result.completeness(),
+        return new TrademarkCheckResult(result.checkId(), result.marketplace(), result.productType(),
+                result.rulesetVersion(), result.catalogVersion(), result.analysisVersion(), result.cached(),
+                result.completeness(),
                 result.riskLevel(), result.failedRuleIds(), result.disclaimer(), result.createdAt(), result.expiresAt(),
                 List.copyOf(findings));
     }
@@ -218,7 +235,27 @@ public class TrademarkCheckStore {
                 rs.getString("field"), rs.getInt("span_start"), rs.getInt("span_end"), rs.getString("snippet"),
                 rs.getString("matched_mark"), MatchType.valueOf(rs.getString("match_type")), nullableScore,
                 rs.getBoolean("inside_color_phrase"), strings(rs.getArray("other_rule_ids")),
-                strings(rs.getArray("source_ids")), rs.getString("message"), rs.getString("suggestion"));
+                strings(rs.getArray("source_ids")),
+                readJson(rs.getString("source_links"), new TypeReference<List<TrademarkCheckResult.SourceLinkView>>() { }),
+                readJson(rs.getString("risk_adjustments"),
+                        new TypeReference<List<TrademarkCheckResult.RiskAdjustmentView>>() { }),
+                rs.getString("message"), rs.getString("suggestion"));
+    }
+
+    private static String json(Object value) {
+        try {
+            return JSON.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("A trademark finding's evidence cannot be written as JSON", e);
+        }
+    }
+
+    private static <T> List<T> readJson(String text, TypeReference<List<T>> type) {
+        try {
+            return List.copyOf(JSON.readValue(text, type));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("A stored trademark finding has JSON that cannot be read", e);
+        }
     }
 
     private static List<String> strings(Array array) throws SQLException {

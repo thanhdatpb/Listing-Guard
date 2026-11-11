@@ -1,8 +1,18 @@
 # Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate, the capabilities endpoint with its MCP tool and one OpenAPI schema fix below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. Etsy, hashes and the request and response shapes of every existing endpoint are unchanged (`docs/api/openapi.json` differs in an example's version string and in the schema of the trademark check's findings, see the last section below, and gains `GET /api/v1/capabilities`); there is no migration.
+Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate, the capabilities endpoint with its MCP tool, one OpenAPI schema fix and the trademark product types, source links and generic words below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities` and the schema of the trademark check's findings (see the sections below). There is one migration, V28.
 
 ## What is new
+
+### Trademark checks: product type, source links and generic words (ruleset `trademark-risk-2026-11b`)
+
+`POST /api/v1/trademark-checks` takes an optional top-level **`product_type`** (`apparel`, `mug`, `poster`, `sticker`, `phone_case`, `jewelry`, `bag`, `furniture_decor`, `fabric`, `toy`). With it, a catalog mark that has Nice classes, none of them the product type's, is reported **one level lower**, and the finding's new **`riskAdjustments`** says why and keeps the original level (`reason`, `from`, `to`, `note`). A mark with no Nice class is never lowered; without `product_type` the result is what it was. A key the ruleset does not declare is `400 unknown-product-type` (with `known`), never ignored. The result carries `productType`. **The product types and their Nice classes were supplied by the maintainer and are `unverified`.**
+
+A finding also gets **`sourceLinks`**: for a catalog imported with `source_key: uspto`, an id `uspto:<serial number>` links to its USPTO TSDR page, built from a template in the ruleset (never in Java). **The address pattern is `unverified`**: no official page describing it could be read, so open one link by hand before relying on it.
+
+The ruleset also has a **`generic_words`** list (a mark that is also an ordinary word keeps its level only as an exact or phrase match in `brand` or `shop_name`; anywhere else it is capped at `LOW` with the original level shown). **The shipped list is empty**, so this changes nothing until the maintainer has reviewed each word. Personalization screenings behave exactly as before (a test compares them on the old and new ruleset). See [the integration guide](../integration-guide.md#trademark-checks), [input schema](../input-schema.md#trademark-checks) and [ADR-009](../adr/ADR-009-trademark-risk-scanner.md).
+
+The canonical input hash is now `listing-guard/trademark-input/v2` and the matcher `matcher-2`; V28 adds `trademark_check.product_type` and the `risk_adjustments` and `source_links` columns of a finding (constant defaults, no table rewrite). `trademark-risk-2026-11` is kept unchanged (its hash is pinned). The MCP tool `check_trademark` does not take `product_type` yet.
 
 ### Amazon `description_length` (ruleset `amazon-2026-12c`)
 
@@ -28,4 +38,6 @@ None for the API. A client generated from `docs/api/openapi.json` should be gene
 
 ## Upgrade notes
 
-Nothing to do.
+- The trademark ruleset the API serves is now `trademark-risk-2026-11b` (`listing-guard.trademark.ruleset`), registered at start-up. A catalog imported with `2026-11` is still served, because the `normalization` section is unchanged. Nothing to import again.
+- Results stored before are not returned for a new request (`analysisVersion` and the input hash changed); they stay readable by `GET` until they expire. Their findings read as no product type, no source link and no adjustment.
+- A client that parses a trademark result strictly must accept the new fields `productType`, `sourceLinks` and `riskAdjustments`.
