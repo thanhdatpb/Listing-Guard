@@ -88,7 +88,7 @@ jobs:
 
       - name: Set up QEMU
         if: steps.trivy.outcome == 'success'
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Build and push multi-platform release image
         if: steps.trivy.outcome == 'success'
