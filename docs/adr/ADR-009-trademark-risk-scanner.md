@@ -479,11 +479,10 @@ that the table covers exactly the 149 codes of Table 1, each once, `DROP` includ
 - **A daily file holds changes, not the register.** The `TRMK` file segment "contains new trademark data and
   modifications made to existing Trademark data". A complete catalog needs the annual or backfile sets, which need an ODP
   account.
-- **No "latest transaction wins".** The same serial number can appear on several days with different statuses, and the
-  converter writes every record it reads. The import then merges records of the same mark and keeps the status declared
-  first in `MarkStatus` (`REGISTERED` before `PENDING`), so an old record can hide a newer one. Fixing it needs either the
-  `status-date` or `transaction-date` in the catalog format or an upsert by `source_id` at import. **PR A2c**, to be done
-  before the catalog for a deployment is built (the maintainer's stage GĐ7). `jsonl-1` does not change in this PR.
+- **No "latest transaction wins" (closed by PR A2c, see "Latest transaction wins and conversion filters (PR A2c)").** The
+  same serial number can appear on several days with different statuses, and the A2b converter writes every record it
+  reads. The import then merges records of the same mark and keeps the status declared first in `MarkStatus`
+  (`REGISTERED` before `PENDING`), so an old record can hide a newer one. A2b did not change `jsonl-1` for this.
 - **The status of each class is ignored.** Only the status of the header is read. A class cancelled in a multi-class
   registration (`classification/status-code`, values `A` to `E` and `1` to `5`) keeps the status of the whole file. This can
   only add warnings; it is accepted for now.
@@ -564,6 +563,148 @@ column (200, 500 and 200 characters). The counts `records_read`, `records_filter
   with `-Xmx40m` against a real PostgreSQL, and another scans a file larger than a 32 MB heap; a whole-file read cannot pass
   either. They prove the application does not hold the file; the database still needs space for the staging table and
   the merge.
+
+## Latest transaction wins and conversion filters (PR A2c)
+
+PR A2c closes the first known limit of A2b: a catalog made of several daily files must show the **latest known state of
+each serial number**, and must hold only marks that matter for print-on-demand and e-commerce products. It changes
+nothing in `/checks`, in the scanner, in the trademark ruleset, in the matcher, in the canonical input hash, in the
+importer or in `jsonl-1`, and it adds **no migration**. It replaces the single-file converter of A2b (`UsptoDailyConverter`,
+report `v1`) with `UsptoCatalogConverter` (several files, report `v2`); the XML reading and the field rules of A2b are
+kept (they moved to `UsptoXmlReader`). Like A2b it is **unverified against real data**: no real file has been read.
+
+**Decision 1: the order key is `case-file/transaction-date`.** The element documentation (saved in `catalogs/raw/uspto/`, see
+the table of A2b) says of `<transaction-date>`, a direct child of `<case-file>`: "an eight position date in the format
+YYYYMMDD. The transaction date is the date of the Trademark Daily XML Process for Action Key entries". Two other dates
+could have been the key and were not:
+
+- `case-file-header/status-date` is "the date on which the current status was reported to the system". It says when a status
+  began, not which record is newer: a record that changes only the owner or the classes repeats the old status date, and
+  two statuses can share one. It would also leave the winner of two records with the same status date undecided.
+- `version/version-date` and the date in the file name describe the file, not the case. The file name date is the first
+  tie-breaker below, because a name is all the operator controls.
+
+`transaction-date` is optional in the DTD (`transaction-date?`). The converter treats it as **required for ordering** and
+never falls back to another date: mixing two kinds of date in one ordering would make a record's place depend on which
+element happened to be present. A record without it, or with a value that is not a real `YYYYMMDD` date (zeros included), is
+a **record error** (below), never a silent drop. Whether real records carry it is one of the things the first real run checks.
+
+The full order, from the most important key: (1) `transaction-date`; (2) the date in the **file name**, read with the patterns
+of the filters file (`file_name_dates`, below; a file whose name matches none has no date and sorts before every dated file);
+(3) the **file name**, compared by code point; (4) the **position** of the `case-file` in its file (the later one wins). Every
+key is a fact of the input, so the order is total: **the result does not depend on the order in which the files are
+passed**, and a test converts three files in every permutation and compares the output and the report byte for byte. The
+files are processed, and the output is written, sorted by the keys (2) and (3), not as given.
+
+**Decision 2: the converter resolves it, over all the files of one run, in two passes.** Pass 1 reads every file and keeps,
+for each serial number, only the key of its latest record (one packed number per distinct serial number, in a primitive
+hash table of about 24 to 48 bytes per distinct serial number; `listing-guard.trademark.uspto.max-distinct-serials`, 12,000,000
+by default, stops the run with a clear message instead of an out-of-memory error). Pass 2 reads every file again and writes
+a record only when it is the latest one of its serial number and passes the filters. The files are streamed both times, so
+no file and no set of records is held in memory (the A2b rule), and a file whose SHA-256 differs between the passes stops the
+run. Alternatives considered:
+
+- *An upsert by `source_id` at import (the other option named in A2b).* `jsonl-1` has no date, so the import could not tell
+  which record is newer; it would need `jsonl-2` and a changed merge in SQL and in `CatalogImport.prepare` (two places that
+  must agree). It would also make a catalog depend on the order of the imports.
+- *A state table kept between runs (daily incremental).* It would need a migration, and the result would depend on the history
+  of the runs, not only on the files; a catalog version is an immutable import of files whose SHA-256 the manifest names
+  (see "Catalog" above), so a reproducible conversion of named files fits it better. The price is that every run reads all
+  the files again.
+- *An external sort on disk.* Memory would not depend on the number of serial numbers, but it needs temporary files, a merge
+  and their cleanup, for a set that is small next to the files themselves (a number per serial number).
+
+A record takes part in the ordering only if it **says something about the mark's status**: a record whose status code is
+`DROP` in the status map (no status of the mark, for example a misassigned serial number or a record created by an
+assignment request), not in the map, missing or not three digits is counted as `status_dropped:<code>` or
+`status_unmapped:<code>` and **cannot replace an earlier record**. Letting it win would remove a live mark because of a record
+that carries no status; a warning too many is better than a risk missed (the principle of the status map). A record that is
+a record error does not take part either. Because the latest record decides, a record that the filters would drop (a
+logo, a class outside the list) still replaces the earlier ones of its serial number.
+
+**Decision 3: a mark that is not live in its latest record is left out; it is not written as inactive.** The schema could
+carry it (`EXPIRED` and `CANCELLED` are catalog statuses), but the scanner **ignores a mark's status** ("Carried for later"
+in A2), so an inactive entry would still raise a finding about a mark that no longer exists, and the catalog would grow with
+every dead mark ever filed. Leaving it out costs nothing in `jsonl-1` or in the schema. What is lost is the information that a
+mark once lived; an operator who wants to warn about recently expired marks lists their status codes as live in the filters
+file. **The "live" test is the list of status codes `live_status_codes`**, not a status of the map, so a deployment can
+choose; the loader checks that every listed code is in the status map and is not `DROP`. A mark is live or dead as its
+**latest** record says: live, then dead, is left out; dead, then live again (a revived application, a restored
+registration), is written with the later record's data.
+
+**Decision 4: the filters are a versioned YAML file, like the status map.** `uspto/uspto-convert-filters-2026-11.yaml`
+(`UsptoConvertFilters`; strict loader: unknown or missing key, duplicate key, bad value and a `source.status` other than
+`unverified` fail at load time; the content hash is reported). A published version is immutable: a change is a new file and
+a new version, and `listing-guard.trademark.uspto.filters` (`classpath:` or `file:`) names the one in use. Its keys:
+
+| Key | Meaning | Shipped value (all `unverified`) |
+|---|---|---|
+| `nice_classes` | keep a record with at least one of these classes; the record is written with **all** its classes | 9, 14, 16, 18, 20, 21, 24, 25, 26, 28 |
+| `live_status_codes` | the status codes (three digits, quoted) that are live | the 121 codes the status map sends to `REGISTERED` or `PENDING`; a test holds that the two agree |
+| `text_only` | drop a mark with no words (drawing code 2, 6 or none) | `true` |
+| `file_name_dates` | the patterns that read a date from a file name (named groups `year` or `yy`, `month`, `day`) | `YYYYMMDD` anywhere in the name, and `apcYYMMDD` (the name the bulk-data product is believed to use; **unverified**, and `yy` is read as 20yy) |
+
+The shipped classes are the Nice classes of the product types of ruleset `trademark-risk-2026-11b` (9, 14, 16, 18, 20, 21,
+24, 25, 28: phone cases, jewelry, paper goods, bags, furniture, household goods, textiles, clothing, toys) plus 26 (haberdashery,
+patches, buttons), which the maintainer suggested. **The list is the maintainer's reading, not a legal or USPTO statement**, and
+a class outside it is a mark the scanner will never warn about, so a product line added later needs the list changed first. The
+filter `include_classes` of the manifest is unchanged and still applies at import; the two filters are independent (a
+manifest that lists a class the converter dropped finds no record of it).
+
+The order in which a record is checked, and counted once under the first check it fails: (1) a record error; (2) no status
+information (`status_dropped`, `status_unmapped`); (3) **superseded** by a later record; (4) **not live** (the latest record's
+status code is not in `live_status_codes`); (5) the drawing code, when `text_only` (`missing_drawing_code`, `logo_only`,
+`no_drawing`, `unknown_drawing_code`); (6) `blank_mark`, `mark_too_long`; (7) `no_valid_nice_class`, `class_not_included`;
+(8) `mark_empty_after_normalization`, `mark_too_long_after_normalization`. The check of the status moved before the drawing
+code (A2b had it after) so that "removed because dead" counts every dead mark, whatever its drawing.
+
+**Decision 5: required fields, bad files and `strict`.** There are two kinds of problem, both reported with the file name
+and the place:
+
+- A **record error** (`missing_serial`, `invalid_serial` (not eight digits), `missing_transaction_date`,
+  `invalid_transaction_date`): the record cannot be placed in the order. Not strict: it is counted by code, listed in the report
+  (`errors`: file, record number from 1, line, column and code; at most the first 100, and the count is complete), and the run
+  goes on. These were drops in A2b; they are errors now because they lose a record that could be live.
+- A **file error** (not well-formed XML, a root other than `trademark-applications-daily`, no `version`, a `version-no` other
+  than 2.0 unless `allow-other-version`, a file that changed between the passes): the file name and, for XML, the line and
+  column. Not strict: the file is **left out whole** (a damaged file's records before the break are not trusted) and listed with
+  `status: FAILED`. If no file can be read, the run fails and writes nothing.
+
+`listing-guard.trademark.uspto.strict` (default `false`; `--strict` on the job) stops the run at the first problem of either
+kind, with that message, writes nothing, and leaves an earlier output alone. **A run with a problem and no `strict` is
+`INCOMPLETE`**: the output is written, the report says `completeness: INCOMPLETE`, and the log warns. It is not an error exit
+and it is not fit to import for a deployment: a file that is missing can make an older, live-looking record win. Use `strict`
+for the catalog you rely on. A message and the report hold no mark and no serial number.
+
+**Decision 6: report `v2` and the job.** `listing-guard/uspto-convert-report/v2` has the files (name, bytes, SHA-256,
+`version-no`, `version-date`, records, `OK` or `FAILED` and why), `completeness`, `strict`, the versions and hashes of the status
+map and the filters, and the counts: `recordsRead`, `recordsWritten`, `recordErrors` (by code), `superseded` (replaced by a
+later record), `deadRemoved` (the latest record's status is not live, with the codes one by one), `filtered` (every other reason,
+one by one), `distinctSerials` and `ignoredClassCodes`, with the output's size and SHA-256 (for `sha256` in the manifest).
+`recordsRead` of the files that were read `= recordsWritten + recordErrors + superseded + deadRemoved + sum(filtered)`, and a
+test holds it. The job takes `--input` once or several times, or `--input-dir` (every `*.xml` file directly in a folder of
+`catalogs/raw/`, not in a sub-folder); with more than one file `--output` is required, and the output and report are written
+as in A2b (a `.part` file renamed on success, no overwrite without `--overwrite`).
+
+**Consequences and limits.**
+
+- A catalog is a function of **the files of one conversion**. Two runs converted separately and listed as two sources in a
+  manifest are merged by mark, **not** by serial number: the latest-wins rule does not cross runs. Convert all the files that
+  belong together in one run.
+- A daily file still holds **changes**. A serial number that no file in the run mentions is not in the catalog, and a death the
+  files do not contain cannot be seen. A catalog that is complete needs the annual or backfile sets (ODP account, A2b).
+- The result `INCOMPLETE` and `strict` are the only guard against a missing or damaged file; the converter cannot know a file is
+  missing. Name the files in order and check the `files` of the report against the days you meant to cover.
+- The whole run reads every file twice, and holds about 24 to 48 bytes per distinct serial number; a deployment with a heap
+  smaller than that for its files sets `max-distinct-serials` and runs fewer files.
+- Unverified, as before: the presence and form of `transaction-date` in real files, the name of the bulk-data files (`apc...`), the
+  status codes of the live list, and the class list. The status of a single class is still ignored.
+- A mark of a serial number that died is gone from the next catalog version; the old version, which is immutable, still has it.
+
+**Questions for the maintainer.** (1) Is leaving a dead mark out right, or should recently expired marks stay (list their codes
+in `live_status_codes`)? (2) Should class 35 (retail services) or others join the list? (3) Is an `INCOMPLETE` run with exit code
+0 right, or should it fail? (4) Is `transaction-date` present in a real file (the first real run answers it)? (5) Should the job
+read the `.zip` files of the bulk-data product (not done: the operator unzips them, the name of the XML keeps its date)?
 
 ## Product classes, source links and generic words (ruleset `trademark-risk-2026-11b`)
 
@@ -734,7 +875,7 @@ ruleset that an earlier PR did not already contain.
 | A1 | `trademark-scanner` core: ruleset `trademark-risk-*` and its loader, canonical input and hash, normalization with offsets, tokens and n-grams, the `TrademarkCatalog` port with an in-memory implementation, exact/phrase/fuzzy matching with the Java final score, the three context rules, risk aggregation, `INCOMPLETE`/`UNKNOWN`, evidence, and the pack fingerprint with room for the catalog/database components. No Spring, no database, no HTTP. | PR 0b (done) |
 | A2 | Catalog: `pg_trgm` migration, catalog tables, offline importer, the PostgreSQL adapter (transaction-local candidate threshold), and the PostgreSQL major version / `pg_trgm` `extversion` / catalog components of the fingerprint. | A1 |
 | A2b | Real catalog for a deployment: a streaming import, V18 (one source row per data file), a catalog from several files (all done) and a converter from the USPTO daily applications XML to `jsonl-1` (written from the public V2.0 DTD, unverified against a real file); see "USPTO conversion and multi-source catalogs (PR A2b)". | A2 |
-| A2c | The latest transaction of a serial number wins: the catalog needs the status date or transaction date of a record (or an upsert by `source_id` at import), so that a daily file's older record does not hide a newer one; see "Known limits" of PR A2b. `jsonl-1` does not change in A2b. | A2b |
+| A2c | The latest transaction of a serial number wins, over all the files of one conversion, and the converter's filters (Nice classes, live status codes, text marks) in a versioned YAML; see "Latest transaction wins and conversion filters (PR A2c)". No migration, `jsonl-1` unchanged (done). | A2b |
 | A3 | `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}`, result tables, cache identity, retention and cleanup, OpenAPI and integration guide (done; see "Endpoint (PR A3)"). | A2 |
 | A4 | Synthetic tuning and held-out datasets, the evaluation run and its gate. | A2 (may run in parallel with A3) |
 | A5 | Product types with Nice classes, `sourceLinks` and generic words in ruleset `trademark-risk-2026-11b`, V28; see "Product classes, source links and generic words" (done). | A3 |
