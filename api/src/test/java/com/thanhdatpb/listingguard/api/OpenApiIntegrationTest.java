@@ -101,6 +101,7 @@ class OpenApiIntegrationTest {
                 "/api/v1/trademark-checks", "/api/v1/trademark-checks/{id}", "/api/v1/usage",
                 "/api/v1/variation-checks", "/api/v1/variation-checks/{id}",
                 "/api/v1/personalization-screenings", "/api/v1/personalization-screenings/{id}",
+                "/api/v1/image-checks", "/api/v1/image-checks/{id}",
                 "/api/v1/rulesets/{marketplace}/limits", "/api/v1/reports/summary", "/api/v1/capabilities", "/health");
         // capabilities (ADR-017): read only, no plan pack, no quota, no 404 (it needs no marketplace)
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1capabilities"))).as("read only: no other method")
@@ -186,6 +187,24 @@ class OpenApiIntegrationTest {
                 .isEqualTo("#/components/schemas/CharacterFindingView");
         assertThat(fieldNames(spec.at("/components/schemas/CharacterFindingView/properties"))).containsExactlyInAnyOrder(
                 "ruleId", "kind", "severity", "sourceStatus", "field", "label", "start", "end", "value", "message", "suggestion");
+        // image checks (ADR-008): multipart only, never JSON, its own result; 503 when off, 413 and 415 for the upload
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1image-checks/post/responses")))
+                .containsExactlyInAnyOrder("200", "400", "401", "403", "413", "415", "422", "429", "503");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1image-checks~1{id}/get/responses")))
+                .containsExactlyInAnyOrder("200", "400", "401", "404", "429");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1image-checks/post/requestBody/content")))
+                .as("multipart only: an image is never sent as JSON, a URL or a path").containsExactly("multipart/form-data");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1image-checks/post/responses/400/content/application~1problem+json/examples")))
+                .containsExactlyInAnyOrder("invalid-request", "too-many-images", "unknown-image-profile");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1image-checks/post/responses/429/content/application~1problem+json/examples")))
+                .containsExactlyInAnyOrder("rate-limited", "quota-exceeded");
+        assertThat(spec.at("/paths/~1api~1v1~1image-checks/post/operationId").asText()).isEqualTo("checkImages");
+        assertThat(spec.at("/paths/~1api~1v1~1image-checks~1{id}/get/operationId").asText()).isEqualTo("getImageCheck");
+        assertThat(fieldNames(spec.at("/components/schemas/ImageCheckResult/properties"))).containsExactlyInAnyOrder(
+                "checkId", "marketplace", "profile", "rulesetVersion", "analysisVersion", "cached", "completeness", "summary",
+                "failedRules", "disclaimer", "createdAt", "expiresAt", "findings", "images");
+        assertThat(fieldNames(spec.at("/components/schemas/ImageView/properties"))).as("no bytes, no file name")
+                .containsExactlyInAnyOrder("ordinal", "imageHash", "role", "source", "completeness", "failedRules", "metadata", "findings");
         // the new operations name themselves, so the numbered ids of the older ones are as they were (no other endpoint changes)
         assertThat(spec.at("/paths/~1api~1v1~1personalization-screenings/post/operationId").asText()).isEqualTo("screenPersonalization");
         assertThat(spec.at("/paths/~1api~1v1~1personalization-screenings~1{id}/get/operationId").asText())

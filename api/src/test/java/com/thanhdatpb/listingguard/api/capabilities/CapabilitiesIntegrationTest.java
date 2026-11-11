@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.api.docs.ApiExamples;
+import com.thanhdatpb.listingguard.api.image.ImageRulesets;
 import com.thanhdatpb.listingguard.api.personalization.PersonalizationRulesets;
 import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkRulesets;
@@ -59,6 +60,9 @@ class CapabilitiesIntegrationTest {
 
     @Autowired
     PersonalizationRulesets personalization;
+
+    @Autowired
+    ImageRulesets images;
 
     private String raw(String key) throws Exception {
         return mvc.perform(get(PATH).header(HEADER, key)).andExpect(status().isOk()).andReturn().getResponse()
@@ -119,6 +123,11 @@ class CapabilitiesIntegrationTest {
             assertThat(pack(body, "personalization-screening").get("rulesetVersions").get(marketplace).asText())
                     .isEqualTo(personalization.ruleset().version());
         }
+        for (String marketplace : List.of("ETSY", "AMAZON")) {
+            assertThat(pack(body, "image-checks").get("rulesetVersions").get(marketplace).asText())
+                    .as("each marketplace has an image ruleset of its own")
+                    .isEqualTo(images.loaded(marketplace).ruleset().version());
+        }
         List<String> ids = new ArrayList<>();
         body.get("packs").forEach(p -> ids.add(p.get("id").asText()));
         assertThat(ids).isSorted().doesNotContain("batch", "policy-analyzer", "sheet-connector");
@@ -132,6 +141,7 @@ class CapabilitiesIntegrationTest {
         assertThat(body.at("/trademarkCatalog/demo").asBoolean()).isFalse();
         assertThat(pack(body, "trademark-risk").get("available").asBoolean()).isFalse();
         assertThat(pack(body, "listing-rules").get("available").asBoolean()).isTrue();
+        assertThat(pack(body, "image-checks").get("available").asBoolean()).as("off by default").isFalse();
         assertThat(body.at("/plans/enforced").asBoolean()).isFalse();
         assertThat(body.at("/fixes/enabled").asBoolean()).isFalse();
     }

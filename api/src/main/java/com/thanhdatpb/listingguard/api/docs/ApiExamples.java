@@ -705,6 +705,103 @@ public final class ApiExamples {
             }
             """;
 
+    /** The metadata part of an image check request, the example of the multipart body (docs/input-schema.md, "Image checks"). */
+    public static final String IMAGE_METADATA = """
+            {
+              "marketplace": "AMAZON",
+              "profile": "default",
+              "images": [
+                {"role": "MAIN", "source": "SELLER"},
+                {"role": "ADDITIONAL"}
+              ]
+            }
+            """;
+
+    public static final String IMAGE_RESULT = """
+            {
+              "checkId": "3c9d1e7a-6b24-4f08-a5d1-2e8b7c0f9a34",
+              "marketplace": "AMAZON",
+              "profile": "default",
+              "rulesetVersion": "amazon-image-2026-11",
+              "analysisVersion": "4b7e0a19c3d85f62a1e0d9c8b7a6f5e4d3c2b1a09887766554433221100ffee1",
+              "cached": false,
+              "completeness": "INCOMPLETE",
+              "summary": "INCOMPLETE",
+              "failedRules": ["image_count", "images[0].image_dimensions", "images[0].aspect_ratio", "images[0].main_background",
+                              "images[0].occupancy", "images[0].blur", "images[1].image_decode"],
+              "disclaimer": "Kết quả chỉ là cảnh báo tham khảo, không xác nhận ảnh được Amazon chấp nhận.",
+              "createdAt": "2026-11-11T09:15:30.123456Z",
+              "expiresAt": "2026-12-11T09:15:30.123456Z",
+              "findings": [],
+              "images": [
+                {"ordinal": 0, "imageHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                 "role": "MAIN", "source": "SELLER", "completeness": "INCOMPLETE",
+                 "failedRules": ["image_dimensions", "aspect_ratio", "main_background", "occupancy", "blur"],
+                 "metadata": {"format": "JPEG", "width": 1600, "height": 1200, "orientation": 1, "hadAlpha": false,
+                              "hadIccProfile": false},
+                 "findings": []},
+                {"ordinal": 1, "imageHash": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                 "role": "ADDITIONAL", "source": "CUSTOMER_CONTENT", "completeness": "INCOMPLETE",
+                 "failedRules": ["image_decode"],
+                 "findings": [
+                   {"ruleId": "customer_content", "severity": "WARNING", "sourceStatus": "unverified",
+                    "message": "Ảnh do khách hàng cung cấp có thể chứa logo hoặc nhãn hiệu bên thứ ba; hãy kiểm tra thủ công trước khi dùng.",
+                    "evidence": "declared source=CUSTOMER_CONTENT"}]}
+              ]
+            }
+            """;
+
+    public static final String PROBLEM_IMAGE_CHECK_NOT_FOUND = """
+            {
+              "type": "urn:listing-guard:problem:image-check-not-found",
+              "title": "Not Found",
+              "status": 404,
+              "detail": "No image check with id 3c9d1e7a-6b24-4f08-a5d1-2e8b7c0f9a34 was found for this client.",
+              "instance": "/api/v1/image-checks/3c9d1e7a-6b24-4f08-a5d1-2e8b7c0f9a34",
+              "code": "image-check-not-found",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
+    public static final String PROBLEM_UNKNOWN_IMAGE_PROFILE = """
+            {
+              "type": "urn:listing-guard:problem:unknown-image-profile",
+              "title": "Bad Request",
+              "status": 400,
+              "detail": "Unknown image profile 'square'. Declared profiles: [default].",
+              "instance": "/api/v1/image-checks",
+              "known": ["default"],
+              "code": "unknown-image-profile",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
+    public static final String PROBLEM_TOO_MANY_IMAGES = """
+            {
+              "type": "urn:listing-guard:problem:too-many-images",
+              "title": "Bad Request",
+              "status": 400,
+              "detail": "A request may hold at most 20 images; 21 were sent.",
+              "instance": "/api/v1/image-checks",
+              "maxImages": 20,
+              "submitted": 21,
+              "code": "too-many-images",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
+    public static final String PROBLEM_IMAGE_CHECKS_NOT_CONFIGURED = """
+            {
+              "type": "urn:listing-guard:problem:image-checks-not-configured",
+              "title": "Service Unavailable",
+              "status": 503,
+              "detail": "Image checks are not enabled in this deployment (listing-guard.image.enabled).",
+              "instance": "/api/v1/image-checks",
+              "code": "image-checks-not-configured",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
     public static final String USAGE_RESULT = """
             {
               "enforced": true,
@@ -714,7 +811,7 @@ public final class ApiExamples {
               "remaining": 958,
               "periodStart": "2026-11-01",
               "resetAt": "2026-12-01T00:00:00Z",
-              "packs": ["batch", "listing-rules", "personalization-screening", "sheet-connector", "trademark-risk", "variation-checks"]
+              "packs": ["batch", "image-checks", "listing-rules", "personalization-screening", "sheet-connector", "trademark-risk", "variation-checks"]
             }
             """;
 
@@ -722,6 +819,7 @@ public final class ApiExamples {
     public static final String CAPABILITIES = """
             {
               "packs": [
+                {"id": "image-checks", "available": false, "rulesetVersions": {"AMAZON": "amazon-image-2026-11", "ETSY": "etsy-image-2026-11"}},
                 {"id": "listing-rules", "available": true, "rulesetVersions": {"AMAZON": "amazon-2026-12c", "ETSY": "etsy-2026-12"}},
                 {"id": "personalization-screening", "available": true, "rulesetVersions": {"AMAZON": "personalization-screening-2026-11", "ETSY": "personalization-screening-2026-11"}},
                 {"id": "trademark-risk", "available": false, "rulesetVersions": {"AMAZON": "trademark-risk-2026-11b", "ETSY": "trademark-risk-2026-11b"}},

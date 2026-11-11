@@ -21,7 +21,9 @@ public enum Pack {
     BATCH("batch"),
     SHEET_CONNECTOR("sheet-connector"),
     VARIATION_CHECKS("variation-checks"),
-    PERSONALIZATION_SCREENING("personalization-screening");
+    PERSONALIZATION_SCREENING("personalization-screening"),
+    /** The plan pack of the image endpoint (ADR-008). Its ruleset keeps the analysis pack id {@code image-compliance} (ADR-010). */
+    IMAGE_CHECKS("image-checks");
 
     private final String id;
 

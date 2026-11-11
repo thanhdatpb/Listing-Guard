@@ -3,6 +3,10 @@ package com.thanhdatpb.listingguard.api.web;
 import com.thanhdatpb.listingguard.api.check.CheckNotFoundException;
 import com.thanhdatpb.listingguard.api.check.MarketplaceNotYetSupportedException;
 import com.thanhdatpb.listingguard.api.check.UnknownMarketplaceException;
+import com.thanhdatpb.listingguard.api.image.ImageCheckNotFoundException;
+import com.thanhdatpb.listingguard.api.image.ImageChecksUnavailableException;
+import com.thanhdatpb.listingguard.api.image.TooManyImagesException;
+import com.thanhdatpb.listingguard.api.image.UnknownImageProfileException;
 import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
 import com.thanhdatpb.listingguard.api.plan.QuotaExceededException;
 import com.thanhdatpb.listingguard.api.policy.CorpusModelMismatchException;
@@ -33,6 +37,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -96,6 +101,26 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** An image check of another client, an unknown one and an expired one all answer alike (ADR-007, ADR-008). */
+    @ExceptionHandler(ImageCheckNotFoundException.class)
+    public ProblemDetail imageCheckNotFound(ImageCheckNotFoundException e) {
+        return Problems.of(HttpStatus.NOT_FOUND, "image-check-not-found", e.getMessage());
+    }
+
+    /** Image checks are switched off in this deployment; only that endpoint is affected (ADR-008). */
+    @ExceptionHandler(ImageChecksUnavailableException.class)
+    public ProblemDetail imageChecksNotConfigured(ImageChecksUnavailableException e) {
+        return Problems.of(HttpStatus.SERVICE_UNAVAILABLE, "image-checks-not-configured", e.getMessage());
+    }
+
+    /** The request named an image profile the ruleset does not declare; it is never replaced by the default (ADR-008). */
+    @ExceptionHandler(UnknownImageProfileException.class)
+    public ProblemDetail unknownImageProfile(UnknownImageProfileException e) {
+        ProblemDetail problem = Problems.of(HttpStatus.BAD_REQUEST, "unknown-image-profile", e.getMessage());
+        problem.setProperty("known", e.known());
+        return problem;
+    }
+
     /**
      * The request named a {@code product_type} that the trademark ruleset does not declare (ADR-009). It is never ignored or
      * guessed, because the answer would then not be the one the client asked for; the declared keys are in {@code known}.
@@ -105,6 +130,27 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = Problems.of(HttpStatus.BAD_REQUEST, "unknown-product-type", e.getMessage());
         problem.setProperty("known", e.known());
         return problem;
+    }
+
+    /** More images than the deployment allows in one request; the limit and the count are in the members (ADR-008). */
+    @ExceptionHandler(TooManyImagesException.class)
+    public ProblemDetail tooManyImages(TooManyImagesException e) {
+        ProblemDetail problem = Problems.of(HttpStatus.BAD_REQUEST, "too-many-images", e.getMessage());
+        problem.setProperty("maxImages", e.maxImages());
+        problem.setProperty("submitted", e.submitted());
+        return problem;
+    }
+
+    /**
+     * A multipart request the container could not read: not multipart after all, a broken boundary, too many parts. Never a
+     * 500, and the parser's own message (which can quote the request) is not repeated. A request over the size limit is
+     * {@link org.springframework.web.multipart.MaxUploadSizeExceededException}, handled by the base class as a 413.
+     */
+    @ExceptionHandler(MultipartException.class)
+    public ProblemDetail invalidMultipart(MultipartException e) {
+        log.debug("Unreadable multipart request: {}", e.getMessage());
+        return Problems.of(HttpStatus.BAD_REQUEST, "invalid-request",
+                "The multipart request could not be read: check the boundary and the number of parts.");
     }
 
     /** No trademark catalog is served (not configured, or refused); only trademark checks are affected, not /checks (ADR-009). */

@@ -5,6 +5,8 @@ import com.thanhdatpb.listingguard.api.capabilities.Capabilities.PackCapability;
 import com.thanhdatpb.listingguard.api.capabilities.Capabilities.PlansCapability;
 import com.thanhdatpb.listingguard.api.capabilities.Capabilities.TrademarkCatalogCapability;
 import com.thanhdatpb.listingguard.api.check.FixesProperties;
+import com.thanhdatpb.listingguard.api.image.ImageProperties;
+import com.thanhdatpb.listingguard.api.image.ImageRulesets;
 import com.thanhdatpb.listingguard.api.personalization.PersonalizationProperties;
 import com.thanhdatpb.listingguard.api.personalization.PersonalizationRulesets;
 import com.thanhdatpb.listingguard.api.plan.Pack;
@@ -44,13 +46,15 @@ public class CapabilitiesService {
     private final PersonalizationProperties personalizationProperties;
     private final PlanService plans;
     private final FixesProperties fixes;
+    private final ImageProperties imageProperties;
+    private final ImageRulesets imageRulesets;
 
     public CapabilitiesService(ActiveRulesets listingRules, TrademarkRulesets trademarkRulesets,
                                TrademarkProperties trademarkProperties, TrademarkCatalogRuntime trademarkRuntime,
                                VariationRulesets variationRulesets, VariationProperties variationProperties,
                                PersonalizationRulesets personalizationRulesets,
                                PersonalizationProperties personalizationProperties, PlanService plans,
-                               FixesProperties fixes) {
+                               FixesProperties fixes, ImageProperties imageProperties, ImageRulesets imageRulesets) {
         this.listingRules = listingRules;
         this.trademarkRulesets = trademarkRulesets;
         this.trademarkProperties = trademarkProperties;
@@ -61,6 +65,8 @@ public class CapabilitiesService {
         this.personalizationProperties = personalizationProperties;
         this.plans = plans;
         this.fixes = fixes;
+        this.imageProperties = imageProperties;
+        this.imageRulesets = imageRulesets;
     }
 
     public Capabilities capabilities() {
@@ -74,12 +80,22 @@ public class CapabilitiesService {
                 versions(variationProperties.marketplaces(), variationRulesets.ruleset().version())));
         packs.add(new PackCapability(Pack.PERSONALIZATION_SCREENING.id(), true,
                 versions(personalizationProperties.marketplaces(), personalizationRulesets.ruleset().version())));
+        packs.add(new PackCapability(Pack.IMAGE_CHECKS.id(), imageProperties.enabled(), imageVersions()));
         packs.sort(Comparator.comparing(PackCapability::id));
 
         return new Capabilities(List.copyOf(packs),
                 new TrademarkCatalogCapability(state.name(), trademarkProperties.demoCatalog()),
                 new PlansCapability(plans.enabled()),
                 new FixesCapability(fixes.enabled()));
+    }
+
+    /** The image ruleset of each marketplace: unlike the other packs, each marketplace has a ruleset of its own. */
+    private Map<String, String> imageVersions() {
+        SortedMap<String, String> versions = new TreeMap<>();
+        for (String marketplace : imageRulesets.marketplaces()) {
+            versions.put(marketplace, imageRulesets.loaded(marketplace).ruleset().version());
+        }
+        return Collections.unmodifiableSortedMap(versions);
     }
 
     private Map<String, String> listingRulesVersions() {

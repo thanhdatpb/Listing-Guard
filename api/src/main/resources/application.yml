@@ -101,6 +101,31 @@ listing-guard:
       cleanup-interval: 1h
       cleanup-initial-delay: 3m
       cleanup-batch-size: 500
+  image:
+    # The image checks (ADR-008): POST /api/v1/image-checks. OFF by default. The bounded decode service and the private upload
+    # staging of ADR-008 "Image input security" are not built yet, so do not turn this on for a caller you do not trust.
+    enabled: ${LISTING_GUARD_IMAGE_ENABLED:false}
+    # The ruleset of each marketplace, registered as pack `image-compliance` (ADR-010). The shipped rulesets keep every marketplace
+    # threshold null until the maintainer has reviewed the official pages, so a check against them is always INCOMPLETE.
+    rulesets:
+      ETSY: classpath:rulesets/etsy-image-2026-11.yaml
+      AMAZON: classpath:rulesets/amazon-image-2026-11.yaml
+    # Operational limits of this deployment, not marketplace rules (those are in the rulesets).
+    default-profile: default
+    max-images: 20
+    max-file-size: 10MB
+    max-request-size: 60MB
+    retention:
+      # How long an image check, its hashes and its evidence are kept (ADR-008). The images themselves are never stored. An
+      # operational proposal, not a guarantee. GET and the cache lookup treat a row past this as absent whether or not the cleanup
+      # has run.
+      period: 30d
+      # The scheduled cleanup runs in every API instance and shares the retention advisory lock with the trademark, variation and
+      # personalization cleanups, so one batch of any of them runs at a time; a skipped run is tried again at the next interval.
+      cleanup-enabled: true
+      cleanup-interval: 1h
+      cleanup-initial-delay: 4m
+      cleanup-batch-size: 500
   batch:
     # The batch-check job (docs/batch-check.md): mappings, inputs and reports; the reports go to <dir>/out by default.
     dir: ${BATCH_DIR:batch}
@@ -166,6 +191,12 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  servlet:
+    multipart:
+      # The upload limits of the image checks (ADR-008), taken from listing-guard.image so that there is one place to change them.
+      # They hold for every multipart request, and the API has no other multipart endpoint.
+      max-file-size: ${listing-guard.image.max-file-size:10MB}
+      max-request-size: ${listing-guard.image.max-request-size:60MB}
   http:
     converters:
       # ADR-020: Spring Boot 4 serializes request and response bodies with Jackson 3 (tools.jackson) when it is on the classpath,

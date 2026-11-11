@@ -595,6 +595,46 @@ ruleset is never edited, a change is a new file and a new version. **Its print p
 The trademark half of a screening uses the catalog named by `listing-guard.trademark.catalog-version`; without one the character
 rules still run and the result is `INCOMPLETE` (never reused, never charged), and `/trademark-checks` keeps answering 503.
 
+## Image check results, their retention and the plan pack (ADR-008)
+
+**Image checks are off by default and are not ready to be turned on for a caller you do not trust.** `POST /api/v1/image-checks`
+answers `503 image-checks-not-configured` until `listing-guard.image.enabled=true` (`LISTING_GUARD_IMAGE_ENABLED=true`). What
+ADR-008 "Image input security" asks for **does not exist yet**: the process-wide bounded decode service (a semaphore, a memory
+budget and a bounded executor, `503` with `Retry-After` when it is full), the private, size-limited staging directory for uploads
+with its start-up cleanup, and the stuck-decoder health check. Until they are built, one client can make the server decode
+several large images at once, and uploads are staged where Spring puts them by default (the system temporary directory). What
+this change does bound: the number of images (`listing-guard.image.max-images`, 20), one image (`max-file-size`, 10 MB), the
+whole request (`max-request-size`, 60 MB; the body limit of this one endpoint, the others keep 256 KB) and, in the checker, the
+decoded pixels of one image (`limits.max_decoded_pixels` of the ruleset) before any pixel is allocated. With the endpoint off
+the large body limit does not apply either, so a large upload is refused as for any other endpoint.
+
+**The shipped rulesets have no marketplace threshold.** `etsy-image-2026-11` and `amazon-image-2026-11` keep every number null until
+the maintainer has saved and reviewed the official pages (the procedure is in ADR-008, "Rules and evidence"); a check against them
+is `INCOMPLETE`, so nothing is reused and no unit is charged, even with plans on. A new ruleset version with reviewed numbers is
+what turns the endpoint into one that gives complete results; point `listing-guard.image.rulesets.<MARKETPLACE>` at it.
+
+Two migrations, both additive. **V29** replaces the `CHECK` of `plan_pack` (V19, V22 and V24 are not edited) so that it keeps every
+pack V24 accepted and also accepts `image-checks`, and gives the pack to `SELLER` and `PRO`; a row an operator already removed is
+not put back, and a missing plan row does not stop the migration. **V30** creates `image_check`, `image_check_item` and
+`image_check_finding`. Neither touches an existing row, both apply on any database, and nothing changes for a deployment while
+`listing-guard.plans.enabled` is false. To give or take the pack away from a plan by hand:
+`INSERT INTO plan_pack (plan_code, pack_id) VALUES ('FREE', 'image-checks')` or the matching `DELETE`. Rolling back is
+`DROP TABLE image_check_finding, image_check_item, image_check;` and, after every instance runs a version without the pack,
+restoring the previous `CHECK` (V29 does not undo itself). The plan pack is `image-checks`; the ruleset behind it is registered
+under the analysis pack `image-compliance` (ADR-010), so the two names differ on purpose.
+
+**The images are never stored, nor their file names.** A result holds a hash of the request, one SHA-256 and the decoder's
+metadata per image (format, width, height, orientation, alpha, ICC profile) and the findings with their evidence (a measured
+value such as `count=6`). Results are kept for `listing-guard.image.retention.period` (30 days by default;
+`LISTING_GUARD_IMAGE_RETENTION_PERIOD=30d`) and `GET` and the cache treat a result past it as absent even if nothing has deleted
+it. The cleanup has the same settings as the others (`listing-guard.image.retention.cleanup-enabled`, `cleanup-interval` 1h,
+`cleanup-initial-delay` 4m, `cleanup-batch-size` 500) and takes the **same advisory lock**, so one batch of any of the four runs at
+a time and a skipped run is tried again at the next interval; it runs whether or not the endpoint is enabled, so rows stored before
+it was switched off still expire.
+
+The rulesets are registered at start-up for `ETSY` and `AMAZON` whether or not the endpoint is enabled. The API refuses to start if
+a version is already registered with other content: a published ruleset is never edited, a change is a new file and a new version.
+
 ## Weekly health report (ADR-018)
 
 The listing health report adds up the results a client has stored: `GET /api/v1/reports/summary` for the client of an API key, the
@@ -682,7 +722,7 @@ UPDATE plan SET monthly_quota = 2000 WHERE code = 'SELLER';      -- NULL means u
 ```
 
 A change applies at once to every client on that plan and keeps this month's `used`. The codes (`FREE`, `SELLER`, `PRO`
-and the seven pack ids, `variation-checks` since V22 and `personalization-screening` since V24) are fixed by `CHECK` constraints and the Java enums, so a new plan or pack
+and the eight pack ids, `variation-checks` since V22, `personalization-screening` since V24 and `image-checks` since V29) are fixed by `CHECK` constraints and the Java enums, so a new plan or pack
 needs a migration.
 `policy-analyzer` and `sheet-connector` are in the seed but **nothing enforces them yet** (ADR-011 PR 5 and phase 4b).
 

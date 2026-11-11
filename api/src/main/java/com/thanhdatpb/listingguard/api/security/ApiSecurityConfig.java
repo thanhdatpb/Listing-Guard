@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thanhdatpb.listingguard.api.client.ApiKeyRepository;
 import com.thanhdatpb.listingguard.api.client.ClientProvisioning;
 import com.thanhdatpb.listingguard.api.console.ConsoleProperties;
+import com.thanhdatpb.listingguard.api.image.ImageProperties;
 import com.thanhdatpb.listingguard.api.web.BodyLimitFilter;
 import com.thanhdatpb.listingguard.api.web.RequestIdFilter;
 import jakarta.servlet.Filter;
@@ -68,8 +69,14 @@ public class ApiSecurityConfig {
     }
 
     @Bean
-    public FilterRegistrationBean<BodyLimitFilter> bodyLimitFilter(ApiProperties properties, ObjectMapper mapper) {
-        return register(new BodyLimitFilter(properties.maxBodyBytes(), mapper), Ordered.HIGHEST_PRECEDENCE + 10);
+    public FilterRegistrationBean<BodyLimitFilter> bodyLimitFilter(ApiProperties properties, ImageProperties images,
+                                                                   ObjectMapper mapper) {
+        // the image endpoint takes a multipart body of its own, larger limit, but only while image checks are enabled: when
+        // they are off a large upload gets the ordinary 413 and is never staged (ADR-008)
+        BodyLimitFilter filter = images.enabled()
+                ? new BodyLimitFilter(properties.maxBodyBytes(), mapper, "/api/v1/image-checks", images.maxRequestSize().toBytes())
+                : new BodyLimitFilter(properties.maxBodyBytes(), mapper);
+        return register(filter, Ordered.HIGHEST_PRECEDENCE + 10);
     }
 
     @Bean

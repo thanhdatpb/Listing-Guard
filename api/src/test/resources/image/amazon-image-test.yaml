@@ -1,0 +1,60 @@
+# TEST ONLY. Every number below is invented so that the tests can reach a COMPLETE result; none is a marketplace threshold and
+# this file must never be copied into a shipped ruleset (ADR-008: no remembered or inferred marketplace limit in a ruleset).
+pack_id: image-compliance
+version: amazon-image-test-1
+marketplace: AMAZON
+checked_at: 2026-11-11
+disclaimer: Test disclaimer - reference warning only, not a statement of the marketplace.
+supported_formats: [JPEG, PNG]
+limits:
+  max_encoded_bytes: 25000000
+  max_decoded_pixels: 40000000
+profiles:
+  default:
+    image_count: {min: 1, max: 5}
+    width: {min: 100, max: 4000}
+    height: {min: 100, max: 4000}
+    aspect_ratio: {min: 0.5, max: 2.0}
+    main_background: {edge_rgb_tolerance: 10, min_white_ratio: 0.9}
+    occupancy: {min_ratio: 0.1, white_rgb_tolerance: 10}
+    blur: {min_laplacian_variance: 5}
+  wide:
+    image_count: {min: 1, max: 5}
+    width: {min: 100, max: 4000}
+    height: {min: 100, max: 4000}
+    aspect_ratio: {min: 0.5, max: 3.0}
+    main_background: {edge_rgb_tolerance: 10, min_white_ratio: 0.9}
+    occupancy: {min_ratio: 0.1, white_rgb_tolerance: 10}
+    blur: {min_laplacian_variance: 5}
+rules:
+  image_count:
+    severity: WARNING
+    message: Test - the number of images is outside the test range.
+    source: {status: unverified, urls: ["https://example.com/test"], note: invented test value}
+  image_dimensions:
+    severity: WARNING
+    message: Test - an image dimension is outside the test range.
+    source: {status: unverified, urls: ["https://example.com/test"], note: invented test value}
+  aspect_ratio:
+    severity: WARNING
+    message: Test - the aspect ratio is outside the test range.
+    source: {status: unverified, urls: ["https://example.com/test"], note: invented test value}
+  main_background:
+    severity: WARNING
+    message: Test - the main image border is not white enough.
+    source: {status: unverified, urls: ["https://example.com/test"], note: invented test value}
+  occupancy:
+    severity: WARNING
+    message: Test - the product fills too little of the frame.
+    source: {status: unverified, urls: ["https://example.com/test"], note: invented test value}
+  blur:
+    severity: INFO
+    message: Test - the image looks blurry.
+    source: {status: unverified, urls: ["https://example.com/test"], note: invented test value}
+  customer_content:
+    severity: WARNING
+    message: Test - a customer-supplied image may contain a third-party mark; check it by hand.
+    source: {status: unverified, urls: ["https://example.com/test"], note: caller-declared source}
+summary:
+  by_severity: {ERROR: BLOCK, WARNING: REVIEW, INFO: REVIEW, NONE: READY}
+  incomplete: INCOMPLETE

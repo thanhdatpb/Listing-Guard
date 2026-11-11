@@ -66,7 +66,9 @@ class CapabilitiesReadyPlansFixesIntegrationTest {
         assertThat(body.at("/trademarkCatalog/demo").asBoolean()).isFalse();
         assertThat(body.at("/plans/enforced").asBoolean()).isTrue();
         assertThat(body.at("/fixes/enabled").asBoolean()).isTrue();
-        body.get("packs").forEach(p -> assertThat(p.get("available").asBoolean()).as(p.get("id").asText()).isTrue());
+        // every pack is available once the catalog is READY, but image checks are a pack of their own that is off by default
+        body.get("packs").forEach(p -> assertThat(p.get("available").asBoolean()).as(p.get("id").asText())
+                .isEqualTo(!p.get("id").asText().equals("image-checks")));
         assertThat(raw).doesNotContain(TrademarkReadyTestConfig.catalogVersion());
     }
 

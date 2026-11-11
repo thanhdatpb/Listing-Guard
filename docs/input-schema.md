@@ -315,6 +315,58 @@ An order with a name and a number:
 }
 ```
 
+## Image checks
+
+The request of `POST /api/v1/image-checks` (pack `image-checks`, [ADR-008](adr/ADR-008-image-compliance-checker.md)): the
+images of one listing. It is **not** the `{"marketplace": ..., "listing": {...}}` envelope and it is **not JSON**: it is
+`multipart/form-data`, because an image is binary. Images are only ever sent as parts of the request; the service never
+fetches an image from a URL and never reads one from a path. The input of `/checks` is not changed, and an image is never
+part of a listing.
+
+The request has two kinds of part:
+
+| Part | Content type | Notes |
+|---|---|---|
+| `metadata` | a plain form field, or `application/json` | One JSON object, described below. Required. |
+| `images` | the image file (any content type) | One part per image, **in the same order** as `metadata.images`. JPEG or PNG; the format is read from the bytes, never from the file name or the content type. The file name is ignored and never stored. At least one, at most the deployment's limit (20 by default; more is `400 too-many-images`). One image larger than the deployment's file limit (10 MB by default) or a request larger than its request limit (60 MB) is `413 payload-too-large`. |
+
+The `metadata` object is read strictly: an unknown member, a missing `role` or a value that is not one of the declared names is
+a `400 invalid-request`, never a guess.
+
+| Field | Type | Notes |
+|---|---|---|
+| `marketplace` | string | `ETSY` or `AMAZON`, case-insensitive. Required. |
+| `profile` | string | Optional. A profile declared in the marketplace's image ruleset; absent means the deployment's default profile (`default`). A name the ruleset does not declare is `400 unknown-image-profile`, never replaced by the default. |
+| `images` | array of objects | Required, one entry per `images` part, in the same order; a different number is a `400`. |
+
+Each entry of `images` has these fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| `role` | string | `MAIN` or `ADDITIONAL`. Required: the checker does not guess which image is the main one. |
+| `source` | string | Optional: `SELLER`, `CUSTOMER_CONTENT` or `UNKNOWN`; absent means `UNKNOWN`. It is only your declaration about where the image came from; nothing can verify it. A `CUSTOMER_CONTENT` image gets a warning to check it by hand for third-party logos or marks. |
+
+The role, the source, the profile, the marketplace and the bytes of every image, in order, make up the cache identity: changing
+any of them is a new check, while an omitted `source` and an explicit `UNKNOWN` are the same input.
+
+The thresholds (sizes, aspect ratio, number of images, background, occupancy, sharpness) are in the versioned rulesets
+`etsy-image-2026-11` and `amazon-image-2026-11` and are not repeated here. **Today they have none**: every marketplace
+threshold is empty until the maintainer has reviewed the official pages, so a check against them is `INCOMPLETE` and says which
+checks could not run (see the [integration guide](integration-guide.md#image-checks)).
+
+The `metadata` of two images, the first the main one:
+
+```json image-metadata
+{
+  "marketplace": "AMAZON",
+  "profile": "default",
+  "images": [
+    {"role": "MAIN", "source": "SELLER"},
+    {"role": "ADDITIONAL"}
+  ]
+}
+```
+
 ## Trademark checks
 
 `POST /api/v1/trademark-checks` takes the same `marketplace` and `listing` as `POST /api/v1/checks` (the listing in the
@@ -332,7 +384,8 @@ and the finding says so. See [the integration guide](integration-guide.md#tradem
 
 The two listing examples above are read out of this file by a test and run through the normalizers (the Amazon example
 includes the `customization` block, and every field of the tables of [Amazon customization](#amazon-customization) is held to
-it), and so are the two variation examples (through the variation normalizer and the rules) and the personalization example
-(through its normalizer and rules), so this page cannot drift from the code without the build failing. The machine-readable
+it), and so are the two variation examples (through the variation normalizer and the rules), the personalization example
+(through its normalizer and rules) and the image `metadata` example (through its strict reader, with its field tables held to
+the reader's members), so this page cannot drift from the code without the build failing. The machine-readable
 description of the request and response is
 [`docs/api/openapi.json`](api/openapi.json); how to call the API is in the [integration guide](integration-guide.md).
