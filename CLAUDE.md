@@ -24,7 +24,7 @@ It never edits a listing, never publishes, and does no SEO.
   (`listing-guard.analyzer.enabled=false`), whose first adapter is OpenAI-compatible; the build and every test
   never need a key. Nothing here is needed to run the rule checks.
 - **Trademark scanner** (`trademark-scanner/`, ADR-009, PR A1): the Java-only core of the trademark pack. Versioned
-  ruleset `rulesets/trademark-risk-2026-11.yaml` (every threshold, word list, risk level and Vietnamese message; every
+  ruleset `rulesets/trademark-risk-2026-11b.yaml` (every threshold, word list, risk level and Vietnamese message; every
   `source.status` must be `unverified`), canonical input hash, normalization with offsets, the `TrademarkCatalog` port
   with `InMemoryTrademarkCatalog`, exact/phrase/fuzzy matching (final score: optimal string alignment, `osa-similarity-1`),
   the three color and place context rules, risk aggregation with `INCOMPLETE`/`UNKNOWN`, and `AnalysisFingerprint`.
@@ -44,7 +44,18 @@ It never edits a listing, never publishes, and does no SEO.
   in `catalogs/raw/` to `jsonl-1` and writes a `.report.json` of the counts; the status map
   `uspto-status-map-2026-11.yaml` has `source.status: unverified`. **The converter is unverified against real data**: it
   follows the public DTD and documentation named in ADR-009 and has never read a real file. The next steps are PR A2c
-  (the latest transaction of a serial number wins) and A4 (evaluation).
+  (the latest transaction of a serial number wins) and A4 (evaluation). **Product classes, source links and generic words
+  (A5, done)**: the API serves ruleset `trademark-risk-2026-11b` (`2026-11` is kept unchanged, a test pins its hash), which
+  adds three optional sections, all `unverified`: `product_classes` (the request may carry a top-level `product_type`, a key
+  of `types`; a mark with Nice classes, none the product type's, drops `out_of_class_downgrade_levels`, a mark with none is not
+  lowered, a type the ruleset does not declare is `400 unknown-product-type` and the scanner throws
+  `UnknownProductTypeException`, never ignored), `generic_words` (**empty in the shipped file until the maintainer reviews each
+  word**; context is only an exact or phrase match in `brand` or `shop_name`, else capped at `LOW`; the catalog's `common_word`
+  flag is still not read; never list a famous brand that is also a common noun) and `source_links` (`uspto:<8 digits>` gets a TSDR
+  URL from a YAML template, never from Java; the address is unverified). A lowered finding carries `riskAdjustments`
+  (`reason`, `from` = the rule's original level, `to`, `note`) and the finding's `risk` is the lowest `to`; links and adjustments
+  are stored (V28, JSONB) with `trademark_check.product_type`. Input hash `trademark-input/v2`, `matcher-2`. Personalization is
+  unchanged (`TrademarkRulesetUnchangedTest`). The MCP `check_trademark` tool takes no `product_type` yet.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`, `FixSuggestion`). No Spring.
 - **Image checker core** (`image-checker/`, ADR-008, Proposed): Java-only ImageIO module, independent image input and canonical byte/metadata hash, immutable Amazon/Etsy `image-compliance` rulesets, runtime-aware analysis fingerprint, EXIF orientation, embedded ICC-to-sRGB conversion, alpha compositing on white, dimensions/aspect ratio, image count, Amazon main-image edge whiteness, occupancy and Laplacian variance. No Spring, database, HTTP or original-image persistence. Both shipped marketplace rulesets keep policy thresholds null until the maintainer reviews saved official sources; affected checks return `INCOMPLETE`. Every shipped source is `unverified`, and findings are only WARNING/INFO. The CUSTOMER_CONTENT rule reads the caller-declared source only; there is no text/logo/watermark detection.
 - **Variation checks** (`variation-checks/`, ADR-015, Proposed; implemented): pure Java (no Spring, database or HTTP) checks
@@ -70,7 +81,9 @@ It never edits a listing, never publishes, and does no SEO.
   `allow_lowercase`, severities and every Vietnamese message are keys; a test pins its hash). Three character rules
   (`unsupported_characters`, `too_long`, `whitespace_issue`) plus the **trademark scanner run on each value as
   `personalization[i]`** (the adapter hands the values over as the items of `tags`, renames the field back and shifts the
-  offsets; `trademark-scanner` and its ruleset are untouched and a test holds that the shipped one scans `tags`). **Every
+  offsets; this PR left `trademark-scanner` and its ruleset untouched and a test holds that the shipped one scans `tags`; A5
+  later added product classes and generic words there, which this pack never uses, and `TrademarkRulesetUnchangedTest` holds
+  that a screening is the same on `2026-11` and `2026-11b`). **Every
   source is `unverified` and the loader refuses any other, so no finding is ERROR; the shipped profiles `latin_basic` (default)
   and `latin_extended` are placeholders with invented numbers, not the real workshop's.** The normalizer does **not trim the
   buyer's text** (spaces are what `whitespace_issue` reports; NFC only). A catalog that is DISABLED or REFUSED is **not a 503**

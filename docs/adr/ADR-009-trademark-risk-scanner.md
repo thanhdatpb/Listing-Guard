@@ -226,7 +226,8 @@ that the Decision above leaves open:
   they are also reported as failed when a catalog rule failed: a color description is never called free of trademark
   references when the lookup failed. Overall risk is the highest finding level; an incomplete scan keeps it only if
   it is MEDIUM or HIGH, otherwise it is `UNKNOWN`.
-- **Input hash.** SHA-256 over `listing-guard/trademark-input/v1` and the fields in this order: title, tags,
+- **Input hash.** (A1 wrote `v1`; since "Product classes, source links and generic words" it is `v2`, with the product type as a
+  last field.) SHA-256 over `listing-guard/trademark-input/v1` and the fields in this order: title, tags,
   bullet points, description, brand, shop name, search terms, category. Tags and bullet points keep the order the
   caller sent; each field is `name:byteLength:text` after NFC and `strip`, and each list is followed by a line
   `name:count` (`tags:2`, `bullet_points:5`) so the serialization says where it ends. A blank tag or bullet point
@@ -564,6 +565,99 @@ column (200, 500 and 200 characters). The counts `records_read`, `records_filter
   either. They prove the application does not hold the file; the database still needs space for the staging table and
   the merge.
 
+## Product classes, source links and generic words (ruleset `trademark-risk-2026-11b`)
+
+This PR changes what a trademark result can say; it does not change the catalog, the import, `jsonl-1` or `/checks`. The
+ruleset `trademark-risk-2026-11` is kept byte for byte (a test pins its hash); `trademark-risk-2026-11b` copies it and adds
+three **optional** sections, so the strict loader still reads the old file (an absent section is "off"). Every new block has
+`source.status: unverified` and the loader refuses anything else. The API serves `2026-11b`
+(`listing-guard.trademark.ruleset`); no migration touches the ruleset registry, the new version registers itself at start-up
+for ETSY and AMAZON. The normalization section is unchanged, so a catalog imported with `2026-11` is still served.
+
+**Product classes (`product_classes`).**
+
+- The request of `POST /api/v1/trademark-checks` gets an optional top-level `product_type` (a request DTO of its own,
+  `TrademarkCheckRequest`; `/checks` ignores the field, so one JSON still goes to both). It is a key of
+  `product_classes.types`, written exactly: `apparel` 25, `mug` 21, `poster` 16, `sticker` 16, `phone_case` 9, `jewelry` 14,
+  `bag` 18, `furniture_decor` 20, `fabric` 24, `toy` 28. The table is the maintainer's; **nobody has checked it against the Nice
+  classification**, so it is `unverified`.
+- A catalog match (exact, phrase or fuzzy) whose mark has Nice classes, none of them in the product type's list, drops by
+  `out_of_class_downgrade_levels` (1, a ruleset key; HIGH to MEDIUM to LOW, never below LOW). A mark with no Nice class is never
+  lowered. Without a product type the behavior is the old one, and the context rules (place + sport, pure color) are never lowered
+  because they have no mark. A match inside a color phrase is lowered like any other.
+- **A product type the ruleset does not declare is a `400 unknown-product-type`** (with `known`), raised after the plan check and
+  before the cache, the quota and the catalog, and the scanner itself throws `UnknownProductTypeException` instead of scanning
+  without it. Silently ignoring it would answer a question the client did not ask. A ruleset with no `product_classes` declares no
+  type, so every type is refused by it. Keys are exact (`Apparel` is unknown); a blank value is none.
+- **Nothing hides the original level.** A lowered finding carries `riskAdjustments`: for each reason, `reason`
+  (`outside_product_classes`, `common_word`), `from` (the level the rule assigned), `to` (the level that reason alone gives) and a
+  Vietnamese `note` that is also appended to the finding's `message`. Each reason is computed from the rule's level, never from
+  the other reason's result, so the order of the checks changes nothing, and the finding's `risk` is the lowest `to`. An entry
+  exists only when it lowers the level.
+
+**Generic words (`generic_words`).**
+
+- A list of catalog marks that are also ordinary words (normalized like a catalog mark, phrases allowed). A match of such a mark
+  keeps its level only when it is an **exact or phrase match in one of `context_fields`** (`brand`, `shop_name`: the word stands
+  as the product's own brand); in any other field, and for every fuzzy match, the level is at most `max_risk_without_context`
+  (`LOW`) and `riskAdjustments` carries `common_word` with the original level. The context definition is the maintainer's choice:
+  brand fields only, no cue words.
+- **The shipped list is empty on purpose.** The code and the tests exist, the ruleset changes nothing until the maintainer has
+  reviewed each word. No list is proposed here. The catalog's own `common_word` flag (jsonl-1, `CatalogMark.commonWord`) is
+  **still not read**: a catalog import must not be able to lower a risk, only this hash-pinned ruleset can. Tests use a synthetic
+  list.
+- **What must not be listed:** a word whose catalog mark is a famous brand that is also used as a common noun. Capping such a mark
+  would hide exactly the finding the check exists for. The maintainer decides each word, with the real catalog in front of them.
+- Consequence for the personalization pack (ADR-016): it hands the scanner buyer text as `tags` and names no brand field, so once
+  a word is listed, a buyer who types it gets a capped hit there too. A test pins this; whether that is wanted is an open question
+  below.
+
+**Source links (`source_links`).**
+
+- A finding's evidence gets `sourceLinks`: `{sourceId, label, url}` for each source id the ruleset has a template for. A stored id
+  is `<source_key>:<id>` (the `sources:` form of the manifest); `source_links.sources[]` lists the `source_key` it applies to
+  (`uspto`), a `label`, an `id_pattern` (the whole id must match: eight digits) and a `url_template` with one `{id}`. The URL is
+  **never in Java**. The loader refuses a template that is not `https`, has no or two `{id}`, another brace, whitespace, or a host
+  that is not plain; at run time an id must also be only letters, digits, `.`, `_`, `-` (at most 64), so no catalog content can add a
+  path, a query or a fragment to the address. An id with no key (the one-file form), another key or a wrong shape gets no link.
+- The template is `https://tsdr.uspto.gov/#caseNumber={id}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch`.
+  **It is `unverified`.** No official USPTO page that describes the address could be read. A web search showed this pattern in
+  a USPTO petition-decisions PDF (`https://www.uspto.gov/sites/default/files/documents/Petition-decisions-May-2022.pdf`, which
+  answered 404 when fetched, so it was not read) and, with `caseType=SERIAL_NO&searchType=statusSearch` instead, in third-party
+  exports. The maintainer should open one link of a real serial number before relying on it and, if it differs, publish a
+  `2026-11c`. No page was fetched around a block.
+- The links are stored with the finding (`source_links`, JSONB) so a result read with GET shows what was shown when it was made,
+  whatever ruleset is active later.
+
+**Identity and storage.**
+
+- The canonical input gains the product type as its last field and the hash format becomes
+  `listing-guard/trademark-input/v2`; the matcher version becomes `matcher-2` (product classes, generic words, source links; the
+  rules of `matcher-1` are unchanged). Both are in the analysis fingerprint (ADR-010), as is the ruleset hash, so no result stored
+  before is ever returned: the cache identity is `(client, marketplace, pack, input hash, ruleset version, analysis version)` and every
+  part of it differs. The personalization pack's fingerprint includes the scanner's, so its cached results are recomputed once too.
+- **V28** adds `trademark_check.product_type` (`VARCHAR(32)`, a `CHECK` on the key shape) and `trademark_check_finding.risk_adjustments`
+  and `source_links` (`JSONB NOT NULL DEFAULT '[]'`, `CHECK` that each is an array). A constant default is a catalog-only change in
+  PostgreSQL 16, and rows written before read as no product type, no adjustment, no link. The product type is a key of a closed
+  list, not free text; neither JSON holds listing text, and both go with the finding at the retention boundary.
+- `riskLevel` is still the highest finding level, so a lowered finding can lower the result's level; the original level is in
+  `riskAdjustments`, the disclaimer is unchanged.
+
+**Personalization (ADR-016).** The adapter passes no product type and names no brand field, and the shipped list is empty, so a
+screening is exactly what it was on `2026-11`; a test runs the same orders through a scanner on each ruleset and compares the
+whole result except the trademark ruleset version.
+
+**Not done here.** The MCP server's `check_trademark` tool does not take `product_type` yet (a change of its schema, ADR-017); the
+console editor and `batch-check` send none. The USPTO converter and `jsonl-1` are untouched.
+
+**Open questions for the maintainer** (they do not block this PR): (1) the word list and, for each word, what the real catalog holds
+for it; (2) cue words next to a match as a second kind of context (for example a word that points at the seller's own brand), to be
+considered after the evaluation (PR A4), because the list would be another invented lexicon; (3) whether a catalog `common_word`
+flag may ever count; (4) whether buyer text in the personalization pack should be capped by a generic word at all; (5) whether the
+Nice classes per product type are right, and whether a product type needs more than one (a mug sold with a printed design may also
+touch class 16 or 25); (6) the TSDR address (above); (7) whether `product_type` should come from the listing itself where the
+marketplace has a field for it.
+
 ## Offline data and source governance
 
 The importer accepts only local files and is a one-shot administrative job. It validates the
@@ -643,6 +737,7 @@ ruleset that an earlier PR did not already contain.
 | A2c | The latest transaction of a serial number wins: the catalog needs the status date or transaction date of a record (or an upsert by `source_id` at import), so that a daily file's older record does not hide a newer one; see "Known limits" of PR A2b. `jsonl-1` does not change in A2b. | A2b |
 | A3 | `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}`, result tables, cache identity, retention and cleanup, OpenAPI and integration guide (done; see "Endpoint (PR A3)"). | A2 |
 | A4 | Synthetic tuning and held-out datasets, the evaluation run and its gate. | A2 (may run in parallel with A3) |
+| A5 | Product types with Nice classes, `sourceLinks` and generic words in ruleset `trademark-risk-2026-11b`, V28; see "Product classes, source links and generic words" (done). | A3 |
 
 Acceptance criteria below are met by the PR that owns the code they test: Unicode, homoglyph/leet,
 boundaries, matching, context rules, aggregation, incomplete results, input hash, evidence spans and the

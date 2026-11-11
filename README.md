@@ -13,8 +13,10 @@ edit or publish anything, and it does not do SEO.
   severities are configured in versioned YAML per marketplace; Amazon rulesets support product-type overrides.
 - **Trademark risk** (`POST /api/v1/trademark-checks`): matches the text of a listing against an offline, versioned
   catalog of marks that you load yourself (exact, phrase and fuzzy matching, plus color and place context rules).
-  Every finding carries explainable evidence (field, span, matched mark, match type, score, source ids) and every
-  result carries a disclaimer: it is a reference warning, not a legal conclusion.
+  Every finding carries explainable evidence (field, span, matched mark, match type, score, source ids, a TSDR link for a
+  USPTO source) and every result carries a disclaimer: it is a reference warning, not a legal conclusion. An optional
+  `product_type` lowers, by one level, a mark whose Nice classes are not the product's, and says why with the original level
+  (the product types and their classes are `unverified`).
 - **Variation checks** (`POST /api/v1/variation-checks`): checks the parent/child structure of a listing with variations
   (Amazon: the parent, its theme and the attributes of its children, apparel size attributes; Etsy: the variation types)
   and repeated combinations and SKUs, in a request of its own. It is built on secondary sources and internal heuristics
@@ -638,7 +640,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
 - [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Proposed; Java core implemented, API/storage remain)
-- [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3 and A2b are implemented; the USPTO converter is unverified against real data)
+- [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3, A2b and A5 (product classes, source links, generic words) are implemented; the USPTO converter is unverified against real data)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
 - [ADR-012: Embeddings default to an external API](docs/adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)
