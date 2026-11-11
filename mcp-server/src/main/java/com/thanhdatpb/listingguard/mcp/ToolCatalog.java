@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The six tools (ADR-017). The list is closed: there is no tool that edits a listing, applies a fix, publishes or writes
+ * The seven tools (ADR-017). The list is closed: there is no tool that edits a listing, applies a fix, publishes or writes
  * anywhere, and none takes a URL or a path. The marketplace is a plain string, not an enum: the API is the only place
  * that knows which marketplaces exist and answers {@code 400 unknown-marketplace} for the others.
  */
@@ -19,6 +19,7 @@ final class ToolCatalog {
     static final String SCREEN_PERSONALIZATION = "screen_personalization";
     static final String GET_LIMITS = "get_limits";
     static final String GET_USAGE = "get_usage";
+    static final String GET_CAPABILITIES = "get_capabilities";
 
     private static final String MARKETPLACE = """
             "marketplace": {"type": "string",
@@ -118,7 +119,15 @@ final class ToolCatalog {
                 new ToolSpec(GET_USAGE, "Read plan and usage",
                         "Read the calling client's plan, packs, monthly quota, usage and reset time. Read only, not "
                                 + "counted against the quota. Use it before a large run.",
-                        Endpoint.USAGE, true, schema(mapper, NO_ARGUMENTS_SCHEMA)));
+                        Endpoint.USAGE, true, schema(mapper, NO_ARGUMENTS_SCHEMA)),
+                new ToolSpec(GET_CAPABILITIES, "Read what the deployment serves",
+                        "Read what this Listing Guard deployment serves: its packs with the ruleset version per "
+                                + "marketplace, the state of the trademark catalog (READY, DISABLED or REFUSED, and "
+                                + "whether it is the DEMO catalog), whether plans and fixes are on. It is the same for "
+                                + "every client and says nothing about this client's plan: use get_usage for that. A "
+                                + "catalog that is not READY means trademark risk is unknown, not low. Read only, not "
+                                + "counted against the quota. Use it before a run to know which checks can answer.",
+                        Endpoint.CAPABILITIES, true, schema(mapper, NO_ARGUMENTS_SCHEMA)));
     }
 
     List<ToolSpec> tools() {

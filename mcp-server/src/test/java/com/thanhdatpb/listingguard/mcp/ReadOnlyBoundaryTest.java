@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * What the module can never do (ADR-017), checked on its own sources and POM: it only reads and checks, reaches exactly six
+ * What the module can never do (ADR-017), checked on its own sources and POM: it only reads and checks, reaches exactly seven
  * API paths with GET and POST, and has no database and no internal service behind it.
  */
 class ReadOnlyBoundaryTest {
@@ -28,7 +28,7 @@ class ReadOnlyBoundaryTest {
     }
 
     @Test
-    void theClientCanOnlyIssueGetAndPostToTheSixApiPaths() {
+    void theClientCanOnlyIssueGetAndPostToTheSevenApiPaths() {
         assertThat(Arrays.stream(Endpoint.values()).map(Endpoint::method).collect(Collectors.toSet()))
                 .isSubsetOf("GET", "POST");
         assertThat(Arrays.stream(Endpoint.values()).map(Endpoint::path)).containsExactlyInAnyOrder(
@@ -37,7 +37,8 @@ class ReadOnlyBoundaryTest {
                 "/api/v1/variation-checks",
                 "/api/v1/personalization-screenings",
                 "/api/v1/rulesets/{marketplace}/limits",
-                "/api/v1/usage");
+                "/api/v1/usage",
+                "/api/v1/capabilities");
     }
 
     @Test

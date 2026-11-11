@@ -1,6 +1,6 @@
-﻿# Unreleased changes
+# Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate and one OpenAPI schema fix below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. Etsy, hashes and API request and response shapes are unchanged (`docs/api/openapi.json` differs in an example's version string and in the schema of the trademark check's findings, see the last section below); there is no migration.
+Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate, the capabilities endpoint with its MCP tool and one OpenAPI schema fix below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. Etsy, hashes and the request and response shapes of every existing endpoint are unchanged (`docs/api/openapi.json` differs in an example's version string and in the schema of the trademark check's findings, see the last section below, and gains `GET /api/v1/capabilities`); there is no migration.
 
 ## What is new
 
@@ -11,6 +11,12 @@ A new rule for the Amazon description: more than 2000 characters (code points) i
 ### `batch-check --split-output`: a review gate
 
 `--split-output` makes the job also write `passed.csv` and `held.csv`: the rows of your input file with the same columns, order, delimiter and encoding and unchanged cells, sorted by whether they need a person. `held.csv` adds `hold_reasons` (`ruleId/ERROR`, `trademark/HIGH`, ...). A row is held for an `ERROR` finding of the rule check, for a trademark result at or above `--hold-trademark-risk` (`HIGH` by default, `MEDIUM`, or `NONE`) and whenever it could not be checked (unreadable, failed, quota, `UNKNOWN` trademark): such a row is never passed. **The trademark hold is the choice of the person who runs the batch, not a legal conclusion**, and a passed row is not a listing a marketplace has accepted. Nothing is edited and no fix is applied. Without the flag the output is exactly what it was. See [batch-check](../batch-check.md#review-gate-passedcsv-and-heldcsv---split-output).
+
+### `GET /api/v1/capabilities` and the MCP tool `get_capabilities`
+
+A new read-only endpoint says what the deployment serves, the same for every client: the packs it serves over HTTP (`listing-rules`, `personalization-screening`, `trademark-risk`, `variation-checks`) each with `available` and the ruleset version per marketplace, the state of the trademark catalog (`READY`, `DISABLED` or `REFUSED`, and `demo` when it is the DEMO catalog), whether plans are on (`plans.enforced`) and whether `POST /api/v1/checks` returns fix suggestions (`fixes.enabled`). It needs an API key, costs no unit, needs no plan pack and carries an `ETag` (five minutes, private). It shows no catalog name, no setting that is a secret and nothing about a client: the client's own plan and quota stay in `GET /api/v1/usage`. While the catalog is not `READY`, `trademark-risk` is `available: false` and a trademark risk is unknown, never low. No existing endpoint, request, response or `analysisVersion` changes, and there is no migration. `docs/api/openapi.json` gains the new path and its schemas.
+
+The MCP server has a seventh tool, `get_capabilities`, read-only and without arguments, that calls it and returns the answer verbatim like the other tools. Authentication on the optional HTTP transport is still an open question of [ADR-017](../adr/ADR-017-mcp-server.md) and is not changed. See [the integration guide](../integration-guide.md#capabilities) and [docs/mcp.md](../mcp.md).
 
 ### OpenAPI: the findings of a trademark check have their own schema
 

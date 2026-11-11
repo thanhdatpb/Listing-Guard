@@ -633,6 +633,21 @@ public final class ApiExamples {
             }
             """;
 
+    /** The answer of a default deployment: no trademark catalog, plans off, fixes off. */
+    public static final String CAPABILITIES = """
+            {
+              "packs": [
+                {"id": "listing-rules", "available": true, "rulesetVersions": {"AMAZON": "amazon-2026-12c", "ETSY": "etsy-2026-12"}},
+                {"id": "personalization-screening", "available": true, "rulesetVersions": {"AMAZON": "personalization-screening-2026-11", "ETSY": "personalization-screening-2026-11"}},
+                {"id": "trademark-risk", "available": false, "rulesetVersions": {"AMAZON": "trademark-risk-2026-11", "ETSY": "trademark-risk-2026-11"}},
+                {"id": "variation-checks", "available": true, "rulesetVersions": {"AMAZON": "variation-checks-2026-11", "ETSY": "variation-checks-2026-11"}}
+              ],
+              "trademarkCatalog": {"state": "DISABLED", "demo": false},
+              "plans": {"enforced": false},
+              "fixes": {"enabled": false}
+            }
+            """;
+
     public static final String PROBLEM_PLAN_NOT_ALLOWED = """
             {
               "type": "urn:listing-guard:problem:plan-not-allowed",
