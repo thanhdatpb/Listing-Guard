@@ -35,7 +35,7 @@
             Jackson 3 (tools.jackson) and is not touched here. Drop this pin when the Boot BOM reaches 2.21.8 or the
             repository moves to Jackson 3 (ADR-020).
         -->
-        <jackson-2-bom.version>2.21.8</jackson-2-bom.version>
+        <jackson-2-bom.version>2.23.0</jackson-2-bom.version>
     </properties>
 
     <dependencyManagement>
