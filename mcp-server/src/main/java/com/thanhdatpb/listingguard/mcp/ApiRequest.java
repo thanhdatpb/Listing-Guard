@@ -22,4 +22,8 @@ record ApiRequest(Endpoint endpoint, String marketplace, String productType, Str
     static ApiRequest usage() {
         return new ApiRequest(Endpoint.USAGE, null, null, null);
     }
+
+    static ApiRequest capabilities() {
+        return new ApiRequest(Endpoint.CAPABILITIES, null, null, null);
+    }
 }

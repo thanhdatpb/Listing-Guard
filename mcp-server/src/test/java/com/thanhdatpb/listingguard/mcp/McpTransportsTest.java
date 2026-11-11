@@ -42,7 +42,7 @@ class McpTransportsTest {
 
     private static final ObjectMapper M = ToolResults.newMapper();
     private static final List<String> TOOLS = List.of("check_listing", "check_trademark", "check_variations",
-            "screen_personalization", "get_limits", "get_usage");
+            "screen_personalization", "get_limits", "get_usage", "get_capabilities");
 
     private static McpServerConfig httpConfig(ApiStub stub) {
         return new McpServerConfig(ApiStub.KEY, stub.baseUri(), Duration.ofSeconds(5), TransportKind.HTTP,
@@ -68,7 +68,8 @@ class McpTransportsTest {
             assertThat(tool.description()).as(tool.name()).isNotBlank();
             assertThat(tool.inputSchema()).as(tool.name()).containsEntry("type", "object").containsKey("properties");
             assertThat(tool.annotations()).as(tool.name()).isNotNull();
-            boolean reader = tool.name().equals("get_limits") || tool.name().equals("get_usage");
+            boolean reader = tool.name().equals("get_limits") || tool.name().equals("get_usage")
+                    || tool.name().equals("get_capabilities");
             assertThat(tool.annotations().readOnlyHint()).as(tool.name()).isEqualTo(reader);
             assertThat(tool.annotations().destructiveHint()).as(tool.name()).isFalse();
             assertThat(tool.annotations().openWorldHint()).as(tool.name()).isFalse();
@@ -82,7 +83,7 @@ class McpTransportsTest {
     }
 
     @Test
-    void overStreamableHttpTheClientListsTheSixToolsAndCallsThem() throws Exception {
+    void overStreamableHttpTheClientListsTheSevenToolsAndCallsThem() throws Exception {
         try (ApiStub stub = new ApiStub();
                 RunningServer server = Launcher.start(httpConfig(stub), InputStream.nullInputStream(),
                         OutputStream.nullOutputStream());
@@ -120,6 +121,20 @@ class McpTransportsTest {
             CallToolResult bad = client.callTool(new CallToolRequest("check_listing", Map.of("marketplace", "ETSY")));
             assertThat(bad.isError()).isTrue();
             assertThat(M.valueToTree(bad.structuredContent()).get("code").asText()).isEqualTo("invalid-arguments");
+
+            stub.requests().clear();
+            String capabilities = "{\"packs\":[{\"id\":\"trademark-risk\",\"available\":false,\"rulesetVersions\":{}}],"
+                    + "\"trademarkCatalog\":{\"state\":\"REFUSED\",\"demo\":true},\"plans\":{\"enforced\":false},"
+                    + "\"fixes\":{\"enabled\":false}}";
+            stub.replying(Reply.json(200, capabilities));
+            CallToolResult served = client.callTool(new CallToolRequest("get_capabilities", Map.of()));
+            assertThat(served.isError()).isFalse();
+            assertThat(text(served)).isEqualTo(capabilities);
+            JsonNode servedStructured = M.valueToTree(served.structuredContent());
+            assertThat(servedStructured).isEqualTo(M.readTree(capabilities));
+            assertThat(stub.only().method()).isEqualTo("GET");
+            assertThat(stub.only().path()).isEqualTo("/api/v1/capabilities");
+            assertThat(stub.only().header("X-API-Key")).isEqualTo(ApiStub.KEY);
         }
     }
 

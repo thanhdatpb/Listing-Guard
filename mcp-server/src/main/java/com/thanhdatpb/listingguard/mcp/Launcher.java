@@ -12,7 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Wires the configuration, the API client, the six tools and the chosen transport together (ADR-017). Nothing is bound
+ * Wires the configuration, the API client, the seven tools and the chosen transport together (ADR-017). Nothing is bound
  * or opened until the settings have been checked: a missing or wrong setting stops here, with a message that names the
  * setting and prints no value.
  */
