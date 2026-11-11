@@ -10,7 +10,10 @@ import java.nio.charset.StandardCharsets;
 public final class TestRulesets {
 
     public static final String TEST = "rulesets/trademark-test.yaml";
-    public static final String SHIPPED = "rulesets/trademark-risk-2026-11.yaml";
+    /** The ruleset the API serves (ADR-009). */
+    public static final String SHIPPED = "rulesets/trademark-risk-2026-11b.yaml";
+    /** The ruleset published before the optional sections existed; frozen, kept for history. */
+    public static final String PREVIOUS = "rulesets/trademark-risk-2026-11.yaml";
 
     private TestRulesets() {
     }
@@ -29,6 +32,10 @@ public final class TestRulesets {
 
     public static TrademarkRuleset shipped() {
         return TrademarkRulesetLoader.loadClasspath(SHIPPED);
+    }
+
+    public static TrademarkRuleset previous() {
+        return TrademarkRulesetLoader.loadClasspath(PREVIOUS);
     }
 
     /** The test ruleset with one text replaced (exactly once present), parsed. */

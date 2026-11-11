@@ -22,13 +22,15 @@ class AnalysisFingerprintTest {
     private static TrademarkRuleset withPackId(TrademarkRuleset r, String packId) {
         return new TrademarkRuleset(packId, r.version(), r.checkedAt(), r.contentHash(), r.disclaimer(),
                 r.normalization(), r.matching(), r.lexicon(), r.ruleOrder(), r.catalogExact(), r.catalogPhrase(),
-                r.catalogFuzzy(), r.geoSport(), r.colorContainsMark(), r.pureColor());
+                r.catalogFuzzy(), r.geoSport(), r.colorContainsMark(), r.pureColor(), r.productClasses(),
+                r.genericWords(), r.sourceLinks());
     }
 
     private static TrademarkRuleset withVersion(TrademarkRuleset r, String version) {
         return new TrademarkRuleset(r.packId(), version, r.checkedAt(), r.contentHash(), r.disclaimer(),
                 r.normalization(), r.matching(), r.lexicon(), r.ruleOrder(), r.catalogExact(), r.catalogPhrase(),
-                r.catalogFuzzy(), r.geoSport(), r.colorContainsMark(), r.pureColor());
+                r.catalogFuzzy(), r.geoSport(), r.colorContainsMark(), r.pureColor(), r.productClasses(),
+                r.genericWords(), r.sourceLinks());
     }
 
     @Test
@@ -37,7 +39,7 @@ class AnalysisFingerprintTest {
         assertThat(base().descriptor()).startsWith(AnalysisFingerprint.FORMAT + "\n")
                 .contains("pack_id=trademark-risk\n", "ruleset_version=trademark-test-1\n",
                         "ruleset_hash=" + ruleset.contentHash() + "\n", "normalization_version=normalization-1\n",
-                        "matcher_version=matcher-1\n", "scoring_version=osa-similarity-1\n",
+                        "matcher_version=matcher-2\n", "scoring_version=osa-similarity-1\n",
                         "external.catalog_hash=abc\n", "external.pg_major=16\n");
         assertThat(base().value()).matches("[0-9a-f]{64}");
     }
@@ -79,7 +81,7 @@ class AnalysisFingerprintTest {
 
         assertThat(AnalysisFingerprint.of(ruleset, new AlgorithmVersions("normalization-2", current.matcher(),
                 current.scoring()), external).value()).isNotEqualTo(base().value());
-        assertThat(AnalysisFingerprint.of(ruleset, new AlgorithmVersions(current.normalization(), "matcher-2",
+        assertThat(AnalysisFingerprint.of(ruleset, new AlgorithmVersions(current.normalization(), "matcher-3",
                 current.scoring()), external).value()).isNotEqualTo(base().value());
         assertThat(AnalysisFingerprint.of(ruleset, new AlgorithmVersions(current.normalization(), current.matcher(),
                 "osa-similarity-2"), external).value()).isNotEqualTo(base().value());

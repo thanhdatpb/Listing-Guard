@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.trademark.rules;
 
 import com.thanhdatpb.listingguard.trademark.MatchType;
+import com.thanhdatpb.listingguard.trademark.RiskAdjustment;
 import com.thanhdatpb.listingguard.trademark.RiskLevel;
 import java.util.List;
 import java.util.Map;
@@ -16,16 +17,27 @@ import java.util.Map;
  * @param score        1.0 for exact and phrase, the final score for fuzzy, null for a context finding
  * @param placeholders values for the rule's message and suggestion templates
  * @param sourceIds    the ids of the source records of the matched catalog mark, empty when there is no mark
+ * @param riskAdjustments why {@code risk} is lower than the level the rule assigns; empty when it is not lower
  */
 public record Candidate(String ruleId, RiskLevel risk, String field, int tokenFrom, int tokenTo, int start, int end,
                         String normalizedToken, String mark, MatchType type, Double score,
                         Map<String, String> placeholders, boolean insideColorPhrase, List<String> otherRuleIds,
-                        List<String> sourceIds) {
+                        List<String> sourceIds, List<RiskAdjustment> riskAdjustments) {
 
     public Candidate {
         placeholders = Map.copyOf(placeholders);
         otherRuleIds = List.copyOf(otherRuleIds);
         sourceIds = List.copyOf(sourceIds);
+        riskAdjustments = List.copyOf(riskAdjustments);
+    }
+
+    /** A candidate whose level is the one its rule assigns. */
+    public Candidate(String ruleId, RiskLevel risk, String field, int tokenFrom, int tokenTo, int start, int end,
+                     String normalizedToken, String mark, MatchType type, Double score,
+                     Map<String, String> placeholders, boolean insideColorPhrase, List<String> otherRuleIds,
+                     List<String> sourceIds) {
+        this(ruleId, risk, field, tokenFrom, tokenTo, start, end, normalizedToken, mark, type, score, placeholders,
+                insideColorPhrase, otherRuleIds, sourceIds, List.of());
     }
 
     /** A candidate without a catalog mark, so without source ids. */
@@ -38,12 +50,12 @@ public record Candidate(String ruleId, RiskLevel risk, String field, int tokenFr
 
     public Candidate withInsideColorPhrase(boolean inside) {
         return new Candidate(ruleId, risk, field, tokenFrom, tokenTo, start, end, normalizedToken, mark, type, score,
-                placeholders, inside, otherRuleIds, sourceIds);
+                placeholders, inside, otherRuleIds, sourceIds, riskAdjustments);
     }
 
     public Candidate withOtherRuleIds(List<String> others) {
         return new Candidate(ruleId, risk, field, tokenFrom, tokenTo, start, end, normalizedToken, mark, type, score,
-                placeholders, insideColorPhrase, others, sourceIds);
+                placeholders, insideColorPhrase, others, sourceIds, riskAdjustments);
     }
 
     boolean overlaps(Candidate other) {

@@ -14,7 +14,8 @@ public record AlgorithmVersions(String normalization, String matcher, String sco
 
     /** Optimal string alignment similarity: see {@code Similarity}. */
     public static final String SCORING = "osa-similarity-1";
-    public static final String MATCHER = "matcher-1";
+    /** matcher-2: product classes, generic words and source links (ADR-009); the rules of matcher-1 are unchanged. */
+    public static final String MATCHER = "matcher-2";
 
     public static final AlgorithmVersions CURRENT = new AlgorithmVersions(TextNormalizer.VERSION, MATCHER, SCORING);
 }

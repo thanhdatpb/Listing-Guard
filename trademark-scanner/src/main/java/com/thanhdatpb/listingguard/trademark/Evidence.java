@@ -18,14 +18,29 @@ import java.util.List;
  * @param insideColorPhrase  the match lies inside a color phrase; this explains the finding and never lowers it
  * @param otherRuleIds       other rules that matched an overlapping span of the same field and lost to this one
  * @param sourceIds          the ids of the source records of the matched catalog mark, empty for a finding without a mark
+ * @param riskAdjustments    why the finding's level is lower than the one its rule assigns, with the original level;
+ *                           empty when it is not lower
+ * @param sourceLinks        public look-up addresses of the source records, only for a source the ruleset has a
+ *                           template for; empty otherwise
  */
 public record Evidence(String field, int start, int end, String snippet, String normalizedToken, String matchedMark,
                        MatchType matchType, Double score, String catalogVersion, String ruleId,
-                       boolean insideColorPhrase, List<String> otherRuleIds, List<String> sourceIds) {
+                       boolean insideColorPhrase, List<String> otherRuleIds, List<String> sourceIds,
+                       List<RiskAdjustment> riskAdjustments, List<SourceLink> sourceLinks) {
 
     public Evidence {
         otherRuleIds = List.copyOf(otherRuleIds);
         sourceIds = List.copyOf(sourceIds);
+        riskAdjustments = List.copyOf(riskAdjustments);
+        sourceLinks = List.copyOf(sourceLinks);
+    }
+
+    /** Evidence with no adjustment and no link. */
+    public Evidence(String field, int start, int end, String snippet, String normalizedToken, String matchedMark,
+                    MatchType matchType, Double score, String catalogVersion, String ruleId,
+                    boolean insideColorPhrase, List<String> otherRuleIds, List<String> sourceIds) {
+        this(field, start, end, snippet, normalizedToken, matchedMark, matchType, score, catalogVersion, ruleId,
+                insideColorPhrase, otherRuleIds, sourceIds, List.of(), List.of());
     }
 
     /** Evidence of a finding without a catalog mark, so without source ids. */
@@ -33,6 +48,6 @@ public record Evidence(String field, int start, int end, String snippet, String 
                     MatchType matchType, Double score, String catalogVersion, String ruleId,
                     boolean insideColorPhrase, List<String> otherRuleIds) {
         this(field, start, end, snippet, normalizedToken, matchedMark, matchType, score, catalogVersion, ruleId,
-                insideColorPhrase, otherRuleIds, List.of());
+                insideColorPhrase, otherRuleIds, List.of(), List.of(), List.of());
     }
 }

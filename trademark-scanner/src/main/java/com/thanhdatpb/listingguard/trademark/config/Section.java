@@ -56,6 +56,65 @@ final class Section {
         return new Section(value, where(key) + ".");
     }
 
+    /** A mapping, or null when the key is absent: the section is optional as a whole, what is inside it is not. */
+    Section optionalSection(String key) {
+        used.add(key);
+        JsonNode value = node.get(key);
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isObject()) {
+            throw new TrademarkRulesetException(where(key) + " must be a mapping");
+        }
+        return new Section(value, where(key) + ".");
+    }
+
+    /** A non-empty list of mappings, in file order. */
+    List<Section> sections(String key) {
+        JsonNode value = require(key);
+        if (!value.isArray() || value.isEmpty()) {
+            throw new TrademarkRulesetException(where(key) + " must be a non-empty list of mappings");
+        }
+        List<Section> result = new ArrayList<>();
+        int index = 0;
+        for (JsonNode item : value) {
+            if (!item.isObject()) {
+                throw new TrademarkRulesetException(where(key) + "[" + index + "] must be a mapping");
+            }
+            result.add(new Section(item, where(key) + "[" + index + "]."));
+            index++;
+        }
+        return result;
+    }
+
+    /** A non-empty mapping of keys to non-empty lists of integers from {@code min} to {@code max}, in file order. */
+    Map<String, List<Integer>> integerLists(String key, int min, int max) {
+        JsonNode value = require(key);
+        if (!value.isObject() || value.isEmpty()) {
+            throw new TrademarkRulesetException(where(key) + " must be a non-empty mapping");
+        }
+        Map<String, List<Integer>> result = new LinkedHashMap<>();
+        for (Iterator<Map.Entry<String, JsonNode>> it = value.fields(); it.hasNext(); ) {
+            Map.Entry<String, JsonNode> entry = it.next();
+            JsonNode list = entry.getValue();
+            String entryPath = where(key) + "." + entry.getKey();
+            if (!list.isArray() || list.isEmpty()) {
+                throw new TrademarkRulesetException(entryPath + " must be a non-empty list of integers");
+            }
+            List<Integer> numbers = new ArrayList<>();
+            for (JsonNode number : list) {
+                if (!number.isIntegralNumber() || !number.canConvertToInt() || number.asInt() < min
+                        || number.asInt() > max) {
+                    throw new TrademarkRulesetException(entryPath + " must hold integers from " + min + " to " + max
+                            + ", got " + number);
+                }
+                numbers.add(number.asInt());
+            }
+            result.put(entry.getKey(), numbers);
+        }
+        return result;
+    }
+
     String text(String key) {
         JsonNode value = require(key);
         if (!value.isTextual() || value.asText().isBlank()) {

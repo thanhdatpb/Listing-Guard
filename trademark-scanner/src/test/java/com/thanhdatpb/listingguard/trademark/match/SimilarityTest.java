@@ -48,6 +48,6 @@ class SimilarityTest {
     void theScoringVersionIsPartOfTheAlgorithmVersions() {
         assertThat(AlgorithmVersions.CURRENT.scoring()).isEqualTo(AlgorithmVersions.SCORING).isEqualTo("osa-similarity-1");
         assertThat(AlgorithmVersions.CURRENT.normalization()).isEqualTo("normalization-1");
-        assertThat(AlgorithmVersions.CURRENT.matcher()).isEqualTo("matcher-1");
+        assertThat(AlgorithmVersions.CURRENT.matcher()).isEqualTo("matcher-2");
     }
 }

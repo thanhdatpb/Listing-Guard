@@ -43,11 +43,13 @@ final class CatalogRule implements TrademarkRule {
             }
             CatalogHits.Gram gram = hit.gram();
             String snippet = context.snippet(gram.field(), gram.start(), gram.end());
-            result.add(new Candidate(id, settings.risk(), gram.field().name(), gram.from(), gram.to(), gram.start(),
+            RiskAdjustments.Outcome outcome = RiskAdjustments.of(context, hit.mark(), type, gram.field().name(),
+                    settings.risk());
+            result.add(new Candidate(id, outcome.risk(), gram.field().name(), gram.from(), gram.to(), gram.start(),
                     gram.end(), gram.text(), hit.mark().display(), type, hit.score(),
                     Map.of("mark", hit.mark().display(), "token", snippet, "field", gram.field().name(),
                             "score", String.valueOf(Math.round(hit.score() * 100))),
-                    false, List.of(), hit.mark().sourceIds()));
+                    false, List.of(), hit.mark().sourceIds(), outcome.adjustments()));
         }
         return result;
     }

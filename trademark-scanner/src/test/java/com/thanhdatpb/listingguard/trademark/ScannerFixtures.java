@@ -1,6 +1,8 @@
 package com.thanhdatpb.listingguard.trademark;
 
+import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
 import com.thanhdatpb.listingguard.trademark.catalog.InMemoryTrademarkCatalog;
+import com.thanhdatpb.listingguard.trademark.catalog.MarkStatus;
 import com.thanhdatpb.listingguard.trademark.catalog.TrademarkCatalog;
 import com.thanhdatpb.listingguard.trademark.config.TrademarkRuleset;
 import com.thanhdatpb.listingguard.trademark.normalize.TextNormalizer;
@@ -26,6 +28,26 @@ final class ScannerFixtures {
 
     static TrademarkScanner scanner(String... marks) {
         return scanner(TestRulesets.test(), marks);
+    }
+
+    /** A catalog mark with Nice classes and source ids, normalized as the ruleset's catalog marks are. */
+    static CatalogMark mark(TrademarkRuleset ruleset, String display, List<Integer> classes, String... sourceIds) {
+        return new CatalogMark(new TextNormalizer(ruleset.normalization()).normalizeMark(display), display, classes,
+                MarkStatus.REGISTERED, false, List.of(sourceIds));
+    }
+
+    static TrademarkScanner scannerOf(TrademarkRuleset ruleset, CatalogMark... marks) {
+        return new TrademarkScanner(ruleset, new InMemoryTrademarkCatalog(CATALOG_VERSION, List.of(marks)));
+    }
+
+    /** A listing that has only a title and a product type. */
+    static TrademarkCheckInput titleAndType(String title, String productType) {
+        return new TrademarkCheckInput(title, List.of(), List.of(), null, null, null, null, null, productType);
+    }
+
+    /** A listing that has only a brand and a product type. */
+    static TrademarkCheckInput brandAndType(String brand, String productType) {
+        return new TrademarkCheckInput(null, List.of(), List.of(), null, brand, null, null, null, productType);
     }
 
     static TrademarkResult scanTitle(TrademarkScanner scanner, String title) {
