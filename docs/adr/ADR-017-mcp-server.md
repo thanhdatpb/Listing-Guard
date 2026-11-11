@@ -9,6 +9,8 @@
   `quota-exceeded`), [ADR-009](ADR-009-trademark-risk-scanner.md) (the `503 trademark-not-configured` answer),
   [ADR-015](ADR-015-variation-checks.md) and [ADR-016](ADR-016-personalization-screening.md) (the two endpoints this server
   also exposes; ADR-016 says the buyer's text is personal data)
+- Amended by: [ADR-020](ADR-020-spring-boot-4.md) (the repository moves to Spring Boot 4.1; the statement "Spring Boot stays
+  3.5" below no longer holds, the rest of this ADR does)
 - Acceptance convention: Keep Proposed until the PR implementing this ADR is approved and merged. Then set Status to
   Accepted and Date to the merge date.
 
@@ -61,7 +63,9 @@ never writes to a marketplace.
   Spring. This also suits the job: the server has no database, no bean worth injecting and no web application; it is a main
   method, six tool specifications and an HTTP client from the JDK. SDK 2.x no longer carries the Spring WebFlux/WebMVC
   transports (they moved to Spring AI), which this design does not need: the servlet transport is in `mcp-core`. Revisit when
-  the repository moves to Spring Boot 4.
+  the repository moves to Spring Boot 4. **Amended by [ADR-020](ADR-020-spring-boot-4.md):** the repository does move to
+  Spring Boot 4.1, so "Spring Boot stays 3.5" no longer holds. This module is unchanged by it: the SDK is still used directly,
+  without Spring, for the reasons in this paragraph (the shape of the server did not change), and Spring AI is still not adopted.
 - HTTP calls to the API use `java.net.http.HttpClient` (JDK), so there is no HTTP library to choose or to patch.
 - The runnable jar is built with the Maven Shade plugin (it must merge `META-INF/services`, which the SDK uses to find its JSON
   mapper) into `mcp-server/target/`. No Dockerfile, no compose service, no registry publication in this change.
@@ -210,8 +214,9 @@ changing the API, its OpenAPI document, its migrations or `docs/releases`.
   document and the integration guide, and it is the API's, which is the point.
 - Annotating the check tools as not read-only may make a host ask before each call. That is the honest description (they store a
   result and may cost a unit) and a user can allow the tools once.
-- Staying off Spring AI keeps Spring Boot 3.5 and a small, dependency-light jar, and costs the Spring conveniences
-  (auto-configuration, annotations). They are not missing here.
+- Staying off Spring AI keeps Spring Boot 3.5 (at the time of this ADR; [ADR-020](ADR-020-spring-boot-4.md) later moves the
+  repository to 4.1) and a small, dependency-light jar, and costs the Spring conveniences (auto-configuration, annotations).
+  They are not missing here.
 - The jar adds an embedded Tomcat for the optional HTTP transport, which STDIO users never start. Splitting the transport into
   its own jar would shrink it, and was judged not worth a second module.
 - The SDK 2.x line is new (the 2.1.0 stable release is what 2026-11-07 offers). Pinning it exactly and testing the protocol
@@ -273,7 +278,8 @@ Written as questions, not decided here; each says what this record assumed meanw
    stubs it with the JDK's `com.sun.net.httpserver.HttpServer`, so this module does too and adds no test library. Assumed
    acceptable.
 8. **Spring AI later.** When the repository moves to Spring Boot 4, the Spring AI starter becomes an option and would replace
-   only the wiring of this module, not the tools or the client.
+   only the wiring of this module, not the tools or the client. [ADR-020](ADR-020-spring-boot-4.md) makes that move; the
+   option is still not taken.
 
 ## Decisions (2026-11-07)
 
