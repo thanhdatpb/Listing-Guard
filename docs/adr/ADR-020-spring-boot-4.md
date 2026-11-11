@@ -92,6 +92,11 @@ from Maven Central; where a page does not say something, this ADR says **chưa k
 7. **Spring Security.** The two filter chains stay separate and unchanged in intent: the stateless API chain with
    `ApiKeyFilter`, and the session and CSRF console chain. Only what the compiler or a test shows is changed.
 8. **Hibernate** stays `ddl-auto=validate`; Flyway keeps running V1 to V27 unchanged.
+9. **The OpenAPI document does not change.** springdoc 3.2.0 on Spring Framework 7 would drop `null` from four members of Spring's
+   own `ProblemDetail` schema (Spring now uses the JSpecify `@Nullable`, which springdoc does not read). One customizer,
+   `OpenApiConfig.nullableProblemDetailMembers`, marks `title`, `detail`, `instance` and `properties` nullable again, so
+   `docs/api/openapi.json` is exactly as published. It is removed when springdoc reads JSpecify `@Nullable` (README Roadmap, next to
+   the Jackson 3 migration).
 
 ## What the guides say that matters here
 
@@ -179,6 +184,8 @@ roll back the image first and investigate on the branch.
 - The build uses a deprecated module (`spring-boot-jackson2`) on purpose and for a limited time; the debt is named, dated by its
   upstream plan, and has a Roadmap line.
 - Test code takes the Boot 4 and Testcontainers 2 package names; nothing in a rule, a ruleset or a result changes.
+- The build carries a second named debt: the `ProblemDetail` customizer of Decision 9. It has a Roadmap line (remove it when springdoc
+  reads JSpecify `@Nullable`) and a test (`OpenApiIntegrationTest`) that fails if the published shape changes.
 - `docs/mcp.md` and the MCP jar are unchanged. ADR-017's open question "Spring AI later" becomes possible but is not taken here.
 
 ## Open questions
@@ -186,9 +193,73 @@ roll back the image first and investigate on the branch.
 1. When is the Jackson 3 migration done relative to Boot 4.2 (the Framework 7.1 plan removes Jackson 2 auto-detection)?
 2. Is the 4.1 line right, or should the repository wait for 4.2 GA? This ADR assumes 4.1 because it is released, maintained and
    supported by springdoc 3.2.0.
-3. After the Trivy scan, does any pin survive (see Decision 5)?
+3. After the Trivy scan, does any pin survive (see Decision 5)? Only the Jackson 2 pin, see the implementation notes.
+4. **The `ProblemDetail` schema in `docs/api/openapi.json`.** Decided on 2026-11-11, see "Decisions" (option b, a customizer).
+5. **`Vary` headers on a `404` for an unknown route.** Decided on 2026-11-11, see "Decisions" (accepted).
 
-## Implementation notes
+## Implementation notes (2026-11-11)
 
-(To be completed when the branch is done: what the compiler and the tests required, the final pins and the findings behind them,
-the deprecation warnings that remain.)
+What the build required, in the order it showed up:
+
+- **Main code compiled unchanged** against 4.1.2 after the POM changes of Decision 4. The test code needed only the mechanical moves:
+  `@AutoConfigureMockMvc` is in `org.springframework.boot.webmvc.test.autoconfigure` (49 classes; read from the
+  `spring-boot-webmvc-test-4.1.2` jar), `@SpyBean` became `@MockitoSpyBean` (2 classes), and the PostgreSQL container is
+  `org.testcontainers.postgresql.PostgreSQLContainer`, not generic (18 classes; the old `org.testcontainers.containers` class still
+  ships in 2.0.5 but is `@Deprecated`). `@Testcontainers` and `@Container` kept their package.
+- **Risk 1 happened.** With Jackson 3 on the classpath (from Boot's web starter and from `flyway-core` 12.4.0), the web layer used
+  Jackson 3 and every request body bound to a Jackson 2 `JsonNode` failed with `500`. The golden-response comparison caught it on
+  the first run. Boot 4.1.2 has a documented switch for this: `spring.http.converters.preferred-json-mapper`, whose configuration
+  metadata says "Supported values are 'jackson', 'jackson2' (deprecated), 'gson' and 'jsonb'". `application.yml` sets `jackson2`
+  (the migration guide pages do not mention it; the metadata of `spring-boot-http-converter-4.1.2` and its
+  `Jackson2HttpMessageConvertersConfiguration` do). The same cause broke `ApiEmbeddingProvider`, a hand-built `RestClient` that the
+  property does not reach: it now reads the body as bytes and parses it with its own Jackson 2 mapper (a new test covers a body that
+  is not JSON; the message does not quote the body).
+- **Spring Framework 7 renamed two reason phrases** (RFC 9110): `413` "Content Too Large" and `422` "Unprocessable Content".
+  `Problems.title` keeps the published titles "Payload Too Large" and "Unprocessable Entity" (`ProblemsTest`). The code uses the new
+  constants `HttpStatus.CONTENT_TOO_LARGE` and `UNPROCESSABLE_CONTENT`, and the tests `isContentTooLarge()` and
+  `isUnprocessableContent()`, because the old names are deprecated.
+- **No configuration property changed.** A run with `spring-boot-properties-migrator` reported nothing for `application.yml`; the
+  migrator was removed again.
+- **Golden-response comparison, final** (64 requests, same data, status, every header and the body with ids and timestamps masked;
+  `main` against `main` already differs in the order of `field` and `message` inside `errors[]`, which is a map, so key order is
+  compared separately): 62 identical and 2 different, the two being one difference: a `404` for an unknown route
+  (`GET /api/v1/usage/`, `GET /api/v1/nope`) no longer carries `Vary: Origin`, `Vary: Access-Control-Request-Method` and
+  `Vary: Access-Control-Request-Headers`. The application configures no CORS and nothing in the repository sets these headers, so the
+  change is Spring's. Accepted (see "Decisions").
+- **`GET /v3/api-docs` was a third difference until the customizer of Decision 9.** Spring Framework 7 moved to JSpecify
+  `@Nullable`, springdoc 3.2.0 does not read it, and the schema of Spring's own `ProblemDetail` lost `null` on `title`, `detail`,
+  `instance` and `properties` (`["string","null"]` became `"string"`, `["object","null"]` became `"object"`). Without the customizer
+  `./mvnw -B verify -Dopenapi.update=true` changed `docs/api/openapi.json` by exactly these four lines and
+  `OpenApiIntegrationTest` failed. With it the generated document is byte for byte the one of `main`
+  (`OpenApiConfigTest` and `theProblemDetailSchemaKeepsItsPublishedNullableMembers` cover it).
+- **Verification** (final tree). `./mvnw -B verify` is green for every module: `api` 867 tests with no failure, `mcp-server` 163
+  (stdio child process and Streamable HTTP, on Tomcat 11.0.27), `rule-engine` 454, `trademark-scanner` 285, `rag-analyzer` 225 (2
+  skipped, as on `main`), `variation-checks` 79, `personalization-screening` 50, `core` 18. Flyway V1 to V27 ran on PostgreSQL 16
+  (Testcontainers) with `ddl-auto=validate`, and the tests that pin the hash of every ruleset, readiness version and the DEMO catalog
+  passed with no pinned value edited. Running `OpenApiIntegrationTest`, the only test that writes the file, with
+  `-Dopenapi.update=true` leaves `docs/api/openapi.json` byte for byte the committed one (`cmp` with `git show HEAD:docs/api/openapi.json`,
+  `git diff --exit-code`). The image built for `linux/amd64` and `linux/arm64`; the arm64 variant runs (`aarch64`, Temurin 25); the
+  amd64 image started with the `prod` profile and the sample `.env` (placeholders filled), applied 27 migrations and answered
+  `GET /health` with `200 {"status":"UP"}`; the start-up warnings are the same as on `main`.
+- **Pins, final.** `tomcat.version` and `postgresql.version` are removed. The Jackson 2 pin (2.21.8) stays for the reason in the POM.
+  Trivy 0.76.2 on the new image (critical and high, fixed only, no `.trivyignore`): no finding in the OS packages, the application jar
+  or the other binaries. A scan of a POM with Jackson 2.21.7 (the Boot BOM's) also found nothing, but its control scan could not run
+  (Maven Central answered `429`), so whether the pin can go is **unverified**; it stays.
+- **`.trivyignore`** keeps no exception (the file stays because the release workflow names it).
+- **Deprecation warnings caused by repository code** (`-Xlint:deprecation`, compared with `main`): left are
+  `MappingJacksonValue` in `CheckController` and `Jackson2ObjectMapperBuilder` in `FilterChainTest`. Both are Spring's Jackson 2 API,
+  deprecated because Jackson 2 is, and go away with the Jackson 3 migration. The pre-existing warnings of the modules without Spring
+  are unchanged.
+
+## Decisions (2026-11-11)
+
+Taken by the maintainer after the implementation notes above were written:
+
+- **The `ProblemDetail` schema is kept as published, by one OpenAPI customizer** (open question 4, option b):
+  `OpenApiConfig.nullableProblemDetailMembers` marks `title`, `detail`, `instance` and `properties` nullable again. Its comment gives the
+  reason (Spring Framework 7 uses JSpecify `@Nullable`, which springdoc 3.2.0 does not read) and the condition for removing it
+  (springdoc reads JSpecify `@Nullable`); a test states that `docs/api/openapi.json` does not change. The README Roadmap lists
+  "remove the `ProblemDetail` customizer" next to the Jackson 3 migration.
+- **The `Vary` headers that a `404` for an unknown route no longer carries are accepted** (open question 5): no CORS is configured.
+  `docs/releases/unreleased.md` says so in one line.
+- **The Jackson 2 pin stays at 2.21.8**, as it is (Decision 5).
