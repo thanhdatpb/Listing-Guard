@@ -39,6 +39,104 @@ or a deactivated client stops working within about 30 seconds. Never log or echo
 What belongs to the client, not to the key: the checks you create, the cached results you get back, the rate
 limit, and the plan and monthly quota (see "Plans and monthly quota"). Another client can neither read your checks nor be answered from them.
 
+## Calling through Cloudflare Access
+
+Some deployments put the API behind Cloudflare Access, for example a small host that is reachable only through a
+Cloudflare Tunnel (see [`deploy-oracle.md`](deploy-oracle.md)). Ask the operator whether yours does; a deployment you
+reach directly needs none of this. If it does, a request to `/api/v1/*` passes two independent checks, in this order:
+Cloudflare Access, then the API. Send three headers on every request:
+
+| Header | Value | Checked by |
+|---|---|---|
+| `CF-Access-Client-Id` | The Client ID of your Access service token | Cloudflare Access |
+| `CF-Access-Client-Secret` | The Client Secret of the same token | Cloudflare Access |
+| `X-API-Key` | Your Listing Guard API key | The API |
+
+The operator gives you all three values. They are different secrets from different systems with different lifetimes: a
+service token expires on a date set in Cloudflare and is rotated there (the Client ID stays, the Client Secret changes),
+while an API key is rotated as described under "Authentication". Keep them in your secret store, never in browser code,
+and never log or echo them. The header names are the ones in Cloudflare's
+[service tokens page](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/).
+
+```bash
+export LISTING_GUARD_BASE_URL=https://listing-api.example.com   # the public hostname the operator gives you
+# CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET and LISTING_GUARD_API_KEY come from your secret store:
+# do not type their values on the command line (shell history, process list)
+
+curl -sS -i --connect-timeout 5 --max-time 10 \
+  -X POST "$LISTING_GUARD_BASE_URL/api/v1/checks" \
+  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+  -H "X-API-Key: $LISTING_GUARD_API_KEY" \
+  -H 'Content-Type: application/json' -H 'X-Request-Id: client-123' \
+  --data @check-request.json     # {"marketplace":"ETSY","listing":{...}}, as in "Create a check"
+```
+
+With the Spring `RestClient` of "Create a check", read the two Access values from configuration and set them as default
+headers; `X-API-Key` stays as in the example:
+
+```java
+RestClient listingGuard = RestClient.builder()
+    .baseUrl(baseUrl)
+    .defaultHeader("CF-Access-Client-Id", accessClientId)
+    .defaultHeader("CF-Access-Client-Secret", accessClientSecret)
+    .build();
+```
+
+The MCP server ([`mcp.md`](mcp.md)) sends only `X-API-Key` (with `X-Request-Id`, `Accept` and `Content-Type`) and has no
+setting for other headers (ADR-017), so it cannot call a hostname that Access protects. Run it where it reaches the API
+without Access.
+
+### Who refused the request: Access or the API
+
+Every error the API itself answers is `application/problem+json` with `code`, `status` and `requestId` (see "Errors"); it
+is built never to answer an error with HTML or a bare body. So decide by the response, not by the status:
+
+- **`application/problem+json` with a `code` and a `requestId`**: the request passed Access and reached the API. Handle
+  it with the "Errors" table. A `401` `unauthorized` here means the `X-API-Key` is wrong or missing; it says nothing about
+  the service token.
+- **Anything else on a refused request** (an HTML page, a redirect to a login page, a `401` or `403` with no problem
+  body): it was refused before the API, by Cloudflare Access, and carries no `code` or `requestId` of ours. Check the
+  service token (both headers present, the token named in the policy, not expired or rotated, the right hostname), not the
+  API key. Retrying it unchanged does not help; report it to the operator.
+
+A wrong API key and an Access refusal can both be `401`, so never branch on the status alone. What Cloudflare documents
+about the status of an Access refusal is narrow: with its *strict service token authentication* setting on, "Access
+always returns `401` or `403` instead of redirecting the client to the login page with `302`". Organizations created on or
+after 2026-10-05 have it on; for an older one it depends on the account. The status and body of a refusal with the
+setting off are **chưa kiểm chứng (unverified)**: the page does not state them, so expect either a redirect or a `401` or
+`403`, and do not parse the body. An application can also be set to return `401` to a request without the correct
+service token (the option "401 Response for Service Auth policies" of the self-hosted application page, whose
+default is not stated, **chưa kiểm chứng (unverified)**).
+
+Cloudflare also answers when the tunnel or the host is down, again without a problem body. From Cloudflare's own error
+pages: `1033` ("Cloudflare Tunnel error", returned with HTTP `530`) means no healthy `cloudflared` instance was found;
+`502` means Cloudflare reached the tunnel but not the origin service; `524` means the origin did not answer within the
+default proxy read timeout of 125 seconds. Treat all three as transient `5xx` errors of the connection.
+Sources: [`1033`](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1033/),
+[`502`](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-502-504/),
+[`524`](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-524/).
+
+### Timeouts and retries through Access
+
+The API answers in milliseconds and the tunnel adds only network time, so use a short connect timeout (5 seconds) and a
+total timeout of about 10 seconds (our recommendation, not a Cloudflare figure); do not rely on Cloudflare's own 125
+second limit. Then:
+
+| Answer | Retry? |
+|---|---|
+| Network error, timeout, or a `5xx` with no problem body (Cloudflare `502`, `530`, `524`) | Yes, at most twice, with exponential backoff and jitter |
+| `5xx` problem (`internal-error`, `service-unavailable`) | Yes, at most twice, with backoff |
+| `429` `rate-limited` | Yes, after `Retry-After` seconds |
+| `429` `quota-exceeded` | **No.** It has no `Retry-After`; not before `resetAt` or a plan change |
+| `401` problem `unauthorized` | No: fix the `X-API-Key` |
+| `401`, `403` or a redirect that is not a problem (Access) | No: fix the service token, tell the operator |
+| Any other `4xx` | No |
+
+Retries are safe for your quota: a result already stored is answered from the cache at no cost, and two identical
+requests sent at the same time cost one unit (see "Plans and monthly quota"). Cap the total attempts, and remember that a
+check is advice, not a gate: if Listing Guard cannot be reached, the listing can still be published.
+
 ## Request id
 
 Send `X-Request-Id: <your id>` (1-64 characters from `A-Za-z0-9._-`) to correlate calls. If it is missing or
@@ -1015,7 +1113,8 @@ the same service, so the three always agree.
 
 Errors are `application/problem+json` (RFC 7807) with these members: `type` (`urn:listing-guard:problem:<code>`),
 `code`, `title`, `status`, `detail`, `instance`, `requestId`, and `errors[]` (`{field, message}`) for
-validation. Branch on `code`, not on `detail`.
+validation. Branch on `code`, not on `detail`. A refusal that is not a problem response did not come from the API; behind
+Cloudflare Access see "Calling through Cloudflare Access".
 
 | Status | `code` | When | What to do |
 |---|---|---|---|

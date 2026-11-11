@@ -18,7 +18,7 @@ production compose setup.
    free instances being reclaimed; this does not guarantee capacity, eliminate quotas or make the VM highly available.
    Never assume a resource is available until the console confirms it.
 4. Put the public DNS zone for your domain on Cloudflare. Pick the hostname to expose the API, for example
-   `listing-api.example.com`. Cloudflare Access will be configured for the console path in step 5.
+   `listing-api.example.com`. Cloudflare Access is configured per path (console, API, health) in step 5.
 5. Create an SSH key pair and keep the private key in a protected password manager or workstation key store. Add the
    public key when creating the VM. Confirm key-based SSH works before running the bootstrap script.
 
@@ -143,16 +143,149 @@ http://api:8080
 `api` resolves only on the private Compose network. cloudflared makes outbound tunnel connections; no host port is
 published and the OCI ingress rules remain SSH-only.
 
+Cloudflare Access is set up as **one self-hosted application per path on the same hostname, each with its own policy**.
+People and machines never share an application:
+
+| Path | Who | Policy action | Subsection |
+|---|---|---|---|
+| `/console/*` | People, by company e-mail | Allow | Console |
+| `/api/v1/*` | Backends in another network or cloud | Service Auth with a service token | Service token, Application for `/api/v1/*` |
+| `/health` | The uptime monitor | Bypass, or Service Auth with its own token | Health |
+
+A request to `/api/v1/*` passes two independent checks: Access (the service token headers, checked by Cloudflare before
+the request reaches the tunnel), then the API (`X-API-Key`, ADR-005 and ADR-007). Both are required and neither
+replaces the other. How a backend sends the headers is in the
+[integration guide](integration-guide.md#calling-through-cloudflare-access).
+
+**How to read the Cloudflare statements below.** A statement that cites a Cloudflare page is what that page said when
+it was read on 2026-11-11 (the pages are dated between April and November 2026); dashboard labels change, so if one
+differs, follow the page. A point marked **chưa kiểm chứng (unverified)** is one those pages do not state: do not rely
+on it, and settle it with the checks in "Check from outside". The pages are listed at the end of this section.
+
+### Console (people)
+
 Create a Cloudflare Access self-hosted application for the same hostname and the path `/console/*`. Add an Allow
 policy restricted to the company's approved email addresses or identity group. Test both a permitted and an
 unpermitted identity. The console itself must also be enabled and configured with SMTP and the exact HTTPS public
 origin in `LISTING_GUARD_CONSOLE_BASE_URL`; Cloudflare Access is an additional gate, not a replacement for console
 login.
 
-API endpoints under `/api/v1/*` use `X-API-Key`. If the API should be internal-only, add a separate Access policy to
-block or protect `/api/v1/*`; known backend callers can use an Access service token as well as their Listing Guard
-API key. Do not apply a human interactive policy to machine clients unless they support it. `/health` does not need
-an API key, so decide explicitly whether it should remain reachable through the hostname.
+`/console/*` is its own application with its own human policy. It never takes a service token, and the `/api/v1/*`
+application never takes a human policy. The console's sign-in pages are served at `/login`, `/login/verify` and
+`/logout`, and the dashboard also answers at `/console`; none of these is under `/console/*` (Cloudflare's
+application-paths page says that `example.com/alpha/*` does not cover `example.com/alpha`). Decide explicitly whether to
+add them to an Access application; the console's own sign-in (magic link, CSRF, login limits) applies either way.
+
+### Service token for a backend
+
+Create one service token for each calling backend, so that one can be rotated or revoked without touching the others
+(our recommendation, not a Cloudflare requirement):
+
+1. In Cloudflare: **Zero Trust > Access controls > Service credentials > Service Tokens**, then **Create Service Token**.
+2. Name it after the caller, choose a **Service Token Duration** (it sets the expiration date), optionally add tags, then
+   **Generate token**.
+3. Copy the Client ID and the Client Secret into the caller's secret store at once. The page says: "This is the only time
+   Cloudflare Access will display the Client Secret." Never put either in a repository, ticket, chat message or log.
+4. Create the caller's Listing Guard client and API key as in step 4. The service token and the API key are different
+   secrets with different lifetimes; the caller keeps both.
+
+Expiry and rotation, as the service-tokens page describes them: a token expires on the date its duration sets, the
+dashboard **Refresh** adds one year (or edit the duration), and an alert can notify "a week before a service token
+expires": set one up. **Rotate** keeps the Client ID and generates a new Client Secret; the old secret keeps working for
+a grace period of one hour to 30 days, or you can revoke it immediately. Rotate with a grace period, give the caller the
+new secret, confirm it works, then let the grace period end. To stop a caller, disable or delete its token. What a client
+receives once its token has expired is **chưa kiểm chứng (unverified)**: the page does not say.
+
+### Application for `/api/v1/*`
+
+1. **Zero Trust > Access controls > Applications > Create new application > Self-hosted and private > Add public
+   hostname.** Domain: the API hostname. Path: `api/v1/*`. The application-paths page says `*` is a wildcard, that
+   `example.com/alpha/*` covers `example.com/alpha/one` but not `example.com/alpha`, and that port numbers, query
+   strings and `#` anchors are not supported. Whether the **Path** field wants a leading slash is **chưa kiểm chứng
+   (unverified)**: the pages write paths as `example.com/alpha/*`; enter what the field accepts and prove it with the
+   checks below.
+2. Add a policy with the action **Service Auth** and an Include rule with the selector **Service Token**, naming the
+   token or tokens of the callers allowed here. The selector **Any Access Service Token** ("the headers for any service
+   token created for this account") also exists and also requires Service Auth; prefer the narrower one. The policies
+   page describes Service Auth as the action for flows "that do not require an identity provider IdP login, such as service
+   tokens and mutual TLS"; the service-tokens page says that with any other action "Access will prompt for an identity
+   provider login".
+3. Do not add an Allow policy for people to this application. A policy has one action, and the pages say nothing about how
+   Allow and Service Auth policies of one application interact (**chưa kiểm chứng (unverified)**). Within an application,
+   the policies page says Bypass and Service Auth policies are evaluated first, top to bottom, then Block and Allow, and
+   that Access is deny by default.
+4. Open the application's **Additional settings** tab and switch on **401 Response for Service Auth policies**:
+   "Return a `401` response code when a user (or machine) makes a request to the application without the correct service
+   token." The page does not state its default, nor whether it treats missing and wrong headers alike (**chưa kiểm chứng
+   (unverified)**).
+5. Check the account's **strict service token authentication** setting (Access settings, **Manage service tokens**). The
+   service-tokens page says that with it on, "If authentication or authorization fails, Access always returns `401` or
+   `403` instead of redirecting the client to the login page with `302`", that organizations created on or after
+   2026-10-05 have it on and cannot turn it off, and that Access then logs failures for recognized tokens only ("It does
+   not log malformed headers or unknown Client IDs"). What a caller with missing or wrong headers sees when it is off is
+   **chưa kiểm chứng (unverified)**. Write down which setting your account has: it decides whether a bad caller sees a
+   redirect, a 401 or a 403.
+
+### Health (uptime monitor)
+
+`GET /health` needs no API key and answers only `200 {"status":"UP"}` or `503 {"status":"DOWN","reason":"database
+unavailable"}`. To keep it reachable for the uptime monitor, pick one:
+
+- **Bypass** (simplest): a separate self-hosted application with the path `health` and one policy, action **Bypass**,
+  Include selector **Everyone** (the policies page's Bypass example). The page says Bypass "disables Access enforcement
+  for specific traffic" and is "typically used to enable applications that require specific endpoints to be public",
+  that bypassed requests are not logged, that Bypass cannot use identity-based selectors, that it should be tested before
+  production and that Cloudflare "does not recommend using Bypass to grant direct permanent access to your internal
+  applications". Only `/health` is bypassed.
+- **Service Auth**: the same as for the API path, with a token of its own named after the monitor. This needs a monitor
+  that can send the two custom headers, which is **chưa kiểm chứng (unverified)** for any particular monitoring product:
+  check its documentation.
+
+### Paths no application covers
+
+The three applications above do not cover `/v3/api-docs` (needs an API key; Swagger UI is off by default),
+`GET /policies/search` (a debug view: `404` unless enabled, and it needs a key), or `/api/v1` with nothing after it (no
+such route). The pages read do not say what Access does with a request whose path matches no application on a hostname
+that has applications (**chưa kiểm chứng (unverified)**, see the checks below); their one related note says that where no Access
+application is in place "the published application will be available to anyone on the Internet". Do not assume: request
+each of these paths from outside. These routes still need an `X-API-Key`, but if they should be closed at Cloudflare too,
+add an application for them.
+
+### Check from outside
+
+Run these from a machine that is not the VM, with the three secrets loaded from your secret store into the environment
+(do not type their values on the command line: they land in shell history and process lists):
+
+```bash
+export LISTING_GUARD_BASE_URL=https://listing-api.example.com   # your public hostname
+
+# 1. Both layers valid: GET /api/v1/usage reads only your own client and costs no quota unit
+curl -sS -o /dev/null -w '%{http_code} %{content_type}\n' --connect-timeout 5 --max-time 10 \
+  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+  -H "X-API-Key: $LISTING_GUARD_API_KEY" \
+  "$LISTING_GUARD_BASE_URL/api/v1/usage"
+
+# 2. Passes Access, wrong or missing API key: the API itself refuses
+curl -sS -w '\n%{http_code} %{content_type}\n' --connect-timeout 5 --max-time 10 \
+  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+  "$LISTING_GUARD_BASE_URL/api/v1/usage"
+
+# 3. No Access headers, valid API key: Access must refuse before the API sees the request
+curl -sS -i --connect-timeout 5 --max-time 10 \
+  -H "X-API-Key: $LISTING_GUARD_API_KEY" "$LISTING_GUARD_BASE_URL/api/v1/usage"
+```
+
+| Check | Expected | Who answered |
+|---|---|---|
+| 1 | `200 application/json` | The API |
+| 2 | `401 application/problem+json` with `"code":"unauthorized"` and a `requestId` | The API: the request passed Access |
+| 3 | Not `200`, and not `application/problem+json` with a `requestId` | Access. The status (`302`, `401` or `403`) depends on the settings above: record what you see |
+| Check 1 with a wrong Client Secret | Same as check 3 | Access |
+| `GET /health` | `200 {"status":"UP"}` | The API, through Bypass or the monitor's token |
+| `GET /console/` with no identity | The Access sign-in page, never the console | Access |
+| `GET /v3/api-docs` and `/policies/search` without Access headers | Record the answer | **chưa kiểm chứng (unverified)**, see "Paths no application covers" |
 
 Verify locally that only `127.0.0.1:<API_PORT>` is published:
 
@@ -162,6 +295,13 @@ docker compose --profile prod ps
 
 From outside the VM, confirm the hostname reaches the API through Cloudflare and that no direct OCI 80/443/8080
 ingress rule exists.
+
+Cloudflare pages used here (all read on 2026-11-11):
+
+- Service tokens: <https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/>
+- Access policies: <https://developers.cloudflare.com/cloudflare-one/access-controls/policies/>
+- Self-hosted application: <https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/>
+- Application paths: <https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/>
 
 ## 6. Back up, restore and update
 
