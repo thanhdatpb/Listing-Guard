@@ -48,6 +48,38 @@ class FrozenRulesetsTest {
     }
 
     @Test
+    void amazon202612bIsUnchanged() {
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-12b.yaml");
+
+        assertThat(config.version()).isEqualTo("amazon-2026-12b");
+        assertThat(config.contentHash())
+                .isEqualTo("0fbce22fac9505369fde50eafe7d7170fe70d5965b866f513b27f67d91aa803f");
+    }
+
+    @Test
+    void amazon202612cIsUnchanged() {
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-12c.yaml");
+
+        assertThat(config.version()).isEqualTo("amazon-2026-12c");
+        assertThat(config.contentHash())
+                .isEqualTo("f816aa2a079519b3646ffe17bed05f20439a0455a10587fd3bcc38938405219e");
+    }
+
+    @Test
+    void amazon202612cIsADifferentVersionThatAddsTheDescriptionLengthRuleAndChangesNothingElse() {
+        RulesetConfig old = RulesetLoader.loadClasspath("rulesets/amazon-2026-12b.yaml");
+        RulesetConfig current = RulesetLoader.loadClasspath("rulesets/amazon-2026-12c.yaml");
+
+        assertThat(current.version()).isEqualTo("amazon-2026-12c");
+        assertThat(current.contentHash()).isNotEqualTo(old.contentHash());
+        assertThat(current.rules().keySet()).containsAll(old.rules().keySet()).contains("description_length");
+        assertThat(current.rules().keySet().size()).isEqualTo(old.rules().keySet().size() + 1);
+        for (String id : old.rules().keySet()) {
+            assertThat(current.rule(id)).as("rule %s is unchanged", id).isEqualTo(old.rule(id));
+        }
+    }
+
+    @Test
     void amazon202612bIsADifferentVersionThatAddsTheCustomizationRulesAndChangesNothingElse() {
         RulesetConfig old = RulesetLoader.loadClasspath("rulesets/amazon-2026-12.yaml");
         RulesetConfig current = RulesetLoader.loadClasspath("rulesets/amazon-2026-12b.yaml");

@@ -182,9 +182,9 @@ class RulesetLimitsIntegrationTest {
         RulesetConfig amazon = rulesets.get("AMAZON").config();
         JsonNode body = json(AMAZON);
 
-        // the ruleset in force is amazon-2026-12b (75-character title, Item Highlights, Amazon Custom); the numbers are read from it
-        assertThat(amazon.version()).isEqualTo("amazon-2026-12b");
-        assertThat(body.get("rulesetVersion").asText()).isEqualTo("amazon-2026-12b");
+        // the ruleset in force is amazon-2026-12c (75-character title, Item Highlights, Amazon Custom); the numbers are read from it
+        assertThat(amazon.version()).isEqualTo("amazon-2026-12c");
+        assertThat(body.get("rulesetVersion").asText()).isEqualTo("amazon-2026-12c");
 
         JsonNode title = limit(body, "title_length");
         assertThat(title.get("field").asText()).isEqualTo("title");
@@ -200,6 +200,16 @@ class RulesetLimitsIntegrationTest {
         assertThat(highlights.get("sourceStatus").asText())
                 .isEqualTo(amazon.rule("item_highlights_length").source().status().name());
         assertThat(highlights.get("enabled").asBoolean()).isEqualTo(amazon.rule("item_highlights_length").enabled());
+
+        // the description limit appears with no change to the endpoint: the rule declares it, the ruleset holds the number
+        JsonNode description = limit(body, "description_length");
+        assertThat(description.get("field").asText()).isEqualTo("description");
+        assertThat(description.get("kind").asText()).isEqualTo("MAX_LENGTH");
+        assertThat(description.get("unit").asText()).isEqualTo("CODE_POINTS");
+        assertThat(description.get("value").asInt()).isEqualTo(amazon.rule("description_length").intParam("max_length"));
+        assertThat(description.get("severity").asText()).isEqualTo("WARNING");
+        assertThat(description.get("sourceStatus").asText()).isEqualTo("UNVERIFIED");
+        assertThat(description.get("enabled").asBoolean()).isTrue();
     }
 
     @Test
@@ -207,7 +217,7 @@ class RulesetLimitsIntegrationTest {
         RulesetConfig amazon = rulesets.get("AMAZON").config();
         JsonNode body = json(AMAZON);
 
-        assertThat(amazon.version()).isEqualTo("amazon-2026-12b");
+        assertThat(amazon.version()).isEqualTo("amazon-2026-12c");
         for (String[] expected : new String[][] {
                 {"customization_text_input_count", "customization.surfaces[].text_inputs"},
                 {"customization_dropdown_options", "customization.surfaces[].dropdowns[].options"},

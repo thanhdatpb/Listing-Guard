@@ -90,8 +90,8 @@ class AmazonCheckIntegrationTest {
 
         assertThat(result.get("status").asText()).isEqualTo("COMPLETED");
         assertThat(result.get("marketplace").asText()).isEqualTo("AMAZON");
-        assertThat(result.get("rulesetVersion").asText()).isEqualTo("amazon-2026-12b");
-        assertThat(result.get("analysisVersion").asText()).isEqualTo("amazon-2026-12b");
+        assertThat(result.get("rulesetVersion").asText()).isEqualTo("amazon-2026-12c");
+        assertThat(result.get("analysisVersion").asText()).isEqualTo("amazon-2026-12c");
         assertThat(result.get("cached").asBoolean()).isFalse();
         assertThat(result.get("summary").get("errors").asInt()).isZero();
         assertThat(result.get("summary").get("warnings").asInt()).isZero();
@@ -208,7 +208,7 @@ class AmazonCheckIntegrationTest {
         assertThat(second.get("cached").asBoolean()).isTrue();
         assertThat(second.get("checkId").asText()).isEqualTo(first.get("checkId").asText());
         assertThat(second.get("contentHash").asText()).isEqualTo(first.get("contentHash").asText());
-        assertThat(second.get("analysisVersion").asText()).isEqualTo("amazon-2026-12b");
+        assertThat(second.get("analysisVersion").asText()).isEqualTo("amazon-2026-12c");
     }
 
     @Test
@@ -229,7 +229,7 @@ class AmazonCheckIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.marketplace").value("AMAZON"))
                 .andExpect(jsonPath("$.cached").value(false))
-                .andExpect(jsonPath("$.rulesetVersion").value("amazon-2026-12b"))
+                .andExpect(jsonPath("$.rulesetVersion").value("amazon-2026-12c"))
                 .andExpect(jsonPath("$.findings[0].ruleId").value("title_repeated_words"))
                 .andExpect(jsonPath("$.findings[0].value").value("bag"));
     }
@@ -237,7 +237,7 @@ class AmazonCheckIntegrationTest {
     @Test
     void theAmazonRulesetIsRegisteredOnceUnderAmazon() {
         Integer rows = jdbc.queryForObject(
-                "SELECT count(*) FROM ruleset_version WHERE marketplace_code = 'AMAZON' AND version = 'amazon-2026-12b'", Integer.class);
+                "SELECT count(*) FROM ruleset_version WHERE marketplace_code = 'AMAZON' AND version = 'amazon-2026-12c'", Integer.class);
 
         assertThat(rows).isEqualTo(1);
     }
