@@ -47,6 +47,23 @@ It never edits a listing, never publishes, and does no SEO.
   (the latest transaction of a serial number wins) and A4 (evaluation).
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`, `FixSuggestion`). No Spring.
 - **Image checker core** (`image-checker/`, ADR-008, Proposed): Java-only ImageIO module, independent image input and canonical byte/metadata hash, immutable Amazon/Etsy `image-compliance` rulesets, runtime-aware analysis fingerprint, EXIF orientation, embedded ICC-to-sRGB conversion, alpha compositing on white, dimensions/aspect ratio, image count, Amazon main-image edge whiteness, occupancy and Laplacian variance. No Spring, database, HTTP or original-image persistence. Both shipped marketplace rulesets keep policy thresholds null until the maintainer reviews saved official sources; affected checks return `INCOMPLETE`. Every shipped source is `unverified`, and findings are only WARNING/INFO. The CUSTOMER_CONTENT rule reads the caller-declared source only; there is no text/logo/watermark detection.
+- **Image checks endpoint** (`api/.../image/`, ADR-008, Proposed; implemented, off by default): `POST /api/v1/image-checks` (multipart:
+  a `metadata` part with `marketplace`, optional `profile` and `images[]` of `{role, source}`, plus one `images` file part per image in
+  the same order; `docs/input-schema.md` "Image checks"; never a URL or a path) and `GET /api/v1/image-checks/{id}` (client-scoped,
+  another client's, an unknown and an expired id are one `404 image-check-not-found`). `listing-guard.image.enabled=false` by default:
+  the endpoint then answers `503 image-checks-not-configured` and the large upload body limit does not apply. V28 (plan pack
+  `image-checks` for SELLER and PRO; the **plan pack id differs from the ruleset's analysis pack `image-compliance`** on purpose,
+  ADR-008 Open question 2) and V29 (`image_check`, `image_check_item`, `image_check_finding`): **only the canonical input hash, one
+  SHA-256 and the decoder's metadata per image, and bounded evidence are stored, never the bytes or a file name**; 30-day retention
+  (`listing-guard.image.retention.*`) enforced on read and by a scheduled cleanup under the shared retention advisory lock; cache
+  `(client, marketplace, pack, input hash, ruleset version, analysis version)` with `COMPLETE` results only; one unit per new
+  `COMPLETE` result, however many images. A corrupt, CMYK or undecodable image is an `INCOMPLETE` image in a `200`, never a 500.
+  **The shipped rulesets keep every marketplace threshold null, so every check against them is `INCOMPLETE` (never cached, never
+  charged)**; tests use test-only rulesets with invented numbers (`api/src/test/resources/image/`). Limits are operational settings
+  (`max-images` 20, `max-file-size` 10 MB, `max-request-size` 60 MB). **Not built, and why it is off by default:** the bounded decode
+  service (semaphore, weighted memory budget, bounded executor, `503` + `Retry-After`), the private upload staging directory and the
+  stuck-decoder health effect (ADR-008 "Image input security"); no MCP tool (ADR-017 allows none, ADR-008 Open question 5), no
+  `batch-check` part, no console page, no health-report section, no `GET .../limits` entry.
 - **Variation checks** (`variation-checks/`, ADR-015, Proposed; implemented): pure Java (no Spring, database or HTTP) checks
   of a parent/child variation family, in a request of its own (`parent`, `variation_properties`, `children[]`;
   `docs/input-schema.md` "Variation checks"; the normalizer only trims and drops blanks). Ruleset
@@ -192,7 +209,7 @@ It never edits a listing, never publishes, and does no SEO.
   operator keys too; the count and insert hold a row lock on the client. `ConsoleModelAdvice` sets `demoCatalog` when
   `listing-guard.trademark.catalog-version` starts with `demo-`: every console page (sign-in pages included, inline style) shows
   the banner and the editor's trademark panel repeats it.
-- Current scope: Etsy and Amazon rule engines, the image-checker core (ADR-008; no endpoint yet), the multi-client API with optional plans and a monthly quota, optional
+- Current scope: Etsy and Amazon rule engines, the image checker (ADR-008: the core and the endpoint, off by default and without the bounded decode service), the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
   endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the listing health report (ADR-018), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
@@ -231,7 +248,7 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
    real data). Next are PR A2c (the latest transaction of a serial number wins, needed before a catalog made of daily
    files is trusted; `jsonl-1` is not changed by A2b) and A4 evaluation.
    ADR-009 "Pull requests" and "USPTO conversion and multi-source catalogs (PR A2b)" have the detail.
-3. PR B: image checker (ADR-008, Proposed); this branch implements the Java core. The API endpoint, result storage, multipart staging and bounded decode service remain separate work.
+3. PR B: image checker (ADR-008, Proposed): the Java core and the endpoint with its result tables, retention and plan pack are done (PR B1, PR B2, off by default). Next, before it may be enabled for an untrusted caller: the bounded decode service, the private upload staging and the stuck-decoder health effect (ADR-008 "Not done in this change"); then reviewed marketplace thresholds as a new ruleset version.
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
    after PR A, in this order: run the retrieval evaluation and commit the real results, then PR 3 (`ApiLlmProvider`),
    PR 4 (profile and retrieval), PR 5 (endpoint) and PR 6 (analyzer evaluation).
@@ -261,7 +278,7 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
 10. MCP server (ADR-017, Proposed): done as one PR (`feat/mcp-server`: ADR, module, tests, `docs/mcp.md`, README, this file). Open
     questions the maintainer decides are at the end of the ADR (the annotations of the check tools, a token on the HTTP transport, a
     key per session, a tool that reads a stored result, how the jar is distributed, cleartext on a private network). Not planned: a
-    tool that writes, a Docker image or compose service, authentication on the HTTP transport.
+    tool that writes, a tool that takes images or a path (ADR-008 Open question 5, ADR-017 Open question 9), a Docker image or compose service, authentication on the HTTP transport.
 
 11. Listing health report (ADR-018, Proposed): done as one PR (`feat/listing-health-report`: ADR, V26/V27, `HealthReportService`, the
     endpoint, the `health-report` job, the console page, docs). Open questions the maintainer decides are at the end of the ADR (plan
@@ -467,6 +484,16 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   trademark scanner (`TrademarkAdapter`) are part of the analysis fingerprint: changing one needs a new `AlgorithmVersions`
   constant. Nothing in `trademark-scanner` or its ruleset changes for this pack. Tests read classes, profiles, limits and
   templates from the ruleset and use invented names (the DEMO catalog's, never a real mark).
+- **Image checks** (ADR-008): no marketplace threshold in Java and none remembered or inferred in a ruleset: an unreviewed number is
+  `null` and its check is `INCOMPLETE` (the loader refuses `ERROR` for anything not `verified`; a ruleset version is immutable, so
+  numbers come as a new version with a source the maintainer has saved under `policies/raw/`). **Never store the image bytes or a file
+  name, never log either, never fetch a URL or read a path** (the only input is a multipart part). The ruleset declares only operational
+  decoder caps; deployment limits (`max-images`, sizes) are `listing-guard.image.*`. A per-image failure is an `INCOMPLETE` image, never
+  a 500, and an `INCOMPLETE` result is stored for GET and never reused or charged. The plan pack is `image-checks` and the ruleset pack
+  is `image-compliance`: do not unify them without ADR-008 Open question 2. `ImageChecker`, `CanonicalImageInput` and
+  `ImageAnalysisFingerprint` decide findings and cache identity: changing one needs a new fingerprint component. Test rulesets with
+  numbers live in `api/src/test/resources/image/` only. Do not enable the endpoint for an untrusted caller before the bounded decode
+  service, the upload staging and the health effect exist.
 - **MCP server** (ADR-017): `mcp-server` stays a client of the REST API and depends on no other module (a test reads its POM and its
   imports: no database, no Spring, no `core`, no `api`). A new tool means a new `Endpoint` entry, a `ToolSpec` with a schema that
   `ArgumentChecker` enforces, and a test of its method, path and header; **never a tool that writes, never a tool that takes a URL

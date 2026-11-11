@@ -24,6 +24,14 @@ edit or publish anything, and it does not do SEO.
   production. Character rules against a print profile (characters the printer cannot print, too long, stray spaces) and the
   trademark scan of the same text, shown side by side. The buyer's text is never stored or repeated in an answer. The print
   profiles shipped are placeholders; it is a reference warning and does not change any other endpoint.
+- **Image checks** (`POST /api/v1/image-checks`, multipart): checks the images of a listing (file format, size, aspect ratio,
+  how many images, the white background of an Amazon main image, how much of the frame the product fills, sharpness) against a
+  marketplace image profile, in a request of its own. An image that cannot be read is reported as an incomplete image, not as an
+  error. **The shipped rulesets hold no marketplace threshold yet, so every check against them is `INCOMPLETE`**; nothing is
+  `verified`, so nothing is an `ERROR`, and nothing in a picture (a logo, a mark, text) is recognized. The images are never stored,
+  only their hashes and what was read from them, for 30 days. It is **off by default** and not ready for an untrusted caller (the
+  bounded decode service of ADR-008 is not built); it is in the `SELLER` and `PRO` plans and costs one unit per new complete result
+  where plans are on.
 - **Ruleset limits** (`GET /api/v1/rulesets/{marketplace}/limits`): the numeric limits of the loaded rulesets (title length,
   number and length of tags, Amazon search terms in bytes, ...), each with the field, the unit it is counted in, its severity
   and how well it is sourced, read from the same rules and ruleset the check uses. A client shows a character counter from it
@@ -128,6 +136,7 @@ Client backend -- X-API-Key --> Listing Guard API (Spring Boot)
    POST /api/v1/trademark-checks     |
    POST /api/v1/variation-checks     |   (its own request: a parent and its children; pack `variation-checks`)
    POST /api/v1/personalization-screenings |   (its own request: what a buyer typed; pack `personalization-screening`)
+   POST /api/v1/image-checks         |   (multipart, its own request: the images; plan pack `image-checks`, off by default)
    GET  /api/v1/rulesets/{m}/limits  |   (read only: the limits of the rules below)
                          API key --> authenticated client
                          rate limit per client
@@ -181,6 +190,7 @@ Modules:
 | `rule-engine/` | `Rule`, `RuleRegistry`, `RuleEngine`, ruleset loader, and versioned Etsy and Amazon rulesets. Amazon supports per-product-type overrides. No Spring. |
 | `trademark-scanner/` | Trademark risk scanner core (ADR-009): versioned ruleset, canonical input hash, normalization with offsets, the `TrademarkCatalog` port with an in-memory catalog, exact/phrase/fuzzy matching, color and place context rules, risk aggregation, the pack fingerprint, and the catalog manifest and data file reader. No Spring, no database. |
 | `variation-checks/` | Variation checks core (ADR-015): the input of a parent and its children, its canonical hash, a strict ruleset loader, `variation-checks-2026-11.yaml` and the seven rules, the pack fingerprint, and `INCOMPLETE` when a rule fails. No Spring, no database. |
+| `image-checker/` | Image checker core (ADR-008): ImageIO analysis of JPEG and PNG (EXIF orientation, ICC to sRGB, alpha on white, dimensions, aspect ratio, image count, Amazon main-image background, occupancy, Laplacian variance), the canonical input hash, the strict loader of `etsy-image-2026-11.yaml` and `amazon-image-2026-11.yaml` (every threshold null until reviewed) and the pack fingerprint. No Spring, no database, no HTTP. |
 | `personalization-screening/` | Personalization screening core (ADR-016): the input of the text a buyer typed, its canonical hash, a strict ruleset loader, `personalization-screening-2026-11.yaml` (character classes and print profiles), the three character rules, the adapter that runs the trademark scanner on each value, the pack fingerprint, and `INCOMPLETE` when a rule fails or no catalog is served. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, hashing for tests), `PolicyRetriever`, retrieval metrics, and the `LlmProvider` contract with a scripted test provider and a `CitationVerifier` (no call to a real model is implemented). No Spring. |
 | `api/` | Spring Boot 4.1 REST app (Java 21, Spring Framework 7, Hibernate 7, PostgreSQL 16) and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks`, `/trademark-checks`, `/variation-checks` and `/personalization-screenings` endpoints with their retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
@@ -587,7 +597,7 @@ What follows, in this order, is **not built yet**:
    needs), and A4, the evaluation that would give the first measured numbers. The trademark pack does not scan the
    Amazon `item_highlights` field yet (the rule checks do): adding it is a change of the trademark ruleset and of its
    canonical input, so it is a separate step.
-2. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)). The Java-only analysis core and synthetic tests are implemented in `image-checker/`; the API, persistence, multipart staging and bounded decode operations are not part of this core change. Shipped Etsy/Amazon profiles leave marketplace thresholds unset, so those checks report `INCOMPLETE` until the maintainer saves and reviews official sources ([source URL list and maintainer steps](docs/image-checker-core.md)). No source pages or original images are stored here.
+2. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)). The Java-only analysis core (`image-checker/`), the endpoint `POST /api/v1/image-checks` with its result tables, retention cleanup and the `image-checks` plan pack are implemented (off by default); the bounded decode service, the private upload staging and the stuck-decoder health check are not, and no tool for the MCP server (ADR-017 allows none). Shipped Etsy/Amazon profiles leave marketplace thresholds unset, so those checks report `INCOMPLETE` until the maintainer saves and reviews official sources ([source URL list and maintainer steps](docs/image-checker-core.md)). No source pages or original images are stored here.
 3. After step 1: run the retrieval evaluation and record the measured results (this needs an embedding provider: an API
    key or Ollama), then build the policy analyzer ([ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md)). Only parts
    exist today (the `LlmProvider` contract, a scripted test provider and the citation verifier); there is no call to a
@@ -637,7 +647,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-005: API auth, rate limit, and result cache](docs/adr/ADR-005-api-auth-rate-limit-and-result-cache.md)
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
-- [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Proposed; Java core implemented, API/storage remain)
+- [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Proposed; the core, the endpoint, the tables and the plan pack are implemented, off by default; the bounded decode service, the upload staging and every marketplace threshold remain)
 - [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3 and A2b are implemented; the USPTO converter is unverified against real data)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)

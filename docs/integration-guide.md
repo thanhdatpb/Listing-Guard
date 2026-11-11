@@ -160,13 +160,14 @@ operator of the deployment you call whether plans are on. The operator sets your
 What counts: **one unit is one new result that is stored, per endpoint.** A full check of one listing, that is
 `POST /api/v1/checks` and `POST /api/v1/trademark-checks` for the same listing, is two units; a variation family sent to
 `POST /api/v1/variation-checks` (`SELLER` and `PRO` plans) is one more, and so is each order sent to
-`POST /api/v1/personalization-screenings` (`SELLER` and `PRO` plans). What does not count:
+`POST /api/v1/personalization-screenings` (`SELLER` and `PRO` plans); the images of one listing sent to
+`POST /api/v1/image-checks` (`SELLER` and `PRO` plans) are one unit however many there are. What does not count:
 
 - a result answered from the cache (`"cached": true`), also when you are at the limit;
 - `GET /api/v1/checks/{id}`, `GET /api/v1/trademark-checks/{id}`, `GET /api/v1/variation-checks/{id}`,
-  `GET /api/v1/personalization-screenings/{id}`, `GET /api/v1/usage` and `GET /api/v1/reports/summary` (the health report, which
-  needs no pack either);
-- a trademark, variation or personalization result that is `INCOMPLETE` (it is stored for `GET` and never reused);
+  `GET /api/v1/personalization-screenings/{id}`, `GET /api/v1/image-checks/{id}`, `GET /api/v1/usage` and
+  `GET /api/v1/reports/summary` (the health report, which needs no pack either);
+- a trademark, variation, personalization or image result that is `INCOMPLETE` (it is stored for `GET` and never reused);
 - a request that is refused or fails (`400`, `401`, `403`, `413`, `429`, `503`).
 
 Repeating a request is therefore safe for your quota: the second identical request is answered from the cache and costs
@@ -185,7 +186,7 @@ The month is the calendar month in UTC; the counter resets at 00:00 UTC on the f
   "remaining": 958,
   "periodStart": "2026-11-01",
   "resetAt": "2026-12-01T00:00:00Z",
-  "packs": ["batch", "listing-rules", "personalization-screening", "sheet-connector", "trademark-risk", "variation-checks"]
+  "packs": ["batch", "image-checks", "listing-rules", "personalization-screening", "sheet-connector", "trademark-risk", "variation-checks"]
 }
 ```
 
@@ -1021,6 +1022,111 @@ the cache. Another client never reads your results, and a `checkId` of another c
 not exist. Where plans are on, the pack `personalization-screening` must be in your plan (`403 plan-not-allowed` otherwise) and
 a new `COMPLETE` result costs one unit; a result without a trademark catalog is `INCOMPLETE` and costs none.
 
+## Image checks
+
+`POST /api/v1/image-checks` checks the **images** of one listing against the image profile of the marketplace: the file
+format, the size, the aspect ratio, how many images there are, the white background of an Amazon main image, how much of the
+frame the product fills and how sharp the image is. It is a separate check with its own request, endpoint, result and
+retention; `/checks` and the other packs do not change and do not depend on it, and an image is never part of a listing. It
+never edits or re-encodes an image, proposes no replacement and **does not recognize a logo, a mark or text in a picture**: no
+finding does not mean an image is free of third-party marks.
+
+**Off by default.** A deployment answers `503 image-checks-not-configured` until its operator turns the endpoint on
+(`listing-guard.image.enabled`, see [deployment](deployment.md#image-check-results-their-retention-and-the-plan-pack-adr-008)).
+**Read this before you rely on it: the shipped rulesets have no threshold yet.** Every marketplace number (the sizes, the aspect
+ratio, the number of images, the white-background tolerance, the occupancy, the sharpness) is empty until the maintainer has
+reviewed the official pages and saved them, because no limit may be remembered or guessed. A check against such a ruleset is
+therefore `INCOMPLETE`, says in `failedRules` which checks could not run and gives no summary but `INCOMPLETE`; it still tells you
+the format and size it read from each image and applies the one rule that needs no number (below). When a reviewed ruleset ships,
+the same call gives complete results.
+
+### Request
+
+`Content-Type: multipart/form-data` (let your HTTP client set the boundary). Two kinds of part, which and how are the public
+contract in [`docs/input-schema.md`](input-schema.md#image-checks): `metadata` (a JSON object with the `marketplace`, an optional
+`profile` and one `{role, source}` entry per image) and one `images` file part per image, in the same order. Only parts are
+accepted: **no URL and no file path is ever fetched or read.** The format is read from the bytes (JPEG and PNG), never from the
+file name or the content type. At most 20 images and 10 MB per image by default (the operator can change both).
+
+```bash
+curl -X POST http://localhost:8080/api/v1/image-checks -H 'X-API-Key: <key>' \
+  -F 'metadata={"marketplace":"AMAZON","images":[{"role":"MAIN","source":"SELLER"},{"role":"ADDITIONAL"}]};type=application/json' \
+  -F 'images=@main.jpg' -F 'images=@angle.png'
+```
+
+### Response
+
+`200`, new or stored (`cached`). An image that cannot be read (corrupt, not a JPEG or PNG, CMYK, too many pixels) is **not an error
+of the request**: that image is `INCOMPLETE` and the others are still checked. The example is a check against a ruleset without
+thresholds, with one image that could not be decoded:
+
+```json
+{
+  "checkId": "3c9d1e7a-6b24-4f08-a5d1-2e8b7c0f9a34",
+  "marketplace": "AMAZON",
+  "profile": "default",
+  "rulesetVersion": "amazon-image-2026-11",
+  "analysisVersion": "4b7e0a19c3d85f62a1e0d9c8b7a6f5e4d3c2b1a09887766554433221100ffee1",
+  "cached": false,
+  "completeness": "INCOMPLETE",
+  "summary": "INCOMPLETE",
+  "failedRules": ["image_count", "images[0].image_dimensions", "images[0].aspect_ratio", "images[0].main_background",
+                  "images[0].occupancy", "images[0].blur", "images[1].image_decode"],
+  "disclaimer": "Kết quả chỉ là cảnh báo tham khảo, không xác nhận ảnh được Amazon chấp nhận.",
+  "createdAt": "2026-11-11T09:15:30.123456Z",
+  "expiresAt": "2026-12-11T09:15:30.123456Z",
+  "findings": [],
+  "images": [
+    {"ordinal": 0, "imageHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+     "role": "MAIN", "source": "SELLER", "completeness": "INCOMPLETE",
+     "failedRules": ["image_dimensions", "aspect_ratio", "main_background", "occupancy", "blur"],
+     "metadata": {"format": "JPEG", "width": 1600, "height": 1200, "orientation": 1, "hadAlpha": false, "hadIccProfile": false},
+     "findings": []},
+    {"ordinal": 1, "imageHash": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+     "role": "ADDITIONAL", "source": "CUSTOMER_CONTENT", "completeness": "INCOMPLETE",
+     "failedRules": ["image_decode"],
+     "findings": [
+       {"ruleId": "customer_content", "severity": "WARNING", "sourceStatus": "unverified",
+        "message": "Ảnh do khách hàng cung cấp có thể chứa logo hoặc nhãn hiệu bên thứ ba; hãy kiểm tra thủ công trước khi dùng.",
+        "evidence": "declared source=CUSTOMER_CONTENT"}]}
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `checkId` | Identifier of the stored result; `GET /api/v1/image-checks/{id}` until `expiresAt`. |
+| `rulesetVersion`, `analysisVersion` | What produced the result (the analysis version includes the ruleset, the algorithm versions and the image runtime of the server). Opaque strings: compare for equality, do not parse. |
+| `profile` | The profile that was used; the default one when your request named none. |
+| `cached` | `true` when the stored result of an identical earlier request is returned. |
+| `completeness` | `COMPLETE`, or `INCOMPLETE` when a check could not run on an image or on the set (a corrupt image, a threshold the ruleset does not have yet): `failedRules` names it (`image_count` for the set, `images[i].rule` for one image) and the findings that were established are kept. **An `INCOMPLETE` result is not a clean result**; it is stored so it can be read with GET, is never returned for another request and costs no quota. |
+| `summary` | The outcome the ruleset maps from the highest severity found (today `READY`, `REVIEW` or `BLOCK`), and always `INCOMPLETE` when the result is. A summary of reference warnings, never a verdict of the marketplace. |
+| `disclaimer` | The statement that the result is a reference warning. Show it with the result. |
+| `findings` | Findings about the set of images as a whole (the number of images). |
+| `images[]` | One entry per image, in your order: `ordinal`, `imageHash` (SHA-256 of the bytes you sent), the `role` and `source` you declared (`UNKNOWN` when you declared none), `completeness`, `failedRules`, `metadata` (`format`, `width`, `height` after the EXIF orientation was applied, `orientation`, `hadAlpha`, `hadIccProfile`; absent when the image could not be decoded) and `findings`. |
+
+A finding has `ruleId` (stable: `image_count`, `image_dimensions`, `aspect_ratio`, `main_background`, `occupancy`, `blur`,
+`customer_content`), `severity` (`WARNING` or `INFO`; **no finding is an `ERROR`**, because no marketplace source is verified),
+`sourceStatus` (the status of the ruleset source behind the rule, `unverified` today), `message` (Vietnamese) and `evidence`, a
+measured value such as `count=6`. It carries no image content.
+
+**The declared `source`.** `CUSTOMER_CONTENT` is your declaration that the image came from a customer. It produces one `WARNING`
+for that image, whether or not the image can be decoded, telling you to check it by hand for a third-party logo or mark. It does
+not look at pixels. `SELLER` and `UNKNOWN` produce no finding, and an omitted `source` is `UNKNOWN`.
+
+### Caching, retention and quota
+
+**The images are never stored**, nor their file names: only a hash of the request, one hash per image, what the decoder read from
+it and the findings are, for 30 days (`expiresAt`; an operational setting, not a guarantee). After the retention `GET` answers
+`404` whether or not the server's cleanup has run, and the same images sent again are analysed again and get a new `checkId`. An
+identical request of the same client (same marketplace, profile, role, declared source and bytes of every image in the same
+order, same `analysisVersion`) returns the stored `COMPLETE` result with `cached: true`; a different ruleset, a different code
+version or a different image runtime changes `analysisVersion` and with it the cache. Another client never reads your results,
+and a `checkId` of another client answers `404` exactly like one that does not exist. Where plans are on, the pack `image-checks`
+must be in your plan (`403 plan-not-allowed` otherwise) and a new `COMPLETE` result costs one unit (the whole request, however
+many images); a cached or an `INCOMPLETE` one costs none. The `413` and `400 too-many-images` limits are the deployment's, not
+the marketplace's.
+
 ## Health report
 
 `GET /api/v1/reports/summary?from=YYYY-MM-DD&to=YYYY-MM-DD[&marketplace=ETSY|AMAZON]` adds up what your client has stored over a
@@ -1134,6 +1240,8 @@ Cloudflare Access see "Calling through Cloudflare Access".
 | 400 | `invalid-request` | Body missing, not JSON, or `marketplace` / `listing` missing; `listing` not an object. | Fix the request. Do not retry unchanged. |
 | 400 | `unknown-marketplace` | The marketplace code is not known. | Fix the code. `detail` lists the supported ones. |
 | 400 | `unknown-print-profile` | `POST /api/v1/personalization-screenings`: `print_profile` names a profile the ruleset does not declare. `known` lists the declared codes. | Fix the code, or leave it out for the default profile. |
+| 400 | `unknown-image-profile` | `POST /api/v1/image-checks`: `metadata.profile` names a profile the marketplace's image ruleset does not declare. `known` lists the declared names. | Fix the name, or leave it out for the default profile. |
+| 400 | `too-many-images` | `POST /api/v1/image-checks`: more images than the deployment allows in one request (20 by default). `maxImages` and `submitted` say how many. | Send fewer images per request. |
 | 400 | `invalid-report-period` | `GET /api/v1/reports/summary`: `from` or `to` is missing, is not a date written `YYYY-MM-DD`, or `from` is after `to`. | Fix the dates. |
 | 400 | `report-period-too-long` | `GET /api/v1/reports/summary`: the period covers more days than the deployment allows (92 by default, both ends counted). `maxDays` and `requestedDays` say how many. | Ask for a shorter period, or several. |
 | 401 | `unauthorized` | Missing or invalid `X-API-Key`. | Check the key. Do not retry in a loop. |
@@ -1142,11 +1250,12 @@ Cloudflare Access see "Calling through Cloudflare Access".
 | 404 | `trademark-check-not-found` | `GET /api/v1/trademark-checks/{id}`: no retained trademark check with that id for your client. A check of another client, an id that never existed and an expired check give this same answer. | The id is wrong, not yours, or past its retention: send the listing again. |
 | 404 | `variation-check-not-found` | `GET /api/v1/variation-checks/{id}`: no retained variation check with that id for your client. A check of another client, an id that never existed and an expired check give this same answer. | The id is wrong, not yours, or past its retention: send the family again. |
 | 404 | `personalization-screening-not-found` | `GET /api/v1/personalization-screenings/{id}`: no retained screening with that id for your client. A screening of another client, an id that never existed and an expired screening give this same answer. | The id is wrong, not yours, or past its retention: send the order again. |
+| 404 | `image-check-not-found` | `GET /api/v1/image-checks/{id}`: no retained image check with that id for your client. A check of another client, an id that never existed and an expired check give this same answer. | The id is wrong, not yours, or past its retention: send the images again. |
 | 404 | `ruleset-not-found` | `GET /api/v1/rulesets/{marketplace}/limits`: no ruleset is active for the marketplace. `detail` lists the supported ones. | Fix the marketplace code. |
 | 404 | `not-found` | Unknown route. | Check the URL. |
 | 405 | `method-not-allowed` | Wrong HTTP method. | |
-| 413 | `payload-too-large` | Body over 256 KB. | Send less. |
-| 415 | `unsupported-media-type` | Not `application/json`. | |
+| 413 | `payload-too-large` | Body over 256 KB; for `POST /api/v1/image-checks` one image over the deployment's file limit (10 MB by default) or a request over its request limit (60 MB). | Send less. |
+| 415 | `unsupported-media-type` | Not `application/json` (not `multipart/form-data` for `POST /api/v1/image-checks`). | |
 | 422 | `marketplace-not-yet-supported` | A marketplace that is planned but not supported yet. None is planned today, so you will not see it now. | Skip the check for it. |
 | 429 | `rate-limited` | Over the per-client limit. | Wait `Retry-After` seconds, then retry. |
 | 429 | `quota-exceeded` | Only where plans are on. The month's quota of your plan is used up; `plan`, `quota`, `used` and `resetAt` say where you are. **No `Retry-After`.** | Do not retry before `resetAt` or a plan change. Results you already have are still answered from the cache. |
@@ -1155,6 +1264,7 @@ Cloudflare Access see "Calling through Cloudflare Access".
 | 503 | `embedding-unavailable` | Only on routes that need the embedding backend. Not `POST /api/v1/checks`. | |
 | 503 | `corpus-model-mismatch` | Only on routes that search the policy corpus. The stored corpus was embedded with another model than the configured one, so searching is refused. Not `POST /api/v1/checks`. | An operator must run the ingest job again. |
 | 503 | `trademark-not-configured` | Only `POST /api/v1/trademark-checks`. The deployment has no trademark catalog configured, or the configured one is refused. `POST /api/v1/checks` is not affected. | Skip the trademark check; retrying does not help. An operator must configure a catalog. |
+| 503 | `image-checks-not-configured` | Only `POST /api/v1/image-checks`. Image checks are not enabled in this deployment (they are off by default). The other endpoints are not affected. | Skip the image check; retrying does not help. An operator must enable it. |
 | 503 | `service-unavailable` | The API key could not be checked because the database did not answer. | Retry later with backoff. |
 
 Retrying `POST /api/v1/checks` is always safe: it has no side effect other than storing the result, and an
@@ -1185,5 +1295,5 @@ the operator creates one.
 
 Mapping a client's own listing format to the standard input format (that is done on the client's side),
 rules that differ per client, an admin UI, billing, policy-grounded LLM findings, feedback on findings,
-image checks, compatibility or descriptive-use rules for trademarks, a client-specific trademark catalog, configured product-type-specific Amazon limits (no overrides are configured until sources are
+logo, text and watermark detection in images (the image checks look at format, size and pixels only, and are not in the health report, `batch-check` or the MCP server), compatibility or descriptive-use rules for trademarks, a client-specific trademark catalog, configured product-type-specific Amazon limits (no overrides are configured until sources are
 verified), and stores other than the US one.

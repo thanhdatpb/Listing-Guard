@@ -253,3 +253,91 @@ These are operational safety controls and are separate from marketplace threshol
   liveness unhealthy.
 - A new ruleset version and source metadata are used; prior rulesets and frozen hashes remain
   unchanged. Update OpenAPI and integration documentation with any endpoint contract.
+
+## Endpoint, storage and plan pack (PR B2)
+
+Implemented on branch `feature/image-checks-endpoint`; the Java core (PR B1, `image-checker/`) was merged before it. This section
+records what that pull request decided where this record left room, what it did **not** do, and what the maintainer still has to
+decide. The Status stays Proposed: the criteria above that concern the bounded decode service, the upload staging and the health
+check are not met, and no marketplace threshold has been reviewed.
+
+### What was built
+
+- **Request.** `POST /api/v1/image-checks` takes `multipart/form-data` only: a `metadata` part (a JSON object with `marketplace`,
+  an optional `profile` and `images[]` with one `{role, source}` per image) and one `images` file part per image, in the same
+  order. `role` (`MAIN` or `ADDITIONAL`) is required and never guessed from the position; `source` is optional and absent means
+  `UNKNOWN`; any other value, an unknown member or a different number of entries and parts is `400 invalid-request`. The reader is
+  strict. A profile the ruleset does not declare is `400 unknown-image-profile` (the declared names in `known`), never replaced by
+  the default. Every field is in `docs/input-schema.md` ("Image checks"), which a test holds to the reader.
+- **Limits from configuration**, in `listing-guard.image.*` and not in a ruleset: `max-images` (20; more is `400 too-many-images`),
+  `max-file-size` (10 MB) and `max-request-size` (60 MB; `413 payload-too-large`). The same two sizes are the Spring multipart
+  limits, and the request size is the body limit of this one path (the other endpoints keep 256 KB), applied only while the endpoint
+  is on. A multipart request the container cannot read is `400 invalid-request`, never a 500 and without the parser's message.
+- **A corrupt, unsupported, CMYK or oversized-pixel image is not an error of the request**: the checker returns that image as
+  `INCOMPLETE` (`image_decode`) and the others are still checked; the request is `200`.
+- **Result and storage.** `GET /api/v1/image-checks/{id}` filters by client; another client's id, an unknown id and an expired id
+  are one `404 image-check-not-found`. V29 adds `image_check`, `image_check_item` and `image_check_finding`. Stored: the canonical
+  input hash, one SHA-256 and the decoder's metadata per image, the findings with their evidence (at most 200 characters, a measured
+  value) and the ruleset's disclaimer. **Not stored: the image bytes and the client's file names** (a test looks for a binary or a
+  name column). Cache identity is `(client, marketplace, pack_id, input hash, ruleset version, analysis version)` with `pack_id`
+  `image-compliance`, in a partial unique index for `COMPLETE` results only; an `INCOMPLETE` result is stored for GET and never
+  reused.
+- **Retention.** 30 days (`listing-guard.image.retention.*`); GET and the cache lookup decide expiry by the database clock; a repeated
+  request deletes the expired row and its children and stores the new result in one transaction; a scheduled cleanup deletes expired
+  checks in bounded batches under `pg_try_advisory_xact_lock(1279746628, 1380271182)`, the pair this record and ADR-010 reserve, shared
+  with the trademark, variation and personalization cleanups (it runs whether or not the endpoint is enabled).
+- **Plan pack (ADR-013).** `image-checks` (V28, `SELLER` and `PRO`). Order as in ADR-013: the pack, the cache, the quota before the
+  analysis, the charge inside the storing transaction; **one unit per new `COMPLETE` result** (the whole request, however many images);
+  cached and `INCOMPLETE` results cost nothing.
+- **Off by default**: `listing-guard.image.enabled=false`. The endpoint then answers `503 image-checks-not-configured`, stores nothing
+  and the large upload limit does not apply. The rulesets are loaded and registered at start-up either way.
+- **The plan pack and the ruleset pack have different ids**, on purpose: the plan pack is `image-checks` (as the request for this change
+  named it); the ruleset and the cache identity keep `image-compliance` (ADR-010, and the two shipped rulesets, which cannot be edited
+  without a new version). ADR-013 says analysis packs share the string with `pack_id`; this is the one exception (Open question 2).
+
+### What the shipped rulesets can and cannot do
+
+`etsy-image-2026-11` and `amazon-image-2026-11` keep every marketplace threshold null (see "Rules and evidence"), so **every check
+against them is `INCOMPLETE`**: it reports the format, size and metadata it read, applies `customer_content` (the one rule that needs
+no number) and names the other checks in `failedRules`. Consequences: no result of the shipped rulesets is cached or charged, and a
+`COMPLETE` result exists only once a reviewed ruleset version supplies the numbers. The tests use test-only rulesets with invented
+numbers (`api/src/test/resources/image/`, marked TEST ONLY, never on a production classpath) and a test holds that the shipped files
+still have no number and only `unverified` sources.
+
+### Not done in this change
+
+The criteria of "Image input security" that need a service of their own are **not built**, which is why the endpoint is off by default
+and `docs/deployment.md` says not to turn it on for a caller you do not trust:
+
+- the process-wide bounded decode service: the semaphore with a weighted memory budget, the bounded executor, the encoded-byte
+  admission budget, `503` with `Retry-After` when full, the caller deadline;
+- the private, size-limited upload staging directory (`spring.servlet.multipart.location` and `file-size-threshold`), its permission and
+  quota contract, and the start-up cleanup of orphaned files;
+- the stuck-decoder metrics and the readiness and liveness effect. `GET /health` is today one probe for both (the database), so this
+  needs a decision on how it is exposed (Open question 3).
+
+Also not done: the image checks in the MCP server, in `batch-check`, in the console and in the health report; a threshold of any
+marketplace; text, logo and watermark detection (still deferred). Until the decode service exists the endpoint decodes one image at a
+time per request but puts no bound on concurrent requests beyond the per-client rate limit.
+
+### Open questions
+
+Written as questions, not decided here; each says what this change assumed meanwhile.
+
+1. **The first marketplace thresholds.** Which official pages are saved under `policies/raw/` and reviewed, so that a new ruleset
+   version can carry numbers and mark sources `verified`? Assumed: none, every number stays null and every result is `INCOMPLETE`.
+2. **One pack id or two.** Should the plan pack be renamed `image-compliance` to follow ADR-013 (a new migration, since V28 is applied
+   once released) or the ruleset pack renamed `image-checks` (a new ruleset version)? Assumed: two ids, as requested.
+3. **How the stuck-decoder state is exposed.** Make `GET /health` answer 503 (one probe serves both liveness and readiness today, and
+   the compose health check calls it), or add separate liveness and readiness probes? Assumed: not decided; not built.
+4. **Scope of the next change.** The bounded decode service, the upload staging and the health effect are one change or three? They are
+   what has to exist before the endpoint can be enabled for an untrusted caller and before this record can be Accepted.
+5. **An MCP tool for images.** [ADR-017](ADR-017-mcp-server.md) allows no such tool: the server passes JSON bodies through, issues only
+   `GET` and `POST` to a closed list of six paths with `Content-Type: application/json`, and forbids a tool that takes a path or a URL.
+   A tool that accepts image data would be a new kind of input (a large base64 argument in the agent's context, or a path the server
+   reads from the machine's disk), a seventh path with a multipart body, and an exception to "never a tool that takes a path". Assumed:
+   no `check_images` tool; if wanted, ADR-017 needs an amendment that decides how the bytes reach the server and how large they may be.
+6. **Image checks in the batch job and the console.** `batch-check` works on a CSV and the console editor never stores what it is given;
+   neither has a way to hold images. Assumed: not wanted yet.
+7. **The unit.** One unit per request, however many images, or one per image? Assumed: per request, as for every other pack (one unit is
+   one new `COMPLETE` stored result).

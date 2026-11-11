@@ -280,6 +280,12 @@ Written as questions, not decided here; each says what this record assumed meanw
 8. **Spring AI later.** When the repository moves to Spring Boot 4, the Spring AI starter becomes an option and would replace
    only the wiring of this module, not the tools or the client. [ADR-020](ADR-020-spring-boot-4.md) makes that move; the
    option is still not taken.
+9. **A tool for image checks** (added with `POST /api/v1/image-checks`, [ADR-008](ADR-008-image-compliance-checker.md)). This record
+   allows none, so none was built: it fixes exactly six tools over six paths with JSON bodies, and forbids a tool that takes a path or
+   a URL. A `check_images` tool would need image bytes to reach the server, either as a large base64 argument in the agent's context
+   or as a path the server reads from the machine's disk (the second is forbidden here), plus a multipart `POST`. Assumed: no such
+   tool. If it is wanted, this record needs an amendment that decides how the bytes arrive, how large they may be and whether the
+   `ReadOnlyBoundaryTest` list of paths grows. The same question is Open question 5 of ADR-008.
 
 ## Decisions (2026-11-07)
 
