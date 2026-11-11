@@ -367,6 +367,19 @@ The `metadata` of two images, the first the main one:
 }
 ```
 
+## Trademark checks
+
+`POST /api/v1/trademark-checks` takes the same `marketplace` and `listing` as `POST /api/v1/checks` (the listing in the
+standard input of the marketplace above, normalized the same way) and one more optional field next to them, not inside
+`listing`:
+
+| Field | Type | Notes |
+|---|---|---|
+| `product_type` | string | Optional. What kind of product the listing sells: a key the active trademark ruleset declares under `product_classes.types` (`trademark-risk-2026-11b`: `apparel`, `mug`, `poster`, `sticker`, `phone_case`, `jewelry`, `bag`, `furniture_decor`, `fabric`, `toy`), written exactly, at most 64 characters, stripped of surrounding whitespace; blank means none. A key the ruleset does not declare is `400 unknown-product-type` (with `known`), never ignored. It is **not** the Amazon `product_type` of the listing, which stays the category. It is part of the identity of the input (hash `listing-guard/trademark-input/v2`) and of the cache, and is never scanned. `POST /api/v1/checks` ignores it. |
+
+With a product type, a catalog mark whose Nice classes do not include one of the product type's is reported one level lower
+and the finding says so. See [the integration guide](integration-guide.md#trademark-checks).
+
 ## Checked by a test
 
 The two listing examples above are read out of this file by a test and run through the normalizers (the Amazon example

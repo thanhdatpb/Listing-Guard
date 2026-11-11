@@ -7,6 +7,7 @@ import com.thanhdatpb.listingguard.trademark.normalize.NormalizedField;
 import com.thanhdatpb.listingguard.trademark.normalize.TextNormalizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -18,27 +19,42 @@ public final class ScanContext {
     private final TrademarkRuleset ruleset;
     private final TrademarkCatalog catalog;
     private final List<NormalizedField> fields;
+    private final String productType;
+    private final Set<Integer> productClasses;
     private final Memo<List<CatalogHits.Hit>> exact;
     private final Memo<List<CatalogHits.Hit>> fuzzy;
 
-    private ScanContext(TrademarkRuleset ruleset, TrademarkCatalog catalog, List<NormalizedField> fields) {
+    private ScanContext(TrademarkRuleset ruleset, TrademarkCatalog catalog, List<NormalizedField> fields,
+                        String productType, Set<Integer> productClasses) {
         this.ruleset = ruleset;
         this.catalog = catalog;
         this.fields = List.copyOf(fields);
+        this.productType = productType;
+        this.productClasses = productClasses == null ? null : Set.copyOf(productClasses);
         this.exact = new Memo<>(() -> CatalogHits.exact(this));
         this.fuzzy = new Memo<>(() -> CatalogHits.fuzzy(this));
     }
 
-    /** Normalizes the fields the ruleset scans, in canonical order. */
+    /** A scan with no product type. */
     public static ScanContext create(TrademarkRuleset ruleset, TrademarkCatalog catalog, TextNormalizer normalizer,
                                      CanonicalInput canonical) {
+        return create(ruleset, catalog, normalizer, canonical, null, null);
+    }
+
+    /**
+     * Normalizes the fields the ruleset scans, in canonical order. {@code productType} and its Nice classes come from
+     * the ruleset and are both null when the request named no product type; the caller has already checked that the
+     * ruleset declares the type.
+     */
+    public static ScanContext create(TrademarkRuleset ruleset, TrademarkCatalog catalog, TextNormalizer normalizer,
+                                     CanonicalInput canonical, String productType, Set<Integer> productClasses) {
         List<NormalizedField> fields = new ArrayList<>();
         for (CanonicalInput.Field field : canonical.fields()) {
             if (isScanned(ruleset, field.name())) {
                 fields.add(new NormalizedField(field.name(), field.text(), normalizer.tokenize(field.text())));
             }
         }
-        return new ScanContext(ruleset, catalog, fields);
+        return new ScanContext(ruleset, catalog, fields, productType, productClasses);
     }
 
     private static boolean isScanned(TrademarkRuleset ruleset, String fieldName) {
@@ -61,6 +77,16 @@ public final class ScanContext {
     /** The scanned fields in canonical order. */
     public List<NormalizedField> fields() {
         return fields;
+    }
+
+    /** The product type the request named, or null. */
+    public String productType() {
+        return productType;
+    }
+
+    /** The Nice classes of the product type, or null when the request named none. */
+    public Set<Integer> productClasses() {
+        return productClasses;
     }
 
     public NormalizedField field(String name) {

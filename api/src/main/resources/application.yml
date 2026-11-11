@@ -39,7 +39,7 @@ listing-guard:
       - classpath:rulesets/amazon-2026-12c.yaml
   trademark:
     # The trademark ruleset (ADR-009), registered for each marketplace below as pack `trademark-risk` (ADR-010).
-    ruleset: classpath:rulesets/trademark-risk-2026-11.yaml
+    ruleset: classpath:rulesets/trademark-risk-2026-11b.yaml
     marketplaces:
       - ETSY
       - AMAZON

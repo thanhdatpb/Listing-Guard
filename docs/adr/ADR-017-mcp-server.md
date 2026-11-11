@@ -11,6 +11,9 @@
   also exposes; ADR-016 says the buyer's text is personal data)
 - Amended by: [ADR-020](ADR-020-spring-boot-4.md) (the repository moves to Spring Boot 4.1; the statement "Spring Boot stays
   3.5" below no longer holds, the rest of this ADR does)
+- Amended on 2026-11-11 by the `get_capabilities` tool and `GET /api/v1/capabilities` (see "Amendment" at the end); "six tools"
+  and "six paths" below are now seven, and the sentence that the API and its OpenAPI document are not changed holds for the
+  original pull request only.
 - Acceptance convention: Keep Proposed until the PR implementing this ADR is approved and merged. Then set Status to
   Accepted and Date to the merge date.
 
@@ -23,7 +26,7 @@ guessing. The second is the failure to avoid: **a language model must not decide
 answer is always the result of the Listing Guard API: its findings, its `disclaimer`, the ruleset, catalog and analysis
 versions, and its `completeness` (an `INCOMPLETE` result or an `UNKNOWN` risk is not a clean one).
 
-So an MCP server is a **thin adapter**: it turns six calls of the existing API into MCP tools, hands the API's answer to the
+So an MCP server is a **thin adapter**: it turns calls of the existing API into MCP tools (six at first, seven since the amendment at the end), hands the API's answer to the
 agent unchanged, and adds nothing that decides. It is not a new analysis, a new pack or a new endpoint of the API.
 
 It checks and suggests, as the rest of the product does. It never edits a listing, never applies a fix, never publishes and
@@ -84,10 +87,11 @@ never writes to a marketplace.
   spends its quota. It is for the machine or the private network of the operator and **must never be exposed to the internet**
   (no port forwarding, no public reverse proxy, no tunnel); `docs/mcp.md` says so in its first lines.
 
-### The six tools
+### The seven tools
 
-Every tool has a JSON Schema for its input, a short description in English written for the agent, and a result as structured
-content. The tool names are fixed.
+The first six are the original decision; the seventh, `get_capabilities`, was added by the amendment at the end. Every tool has
+a JSON Schema for its input, a short description in English written for the agent, and a result as structured content. The tool
+names are fixed.
 
 | Tool | Calls | Input | Pack (ADR-013) |
 |---|---|---|---|
@@ -97,15 +101,16 @@ content. The tool names are fixed.
 | `screen_personalization` | `POST /api/v1/personalization-screenings` | `marketplace`, `values[]` (`label`, `text`), optional `print_profile`, `product_type` | `personalization-screening` |
 | `get_limits` | `GET /api/v1/rulesets/{marketplace}/limits` | `marketplace`, optional `product_type` (sent as `productType`) | none (not counted) |
 | `get_usage` | `GET /api/v1/usage` | none | none (not counted) |
+| `get_capabilities` | `GET /api/v1/capabilities` | none | none (not counted) |
 
 Rules that apply to all of them:
 
 - **Read and check only.** There is no tool that edits a listing, applies a fix, publishes, writes to a marketplace or changes a
-  plan. The server issues only `GET` and `POST`, and only to these six paths (a closed list in code; no tool takes a path or a
+  plan. The server issues only `GET` and `POST`, and only to these seven paths (a closed list in code; no tool takes a path or a
   URL). A `POST` here is a check: the API stores the result and, where plans are on, counts one unit for a new result. For that
   reason `check_*` and `screen_personalization` are annotated `readOnlyHint: false`, `destructiveHint: false`,
-  `idempotentHint: true` (an identical request returns the stored result and costs nothing); `get_limits` and `get_usage` are
-  `readOnlyHint: true`. All are `openWorldHint: false` (one fixed API).
+  `idempotentHint: true` (an identical request returns the stored result and costs nothing); `get_limits`, `get_usage` and
+  `get_capabilities` are `readOnlyHint: true`. All are `openWorldHint: false` (one fixed API).
 - **The input is passed through.** The server does not map a listing format, trim, correct, add defaults or drop fields; what
   the agent sends is what the API gets (ADR-007: mapping is the caller's job; ADR-016: the buyer's text is not trimmed).
   `marketplace` is a string and is not an enum in the schema, so the API stays the only place that knows which marketplaces
@@ -201,7 +206,8 @@ An MCP resource, prompt, sampling or elicitation (tools only); a tool that reads
 and the like; the six above are the request); anything that writes; applying or proposing a fix (ADR-014 stays in the API and the
 console; the check tool returns whatever the API returns and nothing more); a cache, retry or batch in the server; mapping a
 client's own listing format; authentication on the HTTP transport; a Docker image, a compose service and a registry entry;
-changing the API, its OpenAPI document, its migrations or `docs/releases`.
+changing the API, its OpenAPI document, its migrations or `docs/releases` (all for the original pull request; the amendment adds
+one read-only endpoint and its OpenAPI entry, still no migration).
 
 ## Consequences and tradeoffs
 
@@ -227,10 +233,10 @@ changing the API, its OpenAPI document, its migrations or `docs/releases`.
 No test needs Docker, a database, a real API or a real model. The API is a stub HTTP server of the JDK on a free local port,
 as `ApiEmbeddingProviderTest` stubs the embedding API.
 
-1. **Tools**: the server lists exactly six tools with the names above, each with a description and an input schema that is a valid
-   JSON Schema of `type: object` with the required members; `check_*`, `screen_personalization` and the two readers carry their
-   annotations; **no tool name or call can write** (the set is exactly the six; the client can issue only `GET` and `POST` to
-   the six paths, which the stub records and a test over the main sources enforces).
+1. **Tools**: the server lists exactly seven tools with the names above, each with a description and an input schema that is a valid
+   JSON Schema of `type: object` with the required members; `check_*`, `screen_personalization` and the three readers carry their
+   annotations; **no tool name or call can write** (the set is exactly the seven; the client can issue only `GET` and `POST` to
+   the seven paths, which the stub records and a test over the main sources enforces).
 2. **Endpoint, method, header**: each tool sends the right method to the right path with `X-API-Key` and `X-Request-Id`, the
    JSON body it was given unchanged (for `screen_personalization`, the buyer's text not trimmed), and `productType` as a query
    parameter for `get_limits`.
@@ -248,7 +254,7 @@ as `ApiEmbeddingProviderTest` stubs the embedding API.
 7. **Transports**: through the SDK's own client, over the stdio streams and over Streamable HTTP on an ephemeral loopback port,
    the client initializes, lists the tools and calls one; an HTTP request with a foreign `Origin` is refused.
 8. **Repository checks unchanged**: `./mvnw -B verify` of the whole repository passes; `docs/api/openapi.json` and `docs/releases`
-   are not touched.
+   are not touched (by the original pull request; the amendment's own criteria are below).
 
 ## Planned pull request
 
@@ -301,3 +307,67 @@ Written as questions, not decided here; each says what this record assumed meanw
   `release-image` workflow publishes container images only. Automating jar attachment is deferred to a later PR.
 - A non-loopback API base URL must use HTTPS unless `LISTING_GUARD_MCP_ALLOW_INSECURE_HTTP=true` is explicitly set
   for a trusted private network.
+
+## Amendment (2026-11-11): `get_capabilities` and `GET /api/v1/capabilities`
+
+### Why
+
+An agent that is about to check a listing cannot tell what the deployment behind its key can answer. It learns that the
+trademark catalog is missing only after `check_trademark` returns `NOT_CONFIGURED`, it cannot see which ruleset versions apply
+(they are in every result, but only after a check that may cost a unit), and it cannot tell whether plans or fix suggestions
+are on. `get_usage` answers a different question (this client's plan and quota) and `get_limits` another (the numbers of one
+ruleset). Nothing in the API said what the deployment serves, so the API gets one read-only endpoint and the server one tool
+over it; the server still adds nothing that decides.
+
+### Decision
+
+- **API**: `GET /api/v1/capabilities` (`api/.../capabilities/`). It needs an API key, is read only and stores nothing. It takes no
+  `requirePack`, `requireQuota` or `charge` (ADR-013), and the answer is **the same for every client** (a test compares two
+  clients and a client past its quota), so it cannot show anything about a client. It carries an `ETag` and a five minute private
+  cache, as `GET /api/v1/rulesets/{marketplace}/limits` does.
+- **Answer** (`docs/api/openapi.json`, schema `Capabilities`; the example is the answer of a default deployment and a test holds
+  it):
+
+  | Member | Meaning |
+  |---|---|
+  | `packs[]` (sorted by `id`) | the packs served over HTTP: `listing-rules`, `personalization-screening`, `trademark-risk`, `variation-checks`; each has `available` and `rulesetVersions` (marketplace to the version of the active ruleset, the `rulesetVersion` of a result) |
+  | `trademarkCatalog.state` | `READY`, `DISABLED` (no catalog configured) or `REFUSED` (configured, cannot be served): the state of `TrademarkCatalogRuntime` |
+  | `trademarkCatalog.demo` | true when the configured catalog version starts with `demo-` (`TrademarkProperties.isDemo`, the one definition, shared with the console banner) |
+  | `plans.enforced` | `listing-guard.plans.enabled` |
+  | `fixes.enabled` | `listing-guard.fixes.enabled` |
+
+  `trademark-risk` is `available: false` unless the catalog is `READY` (its endpoint answers `503 trademark-not-configured`); the
+  other three packs are always available. `batch`, `policy-analyzer` and `sheet-connector` are plan packs of ADR-013 without an
+  endpoint, so they are not listed.
+- **What it never shows.** The catalog's name (the text of `TrademarkCatalogRuntime.Status#detail()` can name it, so the service
+  never reads that text; every result carries the catalog version anyway, but a configured name is the operator's setting), paths,
+  ruleset locations, database, embedding or key settings, console settings, and anything about a client, a plan of a client or a
+  quota. A test fixes the exact member list and searches the answer for the API keys, `jdbc`, `password` and `classpath:`, and,
+  with a refused demo catalog, for the configured name.
+- **MCP**: `get_capabilities`, no arguments, `readOnlyHint: true`, a new `Endpoint` entry (`GET /api/v1/capabilities`) and a new
+  `ToolSpec` over the same empty schema `get_usage` uses, so `ArgumentChecker` refuses any argument. The result is the API's
+  answer verbatim (exact body as text and the same object as structured content), and errors become tool errors as for every
+  other tool. The server does not interpret `trademarkCatalog.state`: `INSTRUCTIONS` and the tool description tell the agent that a
+  catalog that is not `READY` means the trademark risk is unknown, never low, and the instruction repeats that the agent quotes
+  the answer and does not decide.
+- **Unchanged**: the six existing tools, their annotations and the closed list of calls (now seven paths, `GET` and `POST`
+  only); no migration; the shape and `analysisVersion` of every other endpoint.
+- **Not done and still open**: authentication on the Streamable HTTP transport (open question 2 above) is **not** part of this
+  amendment and is not decided here; the transport is as it was, loopback or private network only and never exposed to the
+  internet. Nor were added: print profile names or the marketplaces' product types to the answer (they are in the rulesets and
+  `unknown-print-profile` already lists the declared profiles), the analyzer, the console or the embedding settings.
+
+### Acceptance criteria (tests)
+
+1. **API** (`CapabilitiesIntegrationTest`, `CapabilitiesRefusedDemoIntegrationTest`,
+   `CapabilitiesReadyPlansFixesIntegrationTest`, Docker): a key is needed (`401`); two clients get the identical answer; `POST` is
+   `405`; the example equals the answer of a default deployment; every version equals the one the checks use (`ActiveRulesets`,
+   the three other rulesets); the member list is exact and holds no key, `jdbc`, `password` or `classpath:`; a refused demo
+   catalog is `REFUSED` with `demo: true`, `trademark-risk` unavailable and its name absent; with a ready catalog, plans and fixes
+   on, the answer says so and reading it 5 times past a `FREE` quota stores and counts nothing; `ETag`, cache header and `304`.
+2. **OpenAPI** (`OpenApiIntegrationTest`): the path is `get` only with `200`, `304`, `401`, `429`, the schema `Capabilities` has
+   its four members, and the committed `docs/api/openapi.json` equals the generated one.
+3. **MCP** (no Docker): seven tools with the fixed names and `get_capabilities` read only; it sends `GET /api/v1/capabilities` with
+   `X-API-Key` and `X-Request-Id` and no body; an argument is `invalid-arguments` and nothing is sent; the answer is verbatim over
+   Streamable HTTP and the closed list of paths is exactly seven.
+4. **Repository**: `./mvnw -B verify` passes.

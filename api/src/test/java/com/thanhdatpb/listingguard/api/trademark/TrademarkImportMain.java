@@ -31,7 +31,7 @@ public final class TrademarkImportMain {
         DriverManagerDataSource dataSource = new DriverManagerDataSource(args[0], args[1], args[2]);
         TrademarkCatalogImporter importer = new TrademarkCatalogImporter(new JdbcTemplate(dataSource),
                 new TransactionTemplate(new DataSourceTransactionManager(dataSource)), new TrademarkImportProperties(5000));
-        TrademarkRuleset ruleset = TrademarkRulesetLoader.parse(new ClassPathResource("rulesets/trademark-risk-2026-11.yaml")
+        TrademarkRuleset ruleset = TrademarkRulesetLoader.parse(new ClassPathResource("rulesets/trademark-risk-2026-11b.yaml")
                 .getContentAsString(StandardCharsets.UTF_8));
         Path dir = Path.of(args[3]);
 

@@ -1,0 +1,256 @@
+# Trademark risk ruleset (ADR-009). Thresholds, word lists, risk levels and messages live here; the logic lives in
+# Java (ADR-001).
+#
+# Any change to this file changes its content hash. Bump `version` for every change: a published version is
+# immutable (ADR-002).
+#
+# Every block has a `source`. All of them are `unverified`: these are internal heuristics, not a marketplace or legal
+# rule, and the loader refuses any other status. Everything here is synthetic. The place names are invented; a
+# production place list is a later ruleset version supplied by the maintainer (places and sport terms only, never
+# place + team pairs).
+#
+# Messages and suggestions are Vietnamese. They report a reference warning and never say a text is allowed or valid.
+#
+# trademark-risk-2026-11b is trademark-risk-2026-11 plus three optional sections: `product_classes` (a request may name a
+# product type; a mark outside that product type's Nice classes is reported one level lower), `generic_words` (a word
+# list; empty here until the maintainer has reviewed it, so it changes nothing) and `source_links` (public look-up
+# address of a catalog source). Every other key is copied unchanged. See ADR-009, "Product classes, source links and
+# generic words".
+pack_id: trademark-risk
+version: trademark-risk-2026-11b
+checked_at: 2026-11-11
+
+disclaimer: Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.
+
+normalization:
+  source:
+    status: unverified
+    note: Internal normalization choices, tuned in the evaluation PR.
+  # Letters that Unicode decomposition leaves alone, mapped to ASCII. Keys are one character.
+  fold_map:
+    "đ": "d"
+    "ð": "d"
+    "ø": "o"
+    "ł": "l"
+    "ß": "ss"
+    "æ": "ae"
+    "œ": "oe"
+    "þ": "th"
+  # Look-alike letters (Cyrillic and Greek) mapped to the Latin letter they imitate.
+  homoglyphs:
+    "а": "a"   # Cyrillic a
+    "в": "b"   # Cyrillic ve
+    "е": "e"   # Cyrillic ie
+    "к": "k"   # Cyrillic ka
+    "м": "m"   # Cyrillic em
+    "н": "h"   # Cyrillic en
+    "о": "o"   # Cyrillic o
+    "р": "p"   # Cyrillic er
+    "с": "c"   # Cyrillic es
+    "т": "t"   # Cyrillic te
+    "у": "y"   # Cyrillic u
+    "х": "x"   # Cyrillic ha
+    "і": "i"   # Cyrillic i
+    "ο": "o"   # Greek omicron
+    "α": "a"   # Greek alpha
+    "ν": "v"   # Greek nu
+    "ρ": "p"   # Greek rho
+  # A digit or symbol that can stand for a letter, mapped only inside a word with at least `min_letters_around`
+  # letters before and after it, so "z0rvex" becomes "zorvex" but "3d" and "2xl" are left alone.
+  leet:
+    min_letters_around: 1
+    map:
+      "0": "o"
+      "1": "i"
+      "3": "e"
+      "4": "a"
+      "5": "s"
+      "7": "t"
+      "@": "a"
+      "$": "s"
+      "!": "i"
+  # Dropped without splitting a word. Any other character that is not a letter or a digit separates tokens.
+  punctuation:
+    delete_chars:
+      - "'"
+      - "’"   # right single quotation mark
+      - "ʼ"   # modifier letter apostrophe
+      - "`"
+      - "´"   # acute accent
+      - "­"   # soft hyphen
+      - "​"   # zero width space
+      - "‌"   # zero width non-joiner
+      - "‍"   # zero width joiner
+      - "﻿"   # zero width no-break space
+
+matching:
+  source:
+    status: unverified
+    note: Starting values, to be tuned on the synthetic tuning set (never on the held-out set).
+  # Input fields the rules read. `tags` and `bullet_points` stand for every item, each its own field.
+  scan_fields:
+    - title
+    - tags
+    - description
+    - brand
+    - shop_name
+    - bullet_points
+    - search_terms
+  # Longest n-gram, in tokens, compared with the catalog. A whole field is never compared with a mark.
+  max_ngram_tokens: 3
+  # A gram shorter or longer than this (characters) is only matched exactly.
+  fuzzy_min_chars: 5
+  fuzzy_max_chars: 40
+  # What the catalog uses to return candidates (pg_trgm similarity in the PostgreSQL adapter).
+  candidate_threshold: 0.30
+  # The Java score a candidate needs to become a fuzzy finding.
+  final_threshold: 0.80
+  # Optimal string alignment similarity: 1 - distance / length of the longer text. Must match the code.
+  scoring_algorithm_version: osa-similarity-1
+  # Longest text copied into evidence.
+  max_snippet_chars: 80
+
+lexicon:
+  source:
+    status: unverified
+    note: Synthetic places. Sport terms, color words and pattern words are generic English words.
+  places:
+    - Northvale
+    - Eastmere
+    - Brightwater
+    - Stonefield
+    - Aldermoor
+    - New Haverton
+  sport_terms:
+    - baseball
+    - basketball
+    - football
+    - soccer
+    - hockey
+    - ice hockey
+    - softball
+    - jersey
+  color_words:
+    - red
+    - blue
+    - navy
+    - royal
+    - white
+    - black
+    - gold
+    - silver
+    - green
+    - orange
+    - yellow
+    - purple
+    - grey
+    - gray
+    - maroon
+    - crimson
+    - teal
+  pattern_words:
+    - pinstripe
+    - pinstripes
+    - stripe
+    - striped
+    - plaid
+    - checkered
+    - camo
+    - solid
+    - gradient
+
+# Product classes. A request may name a product type (`product_type`); a catalog match whose mark has Nice classes, none
+# of them in that product type's list, is reported `out_of_class_downgrade_levels` lower (HIGH, MEDIUM, LOW; never below
+# LOW), and its evidence says so, with the original level. A mark with no Nice class is never lowered, and a request
+# with no product type is scanned as before. A product type that is not listed here is refused by the API, never
+# ignored. The classes are the maintainer's reading of the Nice classification for print-on-demand products.
+product_classes:
+  source:
+    status: unverified
+    note: The product types and their Nice classes were supplied by the maintainer and not checked against the Nice classification here.
+  out_of_class_downgrade_levels: 1
+  # Placeholders: mark, mark_classes, product_type, product_classes, from, to.
+  note: "Nhãn hiệu '{mark}' đăng ký ở nhóm Nice {mark_classes}, không nhóm nào nằm trong các nhóm {product_classes} của loại sản phẩm '{product_type}', nên mức rủi ro hạ từ {from} xuống {to}. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+  types:
+    apparel: [25]
+    mug: [21]
+    poster: [16]
+    sticker: [16]
+    phone_case: [9]
+    jewelry: [14]
+    bag: [18]
+    furniture_decor: [20]
+    fabric: [24]
+    toy: [28]
+
+# Generic words: catalog marks that are also ordinary words. A match of such a mark keeps its level only when it is an
+# exact or phrase match in one of `context_fields` (the word stands as the product's own brand); anywhere else, and for
+# every fuzzy match, the level is at most `max_risk_without_context` and the evidence says so, with the original level.
+# THE LIST IS EMPTY ON PURPOSE: it changes nothing until the maintainer has reviewed each word (ADR-009 says what must
+# not be listed). Tests use their own synthetic list.
+generic_words:
+  source:
+    status: unverified
+    note: No word is listed. The maintainer decides each word; a word that is a famous brand used as a common noun must not be listed.
+  words: []
+  context_fields:
+    - brand
+    - shop_name
+  max_risk_without_context: LOW
+  # Placeholders: mark, context_fields, from, to.
+  note: "'{mark}' là một từ thông dụng. Khi không đứng ở {context_fields} (nơi từ này được dùng như thương hiệu của sản phẩm), mức rủi ro tối đa là {to}; mức gốc của kết quả này là {from}. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+
+# Source links: a public look-up address for the source record of a catalog mark. A stored source id is
+# `<source_key>:<id>` (the `sources:` form of catalogs/manifest.yaml); a link is built only when its `source_key` is
+# listed here and the id matches `id_pattern`. `{id}` is the one placeholder. The scanner never opens a link.
+source_links:
+  source:
+    status: unverified
+    note: The address pattern was seen in a document published by the USPTO and in third-party exports; no official page that describes it could be read. Open one link by hand before relying on it.
+  sources:
+    - source_key: uspto
+      label: USPTO TSDR
+      id_pattern: "[0-9]{8}"
+      url_template: "https://tsdr.uspto.gov/#caseNumber={id}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch"
+
+# The order here is the order the rules run in and the tie-break between findings of equal risk.
+rules:
+  catalog_exact:
+    risk: HIGH
+    source:
+      status: unverified
+    message: "Từ '{token}' ở {field} trùng với nhãn hiệu '{mark}' trong danh mục tham chiếu."
+    suggestion: "Xem lại việc dùng '{mark}' ở {field}. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+  catalog_phrase:
+    risk: HIGH
+    source:
+      status: unverified
+    message: "Cụm '{token}' ở {field} trùng với nhãn hiệu '{mark}' trong danh mục tham chiếu."
+    suggestion: "Xem lại việc dùng '{mark}' ở {field}. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+  catalog_fuzzy:
+    risk: MEDIUM
+    source:
+      status: unverified
+    message: "Cụm '{token}' ở {field} giống nhãn hiệu '{mark}' với độ tương đồng {score}%."
+    suggestion: "Kiểm tra xem '{token}' có phải cách viết sai hoặc biến thể của '{mark}' không. Đây chỉ là cảnh báo tham khảo."
+  geo_sport_combination:
+    risk: MEDIUM
+    # A place and a sport term in the same field, at most this many tokens apart (adjacent words are 1 apart).
+    max_token_distance: 3
+    source:
+      status: unverified
+    message: "{field} có địa danh '{place}' đi cùng từ thể thao '{sport}' (cách nhau {distance} từ, ngưỡng {max_distance} từ). Tổ hợp này có thể gợi đến một đội thể thao."
+    suggestion: "Xem lại cách mô tả sản phẩm ở {field}. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+  color_name_contains_mark:
+    source:
+      status: unverified
+    note: "Kết quả này nằm trong một cụm mô tả màu. Việc đó giải thích kết quả và không làm giảm mức rủi ro."
+  pure_color_description:
+    # Informational: always LOW, never raises the overall risk.
+    risk: LOW
+    # The shortest color/pattern phrase that is reported.
+    min_tokens: 2
+    source:
+      status: unverified
+    message: "Cụm '{phrase}' ở {field} chỉ gồm {tokens} từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này."
+    suggestion: "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."

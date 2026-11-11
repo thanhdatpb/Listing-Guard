@@ -1,6 +1,30 @@
 {
   "components" : {
     "schemas" : {
+      "Capabilities" : {
+        "properties" : {
+          "fixes" : {
+            "$ref" : "#/components/schemas/FixesCapability",
+            "description" : "Whether `POST /api/v1/checks` returns verified fix suggestions and readiness."
+          },
+          "packs" : {
+            "description" : "The analysis packs this deployment serves over HTTP, sorted by id. `batch`, `policy-analyzer` and `sheet-connector` are not listed: they have no endpoint here.",
+            "items" : {
+              "$ref" : "#/components/schemas/PackCapability"
+            },
+            "type" : "array"
+          },
+          "plans" : {
+            "$ref" : "#/components/schemas/PlansCapability",
+            "description" : "Whether plans and the monthly quota are applied in this deployment."
+          },
+          "trademarkCatalog" : {
+            "$ref" : "#/components/schemas/TrademarkCatalogCapability",
+            "description" : "The trademark catalog this deployment serves. Only its state, never its name."
+          }
+        },
+        "type" : "object"
+      },
       "CatalogView" : {
         "properties" : {
           "state" : {
@@ -230,6 +254,16 @@
           "proposedValue" : {
             "description" : "Proposed replacement; null for REMOVE.",
             "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "FixesCapability" : {
+        "properties" : {
+          "enabled" : {
+            "description" : "True when `POST /api/v1/checks` adds verified fix suggestions and `listing-rules` readiness.",
+            "example" : false,
+            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -579,6 +613,32 @@
         },
         "type" : "object"
       },
+      "PackCapability" : {
+        "properties" : {
+          "available" : {
+            "description" : "Whether the pack can answer now. False for `trademark-risk` while the catalog is not READY; the endpoint then answers `503 trademark-not-configured`.",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "id" : {
+            "description" : "The pack id (ADR-010).",
+            "example" : "listing-rules",
+            "type" : "string"
+          },
+          "rulesetVersions" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "The version of the active ruleset per marketplace (upper case, sorted): the `rulesetVersion` of a result.",
+            "example" : {
+              "AMAZON" : "amazon-2026-12c",
+              "ETSY" : "etsy-2026-12"
+            },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
       "PacksView" : {
         "properties" : {
           "listingRules" : {
@@ -770,6 +830,16 @@
         },
         "type" : "object"
       },
+      "PlansCapability" : {
+        "properties" : {
+          "enforced" : {
+            "description" : "True when plans are on: packs are limited by plan and new results count against a monthly quota (read `GET /api/v1/usage` for the calling client). False: nothing is limited.",
+            "example" : false,
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ProblemDetail" : {
         "properties" : {
           "detail" : {
@@ -891,6 +961,30 @@
         },
         "type" : "object"
       },
+      "RiskAdjustmentView" : {
+        "properties" : {
+          "from" : {
+            "description" : "The level the rule assigned before any adjustment.",
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
+            "type" : "string"
+          },
+          "note" : {
+            "description" : "Human text, currently Vietnamese.",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "`outside_product_classes`: the request named a product type and none of the mark's Nice classes is one of the product type's. `common_word`: the mark is an ordinary word of the ruleset's list and the match is not an exact or phrase match in a brand field.",
+            "example" : "outside_product_classes",
+            "type" : "string"
+          },
+          "to" : {
+            "description" : "The level this reason alone gives; lower than `from`.",
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "RuleCountView" : {
         "properties" : {
           "checksAffected" : {
@@ -1005,6 +1099,26 @@
         },
         "type" : "object"
       },
+      "SourceLinkView" : {
+        "properties" : {
+          "label" : {
+            "description" : "What the page is.",
+            "example" : "USPTO TSDR",
+            "type" : "string"
+          },
+          "sourceId" : {
+            "description" : "The source id the link was built from.",
+            "example" : "uspto:12345678",
+            "type" : "string"
+          },
+          "url" : {
+            "description" : "The address. Built from a template of the ruleset, only for a source the ruleset names.",
+            "example" : "https://tsdr.uspto.gov/#caseNumber=12345678&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "Summary" : {
         "properties" : {
           "errors" : {
@@ -1018,6 +1132,22 @@
           "warnings" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkCatalogCapability" : {
+        "properties" : {
+          "demo" : {
+            "description" : "True when the configured catalog is the DEMO catalog of invented marks: a trademark result is then not real.",
+            "example" : false,
+            "type" : "boolean"
+          },
+          "state" : {
+            "description" : "`READY`: trademark checks are served. `DISABLED`: no catalog is configured. `REFUSED`: a catalog is configured but cannot be served. In the last two the risk of a listing is unknown, never low.",
+            "enum" : [ "READY", "DISABLED", "REFUSED" ],
+            "example" : "READY",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -1065,6 +1195,13 @@
             "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
             "type" : "string"
           },
+          "riskAdjustments" : {
+            "description" : "Why `risk` is lower than the level the rule assigned; empty when it is not lower. Each entry says the original level (`from`) and the level that reason alone gives (`to`); `risk` is the lowest `to`.",
+            "items" : {
+              "$ref" : "#/components/schemas/RiskAdjustmentView"
+            },
+            "type" : "array"
+          },
           "ruleId" : {
             "example" : "catalog_exact",
             "type" : "string"
@@ -1086,6 +1223,13 @@
             },
             "type" : "array"
           },
+          "sourceLinks" : {
+            "description" : "Public look-up pages for the source records, one per source id the ruleset has an address for (today an id `uspto:<serial number>` links to its USPTO TSDR page); empty when none has. A link is built from the ruleset and is not checked: open it to read the record, and treat it as unverified.",
+            "items" : {
+              "$ref" : "#/components/schemas/SourceLinkView"
+            },
+            "type" : "array"
+          },
           "start" : {
             "description" : "Start of the span in the field text (UTF-16 code units, inclusive).",
             "example" : 9,
@@ -1097,6 +1241,30 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "TrademarkCheckRequest" : {
+        "properties" : {
+          "listing" : {
+            "$ref" : "#/components/schemas/JsonNode",
+            "description" : "The listing in the marketplace's own JSON format, exactly as for POST /api/v1/checks. Must be a JSON object.",
+            "type" : "object"
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, case-insensitive. Supported: ETSY, AMAZON.",
+            "example" : "ETSY",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "product_type" : {
+            "description" : "Optional. What kind of product the listing sells: one of the product types the active trademark ruleset declares (see the integration guide), written exactly as declared. When it is given, a catalog match whose mark has Nice classes, none of them one of the product type's classes, is reported one level lower and the finding says so in `riskAdjustments`; a mark with no Nice class is never lowered. A value the ruleset does not declare is refused with 400 `unknown-product-type`, never ignored. Leave it out to get the result without product classes. It is not the Amazon `product_type` of the listing, and it is part of what makes two requests identical for the cache.",
+            "example" : "apparel",
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "listing", "marketplace" ],
         "type" : "object"
       },
       "TrademarkCheckResult" : {
@@ -1158,6 +1326,11 @@
             "example" : "ETSY",
             "type" : "string"
           },
+          "productType" : {
+            "description" : "The `product_type` the request named, as the ruleset declares it; null when the request named none (and for a result stored before product types existed).",
+            "example" : "apparel",
+            "type" : [ "string", "null" ]
+          },
           "riskLevel" : {
             "description" : "The highest level among the findings (LOW when a complete check found nothing above LOW). UNKNOWN means the risk could not be determined because the check is INCOMPLETE; it is never reported as LOW.",
             "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
@@ -1165,7 +1338,7 @@
           },
           "rulesetVersion" : {
             "description" : "Version of the trademark ruleset that produced the result.",
-            "example" : "trademark-risk-2026-11",
+            "example" : "trademark-risk-2026-11b",
             "type" : "string"
           }
         },
@@ -1325,7 +1498,7 @@
           },
           "rulesetVersion" : {
             "description" : "Version of the trademark ruleset the scan used; null when it did not run.",
-            "example" : "trademark-risk-2026-11",
+            "example" : "trademark-risk-2026-11b",
             "type" : [ "string", "null" ]
           },
           "status" : {
@@ -1583,6 +1756,122 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/v1/capabilities" : {
+      "get" : {
+        "description" : "Returns the analysis packs this deployment serves with the version of the active ruleset per marketplace, the state of the trademark catalog (`READY`, `DISABLED` or `REFUSED`, and whether it is the DEMO catalog), whether plans and the monthly quota are applied and whether checks return fix suggestions. When the trademark catalog is not `READY` the risk of a listing is unknown, never low. It says nothing about the calling client: use `GET /api/v1/usage` for its plan and quota. It holds no secret setting and no catalog name. The answer is the same for every client, carries an `ETag` and may be cached for five minutes; it costs no quota and needs no plan pack.",
+        "operationId" : "capabilities",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "fixes" : {
+                    "enabled" : false
+                  },
+                  "packs" : [ {
+                    "available" : false,
+                    "id" : "image-checks",
+                    "rulesetVersions" : {
+                      "AMAZON" : "amazon-image-2026-11",
+                      "ETSY" : "etsy-image-2026-11"
+                    }
+                  }, {
+                    "available" : true,
+                    "id" : "listing-rules",
+                    "rulesetVersions" : {
+                      "AMAZON" : "amazon-2026-12c",
+                      "ETSY" : "etsy-2026-12"
+                    }
+                  }, {
+                    "available" : true,
+                    "id" : "personalization-screening",
+                    "rulesetVersions" : {
+                      "AMAZON" : "personalization-screening-2026-11",
+                      "ETSY" : "personalization-screening-2026-11"
+                    }
+                  }, {
+                    "available" : false,
+                    "id" : "trademark-risk",
+                    "rulesetVersions" : {
+                      "AMAZON" : "trademark-risk-2026-11b",
+                      "ETSY" : "trademark-risk-2026-11b"
+                    }
+                  }, {
+                    "available" : true,
+                    "id" : "variation-checks",
+                    "rulesetVersions" : {
+                      "AMAZON" : "variation-checks-2026-11",
+                      "ETSY" : "variation-checks-2026-11"
+                    }
+                  } ],
+                  "plans" : {
+                    "enforced" : false
+                  },
+                  "trademarkCatalog" : {
+                    "demo" : false,
+                    "state" : "DISABLED"
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Capabilities"
+                }
+              }
+            },
+            "description" : "What the deployment serves."
+          },
+          "304" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Capabilities"
+                }
+              }
+            },
+            "description" : "The `If-None-Match` header matches the `ETag`: nothing changed, there is no body."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read what this deployment serves",
+        "tags" : [ "Capabilities" ]
+      }
+    },
     "/api/v1/checks" : {
       "post" : {
         "description" : "Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content was already checked by the calling client with the same analysisVersion, the stored result is returned instead and `cached` is true (no new check is created); results are never shared between clients. A new result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached one costs nothing. The listing is the marketplace's own format; for Etsy it is the Open API v3 style JSON with snake_case fields, for Amazon the simple format with title, brand, bullet_points, description, search_terms, product_type, price, quantity and images.",
@@ -2631,7 +2920,7 @@
                         "failedRuleIds" : [ ],
                         "findings" : [ ],
                         "riskLevel" : "LOW",
-                        "rulesetVersion" : "trademark-risk-2026-11",
+                        "rulesetVersion" : "trademark-risk-2026-11b",
                         "status" : "COMPLETE"
                       }
                     }
@@ -2686,7 +2975,7 @@
                         "failedRuleIds" : [ ],
                         "findings" : [ ],
                         "riskLevel" : "LOW",
-                        "rulesetVersion" : "trademark-risk-2026-11",
+                        "rulesetVersion" : "trademark-risk-2026-11b",
                         "status" : "COMPLETE"
                       }
                     }
@@ -2929,7 +3218,7 @@
                     "failedRuleIds" : [ ],
                     "findings" : [ ],
                     "riskLevel" : "LOW",
-                    "rulesetVersion" : "trademark-risk-2026-11",
+                    "rulesetVersion" : "trademark-risk-2026-11b",
                     "status" : "COMPLETE"
                   }
                 },
@@ -3326,7 +3615,7 @@
                         }, {
                           "marketplace" : "ETSY",
                           "pack" : "trademark-risk",
-                          "version" : "trademark-risk-2026-11"
+                          "version" : "trademark-risk-2026-11b"
                         } ],
                         "trademarkCatalog" : {
                           "state" : "READY",
@@ -3691,7 +3980,7 @@
     },
     "/api/v1/trademark-checks" : {
       "post" : {
-        "description" : "Takes the same request as `POST /api/v1/checks` (`marketplace` and `listing` in the marketplace's own format), so a client can send one JSON to both endpoints. Compares the listing's text with the configured trademark catalog and returns findings with evidence: the field, the span in the text the API worked on (after trimming and Unicode NFC, UTF-16 offsets), the matched mark and how it matched. The result is a reference warning, not a legal conclusion; show the `disclaimer` with it. If the same client already sent the same listing text with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time (`expiresAt`); only the listing's hash and the result are stored, not the listing text.",
+        "description" : "Takes the request of `POST /api/v1/checks` (`marketplace` and `listing` in the marketplace's own format) and an optional `product_type`, so a client can send one JSON to both endpoints (`/checks` ignores `product_type`). Compares the listing's text with the configured trademark catalog and returns findings with evidence: the field, the span in the text the API worked on (after trimming and Unicode NFC, UTF-16 offsets), the matched mark and how it matched. With a `product_type`, a mark whose Nice classes are not the product type's is reported one level lower, and `riskAdjustments` says why and from which level; a mark that is an ordinary word of the ruleset's list is capped the same way unless it is the brand. `sourceLinks` gives a public look-up page for the source records the ruleset has an address for. The result is a reference warning, not a legal conclusion; show the `disclaimer` with it. If the same client already sent the same listing text and product type with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time (`expiresAt`); only the listing's hash and the result are stored, not the listing text.",
         "operationId" : "check_1",
         "requestBody" : {
           "content" : {
@@ -3714,10 +4003,23 @@
                     },
                     "marketplace" : "ETSY"
                   }
+                },
+                "with-product-type" : {
+                  "description" : "with-product-type",
+                  "summary" : "The same envelope with a product type",
+                  "value" : {
+                    "listing" : {
+                      "description" : "A plain ceramic mug.",
+                      "tags" : [ "mug", "gift" ],
+                      "title" : "Zorvex Ceramic Coffee Mug"
+                    },
+                    "marketplace" : "ETSY",
+                    "product_type" : "mug"
+                  }
                 }
               },
               "schema" : {
-                "$ref" : "#/components/schemas/CheckRequest"
+                "$ref" : "#/components/schemas/TrademarkCheckRequest"
               }
             }
           },
@@ -3750,10 +4052,12 @@
                         "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
                         "otherRuleIds" : [ ],
                         "risk" : "HIGH",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "catalog_exact",
                         "score" : 1.0,
                         "snippet" : "Zorvex",
                         "sourceIds" : [ "S-001", "S-002" ],
+                        "sourceLinks" : [ ],
                         "start" : 0,
                         "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                       }, {
@@ -3765,10 +4069,12 @@
                         "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
                         "otherRuleIds" : [ ],
                         "risk" : "MEDIUM",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "geo_sport_combination",
                         "score" : null,
                         "snippet" : "Northvale Baseball",
                         "sourceIds" : [ ],
+                        "sourceLinks" : [ ],
                         "start" : 13,
                         "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                       }, {
@@ -3780,16 +4086,19 @@
                         "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
                         "otherRuleIds" : [ ],
                         "risk" : "LOW",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "pure_color_description",
                         "score" : null,
                         "snippet" : "royal blue white pinstripe",
                         "sourceIds" : [ ],
+                        "sourceLinks" : [ ],
                         "start" : 0,
                         "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
                       } ],
                       "marketplace" : "ETSY",
+                      "productType" : null,
                       "riskLevel" : "HIGH",
-                      "rulesetVersion" : "trademark-risk-2026-11"
+                      "rulesetVersion" : "trademark-risk-2026-11b"
                     }
                   },
                   "findings" : {
@@ -3814,10 +4123,12 @@
                         "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
                         "otherRuleIds" : [ ],
                         "risk" : "HIGH",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "catalog_exact",
                         "score" : 1.0,
                         "snippet" : "Zorvex",
                         "sourceIds" : [ "S-001", "S-002" ],
+                        "sourceLinks" : [ ],
                         "start" : 0,
                         "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                       }, {
@@ -3829,10 +4140,12 @@
                         "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
                         "otherRuleIds" : [ ],
                         "risk" : "MEDIUM",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "geo_sport_combination",
                         "score" : null,
                         "snippet" : "Northvale Baseball",
                         "sourceIds" : [ ],
+                        "sourceLinks" : [ ],
                         "start" : 13,
                         "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                       }, {
@@ -3844,16 +4157,61 @@
                         "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
                         "otherRuleIds" : [ ],
                         "risk" : "LOW",
+                        "riskAdjustments" : [ ],
                         "ruleId" : "pure_color_description",
                         "score" : null,
                         "snippet" : "royal blue white pinstripe",
                         "sourceIds" : [ ],
+                        "sourceLinks" : [ ],
                         "start" : 0,
                         "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
                       } ],
                       "marketplace" : "ETSY",
+                      "productType" : null,
                       "riskLevel" : "HIGH",
-                      "rulesetVersion" : "trademark-risk-2026-11"
+                      "rulesetVersion" : "trademark-risk-2026-11b"
+                    }
+                  },
+                  "product-type" : {
+                    "description" : "product-type",
+                    "summary" : "With a product type: a lower level, and why",
+                    "value" : {
+                      "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+                      "cached" : false,
+                      "catalogVersion" : "synthetic-2026-11-0123456789ab",
+                      "checkId" : "5d2e8a17-3c4b-4f69-8b0e-6a1c9d7f2e35",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-11-11T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+                      "expiresAt" : "2026-12-11T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "end" : 6,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : "ZORVEX",
+                        "matchType" : "EXACT",
+                        "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu. Nhãn hiệu 'ZORVEX' đăng ký ở nhóm Nice 25, 35, không nhóm nào nằm trong các nhóm 21 của loại sản phẩm 'mug', nên mức rủi ro hạ từ HIGH xuống MEDIUM. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "MEDIUM",
+                        "riskAdjustments" : [ {
+                          "from" : "HIGH",
+                          "note" : "Nhãn hiệu 'ZORVEX' đăng ký ở nhóm Nice 25, 35, không nhóm nào nằm trong các nhóm 21 của loại sản phẩm 'mug', nên mức rủi ro hạ từ HIGH xuống MEDIUM. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                          "reason" : "outside_product_classes",
+                          "to" : "MEDIUM"
+                        } ],
+                        "ruleId" : "catalog_exact",
+                        "score" : 1.0,
+                        "snippet" : "Zorvex",
+                        "sourceIds" : [ "S-001", "S-002" ],
+                        "sourceLinks" : [ ],
+                        "start" : 0,
+                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                      } ],
+                      "marketplace" : "ETSY",
+                      "productType" : "mug",
+                      "riskLevel" : "MEDIUM",
+                      "rulesetVersion" : "trademark-risk-2026-11b"
                     }
                   }
                 },
@@ -3883,6 +4241,19 @@
                       "title" : "Bad Request",
                       "type" : "urn:listing-guard:problem:invalid-request"
                     }
+                  },
+                  "unknown-product-type" : {
+                    "description" : "unknown-product-type",
+                    "value" : {
+                      "code" : "unknown-product-type",
+                      "detail" : "Unknown product type 'spaceship'; declared product types: [apparel, mug, poster, sticker, phone_case, jewelry, bag, furniture_decor, fabric, toy]",
+                      "instance" : "/api/v1/trademark-checks",
+                      "known" : [ "apparel", "mug", "poster", "sticker", "phone_case", "jewelry", "bag", "furniture_decor", "fabric", "toy" ],
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:unknown-product-type"
+                    }
                   }
                 },
                 "schema" : {
@@ -3890,7 +4261,7 @@
                 }
               }
             },
-            "description" : "Invalid request (code `invalid-request`) or unknown marketplace (`unknown-marketplace`)."
+            "description" : "Invalid request (code `invalid-request`), unknown marketplace (`unknown-marketplace`) or a `product_type` the ruleset does not declare (`unknown-product-type`; the declared ones are in `known`). A product type is never ignored: the request is refused before anything is stored or counted."
           },
           "401" : {
             "content" : {
@@ -4072,10 +4443,12 @@
                     "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
                     "otherRuleIds" : [ ],
                     "risk" : "HIGH",
+                    "riskAdjustments" : [ ],
                     "ruleId" : "catalog_exact",
                     "score" : 1.0,
                     "snippet" : "Zorvex",
                     "sourceIds" : [ "S-001", "S-002" ],
+                    "sourceLinks" : [ ],
                     "start" : 0,
                     "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                   }, {
@@ -4087,10 +4460,12 @@
                     "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
                     "otherRuleIds" : [ ],
                     "risk" : "MEDIUM",
+                    "riskAdjustments" : [ ],
                     "ruleId" : "geo_sport_combination",
                     "score" : null,
                     "snippet" : "Northvale Baseball",
                     "sourceIds" : [ ],
+                    "sourceLinks" : [ ],
                     "start" : 13,
                     "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                   }, {
@@ -4102,16 +4477,19 @@
                     "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
                     "otherRuleIds" : [ ],
                     "risk" : "LOW",
+                    "riskAdjustments" : [ ],
                     "ruleId" : "pure_color_description",
                     "score" : null,
                     "snippet" : "royal blue white pinstripe",
                     "sourceIds" : [ ],
+                    "sourceLinks" : [ ],
                     "start" : 0,
                     "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
                   } ],
                   "marketplace" : "ETSY",
+                  "productType" : null,
                   "riskLevel" : "HIGH",
-                  "rulesetVersion" : "trademark-risk-2026-11"
+                  "rulesetVersion" : "trademark-risk-2026-11b"
                 },
                 "schema" : {
                   "$ref" : "#/components/schemas/TrademarkCheckResult"
@@ -4731,6 +5109,9 @@
   }, {
     "description" : "The text a buyer typed for a custom product: can it be printed, and does it look like a protected name.",
     "name" : "Personalization screening"
+  }, {
+    "description" : "What this deployment serves.",
+    "name" : "Capabilities"
   }, {
     "description" : "The images of a listing: format, size, count, background, occupancy and sharpness against a marketplace profile.",
     "name" : "Image checks"

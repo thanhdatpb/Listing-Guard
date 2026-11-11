@@ -25,7 +25,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * V28 and V29 (ADR-008): the plan pack of the image checks and the result tables. A complete result is unique per cache
+ * V29 and V30 (ADR-008): the plan pack of the image checks and the result tables. A complete result is unique per cache
  * identity and an INCOMPLETE one is not; items and findings go with their check; the CHECK constraints are the Java enums they
  * mirror; an incomplete check is never summarized as anything but incomplete.
  */
@@ -68,18 +68,18 @@ class MigrationImageCheckTest {
         }
     }
 
-    // ---- V28 ------------------------------------------------------------------------------------------------------
+    // ---- V29 ------------------------------------------------------------------------------------------------------
 
     @Test
-    void v28GivesThePackToSellerAndProOnlyKeepsEveryOtherPackAndWhatAnOperatorSet() throws Exception {
-        flyway("27").migrate();
+    void v29GivesThePackToSellerAndProOnlyKeepsEveryOtherPackAndWhatAnOperatorSet() throws Exception {
+        flyway("28").migrate();
         try (Connection connection = open(); Statement statement = connection.createStatement()) {
             statement.executeUpdate("DELETE FROM plan_pack WHERE plan_code = 'SELLER' AND pack_id = 'batch'");
             assertThatThrownBy(() -> statement.executeUpdate("INSERT INTO plan_pack (plan_code, pack_id) VALUES ('SELLER', 'image-checks')"))
                     .as("V24's constraint does not know the pack yet")
                     .isInstanceOf(SQLException.class).hasMessageContaining("ck_plan_pack_pack_id");
 
-            flyway("28").migrate();
+            flyway("29").migrate();
 
             assertThat(column(statement, "SELECT pack_id FROM plan_pack WHERE plan_code = 'FREE'"))
                     .containsExactlyInAnyOrder("listing-rules");
@@ -96,13 +96,13 @@ class MigrationImageCheckTest {
     }
 
     @Test
-    void v28MigratesAlsoWhenAnOperatorRemovedAPlanRow() throws Exception {
-        flyway("27").migrate();
+    void v29MigratesAlsoWhenAnOperatorRemovedAPlanRow() throws Exception {
+        flyway("28").migrate();
         try (Connection connection = open(); Statement statement = connection.createStatement()) {
             statement.executeUpdate("DELETE FROM plan_pack WHERE plan_code = 'PRO'");
             statement.executeUpdate("DELETE FROM plan WHERE code = 'PRO'");
 
-            flyway("28").migrate();
+            flyway("29").migrate();
 
             assertThat(column(statement, "SELECT code FROM plan")).containsExactlyInAnyOrder("FREE", "SELLER");
             assertThat(column(statement, "SELECT pack_id FROM plan_pack WHERE plan_code = 'SELLER'")).contains("image-checks");
@@ -124,7 +124,7 @@ class MigrationImageCheckTest {
         }
     }
 
-    // ---- V29 ------------------------------------------------------------------------------------------------------
+    // ---- V30 ------------------------------------------------------------------------------------------------------
 
     private static final String CLIENT = "(SELECT id FROM client WHERE name = 'v29-client')";
     private static final String RULESET = "(SELECT id FROM ruleset_version WHERE pack_id = 'image-compliance')";

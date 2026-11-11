@@ -148,6 +148,47 @@ lexicon:
     - solid
     - gradient
 
+# Test values for the three optional sections: product types, generic words and source keys that are not the shipped
+# ones, so a test reads them from here and nothing is assumed from the shipped file.
+product_classes:
+  source:
+    status: unverified
+    note: Synthetic product types.
+  out_of_class_downgrade_levels: 1
+  note: "Nhãn hiệu '{mark}' ở nhóm {mark_classes} ngoài nhóm {product_classes} của '{product_type}': hạ từ {from} xuống {to}."
+  types:
+    shirt: [25, 35]
+    cup: [21]
+    banner: [24, 16]
+    gadget: [9]
+
+generic_words:
+  source:
+    status: unverified
+    note: Synthetic words.
+  words:
+    - Plumb
+    - Harbor Lamp
+  context_fields:
+    - brand
+    - shop_name
+  max_risk_without_context: LOW
+  note: "'{mark}' là từ thông dụng, không đứng ở {context_fields}: tối đa {to}, mức gốc {from}."
+
+source_links:
+  source:
+    status: unverified
+    note: Synthetic registry addresses on a reserved test domain.
+  sources:
+    - source_key: tsreg
+      label: Test registry
+      id_pattern: "[0-9]{6}"
+      url_template: "https://registry.example.test/mark/{id}?view=status"
+    - source_key: other.src
+      label: Other registry
+      id_pattern: "[A-Z]{2}-[0-9]{4}"
+      url_template: "https://other.example.test/{id}"
+
 # The order here is the order the rules run in and the tie-break between findings of equal risk.
 rules:
   catalog_exact:

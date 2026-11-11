@@ -613,14 +613,14 @@ the maintainer has saved and reviewed the official pages (the procedure is in AD
 is `INCOMPLETE`, so nothing is reused and no unit is charged, even with plans on. A new ruleset version with reviewed numbers is
 what turns the endpoint into one that gives complete results; point `listing-guard.image.rulesets.<MARKETPLACE>` at it.
 
-Two migrations, both additive. **V28** replaces the `CHECK` of `plan_pack` (V19, V22 and V24 are not edited) so that it keeps every
+Two migrations, both additive. **V29** replaces the `CHECK` of `plan_pack` (V19, V22 and V24 are not edited) so that it keeps every
 pack V24 accepted and also accepts `image-checks`, and gives the pack to `SELLER` and `PRO`; a row an operator already removed is
-not put back, and a missing plan row does not stop the migration. **V29** creates `image_check`, `image_check_item` and
+not put back, and a missing plan row does not stop the migration. **V30** creates `image_check`, `image_check_item` and
 `image_check_finding`. Neither touches an existing row, both apply on any database, and nothing changes for a deployment while
 `listing-guard.plans.enabled` is false. To give or take the pack away from a plan by hand:
 `INSERT INTO plan_pack (plan_code, pack_id) VALUES ('FREE', 'image-checks')` or the matching `DELETE`. Rolling back is
 `DROP TABLE image_check_finding, image_check_item, image_check;` and, after every instance runs a version without the pack,
-restoring the previous `CHECK` (V28 does not undo itself). The plan pack is `image-checks`; the ruleset behind it is registered
+restoring the previous `CHECK` (V29 does not undo itself). The plan pack is `image-checks`; the ruleset behind it is registered
 under the analysis pack `image-compliance` (ADR-010), so the two names differ on purpose.
 
 **The images are never stored, nor their file names.** A result holds a hash of the request, one SHA-256 and the decoder's
@@ -722,7 +722,7 @@ UPDATE plan SET monthly_quota = 2000 WHERE code = 'SELLER';      -- NULL means u
 ```
 
 A change applies at once to every client on that plan and keeps this month's `used`. The codes (`FREE`, `SELLER`, `PRO`
-and the eight pack ids, `variation-checks` since V22, `personalization-screening` since V24 and `image-checks` since V28) are fixed by `CHECK` constraints and the Java enums, so a new plan or pack
+and the eight pack ids, `variation-checks` since V22, `personalization-screening` since V24 and `image-checks` since V29) are fixed by `CHECK` constraints and the Java enums, so a new plan or pack
 needs a migration.
 `policy-analyzer` and `sheet-connector` are in the seed but **nothing enforces them yet** (ADR-011 PR 5 and phase 4b).
 

@@ -10,8 +10,8 @@ import java.util.List;
 
 /**
  * The submitted text in canonical form and its hash (ADR-009). Canonical means: fixed field
- * order (title, tags, bullet points, description, brand, shop name, search terms, category; the lists in the order
- * sent), Unicode NFC, surrounding whitespace removed
+ * order (title, tags, bullet points, description, brand, shop name, search terms, category, product type; the lists in
+ * the order sent), Unicode NFC, surrounding whitespace removed
  * ({@code String.strip}). It is the text before any homoglyph, leet, diacritic or punctuation normalization, so the
  * hash tells apart submissions that only normalize to the same match form. Evidence offsets refer to these
  * strings, in UTF-16 code units.
@@ -23,7 +23,11 @@ import java.util.List;
  */
 public record CanonicalInput(List<Field> fields, String hash) {
 
-    public static final String HASH_FORMAT = "listing-guard/trademark-input/v1";
+    /**
+     * v2 added the product type (ADR-009, "Product classes, source links and generic words"): every hash changed, so a
+     * result stored under v1 is never matched with a v2 request, whatever the analysis version says.
+     */
+    public static final String HASH_FORMAT = "listing-guard/trademark-input/v2";
 
     /** One canonical field: {@code title}, {@code tags[0]}, {@code description}, {@code brand}, ... */
     public record Field(String name, String text) {
@@ -44,7 +48,17 @@ public record CanonicalInput(List<Field> fields, String hash) {
         add(fields, serialized, "shop_name", input.shopName());
         add(fields, serialized, "search_terms", input.searchTerms());
         add(fields, serialized, "category", input.category());
+        add(fields, serialized, "product_type", input.productType());
         return new CanonicalInput(fields, sha256(serialized.toString()));
+    }
+
+    /**
+     * The product type the caller named, canonical (NFC, stripped), or null when none was named or it was blank. It is a
+     * field of the hash but never a scanned one.
+     */
+    public String productType() {
+        return fields.stream().filter(field -> field.name().equals("product_type")).map(Field::text)
+                .filter(text -> !text.isEmpty()).findFirst().orElse(null);
     }
 
     private static void addList(List<Field> fields, StringBuilder serialized, String name, List<String> values) {

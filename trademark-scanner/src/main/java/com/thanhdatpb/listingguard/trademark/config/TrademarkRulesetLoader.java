@@ -22,9 +22,12 @@ import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * Parses a trademark ruleset YAML into a {@link TrademarkRuleset}. Strict on purpose, like the rule-engine loader:
@@ -43,6 +46,15 @@ public final class TrademarkRulesetLoader {
     private static final Set<String> FUZZY_PLACEHOLDERS = Set.of("mark", "token", "field", "score");
     private static final Set<String> GEO_PLACEHOLDERS = Set.of("place", "sport", "field", "distance", "max_distance");
     private static final Set<String> PURE_COLOR_PLACEHOLDERS = Set.of("phrase", "field", "tokens");
+    private static final Set<String> PRODUCT_NOTE_PLACEHOLDERS =
+            Set.of("mark", "mark_classes", "product_type", "product_classes", "from", "to");
+    private static final Set<String> GENERIC_NOTE_PLACEHOLDERS = Set.of("mark", "context_fields", "from", "to");
+
+    /** A product type key: what a client sends as {@code product_type}. */
+    private static final Pattern PRODUCT_TYPE_KEY = Pattern.compile("[a-z][a-z0-9_]{0,31}");
+    /** The same shape as a {@code source_key} of the catalog manifest. */
+    private static final Pattern SOURCE_KEY = Pattern.compile("[a-z0-9][a-z0-9._-]{0,31}");
+    private static final int MAX_URL_TEMPLATE_CHARS = 300;
 
     private TrademarkRulesetLoader() {
     }
@@ -84,6 +96,11 @@ public final class TrademarkRulesetLoader {
         TextNormalizer normalizer = new TextNormalizer(normalization);
         TrademarkRuleset.Matching matching = parseMatching(root.section("matching"));
         TrademarkRuleset.Lexicon lexicon = parseLexicon(root.section("lexicon"), normalizer);
+        // three optional sections: a ruleset published before they existed has none and keeps its behavior
+        TrademarkRuleset.ProductClasses productClasses = parseProductClasses(root.optionalSection("product_classes"));
+        TrademarkRuleset.GenericWords genericWords =
+                parseGenericWords(root.optionalSection("generic_words"), normalizer);
+        TrademarkRuleset.SourceLinks sourceLinks = parseSourceLinks(root.optionalSection("source_links"));
 
         Section rules = root.section("rules");
         List<String> order = ruleOrder(rules);
@@ -98,7 +115,8 @@ public final class TrademarkRulesetLoader {
         root.finish();
 
         return new TrademarkRuleset(packId, version, checkedAt, sha256(text), disclaimer, normalization, matching,
-                lexicon, order, exact, phrase, fuzzy, geo, colorContains, pureColor);
+                lexicon, order, exact, phrase, fuzzy, geo, colorContains, pureColor, productClasses, genericWords,
+                sourceLinks);
     }
 
     /** LF line endings, no BOM. This is the text that gets hashed. */
@@ -274,6 +292,134 @@ public final class TrademarkRulesetLoader {
         return new TrademarkRuleset.PureColor(risk, minTokens, message, suggestion);
     }
 
+    private static TrademarkRuleset.ProductClasses parseProductClasses(Section section) {
+        if (section == null) {
+            return TrademarkRuleset.ProductClasses.NONE;
+        }
+        parseSource(section.section("source"));
+        int levels = section.integer("out_of_class_downgrade_levels", 1, 2);
+        String note = template(section, "note", PRODUCT_NOTE_PLACEHOLDERS);
+        Map<String, List<Integer>> types = new LinkedHashMap<>();
+        section.integerLists("types", 1, 45).forEach((type, classes) -> {
+            if (!PRODUCT_TYPE_KEY.matcher(type).matches()) {
+                throw new TrademarkRulesetException("product_classes.types key '" + type
+                        + "' must match [a-z][a-z0-9_]{0,31}");
+            }
+            if (new HashSet<>(classes).size() != classes.size()) {
+                throw new TrademarkRulesetException("product_classes.types." + type + " lists a Nice class twice");
+            }
+            types.put(type, classes.stream().sorted().toList());
+        });
+        section.finish();
+        return new TrademarkRuleset.ProductClasses(levels, types, note);
+    }
+
+    private static TrademarkRuleset.GenericWords parseGenericWords(Section section, TextNormalizer normalizer) {
+        if (section == null) {
+            return TrademarkRuleset.GenericWords.NONE;
+        }
+        parseSource(section.section("source"));
+        // the list may be empty: the shipped ruleset lists no word until the maintainer has reviewed each one
+        Set<String> words = new LinkedHashSet<>();
+        for (String entry : section.strings("words", false)) {
+            List<String> tokens = normalizer.tokenTexts(entry);
+            if (tokens.isEmpty()) {
+                throw new TrademarkRulesetException("generic_words.words entry '" + entry
+                        + "' has no letters or digits");
+            }
+            if (!words.add(String.join(" ", tokens))) {
+                throw new TrademarkRulesetException("generic_words.words lists '" + entry
+                        + "' twice (after normalization)");
+            }
+        }
+        List<String> contextFields = section.strings("context_fields", true);
+        if (new HashSet<>(contextFields).size() != contextFields.size()) {
+            throw new TrademarkRulesetException("generic_words.context_fields contains a duplicate");
+        }
+        for (String field : contextFields) {
+            if (!TrademarkRuleset.SCANNABLE_FIELDS.contains(field)) {
+                throw new TrademarkRulesetException("generic_words.context_fields has unknown field '" + field
+                        + "' (use " + TrademarkRuleset.SCANNABLE_FIELDS.stream().sorted().toList() + ")");
+            }
+        }
+        RiskLevel maxRisk = parseRisk(section, "max_risk_without_context");
+        String note = template(section, "note", GENERIC_NOTE_PLACEHOLDERS);
+        section.finish();
+        return new TrademarkRuleset.GenericWords(words, contextFields, maxRisk, note);
+    }
+
+    private static TrademarkRuleset.SourceLinks parseSourceLinks(Section section) {
+        if (section == null) {
+            return TrademarkRuleset.SourceLinks.NONE;
+        }
+        parseSource(section.section("source"));
+        List<TrademarkRuleset.SourceLinks.Template> templates = new ArrayList<>();
+        Set<String> keys = new HashSet<>();
+        for (Section entry : section.sections("sources")) {
+            String key = entry.text("source_key");
+            if (!SOURCE_KEY.matcher(key).matches()) {
+                throw new TrademarkRulesetException(entry.path() + ".source_key must match [a-z0-9][a-z0-9._-]{0,31}, got '"
+                        + key + "'");
+            }
+            if (!keys.add(key)) {
+                throw new TrademarkRulesetException("source_links.sources lists source_key '" + key + "' twice");
+            }
+            String label = entry.text("label");
+            Pattern idPattern = idPattern(entry.path() + ".id_pattern", entry.text("id_pattern"));
+            String urlTemplate = entry.text("url_template");
+            validateUrlTemplate(entry.path() + ".url_template", urlTemplate);
+            entry.finish();
+            templates.add(new TrademarkRuleset.SourceLinks.Template(key, label, idPattern, urlTemplate));
+        }
+        section.finish();
+        return new TrademarkRuleset.SourceLinks(templates);
+    }
+
+    private static Pattern idPattern(String where, String regex) {
+        try {
+            return Pattern.compile(regex);
+        } catch (PatternSyntaxException e) {
+            throw new TrademarkRulesetException(where + " is not a valid regular expression: " + e.getDescription());
+        }
+    }
+
+    /**
+     * An https address with one {@code {id}} after the host, no other brace and no whitespace: what is inserted is an id
+     * the code has already limited to letters, digits and {@code ._-}, so it cannot change the host or add a path.
+     */
+    private static void validateUrlTemplate(String where, String url) {
+        if (url.length() > MAX_URL_TEMPLATE_CHARS) {
+            throw new TrademarkRulesetException(where + " must not be longer than " + MAX_URL_TEMPLATE_CHARS
+                    + " characters");
+        }
+        if (!url.startsWith("https://")) {
+            throw new TrademarkRulesetException(where + " must start with https://, got '" + url + "'");
+        }
+        if (url.chars().anyMatch(Character::isWhitespace)) {
+            throw new TrademarkRulesetException(where + " must not contain whitespace");
+        }
+        int placeholder = url.indexOf("{id}");
+        if (placeholder < 0 || url.indexOf("{id}", placeholder + 1) >= 0) {
+            throw new TrademarkRulesetException(where + " must contain {id} exactly once");
+        }
+        String withoutId = url.replace("{id}", "");
+        if (withoutId.indexOf('{') >= 0 || withoutId.indexOf('}') >= 0) {
+            throw new TrademarkRulesetException(where + " has a stray '{' or '}' (the only placeholder is {id})");
+        }
+        String afterScheme = url.substring("https://".length());
+        int hostEnd = afterScheme.length();
+        for (char separator : new char[] {'/', '?', '#'}) {
+            int at = afterScheme.indexOf(separator);
+            if (at >= 0) {
+                hostEnd = Math.min(hostEnd, at);
+            }
+        }
+        if (!afterScheme.substring(0, hostEnd).matches("[A-Za-z0-9.-]+(:[0-9]{1,5})?")) {
+            throw new TrademarkRulesetException(where + " must have a plain host before the first '/', '?' or '#' "
+                    + "(the placeholder cannot be part of it)");
+        }
+    }
+
     private static String template(Section section, String key, Set<String> allowed) {
         String text = section.text(key);
         Templates.validate(section.path() + "." + key, text, allowed);
@@ -281,7 +427,11 @@ public final class TrademarkRulesetLoader {
     }
 
     private static RiskLevel parseRisk(Section section) {
-        String value = section.text("risk");
+        return parseRisk(section, "risk");
+    }
+
+    private static RiskLevel parseRisk(Section section, String key) {
+        String value = section.text(key);
         try {
             RiskLevel risk = RiskLevel.valueOf(value.toUpperCase(Locale.ROOT));
             if (risk.isDetermined()) {
@@ -290,7 +440,8 @@ public final class TrademarkRulesetLoader {
         } catch (IllegalArgumentException ignored) {
             // reported below
         }
-        throw new TrademarkRulesetException(section.path() + ".risk must be LOW, MEDIUM or HIGH, got '" + value + "'");
+        throw new TrademarkRulesetException(section.path() + "." + key + " must be LOW, MEDIUM or HIGH, got '" + value
+                + "'");
     }
 
     /** Every block's source is an internal heuristic: only {@code unverified} is accepted (ADR-009). */

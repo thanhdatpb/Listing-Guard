@@ -38,7 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 public class ImageCheckStore {
 
-    /** The partial unique index of the cache identity (V29). */
+    /** The partial unique index of the cache identity (V30). */
     static final String CACHE_INDEX = "uq_image_check_cache";
 
     private static final String UNIQUE_VIOLATION = "23505";

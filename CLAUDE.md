@@ -24,7 +24,7 @@ It never edits a listing, never publishes, and does no SEO.
   (`listing-guard.analyzer.enabled=false`), whose first adapter is OpenAI-compatible; the build and every test
   never need a key. Nothing here is needed to run the rule checks.
 - **Trademark scanner** (`trademark-scanner/`, ADR-009, PR A1): the Java-only core of the trademark pack. Versioned
-  ruleset `rulesets/trademark-risk-2026-11.yaml` (every threshold, word list, risk level and Vietnamese message; every
+  ruleset `rulesets/trademark-risk-2026-11b.yaml` (every threshold, word list, risk level and Vietnamese message; every
   `source.status` must be `unverified`), canonical input hash, normalization with offsets, the `TrademarkCatalog` port
   with `InMemoryTrademarkCatalog`, exact/phrase/fuzzy matching (final score: optimal string alignment, `osa-similarity-1`),
   the three color and place context rules, risk aggregation with `INCOMPLETE`/`UNKNOWN`, and `AnalysisFingerprint`.
@@ -44,16 +44,27 @@ It never edits a listing, never publishes, and does no SEO.
   in `catalogs/raw/` to `jsonl-1` and writes a `.report.json` of the counts; the status map
   `uspto-status-map-2026-11.yaml` has `source.status: unverified`. **The converter is unverified against real data**: it
   follows the public DTD and documentation named in ADR-009 and has never read a real file. The next steps are PR A2c
-  (the latest transaction of a serial number wins) and A4 (evaluation).
+  (the latest transaction of a serial number wins) and A4 (evaluation). **Product classes, source links and generic words
+  (A5, done)**: the API serves ruleset `trademark-risk-2026-11b` (`2026-11` is kept unchanged, a test pins its hash), which
+  adds three optional sections, all `unverified`: `product_classes` (the request may carry a top-level `product_type`, a key
+  of `types`; a mark with Nice classes, none the product type's, drops `out_of_class_downgrade_levels`, a mark with none is not
+  lowered, a type the ruleset does not declare is `400 unknown-product-type` and the scanner throws
+  `UnknownProductTypeException`, never ignored), `generic_words` (**empty in the shipped file until the maintainer reviews each
+  word**; context is only an exact or phrase match in `brand` or `shop_name`, else capped at `LOW`; the catalog's `common_word`
+  flag is still not read; never list a famous brand that is also a common noun) and `source_links` (`uspto:<8 digits>` gets a TSDR
+  URL from a YAML template, never from Java; the address is unverified). A lowered finding carries `riskAdjustments`
+  (`reason`, `from` = the rule's original level, `to`, `note`) and the finding's `risk` is the lowest `to`; links and adjustments
+  are stored (V28, JSONB) with `trademark_check.product_type`. Input hash `trademark-input/v2`, `matcher-2`. Personalization is
+  unchanged (`TrademarkRulesetUnchangedTest`). The MCP `check_trademark` tool takes no `product_type` yet.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`, `FixSuggestion`). No Spring.
 - **Image checker core** (`image-checker/`, ADR-008, Proposed): Java-only ImageIO module, independent image input and canonical byte/metadata hash, immutable Amazon/Etsy `image-compliance` rulesets, runtime-aware analysis fingerprint, EXIF orientation, embedded ICC-to-sRGB conversion, alpha compositing on white, dimensions/aspect ratio, image count, Amazon main-image edge whiteness, occupancy and Laplacian variance. No Spring, database, HTTP or original-image persistence. Both shipped marketplace rulesets keep policy thresholds null until the maintainer reviews saved official sources; affected checks return `INCOMPLETE`. Every shipped source is `unverified`, and findings are only WARNING/INFO. The CUSTOMER_CONTENT rule reads the caller-declared source only; there is no text/logo/watermark detection.
 - **Image checks endpoint** (`api/.../image/`, ADR-008, Proposed; implemented, off by default): `POST /api/v1/image-checks` (multipart:
   a `metadata` part with `marketplace`, optional `profile` and `images[]` of `{role, source}`, plus one `images` file part per image in
   the same order; `docs/input-schema.md` "Image checks"; never a URL or a path) and `GET /api/v1/image-checks/{id}` (client-scoped,
   another client's, an unknown and an expired id are one `404 image-check-not-found`). `listing-guard.image.enabled=false` by default:
-  the endpoint then answers `503 image-checks-not-configured` and the large upload body limit does not apply. V28 (plan pack
+  the endpoint then answers `503 image-checks-not-configured` and the large upload body limit does not apply. V29 (plan pack
   `image-checks` for SELLER and PRO; the **plan pack id differs from the ruleset's analysis pack `image-compliance`** on purpose,
-  ADR-008 Open question 2) and V29 (`image_check`, `image_check_item`, `image_check_finding`): **only the canonical input hash, one
+  ADR-008 Open question 2) and V30 (`image_check`, `image_check_item`, `image_check_finding`): **only the canonical input hash, one
   SHA-256 and the decoder's metadata per image, and bounded evidence are stored, never the bytes or a file name**; 30-day retention
   (`listing-guard.image.retention.*`) enforced on read and by a scheduled cleanup under the shared retention advisory lock; cache
   `(client, marketplace, pack, input hash, ruleset version, analysis version)` with `COMPLETE` results only; one unit per new
@@ -87,7 +98,9 @@ It never edits a listing, never publishes, and does no SEO.
   `allow_lowercase`, severities and every Vietnamese message are keys; a test pins its hash). Three character rules
   (`unsupported_characters`, `too_long`, `whitespace_issue`) plus the **trademark scanner run on each value as
   `personalization[i]`** (the adapter hands the values over as the items of `tags`, renames the field back and shifts the
-  offsets; `trademark-scanner` and its ruleset are untouched and a test holds that the shipped one scans `tags`). **Every
+  offsets; this PR left `trademark-scanner` and its ruleset untouched and a test holds that the shipped one scans `tags`; A5
+  later added product classes and generic words there, which this pack never uses, and `TrademarkRulesetUnchangedTest` holds
+  that a screening is the same on `2026-11` and `2026-11b`). **Every
   source is `unverified` and the loader refuses any other, so no finding is ERROR; the shipped profiles `latin_basic` (default)
   and `latin_extended` are placeholders with invented numbers, not the real workshop's.** The normalizer does **not trim the
   buyer's text** (spaces are what `whitespace_issue` reports; NFC only). A catalog that is DISABLED or REFUSED is **not a 503**
@@ -105,12 +118,12 @@ It never edits a listing, never publishes, and does no SEO.
 - **MCP server** (`mcp-server/`, ADR-017, Proposed; implemented, `docs/mcp.md`): a jar of its own for AI agents (Claude Code,
   Claude Desktop, a department's agent) over the Model Context Protocol. **It is only an HTTP client of the REST API**
   (`X-API-Key` from `LISTING_GUARD_MCP_API_KEY`, base URL from `LISTING_GUARD_MCP_BASE_URL`; it does not start without them and
-  never prints a value): no database, no internal service, no dependency on another module, no migration, no change to the API or
-  `docs/api/openapi.json`, so keys, rate limit, plans and quota (ADR-005, ADR-007, ADR-013) apply unchanged. Official MCP Java SDK
+  never prints a value): no database, no internal service, no dependency on another module, no migration, no write and no logic of its own, so keys, rate limit, plans and quota (ADR-005, ADR-007, ADR-013) apply unchanged. Official MCP Java SDK
   `io.modelcontextprotocol.sdk` **2.1.0** pinned exactly (`mcp-core` + `mcp-json-jackson2`; the aggregate `mcp` pulls Jackson 3;
   2.2.0-M2 is a milestone and is not used), **no Spring** (the Spring AI starter needs Spring Boot 4 and is not used; the repository itself is on Boot 4.1, ADR-020), the JDK
-  `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Six tools
-  (`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`; `Endpoint` is the
+  `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Seven tools
+  (`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`, `get_capabilities`
+  (`GET /api/v1/capabilities`, no arguments, read only); `Endpoint` is the
   closed list of API calls, only `GET` and `POST`, no tool takes a path or a URL); **none writes, applies a fix or publishes**.
   **The model does not decide**: a `2xx` answer is returned verbatim (exact body as text, the same object as structured content,
   no `outputSchema`, nothing removed or summarized, `INCOMPLETE` and `UNKNOWN` never turned into anything else). API problems
@@ -123,7 +136,14 @@ It never edits a listing, never publishes, and does no SEO.
   (an echo of it in an answer is replaced), redirects are not followed, cleartext `http` only to localhost unless
   `LISTING_GUARD_MCP_ALLOW_INSECURE_HTTP=true`. **No argument is ever logged** (a listing is client data, the buyer's text is personal
   data). Tests use the JDK `HttpServer` as the API stub (no Docker, no WireMock) and the SDK's own client over stdio (a child process)
-  and HTTP. No compose service, `docs/releases` untouched.
+  and HTTP. No compose service. **`get_capabilities`** (ADR-017 amendment) reads `GET /api/v1/capabilities`, the one endpoint this
+  server needed that the API lacked (`api/.../capabilities/`; the same for every client, an API key, no plan pack, no quota, no
+  write, `ETag`): the packs served over HTTP with `available` and the ruleset version per marketplace, `trademarkCatalog.state`
+  (`READY`/`DISABLED`/`REFUSED`) and `demo`, `plans.enforced`, `fixes.enabled`. It reads the beans that serve the checks, never
+  `TrademarkCatalogRuntime.Status#detail()` (that text can name the configured catalog) and never a client row, so it shows no
+  catalog name, no secret setting and nothing about a client; a test holds the exact member list. `demo` comes from
+  `TrademarkProperties.isDemo`, the one definition the console banner uses too. A new member needs the DTO, `ApiExamples.CAPABILITIES`,
+  `docs/api/openapi.json` and `docs/integration-guide.md`.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Optional ADR-014 fix/readiness output is behind

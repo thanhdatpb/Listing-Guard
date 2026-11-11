@@ -17,7 +17,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "listing-guard.trademark")
 public record TrademarkProperties(
-        @DefaultValue("classpath:rulesets/trademark-risk-2026-11.yaml") String ruleset,
+        @DefaultValue("classpath:rulesets/trademark-risk-2026-11b.yaml") String ruleset,
         @DefaultValue({"ETSY", "AMAZON"}) List<String> marketplaces,
         @DefaultValue("") String catalogVersion,
         @DefaultValue("catalogs") String catalogsDir) {
@@ -27,7 +27,22 @@ public record TrademarkProperties(
         catalogVersion = catalogVersion == null ? "" : catalogVersion.trim();
     }
 
+    /** The prefix of the DEMO catalog's manifest label ({@code demo-fictional-2026-11}): invented marks, not real ones. */
+    public static final String DEMO_PREFIX = "demo-";
+
     public boolean catalogConfigured() {
         return !catalogVersion.isEmpty();
+    }
+
+    /**
+     * Whether a catalog version is a DEMO catalog. Decided from the configured version only, so it holds whatever the state
+     * of the catalog. The one definition: the console banner and {@code GET /api/v1/capabilities} both use it.
+     */
+    public static boolean isDemo(String catalogVersion) {
+        return catalogVersion != null && catalogVersion.startsWith(DEMO_PREFIX);
+    }
+
+    public boolean demoCatalog() {
+        return isDemo(catalogVersion);
     }
 }

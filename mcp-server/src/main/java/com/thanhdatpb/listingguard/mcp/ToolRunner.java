@@ -64,6 +64,7 @@ final class ToolRunner {
         return switch (tool.endpoint()) {
             case RULESET_LIMITS -> ApiRequest.limits((String) args.get("marketplace"), (String) args.get("product_type"));
             case USAGE -> ApiRequest.usage();
+            case CAPABILITIES -> ApiRequest.capabilities();
             default -> ApiRequest.post(tool.endpoint(), mapper.writeValueAsString(args));
         };
     }

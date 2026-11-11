@@ -276,7 +276,7 @@ check are not met, and no marketplace threshold has been reviewed.
 - **A corrupt, unsupported, CMYK or oversized-pixel image is not an error of the request**: the checker returns that image as
   `INCOMPLETE` (`image_decode`) and the others are still checked; the request is `200`.
 - **Result and storage.** `GET /api/v1/image-checks/{id}` filters by client; another client's id, an unknown id and an expired id
-  are one `404 image-check-not-found`. V29 adds `image_check`, `image_check_item` and `image_check_finding`. Stored: the canonical
+  are one `404 image-check-not-found`. V30 adds `image_check`, `image_check_item` and `image_check_finding`. Stored: the canonical
   input hash, one SHA-256 and the decoder's metadata per image, the findings with their evidence (at most 200 characters, a measured
   value) and the ruleset's disclaimer. **Not stored: the image bytes and the client's file names** (a test looks for a binary or a
   name column). Cache identity is `(client, marketplace, pack_id, input hash, ruleset version, analysis version)` with `pack_id`
@@ -286,7 +286,7 @@ check are not met, and no marketplace threshold has been reviewed.
   request deletes the expired row and its children and stores the new result in one transaction; a scheduled cleanup deletes expired
   checks in bounded batches under `pg_try_advisory_xact_lock(1279746628, 1380271182)`, the pair this record and ADR-010 reserve, shared
   with the trademark, variation and personalization cleanups (it runs whether or not the endpoint is enabled).
-- **Plan pack (ADR-013).** `image-checks` (V28, `SELLER` and `PRO`). Order as in ADR-013: the pack, the cache, the quota before the
+- **Plan pack (ADR-013).** `image-checks` (V29, `SELLER` and `PRO`). Order as in ADR-013: the pack, the cache, the quota before the
   analysis, the charge inside the storing transaction; **one unit per new `COMPLETE` result** (the whole request, however many images);
   cached and `INCOMPLETE` results cost nothing.
 - **Off by default**: `listing-guard.image.enabled=false`. The endpoint then answers `503 image-checks-not-configured`, stores nothing
@@ -326,7 +326,7 @@ Written as questions, not decided here; each says what this change assumed meanw
 
 1. **The first marketplace thresholds.** Which official pages are saved under `policies/raw/` and reviewed, so that a new ruleset
    version can carry numbers and mark sources `verified`? Assumed: none, every number stays null and every result is `INCOMPLETE`.
-2. **One pack id or two.** Should the plan pack be renamed `image-compliance` to follow ADR-013 (a new migration, since V28 is applied
+2. **One pack id or two.** Should the plan pack be renamed `image-compliance` to follow ADR-013 (a new migration, since V29 is applied
    once released) or the ruleset pack renamed `image-checks` (a new ruleset version)? Assumed: two ids, as requested.
 3. **How the stuck-decoder state is exposed.** Make `GET /health` answer 503 (one probe serves both liveness and readiness today, and
    the compose health check calls it), or add separate liveness and readiness probes? Assumed: not decided; not built.
