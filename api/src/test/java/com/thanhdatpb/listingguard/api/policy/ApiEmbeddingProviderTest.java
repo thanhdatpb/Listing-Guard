@@ -208,6 +208,15 @@ class ApiEmbeddingProviderTest {
     }
 
     @Test
+    void aResponseThatIsNotJsonIsRejectedWithoutQuotingIt() {
+        script.add(new Reply(200, "<html>this is not json " + KEY.length() + "</html>"));
+
+        assertThatThrownBy(() -> provider(16).embed(List.of("x"), Kind.DOCUMENT))
+                .isInstanceOf(EmbeddingException.class)
+                .hasMessage("The embedding API returned a response that cannot be read as JSON");
+    }
+
+    @Test
     void aResponseWithoutEmbeddingsOrValuesIsRejected() {
         script.add(new Reply(200, "{}"));
         script.add(new Reply(200, "{\"embeddings\":[{}]}"));
