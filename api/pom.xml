@@ -43,6 +43,10 @@
             <groupId>com.thanhdatpb.listingguard</groupId>
             <artifactId>personalization-screening</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.thanhdatpb.listingguard</groupId>
+            <artifactId>image-checker</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -10,6 +10,7 @@ COPY rag-analyzer rag-analyzer
 COPY trademark-scanner trademark-scanner
 COPY variation-checks variation-checks
 COPY personalization-screening personalization-screening
+COPY image-checker image-checker
 COPY api api
 COPY mcp-server mcp-server
 RUN --mount=type=cache,target=/root/.m2 \

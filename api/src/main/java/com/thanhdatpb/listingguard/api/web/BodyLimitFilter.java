@@ -24,21 +24,45 @@ public final class BodyLimitFilter extends OncePerRequestFilter {
 
     private final long maxBytes;
     private final ObjectMapper mapper;
+    private final String uploadPath;
+    private final long uploadMaxBytes;
 
     public BodyLimitFilter(long maxBytes, ObjectMapper mapper) {
+        this(maxBytes, mapper, null, 0);
+    }
+
+    /**
+     * @param uploadPath     the one path whose {@code POST} may carry a {@code multipart/form-data} body up to
+     *                       {@code uploadMaxBytes} (the image checks, ADR-008); null for none. Every other request keeps
+     *                       {@code maxBytes}
+     * @param uploadMaxBytes the limit of that path
+     */
+    public BodyLimitFilter(long maxBytes, ObjectMapper mapper, String uploadPath, long uploadMaxBytes) {
         this.maxBytes = maxBytes;
         this.mapper = mapper;
+        this.uploadPath = uploadPath;
+        this.uploadMaxBytes = uploadMaxBytes;
+    }
+
+    private long limitFor(HttpServletRequest request) {
+        String type = request.getContentType();
+        if (uploadPath != null && "POST".equals(request.getMethod()) && uploadPath.equals(request.getRequestURI())
+                && type != null && type.toLowerCase(java.util.Locale.ROOT).startsWith("multipart/form-data")) {
+            return uploadMaxBytes;
+        }
+        return maxBytes;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        if (request.getContentLengthLong() > maxBytes) {
+        long limit = limitFor(request);
+        if (request.getContentLengthLong() > limit) {
             ProblemResponses.write(request, response, mapper, HttpStatus.CONTENT_TOO_LARGE, "payload-too-large",
-                    "The request body is larger than the limit of " + maxBytes + " bytes.");
+                    "The request body is larger than the limit of " + limit + " bytes.");
             return;
         }
-        chain.doFilter(new LimitedRequest(request, maxBytes), response);
+        chain.doFilter(new LimitedRequest(request, limit), response);
     }
 
     private static final class LimitedRequest extends HttpServletRequestWrapper {
