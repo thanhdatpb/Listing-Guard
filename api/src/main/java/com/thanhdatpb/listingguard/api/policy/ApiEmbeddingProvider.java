@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingProvider;
+import java.io.IOException;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -123,13 +124,15 @@ public final class ApiEmbeddingProvider implements EmbeddingProvider {
 
         for (int attempt = 0; ; attempt++) {
             try {
-                JsonNode response = client.post()
+                // The body is read as bytes and parsed with this class's Jackson 2 mapper: with both Jackson 2 and Jackson 3 on the
+                // classpath a hand-built RestClient converts JSON with Jackson 3, which cannot produce a Jackson 2 JsonNode (ADR-020).
+                byte[] response = client.post()
                         .uri("/models/{model}:batchEmbedContents", model)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(payload)
                         .retrieve()
-                        .body(JsonNode.class);
-                return parse(response, batch.size());
+                        .body(byte[].class);
+                return parse(readJson(response), batch.size());
             } catch (RestClientResponseException e) {
                 int status = e.getStatusCode().value();
                 if (retryable(status) && attempt < retries) {
@@ -144,6 +147,19 @@ public final class ApiEmbeddingProvider implements EmbeddingProvider {
             } catch (RestClientException e) {
                 throw new EmbeddingException(scrub("The embedding API returned a response that cannot be read: " + e.getMessage()));
             }
+        }
+    }
+
+    /** An empty body is {@code null} (as before, it ends as "no embeddings"); a body that is not JSON is an {@link EmbeddingException}. */
+    private JsonNode readJson(byte[] response) {
+        if (response == null || response.length == 0) {
+            return null;
+        }
+        try {
+            return json.readTree(response);
+        } catch (IOException e) {
+            // no e.getMessage(): a parse error quotes a piece of the body
+            throw new EmbeddingException("The embedding API returned a response that cannot be read as JSON");
         }
     }
 

@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -68,6 +68,29 @@ class OpenApiIntegrationTest {
         assertThat(Files.readString(SPEC, StandardCharsets.UTF_8).replace("\r\n", "\n"))
                 .as("docs/api/openapi.json is out of date; run the build with -Dopenapi.update=true and commit it")
                 .isEqualTo(generated);
+    }
+
+    /**
+     * The upgrade to Spring Boot 4 (ADR-020) must not change {@code docs/api/openapi.json}. Spring Framework 7 marks the members of
+     * {@code ProblemDetail} with JSpecify {@code @Nullable}, which springdoc 3.2.0 does not read, so a customizer
+     * ({@code OpenApiConfig.nullableProblemDetailMembers}) keeps them nullable. This pins the published shape, in the committed file and
+     * in what the code generates, and fails with a message that names the cause if the customizer stops working.
+     */
+    @Test
+    void theProblemDetailSchemaKeepsItsPublishedNullableMembers() throws Exception {
+        JsonNode committed = mapper.readTree(Files.readString(SPEC, StandardCharsets.UTF_8)).at("/components/schemas/ProblemDetail/properties");
+        JsonNode generated = mapper.readTree(generatedSpec()).at("/components/schemas/ProblemDetail/properties");
+
+        for (JsonNode properties : List.of(committed, generated)) {
+            assertThat(fieldNames(properties)).containsExactlyInAnyOrder("detail", "instance", "properties", "status", "title", "type");
+            assertThat(typesOf(properties.get("title"))).containsExactly("string", "null");
+            assertThat(typesOf(properties.get("detail"))).containsExactly("string", "null");
+            assertThat(typesOf(properties.get("instance"))).containsExactly("string", "null");
+            assertThat(typesOf(properties.get("properties"))).containsExactly("object", "null");
+            assertThat(typesOf(properties.get("status"))).as("not nullable").containsExactly("integer");
+            assertThat(typesOf(properties.get("type"))).as("not nullable").containsExactly("string");
+        }
+        assertThat(generated).as("the generated ProblemDetail schema is the committed one").isEqualTo(committed);
     }
 
     @Test
@@ -224,6 +247,18 @@ class OpenApiIntegrationTest {
         spec.remove("servers");
         return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(mapper.treeToValue(spec, Object.class))
                 .replace("\r\n", "\n") + "\n";
+    }
+
+    /** The {@code type} of a schema as a list: {@code "string"} is one entry, {@code ["string", "null"]} is two. */
+    private static List<String> typesOf(JsonNode schema) {
+        JsonNode type = schema.get("type");
+        List<String> types = new ArrayList<>();
+        if (type.isArray()) {
+            type.forEach(each -> types.add(each.asText()));
+        } else {
+            types.add(type.asText());
+        }
+        return types;
     }
 
     private static List<String> fieldNames(JsonNode node) {

@@ -33,7 +33,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -253,7 +253,7 @@ class HealthReportApiIntegrationTest {
 
         get(c, WEEK_FROM, WEEK_TO, "NOPE").andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("unknown-marketplace"));
-        get(c, WEEK_FROM, WEEK_TO, "WALMART").andExpect(status().isUnprocessableEntity())
+        get(c, WEEK_FROM, WEEK_TO, "WALMART").andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("marketplace-not-yet-supported"));
         get(c, WEEK_FROM, WEEK_TO, "  ").andExpect(status().isOk());
     }

@@ -90,7 +90,7 @@ It never edits a listing, never publishes, and does no SEO.
   never prints a value): no database, no internal service, no dependency on another module, no migration, no change to the API or
   `docs/api/openapi.json`, so keys, rate limit, plans and quota (ADR-005, ADR-007, ADR-013) apply unchanged. Official MCP Java SDK
   `io.modelcontextprotocol.sdk` **2.1.0** pinned exactly (`mcp-core` + `mcp-json-jackson2`; the aggregate `mcp` pulls Jackson 3;
-  2.2.0-M2 is a milestone and is not used), **no Spring** (the Spring AI starter needs Spring Boot 4; Spring Boot stays 3.5), the JDK
+  2.2.0-M2 is a milestone and is not used), **no Spring** (the Spring AI starter needs Spring Boot 4 and is not used; the repository itself is on Boot 4.1, ADR-020), the JDK
   `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Six tools
   (`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`; `Endpoint` is the
   closed list of API calls, only `GET` and `POST`, no tool takes a path or a URL); **none writes, applies a fix or publishes**.
@@ -260,8 +260,17 @@ has no default, and the registry and cache identities include the pack (`docs/de
 
 ## Stack
 
-Java 21, Spring Boot 3.5, Maven multi-module, PostgreSQL 16 + pgvector, Flyway,
-JUnit 5 + Testcontainers. Root package `com.thanhdatpb.listingguard`.
+Java 21, Spring Boot 4.1, Maven multi-module, PostgreSQL 16 + pgvector, Flyway,
+JUnit 5 + Testcontainers. Root package `com.thanhdatpb.listingguard`. **Jackson 2 is kept on Boot 4** (ADR-020): the code still
+imports `com.fasterxml.jackson`, through the deprecated `spring-boot-jackson2` module and
+`spring.http.converters.preferred-json-mapper: jackson2`, because Jackson 3 (`tools.jackson`) is also on the classpath and the web
+layer would otherwise use it and fail on a Jackson 2 type. Spring Framework plans to disable Jackson 2 auto-detection in 7.1 and drop
+it in 7.2, so the Jackson 3 migration (own PR, see the README Roadmap) comes before the repository moves to Boot 4.2. A hand-built
+`RestClient` must not read a Jackson 2 type (`ApiEmbeddingProvider` reads bytes and parses them itself). Two more upgrade debts, both
+with a Roadmap line: `Problems.title` keeps the titles "Payload Too Large" and "Unprocessable Entity" that Spring Framework 7
+renamed, and `OpenApiConfig.nullableProblemDetailMembers` keeps four members of `ProblemDetail` nullable in `docs/api/openapi.json`
+(springdoc 3.2.0 does not read JSpecify `@Nullable`); remove the customizer when springdoc does, and `OpenApiIntegrationTest` must pass
+without it.
 
 ## Commands
 

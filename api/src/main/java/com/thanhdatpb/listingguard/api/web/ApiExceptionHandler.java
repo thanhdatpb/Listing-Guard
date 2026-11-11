@@ -52,7 +52,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(MarketplaceNotYetSupportedException.class)
     public ProblemDetail marketplaceNotYetSupported(MarketplaceNotYetSupportedException e) {
-        return Problems.of(HttpStatus.UNPROCESSABLE_ENTITY, "marketplace-not-yet-supported", e.getMessage());
+        return Problems.of(HttpStatus.UNPROCESSABLE_CONTENT, "marketplace-not-yet-supported", e.getMessage());
     }
 
     @ExceptionHandler(CheckNotFoundException.class)
@@ -176,8 +176,8 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                                                                   HttpStatusCode status, WebRequest request) {
         for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
             if (cause instanceof PayloadTooLargeException) {
-                ProblemDetail tooLarge = Problems.of(HttpStatus.PAYLOAD_TOO_LARGE, "payload-too-large", cause.getMessage() + ".");
-                return handleExceptionInternal(ex, tooLarge, headers, HttpStatus.PAYLOAD_TOO_LARGE, request);
+                ProblemDetail tooLarge = Problems.of(HttpStatus.CONTENT_TOO_LARGE, "payload-too-large", cause.getMessage() + ".");
+                return handleExceptionInternal(ex, tooLarge, headers, HttpStatus.CONTENT_TOO_LARGE, request);
             }
         }
         ProblemDetail problem = Problems.of(status, "invalid-request", "The request body is missing or is not valid JSON.");

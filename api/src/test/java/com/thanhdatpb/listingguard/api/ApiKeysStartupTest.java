@@ -11,7 +11,7 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -22,14 +22,14 @@ import org.testcontainers.utility.DockerImageName;
 class ApiKeysStartupTest {
 
     @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(
             DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
 
-    private static PostgreSQLContainer<?> newDatabase() {
-        return new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
+    private static PostgreSQLContainer newDatabase() {
+        return new PostgreSQLContainer(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
     }
 
-    private ConfigurableApplicationContext start(PostgreSQLContainer<?> database, WebApplicationType type, String... extraArgs) {
+    private ConfigurableApplicationContext start(PostgreSQLContainer database, WebApplicationType type, String... extraArgs) {
         String[] args = new String[4 + extraArgs.length];
         args[0] = "--spring.datasource.url=" + database.getJdbcUrl();
         args[1] = "--spring.datasource.username=" + database.getUsername();
@@ -54,7 +54,7 @@ class ApiKeysStartupTest {
 
     @Test
     void startsWithoutAnyKeyAndWarnsThatEveryRequestWillGet401(CapturedOutput output) {
-        try (PostgreSQLContainer<?> empty = newDatabase()) {
+        try (PostgreSQLContainer empty = newDatabase()) {
             empty.start();
             try (ConfigurableApplicationContext context = start(empty, WebApplicationType.SERVLET, "--listing-guard.embedding.provider=hashing")) {
                 assertThat(context.isRunning()).isTrue();

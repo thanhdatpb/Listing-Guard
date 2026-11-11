@@ -16,7 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
  * A catalog file larger than the heap is imported (ADR-009, PR A2b): the import runs in a child JVM with a heap smaller
@@ -32,7 +32,7 @@ class TrademarkCatalogImporterHeapTest {
     private static final int HEAP_MEGABYTES = 40;
 
     @Autowired
-    PostgreSQLContainer<?> postgres;
+    PostgreSQLContainer postgres;
 
     @Autowired
     JdbcTemplate jdbc;
