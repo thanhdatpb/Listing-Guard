@@ -120,7 +120,8 @@ Before you rely on it:
 - **The trademark catalog is yours to load.** No trademark data is shipped or downloaded. You prepare the data, check
   that the terms of its source allow this storage and use, and import it (see [Trademark catalog](#trademark-catalog)).
   Without a catalog the trademark check answers `503` and the rule checks are not affected. The `uspto-convert` job
-  converts a USPTO Trademark Daily XML applications file you downloaded yourself to the `jsonl-1` format, but it is
+  converts USPTO Trademark Daily XML applications files you downloaded yourself to the `jsonl-1` format (the latest record of
+  each serial number, only the marks of your product classes that are live), but it is
   **unverified against real data**: it was written from the public DTD V2.0 and tested with synthetic XML only, and a daily
   file holds changes, not the whole register. For any other source you convert your data to `jsonl-1` yourself.
 - **No accuracy has been measured on real data.** The evaluation of the trademark check (ADR-009, PR A4) has not been
@@ -452,12 +453,16 @@ your data to `jsonl-1` yourself.
 1. **Prepare the file.** UTF-8 JSON Lines in `catalogs/raw/` (git-ignored), one record per line:
    `{"mark": "Zorvex", "status": "REGISTERED", "nice_classes": [25], "source_id": "123", "common_word": false}`
    (`status` is `REGISTERED`, `PENDING`, `EXPIRED` or `CANCELLED`; `nice_classes` are 1 to 45; `common_word` is
-   optional). For a USPTO Trademark Daily XML applications file (DTD V2.0) that you downloaded yourself, put it in
-   `catalogs/raw/uspto/` and run `docker compose run --rm uspto-convert --input=uspto/<file.xml>`: it writes this format
-   into `catalogs/raw/`, a `.report.json` with the counts of the records written and dropped (and why), and prints the
-   `sha256` for the manifest. It reads the XML as a stream and stops on a `version-no` other than 2.0. It is unverified
-   against real data, a daily file holds changes only, and the same serial number can appear more than once
-   ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md), PR A2c).
+   optional). For USPTO Trademark Daily XML applications files (DTD V2.0) that you downloaded yourself, unzip them into
+   `catalogs/raw/uspto/` (keep the `apcYYMMDD.xml` names) and run
+   `docker compose run --rm uspto-convert --input-dir=uspto --output=<name>.jsonl --strict` (or `--input=` once for each
+   file): it writes this format into `catalogs/raw/`, a `.report.json` with the files and the counts (records read, replaced
+   by a later transaction, removed because their latest status is not live, filtered by each reason, written), and prints the
+   `sha256` for the manifest. For each serial number only the record with the latest `transaction-date` is kept, whatever the
+   order of the files, and only the Nice classes, live status codes and marks with words of a filters file
+   (`uspto-convert-filters-2026-11.yaml`; every value is `unverified`). It reads the XML as a stream, stops on a `version-no`
+   other than 2.0, and without `--strict` leaves a file it cannot read out and ends `INCOMPLETE`. It is unverified against
+   real data, and a daily file holds changes only ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md), PR A2c).
 2. **Describe it in `catalogs/manifest.yaml`:** a `version` label, `file`, `format_version: jsonl-1`, `source_name`,
    `url`, `license`, `source_date`, the file's `sha256` (`sha256sum`) and the `filters` (`include_classes`,
    `include_status`). A missing license or date, or a hash that differs from the file, is refused. To join several
@@ -600,8 +605,8 @@ only calls the API, no migration).
 What follows, in this order, is **not built yet**:
 
 1. Trademark scanner ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)), what remains: a first run of the converter
-   on a real USPTO file, PR A2c (the latest transaction of a serial number wins, which a catalog made of daily files
-   needs), and A4, the evaluation that would give the first measured numbers. The trademark pack does not scan the
+   on real USPTO files (PR A2c, the latest transaction of a serial number wins and the conversion filters, is written but
+   has only met synthetic XML), and A4, the evaluation that would give the first measured numbers. The trademark pack does not scan the
    Amazon `item_highlights` field yet (the rule checks do): adding it is a change of the trademark ruleset and of its
    canonical input, so it is a separate step.
 2. Image checker ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)). The Java-only analysis core (`image-checker/`), the endpoint `POST /api/v1/image-checks` with its result tables, retention cleanup and the `image-checks` plan pack are implemented (off by default); the bounded decode service, the private upload staging and the stuck-decoder health check are not, and no tool for the MCP server (ADR-017 allows none). Shipped Etsy/Amazon profiles leave marketplace thresholds unset, so those checks report `INCOMPLETE` until the maintainer saves and reviews official sources ([source URL list and maintainer steps](docs/image-checker-core.md)). No source pages or original images are stored here.

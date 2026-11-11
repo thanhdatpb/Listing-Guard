@@ -40,11 +40,17 @@ It never edits a listing, never publishes, and does no SEO.
   entry of `catalogs/manifest.yaml` may list `sources:` (each with a `source_key`; stored source ids are `<key>:<id>`),
   the import reads files as a stream through a temporary staging table merged by SQL (`listing-guard.trademark.import.batch-size`),
   and V18 `trademark_catalog_source` has one row per data file. The `uspto-convert` job (profile and compose service;
-  `UsptoDailyConverter`, StAX, in `trademark-scanner`) converts a USPTO Trademark Daily XML applications file (DTD V2.0)
-  in `catalogs/raw/` to `jsonl-1` and writes a `.report.json` of the counts; the status map
-  `uspto-status-map-2026-11.yaml` has `source.status: unverified`. **The converter is unverified against real data**: it
-  follows the public DTD and documentation named in ADR-009 and has never read a real file. The next steps are PR A2c
-  (the latest transaction of a serial number wins) and A4 (evaluation). **Product classes, source links and generic words
+  `UsptoCatalogConverter` over `UsptoXmlReader`, StAX, in `trademark-scanner`) converts USPTO Trademark Daily XML
+  applications files (DTD V2.0) in `catalogs/raw/` (`--input` once per file, or `--input-dir`) to one `jsonl-1` file and writes
+  a `.report.json` v2; the status map `uspto-status-map-2026-11.yaml` has `source.status: unverified`. **A2c (done, no
+  migration, `jsonl-1` unchanged)**: for each serial number only the record with the latest `case-file/transaction-date`
+  is kept (ties: the date in the file name, the file name, the place in the file; the files are sorted first, so the result
+  does not depend on the order given; two passes, one number per distinct serial number in memory), a mark whose latest
+  record is not live is left out, and the versioned, `unverified` filters file `uspto-convert-filters-2026-11.yaml` keeps
+  Nice classes 9, 14, 16, 18, 20, 21, 24, 25, 26, 28, the live status codes and text marks. A file that cannot be read or a
+  record with no serial number or `transaction-date` is reported with its file and place; without `--strict` the run ends
+  `INCOMPLETE`, with it the first problem stops it. **The converter is unverified against real data**: it follows the public
+  DTD and documentation named in ADR-009 and has never read a real file. The next step is A4 (evaluation). **Product classes, source links and generic words
   (A5, done)**: the API serves ruleset `trademark-risk-2026-11b` (`2026-11` is kept unchanged, a test pins its hash), which
   adds three optional sections, all `unverified`: `product_classes` (the request may carry a top-level `product_type`, a key
   of `types`; a mark with Nice classes, none the product type's, drops `out_of_class_downgrade_levels`, a mark with none is not
@@ -264,10 +270,11 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
 
 1. PR 0a (done, V7) and PR 0b (done, V8-V14) (ADR-010).
 2. PR A: trademark scanner (ADR-009), delivered as A1 core (done), A2 catalog (done, V15-V16) and A3 endpoint (done,
-   V17) and A2b (done: streaming import, V18, multi-source manifest and the USPTO converter, which is unverified against
-   real data). Next are PR A2c (the latest transaction of a serial number wins, needed before a catalog made of daily
-   files is trusted; `jsonl-1` is not changed by A2b) and A4 evaluation.
-   ADR-009 "Pull requests" and "USPTO conversion and multi-source catalogs (PR A2b)" have the detail.
+   V17), A2b (done: streaming import, V18, multi-source manifest and the USPTO converter, which is unverified against
+   real data) and A2c (done: the latest transaction of a serial number wins over all the files of one conversion, and the
+   converter's filters; no migration, `jsonl-1` unchanged). Next are a first run on real USPTO files and A4 evaluation.
+   ADR-009 "Pull requests", "USPTO conversion and multi-source catalogs (PR A2b)" and "Latest transaction wins and
+   conversion filters (PR A2c)" have the detail; its questions for the maintainer are at the end of that section.
 3. PR B: image checker (ADR-008, Proposed): the Java core and the endpoint with its result tables, retention and plan pack are done (PR B1, PR B2, off by default). Next, before it may be enabled for an untrusted caller: the bounded decode service, the private upload staging and the stuck-decoder health effect (ADR-008 "Not done in this change"); then reviewed marketplace thresholds as a new ruleset version.
 4. Policy analyzer (ADR-011). PR 1 (API embedding provider) and PR 2 (verification core) are done. The rest starts
    after PR A, in this order: run the retrieval evaluation and commit the real results, then PR 3 (`ApiLlmProvider`),
@@ -349,7 +356,7 @@ Policy corpus (see README "Policy corpus and retrieval"):
 ```bash
 # optional: needs a provider, default is `none` and then both jobs fail at once (ADR-012).
 # EMBEDDING_PROVIDER=api + LISTING_GUARD_EMBEDDING_API_KEY in .env (Google Gemini), or EMBEDDING_PROVIDER=ollama
-docker compose run --rm uspto-convert --input=uspto/<file.xml>        # catalogs/raw/uspto/ XML -> catalogs/raw/<name>.jsonl + report (profile `uspto-convert`; no network, no model)
+docker compose run --rm uspto-convert --input-dir=uspto --output=<name>.jsonl [--strict]   # catalogs/raw/uspto/*.xml (or --input=uspto/<file.xml> once per file) -> latest record per serial number, filtered -> catalogs/raw/<name>.jsonl + report (profile `uspto-convert`; no network, no model)
 docker compose run --rm trademark-import --catalog=<label>           # catalogs/ -> trademark_entry (profile `trademark-import`; no network, no model)
 docker compose run --rm ingest                                       # policies/ -> pgvector (profile `ingest`)
 docker compose run --rm eval-retrieval                               # writes eval/retrieval/results.md
@@ -446,9 +453,17 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   public DTD V2.0 and element documentation named there and is unverified against real data, so a change to what it reads
   needs the documentation first and a real-file check later. It reads the XML as a stream (StAX; no DTD, no external
   entity, no network) and stops on a `version-no` other than 2.0 unless `listing-guard.trademark.uspto.allow-other-version`.
-  A record is counted once under the first drop reason that applies, in the order of `UsptoDailyConverter`. The status map is
+  A record is counted once under the first check it fails, in the order of `UsptoCatalogConverter` (record error, no status
+  information, superseded, not live, drawing, mark, classes, normalization), and `recordsRead` always equals the sum of the
+  counts (a test holds it). The status map is
   a versioned YAML with `source.status: unverified` that covers the 149 codes of Table 1, `DROP` included (a test checks
-  it); a published version is immutable, so a change is a new file and a new version. `jsonl-1` is not changed by it.
+  it); the filters file (`UsptoConvertFilters`: classes, live codes, `text_only`, file name dates) is the same kind of file,
+  its live codes must be codes of a mark in the map (checked at start) and a test holds that the shipped list equals the
+  map's `REGISTERED` and `PENDING` codes. A published version of either is immutable, so a change is a new file and a new
+  version. `jsonl-1` is not changed by it. The order key is `transaction-date` and nothing else (never fall back to another
+  date); a record that carries no status of the mark never replaces an earlier one; a mark that is not live in its latest record
+  is left out, not written as inactive; and the output of a run does not depend on the order of its inputs (a test converts
+  them in every permutation). A report holds counts, file names and places, never a mark or a serial number.
 - **Trademark results** (ADR-009 "Endpoint (PR A3)"): never store the submitted listing, only the canonical input hash and
   bounded evidence. Expiry (`expires_at`, 30 days) is decided on read by GET and the cache lookup, never by the cleanup job
   alone. Only a `COMPLETE` result is cached (partial unique index); an `INCOMPLETE` one is stored for GET and never

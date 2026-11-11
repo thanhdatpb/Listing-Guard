@@ -388,41 +388,75 @@ TRADEMARK_CATALOG_VERSION=<label>-<digest>      # in .env, then recreate the api
 5. Run `docker compose run --rm trademark-import --catalog=<version label>`, then set `TRADEMARK_CATALOG_VERSION` to the
    printed version and recreate the api.
 
-**The USPTO converter (ADR-009, PR A2b).** The one-shot job `uspto-convert` converts one USPTO Trademark Applications
-Daily XML file (TDXF, DTD V2.0) to `jsonl-1`. **It is unverified against real data**: it follows the public DTD V2.0 and its
-element documentation, and its tests use synthetic XML (ADR-009 names the two documents and the element of each datum).
+**The USPTO converter (ADR-009, PRs A2b and A2c).** The one-shot job `uspto-convert` converts USPTO Trademark Applications
+Daily XML files (TDXF, DTD V2.0) to **one** `jsonl-1` file that holds, for each serial number, only the record with the
+**latest transaction date**, and only the marks the filters keep (Nice classes, live status codes, marks with words).
+**It is unverified against real data**: it follows the public DTD V2.0 and its element documentation, and its tests use
+synthetic XML (ADR-009 names the two documents and the element of each datum).
 
 ```bash
-# you download the file yourself and check its terms; the job never downloads anything
-docker compose run --rm uspto-convert --input=uspto/<file.xml> [--output=<name>.jsonl] [--overwrite]
+# you download the files yourself and check their terms; the job never downloads anything. Unzip each apcYYMMDD.zip first and
+# keep the name of the XML (apcYYMMDD.xml): the date in the name breaks a tie between two records of the same transaction date
+docker compose run --rm uspto-convert --input=uspto/<file.xml> [--input=uspto/<file2.xml> ...] [--output=<name>.jsonl] [--overwrite] [--strict]
+docker compose run --rm uspto-convert --input-dir=uspto --output=<name>.jsonl [--overwrite] [--strict]
 # logs the counts and: To import it, list <name>.jsonl in catalogs/manifest.yaml with sha256: <hash>
 ```
 
-- **Files.** The input is a file inside `catalogs/raw/` (the compose service mounts only that folder, writable). The job
-  writes `<name>.jsonl` (the input name with `.jsonl` unless `--output` says another plain file name) and
-  `<name>.jsonl.report.json` next to it, through a `.part` file that is renamed when the conversion succeeded. An existing
+- **Files.** The inputs are files inside `catalogs/raw/` (the compose service mounts only that folder, writable), given with
+  `--input` once for each file, or with `--input-dir` (every `*.xml` file directly in that folder, not in a sub-folder). The
+  job writes `<name>.jsonl` (the input name with `.jsonl` for one `--input`; with more than one file `--output` is required)
+  and `<name>.jsonl.report.json` next to it, through a `.part` file that is renamed when the conversion succeeded. An existing
   output is refused unless `--overwrite` is given (a manifest that names it then needs the new `sha256`). Declare the output
   as one source of a manifest entry with a `source_key` (`catalogs/manifest.yaml` has a commented example), with the
-  `sha256` the job printed and the license and url of the data you downloaded.
-- **Stream.** The XML is read with StAX and each record is written as soon as it is read, so the memory of the job does not
-  depend on the size of the file (a test converts a file larger than a 32 MB heap). The DTD is never loaded and no external
-  entity is resolved. The job makes no network call and imports no catalog; the application context it starts still applies
-  pending migrations and registers the trademark ruleset, like the other jobs, so the database must be running.
+  `sha256` the job printed and the license and url of the data you downloaded. **Convert all the files that belong together
+  in one run**: the rule below does not cross runs (two outputs listed as two sources are merged by mark, not by serial number).
+- **Stream and memory.** Every XML is read with StAX twice (pass 1 decides the latest record of each serial number, pass 2
+  writes), so the memory of the job does not depend on the size of a file (a test converts a file larger than a 32 MB heap).
+  What it does hold is one number for each distinct serial number, about 17 to 34 bytes: 12,000,000 serial numbers (the limit
+  `listing-guard.trademark.uspto.max-distinct-serials`) need about 200 to 400 MB of heap, and the job stops with a message
+  rather than run out of memory. A file whose bytes change between the two passes stops the run. The DTD is never loaded and
+  no external entity is resolved. The job makes no network call and imports no catalog; the application context it starts
+  still applies pending migrations and registers the trademark ruleset, like the other jobs, so the database must be running.
+- **Latest transaction wins.** Records of one serial number are ordered by `case-file/transaction-date` (required; the
+  documentation calls it the date of the Daily XML Process), then by the date in the file name, then by the file name, then by
+  the place in the file; the later one wins. The files are sorted before they are read, so **the result does not depend on the
+  order of `--input`**. A record whose status code carries no status of the mark (`DROP` in the map), is not in the map, or is
+  missing, and a record that cannot be placed, does not replace an earlier one. A mark that is not live in its latest record is
+  **left out of the catalog** (not written as inactive: the scanner ignores a mark's status), so a mark that was live and is
+  cancelled later disappears, and one that was dead and is revived is written with its later data.
+- **Filters** (`uspto/uspto-convert-filters-2026-11.yaml`, every value `unverified`): `nice_classes` (a record needs at least one;
+  9, 14, 16, 18, 20, 21, 24, 25, 26 and 28 are shipped), `live_status_codes` (the 121 codes the status map sends to `REGISTERED`
+  or `PENDING`) and `text_only` (a mark without words is dropped). The file is immutable like a ruleset: to change a list, copy
+  it to a new file in `catalogs/raw/` with a new `version`, and set `USPTO_FILTERS=file:/catalogs/raw/<file>.yaml` in `.env`
+  (`listing-guard.trademark.uspto.filters`). The `include_classes` and `include_status` of the manifest still apply at import,
+  after these.
+- **Problems and `--strict`.** A file that cannot be read (not well-formed XML, not a daily applications file, another
+  `version-no`) is left out whole and listed in the report with its name and the line and column; a record without a serial
+  number or a real `transaction-date` is counted and listed with its file and record number (the first 100; the counts are
+  complete). The run goes on and the report says `completeness: INCOMPLETE`, the log warns, and the exit code is still 0. **An
+  `INCOMPLETE` catalog is not fit to rely on**: a missing file can leave an older, live-looking record standing. `--strict`
+  (or `USPTO_STRICT=true`) stops at the first problem instead, with the file name and the place, and writes nothing. Use it for
+  the catalog you will serve. If no file can be read the run fails.
 - **Version.** It reads `version/version-no` and `version-date` and stops on a `version-no` other than `2.0`, naming what it
   found. `USPTO_ALLOW_OTHER_VERSION=true` (`listing-guard.trademark.uspto.allow-other-version`) reads it anyway; the output
   is then unchecked against that version.
 - **What is kept.** One record per `case-file`: the serial number is the `source_id`, `mark-identification` the mark, the
   header `status-code` is mapped through `uspto-status-map-2026-11.yaml` (the 149 codes of Table 1 of the documentation,
-  `source.status: unverified`), and the `international-code` values from 1 to 45 are the classes. A record is dropped, and
-  counted once in the report under the first reason that applies, when it has no or an invalid serial number, a logo-only
-  or no-drawing mark (`logo_only`, `no_drawing`) or no drawing code, no mark text, a mark longer than the import accepts or
-  one that is empty or too long after normalization (the import would refuse the whole catalog), a status that carries no
-  status of the mark (`status_dropped:<code>`) or is not listed (`status_unmapped:<code>`), or no class from 1 to 45.
-- **Limits.** A daily file holds changes, not the register, and a serial number can come several times with different
-  statuses: every record is written, and when a catalog is imported the status declared first wins (`REGISTERED` before
-  `PENDING`), so an old record can hide a newer one. "The latest transaction wins" is PR A2c. The status of each class is
-  ignored, and the codes `A`, `B` and `200` (certification and collective membership marks) are not classes and are left
-  out. Run the job on a real file and read its report before you rely on a catalog made from it.
+  `source.status: unverified`), and the `international-code` values from 1 to 45 are the classes. Every record is counted
+  once in the report, under the first check it fails, in this order: a record error (`missing_serial`, `invalid_serial`,
+  `missing_transaction_date`, `invalid_transaction_date`), a status that carries no status of the mark
+  (`status_dropped:<code>`) or is not listed (`status_unmapped:<code>`), **superseded** by a later record, **dead** (its latest
+  status code is not live: `deadRemoved`, with `deadByStatus` by code), a logo-only or no-drawing mark (`logo_only`,
+  `no_drawing`) or no drawing code, no mark text (`blank_mark`), a mark longer than the import accepts, no class from 1 to 45 or
+  none of the listed classes (`class_not_included`), or one that is empty or too long after normalization (the import would
+  refuse the whole catalog). `recordsRead = recordsWritten + recordErrors + superseded + deadRemoved + filteredTotal`. The
+  report holds counts, file names and places, never a mark or a serial number.
+- **Limits.** A daily file holds **changes**, not the register: a serial number that no file of the run mentions is not in the
+  catalog, and a death that the files do not contain cannot be seen; a complete catalog needs the annual or backfile sets
+  (ODP account). The converter cannot know that a day is missing: check the `files` of the report against the days you meant to
+  cover. The status of each class is ignored, and the codes `A`, `B` and `200` (certification and collective membership marks)
+  are not classes and are left out. Whether real records carry `transaction-date`, and the name `apcYYMMDD` of the bulk-data
+  files, are unverified. Run the job on a real file and read its report before you rely on a catalog made from it.
 
 Stored source ids are `<source_key>:<source_id>` for this form. One file whose hash differs from the manifest refuses the
 whole catalog; changing any file, term, date, filter or the list of sources is another version (the old one stays).
@@ -472,15 +506,19 @@ use. You are responsible for checking that the terms of your data source allow t
    mkdir -p catalogs/raw && sudo chown 10001 catalogs/raw
    ```
 
-2. **Optional: convert a USPTO daily applications file** you downloaded yourself (put it in `catalogs/raw/uspto/`; the
-   converter is unverified against real data, read its report before you rely on the catalog):
+2. **Optional: convert USPTO daily applications files** you downloaded yourself (unzip them into `catalogs/raw/uspto/` and keep
+   the `apcYYMMDD.xml` names; the converter is unverified against real data, read its report before you rely on the catalog):
 
    ```bash
    docker compose -f docker-compose.prod.yml --profile prod --profile tools \
-     run --rm uspto-convert --input=uspto/<file.xml>
+     run --rm uspto-convert --input-dir=uspto --output=<name>.jsonl --strict
    ```
 
-   `USPTO_ALLOW_OTHER_VERSION=true` in `.env` lets it read a `version-no` other than 2.0.
+   The job keeps the latest record of each serial number and only the marks of the filters file (see "The USPTO converter"
+   above); all the files of one catalog go in one run. `--strict` (or
+   `USPTO_STRICT=true`) stops at a file it cannot read; without it the run ends `INCOMPLETE` and the report says so.
+   `USPTO_ALLOW_OTHER_VERSION=true` in `.env` lets it read a `version-no` other than 2.0, and `USPTO_FILTERS` names a filters
+   file of your own.
 3. **Import the catalog** named by an entry of `catalogs/manifest.yaml`:
 
    ```bash
