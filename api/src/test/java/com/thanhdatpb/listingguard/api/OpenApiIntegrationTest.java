@@ -227,7 +227,12 @@ class OpenApiIntegrationTest {
                 .isEqualTo("#/components/schemas/TrademarkCheckFindingView");
         assertThat(fieldNames(spec.at("/components/schemas/TrademarkCheckFindingView/properties"))).containsExactlyInAnyOrder(
                 "ruleId", "risk", "field", "start", "end", "snippet", "mark", "matchType", "score", "insideColorPhrase",
-                "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "message", "suggestion");
+                "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "message", "suggestion", "tsdrStatuses");
+        assertThat(spec.at("/components/schemas/TrademarkCheckFindingView/properties/tsdrStatuses/items/$ref").asText())
+                .as("the optional TSDR status (ADR-009): additive, present only when the deployment turns it on")
+                .isEqualTo("#/components/schemas/TsdrStatusView");
+        assertThat(spec.at("/components/schemas/TrademarkCheckFindingView/required").toString())
+                .doesNotContain("tsdrStatuses");
         assertThat(spec.at("/components/schemas/CheckResult/properties/findings/items/$ref").asText())
                 .as("/checks keeps its own finding schema").isEqualTo("#/components/schemas/FindingView");
         assertThat(spec.at("/components/schemas/CheckResult/properties/readiness/anyOf/0/$ref").asText())

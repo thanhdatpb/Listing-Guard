@@ -29,6 +29,7 @@ import com.thanhdatpb.listingguard.client.model.SourceLink;
 import com.thanhdatpb.listingguard.client.model.Summary;
 import com.thanhdatpb.listingguard.client.model.TrademarkCatalogCapability;
 import com.thanhdatpb.listingguard.client.model.TrademarkCheckFinding;
+import com.thanhdatpb.listingguard.client.model.TsdrStatus;
 import com.thanhdatpb.listingguard.client.model.TrademarkCheckRequest;
 import com.thanhdatpb.listingguard.client.model.TrademarkCheckResult;
 import com.thanhdatpb.listingguard.client.model.Usage;
@@ -99,6 +100,7 @@ class ContractConformanceTest {
             entry(TrademarkCheckFinding.class, "TrademarkCheckFindingView"),
             entry(RiskAdjustment.class, "RiskAdjustmentView"),
             entry(SourceLink.class, "SourceLinkView"),
+            entry(TsdrStatus.class, "TsdrStatusView"),
             entry(VariationCheckResult.class, "VariationCheckResult"),
             entry(PersonalizationScreeningResult.class, "PersonalizationScreeningResult"),
             entry(CharacterFinding.class, "CharacterFindingView"),

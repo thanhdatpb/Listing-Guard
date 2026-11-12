@@ -61,7 +61,9 @@ class ClientEndpointsTest {
                "mark":"ZORVEX","matchType":"EXACT","score":1.0,"insideColorPhrase":false,"otherRuleIds":[],
                "sourceIds":["uspto:90000001"],"sourceLinks":[{"sourceId":"uspto:90000001","label":"USPTO TSDR",
                "url":"https://tsdr.example/90000001"}],"riskAdjustments":[{"reason":"product_type_classes","from":"HIGH",
-               "to":"MEDIUM","note":"Nhóm khác."}],"message":"Khớp nhãn.","suggestion":"Kiểm tra."}]}""";
+               "to":"MEDIUM","note":"Nhóm khác."}],"message":"Khớp nhãn.","suggestion":"Kiểm tra.",
+               "tsdrStatuses":[{"sourceId":"uspto:90000001","statusCode":"602","statusDescription":"ABANDONED",
+               "statusClass":"DEAD","statusDate":"2024-05-06","checkedAt":"2026-11-12T11:00:00Z"}]}]}""";
 
     static final String VARIATION_RESULT = """
             {"checkId":"5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d","marketplace":"AMAZON","rulesetVersion":"variation-checks-2026-11",
@@ -171,6 +173,12 @@ class ClientEndpointsTest {
                 assertThat(f.matchType()).isEqualTo(MatchType.EXACT);
                 assertThat(f.score()).isEqualTo(1.0);
                 assertThat(f.sourceLinks()).singleElement().satisfies(l -> assertThat(l.label()).isEqualTo("USPTO TSDR"));
+                assertThat(f.tsdrStatuses()).singleElement().satisfies(s -> {
+                    assertThat(s.sourceId()).isEqualTo("uspto:90000001");
+                    assertThat(s.statusClass()).isEqualTo(com.thanhdatpb.listingguard.client.model.TsdrStatusClass.DEAD);
+                    assertThat(s.statusDate()).isEqualTo(java.time.LocalDate.of(2024, 5, 6));
+                    assertThat(s.checkedAt()).isEqualTo(java.time.Instant.parse("2026-11-12T11:00:00Z"));
+                });
                 assertThat(f.riskAdjustments()).singleElement().satisfies(a -> {
                     assertThat(a.from()).isEqualTo(RiskLevel.HIGH);
                     assertThat(a.to()).isEqualTo(RiskLevel.MEDIUM);
