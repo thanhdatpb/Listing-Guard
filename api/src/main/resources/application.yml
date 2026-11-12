@@ -74,6 +74,15 @@ listing-guard:
       # The most distinct serial numbers the job holds in memory (about 17 to 34 bytes each) to decide the latest record of
       # each. More stops the job with a message; raise it together with the heap.
       max-distinct-serials: 12000000
+      # The uspto-sync job (ADR-009, PR A2d); every setting and its default is in UsptoSyncProperties. It needs
+      # sync.catalog.license (USPTO_SYNC_LICENSE in compose) before it runs.
+      sync:
+        download:
+          # Off by default: the job then reads folders of catalogs/raw (--input-dir) and the files it stored. Every ODP
+          # endpoint is unverified (ADR-009, "Verification steps when the key exists").
+          enabled: false
+          # The USPTO Open Data Portal key, only from this environment variable; sent only to the API host, never logged.
+          api-key: ${LISTING_GUARD_USPTO_ODP_API_KEY:}
     retention:
       # How long a trademark result, its input hash and its evidence are kept (ADR-009). An operational proposal, not a
       # legal guarantee. GET and the cache lookup treat a row past this as absent whether or not the cleanup has run.
