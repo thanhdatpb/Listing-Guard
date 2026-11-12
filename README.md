@@ -1,5 +1,7 @@
 # Listing Guard
 
+[Official agent skill](docs/agent-skill.md)
+
 [![CI](https://github.com/thanhdatpb/Listing-Guard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/thanhdatpb/Listing-Guard/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/thanhdatpb/Listing-Guard?label=release)](https://github.com/thanhdatpb/Listing-Guard/releases/latest)
 [![License](https://img.shields.io/github/license/thanhdatpb/Listing-Guard)](LICENSE)
