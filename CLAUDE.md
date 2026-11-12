@@ -162,6 +162,28 @@ It never edits a listing, never publishes, and does no SEO.
   listed with `enabled: false`; an unknown marketplace is `404 ruleset-not-found`; `ETag` and a five minute private cache. The
   console editor's counters (`EditorLimits`) read the same `RulesetLimitsService`, so the page and the endpoint cannot differ (a
   test holds it).
+- **API contract and compatibility** (`contract-tools/`, ADR-022, Proposed; implemented): the contract of `/api/v1` is
+  `docs/api/openapi.json` plus `docs/api/input-schema.json` (a hand-written JSON Schema 2020-12 of the listing formats and the request
+  bodies, written from `docs/input-schema.md`; `InputSchemaDocumentTest` holds every field table of that page to its definition and
+  validates every example of the page with `com.networknt:json-schema-validator`, test scope) plus the problem codes. Changes inside
+  `/api/v1` are additive only. `contract-tools` (Java and Jackson only: no Spring, database, network, Node or Go) compares the
+  current contract with `docs/api/baseline/openapi-v<version>.json`, a byte copy of the latest **published** release's file (today
+  `v0.6.0`; an `input-schema-v<same>.json` there is compared too), with 69 rules (`Rule`, each `breaking`, `additive` or
+  `non-breaking`; ADR-022's table equals the enum, `ContractRulesDocumentedTest`; one synthetic pair per rule,
+  `CompatibilityRulesTest`). `ContractCompatibilityTest` runs in every `verify` and fails on a breaking change that
+  `docs/api/breaking-changes.yaml` does not declare (entry: `rule`, `location` exactly as reported, `reason`, `adr` naming an ADR that
+  contains the location; stale entries and a wrong `baseline` fail too); it writes
+  `contract-tools/target/contract/compatibility-report.md` (CI puts it in the job summary). Four entries today: the v0.6.0 document
+  gave trademark findings the `FindingView` schema (doc fix, no wire change). Every `/api/v1` response carries
+  `X-Listing-Guard-Version` (`ApiContractHeadersFilter`, order `HIGHEST_PRECEDENCE + 5`, so `401`/`413`/`429` carry it; `ServerVersion`
+  from `META-INF/build-info.properties` `release`, Maven property `listing-guard.release`, default `dev`; the Dockerfile argument
+  `LISTING_GUARD_RELEASE` and the release workflow set it). `listing-guard.api.deprecation.endpoints[]` (`method`, `path` exactly as in
+  openapi.json, `deprecated-at`, `sunset-at` at least 180 days later, `https` `link`) adds `Deprecation` (RFC 9745 `@epoch`), `Sunset`
+  (RFC 8594) and `Link rel="deprecation"` to every response of that operation; empty by default; a wrong entry or one that names no
+  mapped operation stops the start-up. `openapi.json` documents the three headers under `components.headers` on every `/api/v1`
+  response. The release workflow's `publish-contract` job checks the baseline against its tag (byte equal, ancestor, not the release)
+  and attaches `openapi.json`, `input-schema.json`, `contract-sha256.txt` and `compatibility-report.md` to the GitHub Release
+  (draft created when none exists).
 - **Batch check** (`api/.../batch/`, `docs/batch-check.md`): the one-shot job `batch-check` (Spring profile and compose
   service of that name; no network, no HTTP, no new endpoint, no migration). It reads a listing CSV as a stream, maps the
   columns to the standard input with a YAML mapping (`batch/mappings/`, no version; every key but `id` and `csv` must be a
@@ -323,6 +345,12 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     is built before the maintainer answers questions 1 to 3 and 6 at the end of the ADR (raise the level or a separate signal, the source and its
     terms, commercial use of CourtListener, the initial thresholds).
 
+13. API contract and compatibility policy (ADR-022, Proposed): done as one PR (`feature/api-contract-publishing`: ADR, `contract-tools`,
+    the v0.6.0 baseline, `breaking-changes.yaml`, `input-schema.json`, the headers, the release job, docs). After every release tag the
+    maintainer moves the baseline in a PR (copy `docs/api/openapi.json` and `input-schema.json` of the tag into `docs/api/baseline/`,
+    delete the previous files, `baseline: v<new>` and no exceptions). Open questions are at the end of the ADR (the 180 days, a
+    `CODEOWNERS` entry, attaching assets to v0.6.0 by hand, whether a renamed schema is breaking for a generated Java SDK).
+
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
 
@@ -344,7 +372,8 @@ without it.
 
 ```bash
 ./mvnw -B verify                 # build + all tests (needs Docker for Testcontainers)
-./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening,mcp-server verify   # fast: no Docker needed
+./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening,mcp-server,contract-tools verify   # fast: no Docker needed
+./mvnw -B -pl contract-tools verify # API compatibility check against the latest release (ADR-022); report in contract-tools/target/contract/
 ./mvnw -B -pl mcp-server package # -> mcp-server/target/listing-guard-mcp.jar (the MCP server; see docs/mcp.md)
 docker compose up --build        # postgres + api (override ports: POSTGRES_PORT, API_PORT)
 ```
@@ -504,6 +533,18 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `docs/integration-guide.md` when behavior a client sees changes. Dev-only settings are fenced by
   `StartupSafetyCheck`: `LISTING_GUARD_DEV_API_KEY` needs profile `dev` (never `prod`), and
   `LISTING_GUARD_SWAGGER_UI=true` warns and is refused under `prod`; compose sets `SPRING_PROFILES_ACTIVE=dev`.
+- **Compatibility** (ADR-022): **every PR that changes the API runs the compatibility check** (`./mvnw -B -pl contract-tools verify`
+  after refreshing `openapi.json`; it is also part of `./mvnw verify`) and copies the additive and non-breaking lines of
+  `contract-tools/target/contract/compatibility-report.md` into `docs/releases/unreleased.md`. Inside `/api/v1` only additive changes
+  are allowed: never remove or rename a field, parameter, operation, media type, success response or documented header, never change a
+  type, never make a response field nullable or optional, never make a request field required, never change an `operationId`, and
+  never change the status, `type` or meaning of a problem `code` (a new meaning is a new code). The way out of a break is an additive
+  form (a new field or endpoint) plus deprecation (`deprecated: true` in the code, the deployment's `Deprecation`/`Sunset`, at least
+  180 days, release notes). A break that cannot be avoided needs an entry in `docs/api/breaking-changes.yaml` **and** an ADR change
+  that names its location, reviewed by the maintainer; never edit the baseline, never add an exception to make a build pass. A new
+  rule of the check is a `Rule` constant, a row in ADR-022's table and a case in `CompatibilityRulesTest`. A new field table or
+  example in `docs/input-schema.md` needs its definition in `docs/api/input-schema.json` (and `InputSchemaDocumentTest`'s maps).
+  Never mark a change additive by touching the classifier to silence the check.
 - **Analysis packs** (ADR-010): each new analysis is its own pack, with its own `pack_id`, endpoint, DTO, result
   tables and cache identity. `/checks` keeps its request, response, hash and `analysisVersion` as they are. A new
   pack reports `completeness`: a failing rule gives `INCOMPLETE` and keeps the findings already established, never a

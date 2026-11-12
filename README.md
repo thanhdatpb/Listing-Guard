@@ -86,6 +86,12 @@ Working end to end:
   at `/console/report`. All three use one service, so they show the same numbers.
 - Client API keys, per-client rate limits and per-client isolation; see the
   [integration guide](docs/integration-guide.md).
+- A published API contract with a compatibility policy ([ADR-022](docs/adr/ADR-022-api-contract-and-compatibility.md)). Inside
+  `/api/v1` changes are additive only; the build compares `docs/api/openapi.json` (and `docs/api/input-schema.json`, the listing
+  formats as a JSON Schema) with the contract of the latest release and fails on a breaking change that is not declared and
+  reviewed. Each release attaches `openapi.json`, `input-schema.json` and `contract-sha256.txt` to its GitHub Release, every
+  `/api/v1` response says which release answered (`X-Listing-Guard-Version`), and a deployment can announce a deprecated
+  operation with `Deprecation` and `Sunset` headers.
 - Client plans and a monthly quota ([ADR-013](docs/adr/ADR-013-client-plans-and-monthly-quota.md)), **off by default**
   (`listing-guard.plans.enabled=false`): the operator sets a client's plan with `admin plan set <client> <plan>`, a new
   stored result counts one unit per endpoint (a cached one costs nothing, so a full check of one listing is two units, three
@@ -208,7 +214,8 @@ Modules:
 | `batch/` | `mappings/` (example column mappings, committed); `input/` and `out/` (your exports and the reports, git-ignored) |
 | `policies/` | `manifest.yaml` (committed) and `raw/` (local files, git-ignored) |
 | `docs/adr/` | Architecture decision records |
-| `docs/api/` | `openapi.json`, the committed API contract (a test fails when it drifts from the code) |
+| `contract-tools/` | API compatibility check (ADR-022): compares the contract with the baseline of the latest release and classifies every change as breaking, additive or non-breaking; holds `docs/api/input-schema.json` to `docs/input-schema.md`. Java and Jackson only: no Spring, no database, no network. |
+| `docs/api/` | `openapi.json`, the committed API contract (a test fails when it drifts from the code); `input-schema.json`, the listing formats as JSON Schema; `baseline/`, the contract of the latest release; `breaking-changes.yaml`, the reviewed exceptions (ADR-022) |
 | `docs/integration-guide.md` | How a backend calls the API: auth, flow, field paths, errors |
 | `docs/batch-check.md` | How to check an export file and read the reports |
 | `docs/mcp.md` | How to use the checks from an AI agent: Claude Code and Claude Desktop setup, the seven tools, errors, limits |
@@ -280,7 +287,11 @@ This example reports the duplicate tag (`WARNING`), the `_` in `gift_idea` (`ERR
 returns the stored result with `cached: true`; `GET /api/v1/checks/{checkId}` reads it later. Errors are
 RFC 7807 problems. Everything about calling the API is in [docs/integration-guide.md](docs/integration-guide.md),
 the contract in [docs/api/openapi.json](docs/api/openapi.json) (after an intended API change refresh it with
-`./mvnw -B verify -Dopenapi.update=true`, then commit it).
+`./mvnw -B verify -Dopenapi.update=true`, then commit it). Every API change also runs the compatibility check of
+[ADR-022](docs/adr/ADR-022-api-contract-and-compatibility.md) (`./mvnw -B -pl contract-tools verify`, no Docker): it fails on a
+breaking change against the latest release and writes the additive ones to `contract-tools/target/contract/compatibility-report.md`
+for the release notes. A client downloads the contract of a release from its GitHub Release, see
+[Compatibility and versions](docs/integration-guide.md#compatibility-and-versions).
 
 ### Check a whole export without an integration
 
@@ -678,6 +689,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-018: Listing health report](docs/adr/ADR-018-listing-health-report.md) (Proposed; implemented: an endpoint, a weekly job and a console page that add up stored counts per client, never listing text; it ends with the questions the maintainer has to decide)
 - [ADR-021: Enforcement signal for the trademark pack](docs/adr/ADR-021-enforcement-signal.md) (Proposed; a design only, nothing is implemented: an offline catalog of court cases linked by review to marks, the sources and their terms as far as they could be read, and the questions the maintainer has to decide)
 - [ADR-019: Oracle A1 deployment behind Cloudflare Tunnel](docs/adr/ADR-019-oracle-a1-cloudflare-tunnel.md) (Proposed)
+- [ADR-022: API contract and compatibility policy](docs/adr/ADR-022-api-contract-and-compatibility.md) (Proposed; implemented: what is additive and what is breaking inside `/api/v1`, the compatibility check against the latest release, the reviewed exception file, deprecation with `Deprecation` and `Sunset`, `X-Listing-Guard-Version`, and the contract attached to each release; it ends with the questions the maintainer has to decide)
 - [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor and API keys page are implemented, all off by default; saved listings and history are not designed yet)
 
 ## License
