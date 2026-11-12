@@ -74,6 +74,10 @@ class BatchMappingTest {
 
         assertThat(data.id()).isEqualTo("E-1");
         assertThat(data.label()).isNull();
+        assertThat(data.listing().toString()).isEqualTo("{\"category\":\"Mugs\",\"description\":\"A mug, handmade\","
+                + "\"materials\":[\"clay\",\"\"],\"price\":19.99,\"quantity\":5,"
+                + "\"tags\":[\"mug\",\" ceramic \",\"\",\"gift\"],\"title\":\"Zorvex mug\","
+                + "\"when_made\":\"made_to_order\",\"who_made\":\"i_did\"}");
         Listing listing = new EtsyNormalizer().normalize(data.listing());
         assertThat(listing.title()).isEqualTo("Zorvex mug");
         assertThat(listing.description()).isEqualTo("A mug, handmade");
@@ -347,7 +351,8 @@ class BatchMappingTest {
     @Test
     void theExampleMappingsAreValidAndEveryLineThatNamesAColumnIsMarkedUnverified() throws IOException {
         Path mappings = Path.of("..", "batch", "mappings");
-        String[][] examples = {{"etsy-listings-export.example.yaml", "ETSY"}, {"amazon-flat-file.example.yaml", "AMAZON"}};
+        String[][] examples = {{"etsy-listings-export.example.yaml", "ETSY"},
+                {"amazon-flat-file.example.yaml", "AMAZON"}, {"shopify-product-csv.example.yaml", "AMAZON"}};
         for (String[] example : examples) {
             String text = Files.readString(mappings.resolve(example[0]));
 

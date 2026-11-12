@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.console.editor;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.thanhdatpb.listingguard.input.StandardListingAdapter;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,7 +50,7 @@ public final class EditorListingMapper {
         }
         putPrice(listing, form.price(), errors);
         putQuantity(listing, form.quantity(), errors);
-        return new Mapped(listing, errors);
+        return new Mapped(StandardListingAdapter.toStandardInput(marketplace.isEtsy() ? "ETSY" : "AMAZON", listing), errors);
     }
 
     /** One entry per line, kept as typed (the normalizer trims and drops blanks); {@code \r\n} and {@code \n} both end a line. */

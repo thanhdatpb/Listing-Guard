@@ -1,0 +1,6 @@
+id: generic-json
+marketplace: ETSY
+format: json-array
+encoding: UTF-8
+required_fields: [title]
+schema: docs/input-schema.md

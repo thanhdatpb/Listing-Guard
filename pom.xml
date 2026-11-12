@@ -19,6 +19,7 @@
         <module>variation-checks</module>
         <module>personalization-screening</module>
         <module>image-checker</module>
+        <module>listing-input-adapters</module>
         <module>client</module>
         <module>api</module>
         <module>mcp-server</module>
@@ -95,6 +96,11 @@
             <dependency>
                 <groupId>com.thanhdatpb.listingguard</groupId>
                 <artifactId>image-checker</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thanhdatpb.listingguard</groupId>
+                <artifactId>listing-input-adapters</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

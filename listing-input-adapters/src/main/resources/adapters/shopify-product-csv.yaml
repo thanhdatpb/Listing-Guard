@@ -1,0 +1,15 @@
+id: shopify-product-csv
+marketplace: AMAZON
+format: csv
+delimiter: ','
+encoding: UTF-8
+experimental: true
+required_columns: [Handle, Title, 'Variant Price']
+fields:
+  title: Title
+  description: 'Body (HTML)'
+  brand: Vendor
+  product_type: Type
+  search_terms: Tags
+  price: 'Variant Price'
+  quantity: 'Variant Inventory Qty'

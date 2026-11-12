@@ -1,21 +1,22 @@
 package com.thanhdatpb.listingguard.trademark;
 
+import static com.thanhdatpb.listingguard.trademark.ScannerFixtures.CATALOG_VERSION;
+import static com.thanhdatpb.listingguard.trademark.ScannerFixtures.ruleIds;
+import static com.thanhdatpb.listingguard.trademark.ScannerFixtures.scanTitle;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
+import com.thanhdatpb.listingguard.trademark.catalog.TrademarkCatalog;
+import com.thanhdatpb.listingguard.trademark.config.RuleIds;
+import com.thanhdatpb.listingguard.trademark.config.TrademarkRuleset;
+
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
-
-import static com.thanhdatpb.listingguard.trademark.ScannerFixtures.CATALOG_VERSION;
-import static com.thanhdatpb.listingguard.trademark.ScannerFixtures.ruleIds;
-import static com.thanhdatpb.listingguard.trademark.ScannerFixtures.scanTitle;
-import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
-import com.thanhdatpb.listingguard.trademark.catalog.TrademarkCatalog;
-import com.thanhdatpb.listingguard.trademark.config.RuleIds;
-import com.thanhdatpb.listingguard.trademark.config.TrademarkRuleset;
 
 class CatalogMatchingTest {
 

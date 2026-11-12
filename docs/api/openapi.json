@@ -25,6 +25,47 @@
       }
     },
     "schemas" : {
+      "AdapterList" : {
+        "properties" : {
+          "adapters" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AdapterView"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "AdapterView" : {
+        "properties" : {
+          "experimental" : {
+            "type" : "boolean"
+          },
+          "family" : {
+            "type" : "string"
+          },
+          "formats" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "marketplace" : {
+            "type" : "string"
+          },
+          "requiredColumns" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
       "Capabilities" : {
         "properties" : {
           "fixes" : {
@@ -3198,6 +3239,37 @@
         "tags" : [ "Image checks" ]
       }
     },
+    "/api/v1/input-adapters" : {
+      "get" : {
+        "description" : "Lists read-only input adapters, accepted formats, marketplace targets and required header columns.",
+        "operationId" : "adapters",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdapterList"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "List supported listing input adapters",
+        "tags" : [ "Input adapters" ]
+      }
+    },
     "/api/v1/personalization-screenings" : {
       "post" : {
         "description" : "Takes the text a buyer typed for a custom product (a name, a number), one entry per field of the order, and a print profile (see docs/input-schema.md, \"Personalization screening\"). It is meant for the step before an order goes into production, not for listings. Two independent answers: the character rules (characters the print profile cannot print, a text that is too long, stray spaces) in `findings`, and the trademark scan of the same text in `trademark`. Show both; neither replaces the other. If no trademark catalog is served, the character rules still run and `trademark.status` is NOT_CONFIGURED with `riskLevel` UNKNOWN (UNKNOWN is never LOW), and the result is INCOMPLETE. The result is a reference warning built on an internal print policy and a catalog, not a statement of the print workshop, a marketplace or a court; show the `disclaimer` with it. It proposes no replacement and changes no text. The answer never repeats the text; use the offsets (UTF-16 code units) to find a finding in it. If the same client already sent the same values with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result is stored so its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time (`expiresAt`); the text the buyer typed is never stored, only its hash and the result.",
@@ -6043,6 +6115,9 @@
     "ApiKeyAuth" : [ ]
   } ],
   "tags" : [ {
+    "description" : "Read-only listing input format metadata.",
+    "name" : "Input adapters"
+  }, {
     "description" : "Possible trademark references in a listing's text, as a reference warning.",
     "name" : "Trademark checks"
   }, {

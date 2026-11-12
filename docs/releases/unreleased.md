@@ -1,8 +1,48 @@
 # Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities` and the schema of the trademark check's findings (see the sections below). There are five migrations: V28 (trademark), V29 and V30 (image checks), and V31 and V32 (USPTO sync), all additive.
+Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), listing input adapters (ADR-025), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities`, `GET /api/v1/input-adapters` and the schema of the trademark check's findings (see the sections below). There are five migrations: V28 (trademark), V29 and V30 (image checks), and V31 and V32 (USPTO sync), all additive.
 
 ## What is new
+
+### Listing input adapters (ADR-025)
+
+The Java-only `listing-input-adapters` module defines a streaming, bounded, read-only adapter contract for converting
+local exports to [`input-schema.md`](../input-schema.md). YAML templates describe Etsy listings CSV, Amazon flat files,
+an experimental Shopify-to-Amazon mapping, and generic standard-schema JSON. Amazon parent/child records use a shared
+family key for variation checks. Legacy batch mapping files remain supported. `GET /api/v1/input-adapters` lists the
+formats and required columns; it accepts no listing data. Shopify remains experimental because Shopify's field meanings
+do not exactly match Amazon's. See [docs/adapters.md](../adapters.md).
+
+ADR-022 compatibility report lines (`contract-tools/target/contract/compatibility-report.md`):
+
+- `operation-added` at `GET /api/v1/capabilities`
+- `operation-added` at `GET /api/v1/image-checks/{id}`
+- `operation-added` at `GET /api/v1/input-adapters`
+- `operation-added` at `POST /api/v1/image-checks`
+- `response-header-added` at `header Deprecation (shared)`: first added at POST /api/v1/checks response 200
+- `response-header-added` at `header Sunset (shared)`: first added at POST /api/v1/checks response 200
+- `response-header-added` at `header X-Listing-Guard-Version (shared)`: first added at POST /api/v1/checks response 200
+- `problem-code-added` at `problem image-check-not-found`
+- `problem-code-added` at `problem image-checks-not-configured`
+- `problem-code-added` at `problem too-many-images`
+- `problem-code-added` at `problem unknown-image-profile`
+- `problem-code-added` at `problem unknown-product-type`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).end`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).insideColorPhrase`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).mark`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).matchType`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).otherRuleIds`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).risk`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).riskAdjustments`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).score`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).snippet`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).sourceIds`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).sourceLinks`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).start`
+- `request-optional-property-added` at `schema TrademarkCheckRequest (was CheckRequest).product_type`
+- `response-property-added` at `schema TrademarkCheckResult.productType`
+- `schema-renamed` at `POST /api/v1/trademark-checks request application/json $`: CheckRequest -> TrademarkCheckRequest
+- `schema-renamed` at `schema TrademarkCheckResult.findings[]`: FindingView -> TrademarkCheckFindingView
 
 ### API contract and compatibility policy (ADR-022)
 

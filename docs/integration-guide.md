@@ -267,6 +267,13 @@ It needs an API key, is read only, costs no unit and needs no plan pack. It carr
 minutes (it changes only when the deployment is restarted with other settings). It holds no secret setting and no information
 about any client.
 
+## Listing input adapters
+
+`GET /api/v1/input-adapters` is a read-only catalog for tools that need to identify a supported local export format. It
+lists adapter ids, their target marketplace, media formats, required header columns, whether the mapping is experimental,
+and any variation-family behavior. It does not accept or inspect a listing file. Adapter configuration and examples are
+documented in [`docs/adapters.md`](adapters.md). The endpoint needs an API key, is read only and costs no unit.
+
 ## Create a check
 
 `POST /api/v1/checks`, `Content-Type: application/json`, body at most 256 KB (larger gets `413`).
