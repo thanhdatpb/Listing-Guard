@@ -75,23 +75,23 @@
   <text x="65" y="542" class="head">Pattern 1 | Check a listing before publishing</text>
   <rect x="65" y="571" width="205" height="116" rx="14" class="card"/>
   <text x="87" y="608" class="label">Listing input</text><text x="87" y="638" class="body">One marketplace listing</text><text x="87" y="665" class="small">Seller or integration</text>
-  <path d="M270 628h39" class="line"/>
-  <rect x="309" y="571" width="218" height="116" rx="14" class="card"/>
-  <text x="331" y="608" class="label">Pre-publish checks</text><text x="331" y="631" class="body">POST /api/v1/checks</text><text x="331" y="654" class="body">POST /api/v1/trademark-checks</text><text x="331" y="677" class="body">POST /api/v1/variation-checks</text>
-  <path d="M527 628h39" class="line"/>
-  <rect x="566" y="571" width="199" height="116" rx="14" class="green"/>
-  <text x="588" y="608" class="label">Person reviews</text><text x="588" y="638" class="body">Findings + evidence</text><text x="588" y="665" class="small">No auto-publish</text>
+  <path d="M270 628h24" class="line"/>
+  <rect x="294" y="571" width="270" height="116" rx="14" class="card"/>
+  <text x="316" y="608" class="label">Pre-publish checks</text><text x="316" y="631" class="small">POST /api/v1/checks</text><text x="316" y="654" class="small">POST /api/v1/trademark-checks</text><text x="316" y="677" class="small">POST /api/v1/variation-checks</text>
+  <path d="M564 628h24" class="line"/>
+  <rect x="588" y="571" width="177" height="116" rx="14" class="green"/>
+  <text x="606" y="608" class="label">Person reviews</text><text x="606" y="638" class="body">Findings + evidence</text><text x="606" y="665" class="small">No auto-publish</text>
 
   <rect x="35" y="761" width="760" height="232" rx="20" class="soft"/>
   <text x="65" y="802" class="head">Pattern 2 | Screen buyer text before printing</text>
   <rect x="65" y="831" width="205" height="116" rx="14" class="card"/>
   <text x="87" y="868" class="label">Order text</text><text x="87" y="898" class="body">Buyer typed values</text><text x="87" y="925" class="small">Fulfillment / support</text>
-  <path d="M270 888h39" class="line"/>
-  <rect x="309" y="831" width="218" height="116" rx="14" class="card"/>
-  <text x="331" y="868" class="label">Screen personalization</text><text x="331" y="898" class="body">POST /api/v1/personalization-</text><text x="331" y="925" class="body">screenings</text>
-  <path d="M527 888h39" class="line"/>
-  <rect x="566" y="831" width="199" height="116" rx="14" class="green"/>
-  <text x="588" y="868" class="label">Safe handling</text><text x="588" y="898" class="body">Text not stored</text><text x="588" y="925" class="small">Warnings for a person</text>
+  <path d="M270 888h24" class="line"/>
+  <rect x="294" y="831" width="270" height="116" rx="14" class="card"/>
+  <text x="316" y="868" class="label">Screen personalization</text><text x="316" y="898" class="small">POST /api/v1/</text><text x="316" y="925" class="small">personalization-screenings</text>
+  <path d="M564 888h24" class="line"/>
+  <rect x="588" y="831" width="177" height="116" rx="14" class="green"/>
+  <text x="606" y="868" class="label">Safe handling</text><text x="606" y="898" class="body">Text not stored</text><text x="606" y="925" class="small">Warnings for a person</text>
 
   <rect x="830" y="501" width="735" height="492" rx="20" class="soft"/>
   <text x="860" y="542" class="head">Trademark data pipeline</text>
