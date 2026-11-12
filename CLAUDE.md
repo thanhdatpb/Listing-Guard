@@ -702,6 +702,10 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 - Conventional Commits (`feat:`, `fix:`, `test:`, `build:`, `ci:`, `docs:`, `chore:`), small commits.
 - Run `./mvnw verify` before every commit. Push a branch only when build and tests pass.
 
+## MCP agent skill
+
+- When changing an MCP tool's name, parameters, or description, update `skills/listing-guard/` and its catalog-backed test in the same change.
+
 ## Out of scope
 
 Auto-fixing listings, publishing or any write to a marketplace, SEO or keyword optimization, price
