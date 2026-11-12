@@ -240,7 +240,13 @@ It never edits a listing, never publishes, and does no SEO.
   the flag the output is unchanged (files of an earlier run are removed either way). Held: an `ERROR` finding of the rule check, a
   trademark level at or above `--hold-trademark-risk` (`HIGH` default, `MEDIUM`, `NONE`; the operator's choice, never a legal
   conclusion), and every row that was not checked (unreadable, failed, quota, `trademark/UNKNOWN`): never passed. Nothing is
-  edited and no fix is applied.
+  written to a marketplace, a listing is never edited and no fix is applied.
+- **Listing input adapters** (`listing-input-adapters/`, ADR-025): Java-only adapter contract for reading seller exports
+  as a stream, detecting delimited formats from headers and producing `docs/input-schema.md` records with source lines
+  and field errors under byte/row caps. Adapter templates are YAML; built-ins are Etsy CSV, Amazon flat file, experimental
+  Shopify CSV (Amazon approximation), and generic standard-schema JSON. `GET /api/v1/input-adapters` is read-only and
+  lists their formats, destinations and required columns. Legacy batch mapping YAML remains compatible. This feature never
+  writes to a marketplace and does not alter pack hashes or `analysisVersion`.
 - **Listing health report** (`api/.../report/`, ADR-018, Proposed; implemented): counts of the results a client has stored over a
   period, for a lead. `GET /api/v1/reports/summary?from=&to=[&marketplace=]` (an API key; the client is the key's, there is no client
   parameter; `from` and `to` are required UTC dates, both included, at most `listing-guard.reports.max-days` = 92; `400

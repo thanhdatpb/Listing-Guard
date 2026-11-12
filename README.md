@@ -1,5 +1,7 @@
 # Listing Guard
 
+Input format adapters: [docs/adapters.md](docs/adapters.md)
+
 [Official agent skill](docs/agent-skill.md)
 
 [![CI](https://github.com/thanhdatpb/Listing-Guard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/thanhdatpb/Listing-Guard/actions/workflows/ci.yml)

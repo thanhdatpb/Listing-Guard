@@ -47,6 +47,10 @@
             <groupId>com.thanhdatpb.listingguard</groupId>
             <artifactId>image-checker</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.thanhdatpb.listingguard</groupId>
+            <artifactId>listing-input-adapters</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

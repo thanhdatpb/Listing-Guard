@@ -1,0 +1,13 @@
+id: etsy-listings-export
+marketplace: ETSY
+format: csv
+delimiter: ','
+encoding: UTF-8
+required_columns: [SKU, TITLE]
+fields:
+  title: TITLE
+  description: DESCRIPTION
+  price: PRICE
+  quantity: QUANTITY
+  tags: {column: TAGS, separator: ','}
+  materials: {column: MATERIALS, separator: ','}

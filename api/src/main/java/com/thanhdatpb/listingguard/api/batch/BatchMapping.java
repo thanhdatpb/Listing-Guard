@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.thanhdatpb.listingguard.input.StandardListingAdapter;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
@@ -239,7 +240,7 @@ public final class BatchMapping {
         sources.forEach((field, source) -> bindings.put(field, new Bound.Binding(schema.get(field), source.shape(),
                 source.columns().stream().mapToInt(index::get).toArray(), source.separator(), source.columns().get(0))));
         return new Bound(header.size(), index.get(idColumn), idColumn, labelColumn == null ? -1 : index.get(labelColumn),
-                labelColumn, bindings);
+                labelColumn, marketplace, bindings);
     }
 
     /** A mapping fixed to the columns of one input file; turns a row of cells into a listing. */
@@ -256,15 +257,17 @@ public final class BatchMapping {
         private final String idName;
         private final int labelIndex;
         private final String labelName;
+        private final String marketplace;
         private final Map<String, Binding> bindings;
 
         private Bound(int columnCount, int idIndex, String idName, int labelIndex, String labelName,
-                      Map<String, Binding> bindings) {
+                      String marketplace, Map<String, Binding> bindings) {
             this.columnCount = columnCount;
             this.idIndex = idIndex;
             this.idName = idName;
             this.labelIndex = labelIndex;
             this.labelName = labelName;
+            this.marketplace = marketplace;
             this.bindings = bindings;
         }
 
@@ -309,7 +312,7 @@ public final class BatchMapping {
             if (!problems.isEmpty()) {
                 throw new RowException("Dữ liệu sai: " + String.join("; ", problems) + ".");
             }
-            return new RowData(id, label, listing);
+            return new RowData(id, label, StandardListingAdapter.toStandardInput(marketplace, listing));
         }
 
         private static void put(ObjectNode listing, String field, Binding binding, String[] cells, List<String> problems) {

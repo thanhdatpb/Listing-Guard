@@ -1,0 +1,21 @@
+id: amazon-flat-file
+marketplace: AMAZON
+format: csv
+delimiter: tab
+encoding: UTF-8
+required_columns: [item_sku, item_name]
+family:
+  role_column: parentage
+  parent_value: parent
+  child_value: child
+  sku_column: item_sku
+  parent_sku_column: parent_sku
+fields:
+  title: item_name
+  brand: brand_name
+  bullet_points: [bullet_point1, bullet_point2, bullet_point3, bullet_point4, bullet_point5]
+  description: product_description
+  price: standard_price
+  quantity: quantity
+  search_terms: generic_keywords
+  product_type: feed_product_type

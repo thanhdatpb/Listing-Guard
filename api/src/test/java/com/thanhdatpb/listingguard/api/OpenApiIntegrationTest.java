@@ -102,7 +102,8 @@ class OpenApiIntegrationTest {
                 "/api/v1/variation-checks", "/api/v1/variation-checks/{id}",
                 "/api/v1/personalization-screenings", "/api/v1/personalization-screenings/{id}",
                 "/api/v1/image-checks", "/api/v1/image-checks/{id}",
-                "/api/v1/rulesets/{marketplace}/limits", "/api/v1/reports/summary", "/api/v1/capabilities", "/health");
+                "/api/v1/rulesets/{marketplace}/limits", "/api/v1/reports/summary", "/api/v1/capabilities",
+                "/api/v1/input-adapters", "/health");
         // capabilities (ADR-017): read only, no plan pack, no quota, no 404 (it needs no marketplace)
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1capabilities"))).as("read only: no other method")
                 .containsExactly("get");

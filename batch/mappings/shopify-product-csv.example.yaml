@@ -1,0 +1,14 @@
+# EXPERIMENTAL and NOT VERIFIED. No Shopify export has been checked. Please compare its header row with this mapping and
+# review every field against your export and the destination marketplace before relying on results.
+# This example targets AMAZON: Vendor -> brand, Type -> product_type, Tags -> search_terms.
+csv:
+  delimiter: "," # unverified
+  encoding: UTF-8 # unverified
+id: Handle                         # unverified
+title: Title                       # unverified
+description: Body (HTML)           # unverified
+brand: Vendor                      # unverified
+product_type: Type                 # unverified
+search_terms: {column: Tags, separator: ","}  # unverified
+price: "Variant Price"            # unverified
+quantity: "Variant Inventory Qty" # unverified
