@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:listing-guard:input-schema:v1",
+  "title": "Listing Guard input schema (/api/v1)",
+  "description": "The request bodies of the Listing Guard API in machine-readable form (ADR-022). Written from docs/input-schema.md, which stays the prose reference; a test in contract-tools holds every field table and every JSON example of that page to this file. The root is the request of POST /api/v1/checks; the other bodies are under $defs. Lenient like the API: unknown members are allowed and ignored (except in the image metadata, which is read strictly), strings are trimmed, and a number or boolean where a string is expected is read as its text. Limits are not here: they come from the versioned rulesets and GET /api/v1/rulesets/{marketplace}/limits.",
+  "$ref": "#/$defs/CheckRequest",
+  "$defs": {
+    "CheckRequest": {
+      "description": "POST /api/v1/checks: the envelope. Only the object under listing depends on the marketplace. The whole body is at most 256 KB.",
+      "type": "object",
+      "required": ["marketplace", "listing"],
+      "properties": {
+        "marketplace": {"$ref": "#/$defs/Marketplace"},
+        "listing": {"type": "object", "description": "The listing in the marketplace's own format: EtsyListing for ETSY, AmazonListing for AMAZON."}
+      },
+      "allOf": [
+        {
+          "if": {"required": ["marketplace"], "properties": {"marketplace": {"pattern": "^\\s*[Ee][Tt][Ss][Yy]\\s*$"}}},
+          "then": {"properties": {"listing": {"$ref": "#/$defs/EtsyListing"}}}
+        },
+        {
+          "if": {"required": ["marketplace"], "properties": {"marketplace": {"pattern": "^\\s*[Aa][Mm][Aa][Zz][Oo][Nn]\\s*$"}}},
+          "then": {"properties": {"listing": {"$ref": "#/$defs/AmazonListing"}}}
+        }
+      ]
+    },
+    "Marketplace": {
+      "description": "ETSY or AMAZON, case-insensitive. Another code is 400 unknown-marketplace.",
+      "type": "string",
+      "minLength": 1,
+      "examples": ["ETSY", "AMAZON"]
+    },
+    "Price": {
+      "description": "An object with amount (divided by divisor when divisor is given; currency or currency_code, upper-cased), or a plain number or numeric string with no currency. A price that cannot be read as a number counts as absent.",
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "amount": {"type": ["number", "string"], "description": "A number or a numeric string."},
+            "divisor": {"type": "number", "description": "Optional; zero or a non-number is ignored."},
+            "currency_code": {"type": "string"},
+            "currency": {"type": "string", "description": "Accepted in place of currency_code."}
+          }
+        },
+        {"type": "number"},
+        {"type": "string"}
+      ]
+    },
+    "EtsyListing": {
+      "description": "Etsy Open API v3 style, snake_case.",
+      "type": "object",
+      "properties": {
+        "title": {"type": "string"},
+        "description": {"type": "string"},
+        "tags": {"type": "array", "items": {"type": "string"}, "description": "Duplicates are kept."},
+        "price": {"$ref": "#/$defs/Price"},
+        "category": {"type": "string", "description": "Takes precedence over taxonomy_path."},
+        "taxonomy_path": {"type": "array", "items": {"type": "string"}, "description": "Joined with ' > ' to form the category when category is absent."},
+        "materials": {"type": "array", "items": {"type": "string"}},
+        "images": {
+          "type": "array",
+          "description": "Each entry is a URL string, or an object whose url_fullxfull (preferred) or url is the URL.",
+          "items": {
+            "anyOf": [
+              {"type": "string"},
+              {"type": "object", "properties": {"url_fullxfull": {"type": "string"}, "url": {"type": "string"}}}
+            ]
+          }
+        },
+        "quantity": {"type": "number", "description": "A JSON number; a string is not accepted. A fractional part is dropped."},
+        "who_made": {"type": "string", "description": "Etsy's code, for example i_did."},
+        "when_made": {"type": "string", "description": "Etsy's code, for example made_to_order."},
+        "personalization": {"$ref": "#/$defs/EtsyPersonalization"}
+      }
+    },
+    "EtsyPersonalization": {
+      "description": "Optional: the structured personalization questions of the listing. An empty questions array is the same as no personalization.",
+      "type": "object",
+      "properties": {
+        "questions": {"type": "array", "items": {"$ref": "#/$defs/EtsyPersonalizationQuestion"}, "description": "An entry that is not an object is dropped."}
+      }
+    },
+    "EtsyPersonalizationQuestion": {
+      "type": "object",
+      "properties": {
+        "type": {"type": "string", "description": "TEXT, DROPDOWN or UPLOAD, in any case. Any other value is kept as written.", "examples": ["TEXT", "DROPDOWN", "UPLOAD"]},
+        "question_text": {"type": "string", "description": "The question the buyer sees."},
+        "instructions": {"type": "string", "description": "Help text for the buyer."},
+        "required": {"type": "boolean", "description": "A JSON true or false; anything else counts as absent."},
+        "max_chars": {"type": "number", "description": "The longest answer of a TEXT question. A JSON number; a string is not accepted."},
+        "options": {"type": "array", "items": {"type": "string"}, "description": "The choices of a DROPDOWN, or the labels of the files of an UPLOAD. Duplicates are kept. An option given as an object is not read."},
+        "max_files": {"type": "number", "description": "The number of files an UPLOAD accepts. A JSON number; a string is not accepted."}
+      }
+    },
+    "AmazonListing": {
+      "description": "A simple format for the US store. The SP-API attribute format is not accepted. Etsy fields such as tags are ignored.",
+      "type": "object",
+      "properties": {
+        "title": {"type": "string"},
+        "brand": {"type": "string"},
+        "bullet_points": {"type": "array", "items": {"type": "string"}},
+        "description": {"type": "string"},
+        "search_terms": {
+          "description": "A string, or an array of strings joined with single spaces.",
+          "anyOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]
+        },
+        "product_type": {"type": "string", "description": "For example LUGGAGE. Matched to the ruleset ignoring case."},
+        "price": {"$ref": "#/$defs/Price"},
+        "quantity": {"type": "number", "description": "A JSON number; a string is not accepted. A fractional part is dropped."},
+        "images": {"type": "array", "items": {"type": "string"}, "description": "URLs. Blank entries, and entries that are objects or arrays, are dropped."},
+        "item_highlights": {"type": "string", "description": "The Amazon Item Highlights field. Optional."},
+        "customization": {"$ref": "#/$defs/AmazonCustomization"}
+      }
+    },
+    "AmazonCustomization": {
+      "description": "Optional: an Amazon Custom product. An empty surfaces array is the same as no customization.",
+      "type": "object",
+      "properties": {
+        "surfaces": {"type": "array", "items": {"$ref": "#/$defs/AmazonSurface"}, "description": "The print surfaces, in the order sent. An entry that is not an object is dropped."}
+      }
+    },
+    "AmazonSurface": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string", "description": "For example Front. Optional."},
+        "text_inputs": {"type": "array", "items": {"$ref": "#/$defs/AmazonTextInput"}},
+        "dropdowns": {"type": "array", "items": {"$ref": "#/$defs/AmazonDropdown"}},
+        "image_inputs": {"type": "array", "items": {"$ref": "#/$defs/AmazonImageInput"}}
+      }
+    },
+    "AmazonTextInput": {
+      "type": "object",
+      "properties": {
+        "label": {"type": "string"},
+        "max_chars": {"type": "number", "description": "A JSON number; a string is not accepted. A fractional part is dropped."},
+        "allowed_char_types": {"type": "array", "items": {"type": "string"}, "description": "Kept as written; not interpreted."}
+      }
+    },
+    "AmazonDropdown": {
+      "type": "object",
+      "properties": {
+        "label": {"type": "string"},
+        "options": {"type": "array", "items": {"type": "string"}, "description": "In the order sent. Duplicates are kept; blank entries are dropped."}
+      }
+    },
+    "AmazonImageInput": {
+      "type": "object",
+      "properties": {
+        "label": {"type": "string"}
+      }
+    },
+    "TrademarkCheckRequest": {
+      "description": "POST /api/v1/trademark-checks: the /checks envelope (normalized the same way) and an optional product_type next to it.",
+      "type": "object",
+      "required": ["marketplace", "listing"],
+      "properties": {
+        "marketplace": {"$ref": "#/$defs/Marketplace"},
+        "listing": {"type": "object", "description": "As for POST /api/v1/checks: EtsyListing or AmazonListing."},
+        "product_type": {"type": "string", "description": "Optional. A key of product_classes.types in the active trademark ruleset, written exactly, at most 64 characters. An undeclared key is 400 unknown-product-type. Not the Amazon product_type of the listing."}
+      },
+      "allOf": [
+        {
+          "if": {"required": ["marketplace"], "properties": {"marketplace": {"pattern": "^\\s*[Ee][Tt][Ss][Yy]\\s*$"}}},
+          "then": {"properties": {"listing": {"$ref": "#/$defs/EtsyListing"}}}
+        },
+        {
+          "if": {"required": ["marketplace"], "properties": {"marketplace": {"pattern": "^\\s*[Aa][Mm][Aa][Zz][Oo][Nn]\\s*$"}}},
+          "then": {"properties": {"listing": {"$ref": "#/$defs/AmazonListing"}}}
+        }
+      ]
+    },
+    "VariationCheckRequest": {
+      "description": "POST /api/v1/variation-checks: a parent and its children, at the top level of the body (not the /checks envelope).",
+      "type": "object",
+      "required": ["marketplace"],
+      "properties": {
+        "marketplace": {"$ref": "#/$defs/Marketplace"},
+        "parent": {"$ref": "#/$defs/VariationParent"},
+        "variation_properties": {"type": "array", "items": {"type": "string"}, "description": "Etsy only; ignored for Amazon. The names of the variation types."},
+        "children": {"type": "array", "items": {"$ref": "#/$defs/VariationChild"}, "description": "In the order sent. An entry that is not an object, or has no non-blank field, is dropped."}
+      }
+    },
+    "VariationParent": {
+      "description": "Amazon only; ignored for Etsy. All fields optional.",
+      "type": "object",
+      "properties": {
+        "sku": {"type": "string"},
+        "product_type": {"type": "string", "description": "For example SHIRT. Matched to the ruleset ignoring case."},
+        "variation_theme": {"type": "string", "description": "For example Color-Size. Matched to the ruleset ignoring case."},
+        "title": {"type": "string"}
+      }
+    },
+    "VariationChild": {
+      "type": "object",
+      "properties": {
+        "sku": {"type": "string"},
+        "parent_sku": {"type": "string", "description": "Amazon only. Compared with the parent's sku exactly (after Unicode NFC)."},
+        "title": {"type": "string"},
+        "attributes": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean"]}, "description": "Attribute name to value. An attribute whose value is an object or array is dropped."}
+      }
+    },
+    "PersonalizationScreeningRequest": {
+      "description": "POST /api/v1/personalization-screenings: the text a buyer typed for a custom product, at the top level of the body.",
+      "type": "object",
+      "required": ["marketplace"],
+      "properties": {
+        "marketplace": {"$ref": "#/$defs/Marketplace"},
+        "product_type": {"type": "string", "description": "Optional free text, for example jersey. Hashed; no rule reads it yet."},
+        "print_profile": {"type": "string", "description": "Optional. A profile declared in the ruleset; absent means the default. An undeclared code is 400 unknown-print-profile."},
+        "values": {"type": "array", "items": {"$ref": "#/$defs/PersonalizationValue"}, "description": "One entry per field of the order. An entry that is not an object, or has no text, is dropped."}
+      }
+    },
+    "PersonalizationValue": {
+      "type": "object",
+      "properties": {
+        "label": {"type": "string", "description": "Optional name of the field, for example name or number."},
+        "text": {"type": "string", "description": "What the buyer typed. Not trimmed; never stored; never repeated in an answer."}
+      }
+    },
+    "ImageCheckMetadata": {
+      "description": "POST /api/v1/image-checks: the metadata part of the multipart request (the images are file parts named images, in the same order). Read strictly: an unknown member is 400 invalid-request.",
+      "type": "object",
+      "required": ["marketplace", "images"],
+      "additionalProperties": false,
+      "properties": {
+        "marketplace": {"$ref": "#/$defs/Marketplace"},
+        "profile": {"type": ["string", "null"], "description": "Optional. A profile of the marketplace's image ruleset; absent or null means the default. An undeclared name is 400 unknown-image-profile."},
+        "images": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/ImageCheckImage"}, "description": "One entry per images part, in the same order."}
+      }
+    },
+    "ImageCheckImage": {
+      "type": "object",
+      "required": ["role"],
+      "additionalProperties": false,
+      "properties": {
+        "role": {"type": "string", "enum": ["MAIN", "ADDITIONAL"]},
+        "source": {"type": ["string", "null"], "enum": ["SELLER", "CUSTOMER_CONTENT", "UNKNOWN", null], "description": "Optional; absent or null means UNKNOWN. Only a declaration; nothing verifies it."}
+      }
+    }
+  }
+}

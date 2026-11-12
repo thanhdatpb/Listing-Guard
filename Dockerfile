@@ -13,6 +13,7 @@ COPY personalization-screening personalization-screening
 COPY image-checker image-checker
 COPY api api
 COPY mcp-server mcp-server
+COPY contract-tools contract-tools
 RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw -B -q -DskipTests -pl api -am package
 

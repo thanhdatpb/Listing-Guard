@@ -1,0 +1,36 @@
+# Reviewed breaking changes of the API contract against the baseline in docs/api/baseline/ (ADR-022, section 5).
+#
+# A breaking change passes ContractCompatibilityTest only when an entry below names its rule and its location exactly as the
+# compatibility report prints them, gives the reason, and names an ADR in docs/adr/ that mentions the location (a new ADR or an
+# amendment saying what changes, why and what a client must do). The maintainer reviews every entry; the release notes list
+# each one under "Breaking changes".
+#
+# When the baseline moves to a new release, set `baseline` to that release and empty `exceptions`.
+#
+# exceptions:
+#   - rule: response-property-removed
+#     location: schema CheckResult.status
+#     reason: Why the change is needed and why no additive form works.
+#     adr: ADR-022-api-contract-and-compatibility.md
+format: listing-guard/breaking-changes/v1
+baseline: v0.6.0
+exceptions:
+  # v0.6.0's document pointed TrademarkCheckResult.findings at FindingView, the finding of POST /api/v1/checks. The fix after
+  # v0.6.0 ("the findings of a trademark check have their own schema", docs/releases/unreleased.md) points it at
+  # TrademarkCheckFindingView. The responses never carried these four members in a trademark finding; only the document did.
+  - rule: response-property-removed
+    location: schema TrademarkCheckFindingView (was FindingView).fix
+    reason: Documentation fix. A trademark finding never had fix; the v0.6.0 document described the wrong schema.
+    adr: ADR-022-api-contract-and-compatibility.md
+  - rule: response-property-removed
+    location: schema TrademarkCheckFindingView (was FindingView).severity
+    reason: Documentation fix. A trademark finding has risk, never severity; the v0.6.0 document described the wrong schema.
+    adr: ADR-022-api-contract-and-compatibility.md
+  - rule: response-property-removed
+    location: schema TrademarkCheckFindingView (was FindingView).source
+    reason: Documentation fix. A trademark finding never had source; the v0.6.0 document described the wrong schema.
+    adr: ADR-022-api-contract-and-compatibility.md
+  - rule: response-property-removed
+    location: schema TrademarkCheckFindingView (was FindingView).value
+    reason: Documentation fix. A trademark finding has snippet, never value; the v0.6.0 document described the wrong schema.
+    adr: ADR-022-api-contract-and-compatibility.md

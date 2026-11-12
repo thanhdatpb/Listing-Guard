@@ -21,6 +21,7 @@
         <module>image-checker</module>
         <module>api</module>
         <module>mcp-server</module>
+        <module>contract-tools</module>
     </modules>
 
     <properties>

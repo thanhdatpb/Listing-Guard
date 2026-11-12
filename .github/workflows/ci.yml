@@ -27,5 +27,10 @@ jobs:
           java-version: "21"
           cache: maven
 
+      # includes the API compatibility check of ADR-022 (contract-tools: ContractCompatibilityTest)
       - name: Build and test
         run: ./mvnw -B verify
+
+      - name: API compatibility report
+        if: always() && hashFiles('contract-tools/target/contract/compatibility-report.md') != ''
+        run: cat contract-tools/target/contract/compatibility-report.md >> "$GITHUB_STEP_SUMMARY"
