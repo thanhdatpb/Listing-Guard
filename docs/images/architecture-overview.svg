@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title desc">
+  <title id="title">Listing Guard system architecture</title>
+  <desc id="desc">Clients use the Listing Guard Spring Boot API. Versioned rulesets, trademark catalog and policy corpus feed checks; PostgreSQL stores results and operational jobs provide health reports and backups.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#315b83"/></marker>
+    <style>
+      text{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#172b42}
+      .title{font-size:30px;font-weight:700}.subtitle{font-size:16px;fill:#52677d}.head{font-size:21px;font-weight:700}.label{font-size:17px;font-weight:700}.body{font-size:15px}.small{font-size:14px;fill:#43596f}.tiny{font-size:14px;font-weight:700}
+      .card{fill:#fff;stroke:#5d7895;stroke-width:2}.soft{fill:#f2f7fb;stroke:#5d7895;stroke-width:2}.api{fill:#eaf3fc;stroke:#245b8f;stroke-width:3}.data{fill:#f3f7fb;stroke:#617a91;stroke-width:2}.optional{fill:#fff;stroke:#647d94;stroke-width:2;stroke-dasharray:9 7}.line{fill:none;stroke:#315b83;stroke-width:2.5;marker-end:url(#arrow)}.thin{fill:none;stroke:#315b83;stroke-width:2}.dash{fill:none;stroke:#647d94;stroke-width:2;stroke-dasharray:9 7}.step{fill:#145c8d;stroke:#fff;stroke-width:2}.steptext{font-size:16px;font-weight:700;fill:#fff;text-anchor:middle;dominant-baseline:central}.icon{fill:none;stroke:#245b8f;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+    </style>
+  </defs>
+  <rect width="1600" height="1120" fill="#fff"/>
+  <text x="40" y="48" class="title">Listing Guard | system architecture</text>
+  <text x="40" y="76" class="subtitle">Self-hosted checks for Etsy and Amazon listings, variation families, personalization text and images</text>
+
+  <rect x="35" y="112" width="325" height="680" rx="20" class="soft"/>
+  <text x="60" y="151" class="head">Clients and tools</text>
+  <rect x="60" y="178" width="275" height="76" rx="14" class="card"/>
+  <rect x="78" y="200" width="26" height="30" rx="5" class="icon"/><path d="M78 207h26M91 207v23M84 200l-7-8M98 200l7-8" class="icon"/>
+  <text x="120" y="207" class="label">Chrome extension</text><text x="120" y="232" class="small">Listing-Guard-extension</text>
+  <rect x="60" y="274" width="275" height="70" rx="14" class="card"/>
+  <rect x="78" y="294" width="27" height="25" rx="3" class="icon"/><path d="M78 302h27M84 298h2M90 298h2" class="icon"/>
+  <text x="120" y="316" class="label">Seller console</text>
+  <rect x="60" y="364" width="275" height="83" rx="14" class="card"/>
+  <path d="M79 389h24v20H79zM85 415h12M91 409v6M84 397l4 4 9-10" class="icon"/>
+  <text x="120" y="396" class="label">AI agent via MCP</text><text x="120" y="422" class="small">STDIO default; HTTP private only</text>
+  <rect x="60" y="467" width="275" height="70" rx="14" class="card"/>
+  <path d="M80 488h22v28H80zM85 495h12M85 501h12M85 507h8" class="icon"/>
+  <text x="120" y="509" class="label">batch-check job</text>
+  <rect x="60" y="557" width="275" height="70" rx="14" class="card"/>
+  <path d="M79 578h24v28H79zM84 584h14M84 590h14M84 596h10" class="icon"/>
+  <text x="120" y="599" class="label">Java client SDK</text>
+  <rect x="60" y="647" width="275" height="100" rx="14" class="card"/>
+  <path d="M79 675h25v28H79zM85 670h13M85 681h13M85 687h13M85 693h9" class="icon"/>
+  <text x="120" y="682" class="label">Third-party backend</text><text x="120" y="710" class="small">REST API + X-API-Key</text>
+
+  <rect x="400" y="112" width="740" height="680" rx="22" class="api"/>
+  <text x="430" y="151" class="head">Listing Guard API | Spring Boot</text>
+  <text x="430" y="177" class="small">Per-client identity, rate limits, cache, optional plans and monthly quota</text>
+  <rect x="430" y="199" width="325" height="130" rx="15" class="card"/>
+  <circle cx="457" cy="229" r="14" class="step"/><text x="457" y="229" class="steptext">A</text>
+  <text x="482" y="235" class="label">Listing rules</text>
+  <text x="450" y="269" class="body">listing-rules | Etsy + Amazon</text><text x="450" y="297" class="body">Versioned YAML rulesets</text>
+  <rect x="785" y="199" width="325" height="130" rx="15" class="card"/>
+  <circle cx="812" cy="229" r="14" class="step"/><text x="812" y="229" class="steptext">B</text>
+  <text x="837" y="235" class="label">Trademark risk</text>
+  <text x="805" y="269" class="body">trademark-risk | exact, phrase, fuzzy</text><text x="805" y="297" class="body">Context rules + evidence + disclaimer</text>
+  <rect x="430" y="349" width="325" height="130" rx="15" class="card"/>
+  <circle cx="457" cy="379" r="14" class="step"/><text x="457" y="379" class="steptext">C</text>
+  <text x="482" y="385" class="label">Variation checks</text>
+  <text x="450" y="419" class="body">variation-checks</text><text x="450" y="447" class="body">Parent, children, combinations, SKUs</text>
+  <rect x="785" y="349" width="325" height="130" rx="15" class="card"/>
+  <circle cx="812" cy="379" r="14" class="step"/><text x="812" y="379" class="steptext">D</text>
+  <text x="837" y="385" class="label">Personalization</text>
+  <text x="805" y="419" class="body">personalization-screening</text><text x="805" y="447" class="body">Buyer text screened; not stored</text>
+  <rect x="430" y="499" width="325" height="112" rx="15" class="optional"/>
+  <circle cx="457" cy="529" r="14" fill="#657f96"/><text x="457" y="529" class="steptext">E</text>
+  <text x="482" y="535" class="label">Image checks</text>
+  <text x="450" y="569" class="body">image-checks | off by default</text><text x="450" y="593" class="small">Thresholds unset; results INCOMPLETE</text>
+  <rect x="785" y="499" width="325" height="112" rx="15" class="optional"/>
+  <circle cx="812" cy="529" r="14" fill="#657f96"/><text x="812" y="529" class="steptext">F</text>
+  <text x="837" y="535" class="label">Policy analyzer</text>
+  <text x="805" y="569" class="body">Planned | off by default</text><text x="805" y="593" class="small">No real LLM call or endpoint</text>
+  <rect x="430" y="633" width="680" height="128" rx="15" class="card"/>
+  <text x="455" y="669" class="label">Shared API capabilities</text>
+  <text x="455" y="701" class="body">Verified fixes + listing-rules readiness (optional) | ruleset limits | health report</text>
+  <text x="455" y="733" class="body">Capabilities | usage | client-scoped results | RFC 7807 problems</text>
+
+  <rect x="1180" y="112" width="385" height="430" rx="20" class="soft"/>
+  <text x="1210" y="151" class="head">Versioned inputs</text>
+  <rect x="1210" y="180" width="325" height="93" rx="14" class="card"/>
+  <path d="M1232 203h30v39h-30zM1239 213h16M1239 220h16M1239 227h12" class="icon"/>
+  <text x="1277" y="215" class="label">Rulesets YAML</text><text x="1277" y="242" class="small">Etsy + Amazon versions</text>
+  <rect x="1210" y="292" width="325" height="110" rx="14" class="card"/>
+  <path d="M1232 318h30v38h-30zM1238 327h18M1238 335h18M1238 343h12" class="icon"/>
+  <text x="1277" y="327" class="label">Trademark catalog</text><text x="1277" y="354" class="small">DEMO / imported USPTO data</text><text x="1277" y="378" class="small">Named version; activation logged</text>
+  <rect x="1210" y="421" width="325" height="91" rx="14" class="optional"/>
+  <path d="M1232 445h29v36h-29zM1238 453h17M1238 461h17M1238 469h12" class="icon"/>
+  <text x="1277" y="454" class="label">Policy corpus</text><text x="1277" y="481" class="small">Optional ingest + pgvector</text><text x="1277" y="502" class="small">Analyzer remains planned</text>
+
+  <path d="M1140 262h40" class="line"/><text x="1145" y="246" class="small">rules</text>
+  <path d="M1140 362h40" class="line"/><text x="1145" y="348" class="small">catalog</text>
+  <path d="M1140 465h40" class="dash"/><text x="1145" y="451" class="small">retrieval</text>
+  <path d="M360 400h40" class="line"/>
+
+  <rect x="400" y="828" width="745" height="205" rx="20" class="data"/>
+  <text x="430" y="868" class="head">PostgreSQL 16 + pgvector</text>
+  <ellipse cx="468" cy="926" rx="31" ry="13" class="icon"/><path d="M437 926v47c0 8 14 14 31 14s31-6 31-14v-47M437 949c0 8 14 14 31 14s31-6 31-14" class="icon"/>
+  <text x="525" y="923" class="body">Flyway migrations | API results and findings scoped by client</text>
+  <text x="525" y="953" class="body">Versioned trademark catalog | policy chunks and embeddings</text>
+  <text x="525" y="983" class="small">Retained packs keep only a canonical input hash and bounded evidence</text>
+  <path d="M770 792v36" class="line"/>
+
+  <rect x="1180" y="590" width="385" height="443" rx="20" class="soft"/>
+  <text x="1210" y="631" class="head">Operations</text>
+  <rect x="1210" y="659" width="325" height="86" rx="14" class="card"/>
+  <path d="M1235 680a18 18 0 1 0 14 30M1235 680v12h12" class="icon"/>
+  <text x="1277" y="691" class="label">Health endpoint</text><text x="1277" y="719" class="small">GET /health</text>
+  <rect x="1210" y="761" width="325" height="86" rx="14" class="card"/>
+  <path d="M1233 785h32v31h-32zM1239 793h20M1239 800h20M1239 807h14" class="icon"/>
+  <text x="1277" y="794" class="label">health-report job</text><text x="1277" y="822" class="small">Aggregates stored counts only</text>
+  <rect x="1210" y="863" width="325" height="86" rx="14" class="card"/>
+  <path d="M1234 885h29v34h-29zM1240 879h17v8M1240 894h17M1240 901h17M1240 908h12" class="icon"/>
+  <text x="1277" y="896" class="label">Backup jobs</text><text x="1277" y="924" class="small">Daily + weekly off-host copies</text>
+  <text x="1210" y="981" class="small">Oracle A1 deployment is one supported setup</text>
+  <path d="M1145 925h35" class="line"/>
+
+  <rect x="38" y="1060" width="20" height="3" fill="#315b83"/><text x="68" y="1067" class="small">Implemented request/data path</text>
+  <rect x="300" y="1054" width="28" height="15" rx="3" class="optional"/><text x="340" y="1067" class="small">Optional, disabled or planned capability</text>
+  <circle cx="680" cy="1061" r="13" class="step"/><text x="680" y="1061" class="steptext">1</text><text x="704" y="1067" class="small">Numbered sequence (see request flow)</text>
+  <text x="1180" y="1067" class="small">Icons are original geometric drawings; no vendor marks.</text>
+</svg>

@@ -446,6 +446,7 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 
 ## Conventions
 
+- When adding an API endpoint, check pack or MCP tool, update the architecture diagrams in `docs/images/` and the product overview in `README.md`.
 - **No marketplace limits in Java.** Thresholds, word lists, field lists and severities go in the ruleset
   YAML, logic in Java (ADR-001). A rule class reads its severity via `Rule.severity(config)`.
 - **A ruleset version is immutable** (ADR-002). Never edit a published `rulesets/*.yaml`: copy it to a new

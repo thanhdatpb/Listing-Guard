@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title desc">
+  <title id="title">Listing Guard request flow and trademark data pipeline</title>
+  <desc id="desc">Seven steps trace a checks request through Cloudflare Access and Tunnel to the Oracle A1 Compose API, client authentication, cache, pack execution, PostgreSQL persistence and response. Lower panels show pre-publish and pre-production patterns and the USPTO catalog pipeline.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#315b83"/></marker>
+    <style>
+      text{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#172b42}.title{font-size:30px;font-weight:700}.subtitle{font-size:16px;fill:#52677d}.head{font-size:22px;font-weight:700}.label{font-size:17px;font-weight:700}.body{font-size:15px}.small{font-size:14px;fill:#43596f}.tiny{font-size:14px;font-weight:700}
+      .card{fill:#fff;stroke:#5d7895;stroke-width:2}.soft{fill:#f2f7fb;stroke:#5d7895;stroke-width:2}.cloud{fill:#edf6fd;stroke:#2873aa;stroke-width:2}.host{fill:#f5f8fb;stroke:#657f96;stroke-width:2;stroke-dasharray:9 7}.line{fill:none;stroke:#315b83;stroke-width:2.5;marker-end:url(#arrow)}.return{fill:none;stroke:#1b7c71;stroke-width:2.5;marker-end:url(#arrow)}.step{fill:#145c8d;stroke:#fff;stroke-width:2}.steptext{font-size:16px;font-weight:700;fill:#fff;text-anchor:middle;dominant-baseline:central}.icon{fill:none;stroke:#245b8f;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}.green{fill:#e9f7f3;stroke:#328477;stroke-width:2}.orange{fill:#fff7ec;stroke:#b77a27;stroke-width:2}
+    </style>
+  </defs>
+  <rect width="1600" height="1120" fill="#fff"/>
+  <text x="40" y="48" class="title">Listing Guard | request flow and data</text>
+  <text x="40" y="77" class="subtitle">Example: POST /api/v1/checks through an Oracle Cloud A1 deployment behind Cloudflare</text>
+
+  <rect x="835" y="104" width="730" height="366" rx="22" class="host"/>
+  <text x="866" y="139" class="head">Oracle A1 | Docker Compose host</text>
+
+  <rect x="35" y="177" width="178" height="210" rx="16" class="card"/>
+  <circle cx="60" cy="202" r="17" class="step"/><text x="60" y="202" class="steptext">1</text>
+  <path d="M101 235h45v38h-45zM109 245h29M109 253h18M109 261h24M121 274v10M110 284h23" class="icon"/>
+  <text x="57" y="315" class="label">Client</text>
+  <text x="57" y="344" class="body">POST /api/v1/checks</text>
+  <text x="57" y="370" class="small">X-API-Key + JSON</text>
+
+  <rect x="239" y="177" width="200" height="210" rx="16" class="cloud"/>
+  <circle cx="264" cy="202" r="17" class="step"/><text x="264" y="202" class="steptext">2</text>
+  <path d="M300 259c0-14 11-25 25-25 8-17 32-15 38 2 14-1 25 10 25 23 0 14-11 24-25 24h-39c-13 0-24-10-24-24zM325 258h38M344 244v28" class="icon"/>
+  <text x="261" y="315" class="label">Cloudflare</text>
+  <text x="261" y="344" class="body">Access validates token</text>
+  <text x="261" y="370" class="small">Tunnel forwards to origin</text>
+
+  <rect x="467" y="177" width="194" height="210" rx="16" class="card"/>
+  <circle cx="492" cy="202" r="17" class="step"/><text x="492" y="202" class="steptext">3</text>
+  <path d="M543 234l31 12v24c0 18-13 31-31 39-18-8-31-21-31-39v-24zM532 268l8 8 16-18" class="icon"/>
+  <text x="488" y="315" class="label">API security</text>
+  <text x="488" y="344" class="body">API key + client scope</text>
+  <text x="488" y="370" class="small">Rate limit + optional quota</text>
+
+  <rect x="689" y="177" width="194" height="210" rx="16" class="card"/>
+  <circle cx="714" cy="202" r="17" class="step"/><text x="714" y="202" class="steptext">4</text>
+  <path d="M757 239h58v43h-58zM757 251h58M757 266h58M771 239v43M800 239v43" class="icon"/>
+  <text x="710" y="315" class="label">Result cache</text>
+  <text x="710" y="344" class="body">analysisVersion key</text>
+  <text x="710" y="370" class="small">Client + pack + input hash</text>
+
+  <rect x="913" y="177" width="194" height="210" rx="16" class="card"/>
+  <circle cx="938" cy="202" r="17" class="step"/><text x="938" y="202" class="steptext">5</text>
+  <path d="M978 240h64v42h-64zM991 253h38M991 263h38M991 273h25" class="icon"/>
+  <text x="934" y="315" class="label">Run pack</text>
+  <text x="934" y="344" class="body">Rules + versioned YAML</text>
+  <text x="934" y="370" class="small">On a cache miss</text>
+
+  <rect x="1137" y="177" width="194" height="210" rx="16" class="card"/>
+  <circle cx="1162" cy="202" r="17" class="step"/><text x="1162" y="202" class="steptext">6</text>
+  <ellipse cx="1234" cy="245" rx="35" ry="13" class="icon"/><path d="M1199 245v43c0 8 16 14 35 14s35-6 35-14v-43M1199 266c0 8 16 14 35 14s35-6 35-14" class="icon"/>
+  <text x="1158" y="329" class="label">Persist result</text>
+  <text x="1158" y="356" class="body">PostgreSQL, client-scoped</text>
+
+  <rect x="1361" y="177" width="204" height="210" rx="16" class="green"/>
+  <circle cx="1386" cy="202" r="17" class="step"/><text x="1386" y="202" class="steptext">7</text>
+  <path d="M1417 240h55v45h-55zM1425 251h39M1425 260h30M1425 269h35M1435 294l11 9 17-21" class="icon"/>
+  <text x="1382" y="329" class="label">Return findings</text>
+  <text x="1382" y="356" class="body">Evidence + versions</text>
+
+  <path d="M213 280h26" class="line"/>
+  <path d="M439 280h28" class="line"/>
+  <path d="M661 280h28" class="line"/>
+  <path d="M883 280h30" class="line"/>
+  <path d="M1107 280h30" class="line"/>
+  <path d="M1331 280h30" class="line"/>
+  <path d="M1463 387v45H125v-45" class="return"/><text x="618" y="422" class="small">HTTP response carries findings, evidence, rulesetVersion, analysisVersion and disclaimer</text>
+  <text x="845" y="451" class="small">Checks never edit or publish listings; only result data is persisted.</text>
+
+  <rect x="35" y="501" width="760" height="232" rx="20" class="soft"/>
+  <text x="65" y="542" class="head">Pattern 1 | Check a listing before publishing</text>
+  <rect x="65" y="571" width="205" height="116" rx="14" class="card"/>
+  <text x="87" y="608" class="label">Listing input</text><text x="87" y="638" class="body">One marketplace listing</text><text x="87" y="665" class="small">Seller or integration</text>
+  <path d="M270 628h39" class="line"/>
+  <rect x="309" y="571" width="218" height="116" rx="14" class="card"/>
+  <text x="331" y="608" class="label">Pre-publish checks</text><text x="331" y="631" class="body">POST /api/v1/checks</text><text x="331" y="654" class="body">POST /api/v1/trademark-checks</text><text x="331" y="677" class="body">POST /api/v1/variation-checks</text>
+  <path d="M527 628h39" class="line"/>
+  <rect x="566" y="571" width="199" height="116" rx="14" class="green"/>
+  <text x="588" y="608" class="label">Person reviews</text><text x="588" y="638" class="body">Findings + evidence</text><text x="588" y="665" class="small">No auto-publish</text>
+
+  <rect x="35" y="761" width="760" height="232" rx="20" class="soft"/>
+  <text x="65" y="802" class="head">Pattern 2 | Screen buyer text before printing</text>
+  <rect x="65" y="831" width="205" height="116" rx="14" class="card"/>
+  <text x="87" y="868" class="label">Order text</text><text x="87" y="898" class="body">Buyer typed values</text><text x="87" y="925" class="small">Fulfillment / support</text>
+  <path d="M270 888h39" class="line"/>
+  <rect x="309" y="831" width="218" height="116" rx="14" class="card"/>
+  <text x="331" y="868" class="label">Screen personalization</text><text x="331" y="898" class="body">POST /api/v1/personalization-</text><text x="331" y="925" class="body">screenings</text>
+  <path d="M527 888h39" class="line"/>
+  <rect x="566" y="831" width="199" height="116" rx="14" class="green"/>
+  <text x="588" y="868" class="label">Safe handling</text><text x="588" y="898" class="body">Text not stored</text><text x="588" y="925" class="small">Warnings for a person</text>
+
+  <rect x="830" y="501" width="735" height="492" rx="20" class="soft"/>
+  <text x="860" y="542" class="head">Trademark data pipeline</text>
+  <text x="860" y="570" class="small">Optional operator workflow; a sync or import never runs during a check.</text>
+  <rect x="860" y="597" width="285" height="89" rx="14" class="card"/>
+  <text x="882" y="631" class="label">USPTO Open Data Portal</text><text x="882" y="659" class="body">or operator-downloaded files</text>
+  <path d="M1145 642h48" class="line"/>
+  <rect x="1193" y="597" width="334" height="89" rx="14" class="card"/>
+  <text x="1215" y="631" class="label">uspto-sync job</text><text x="1215" y="659" class="body">Stores selected backfile + daily files</text>
+  <path d="M1360 686v39h-299v25" class="line"/>
+  <rect x="860" y="750" width="285" height="109" rx="14" class="card"/>
+  <text x="882" y="784" class="label">uspto-convert</text><text x="882" y="812" class="body">A2c: latest transaction wins</text><text x="882" y="838" class="small">Filter classes + live status; jsonl-1</text>
+  <path d="M1145 805h48" class="line"/>
+  <rect x="1193" y="750" width="334" height="109" rx="14" class="card"/>
+  <text x="1215" y="784" class="label">trademark-import</text><text x="1215" y="812" class="body">Creates immutable catalog version</text><text x="1215" y="838" class="small">Named version; never “latest”</text>
+  <path d="M1360 859v38h-299v23" class="line"/>
+  <rect x="860" y="918" width="285" height="55" rx="14" class="card"/>
+  <text x="882" y="952" class="label">Activation log</text>
+  <path d="M1145 945h48" class="line"/>
+  <rect x="1193" y="918" width="334" height="55" rx="14" class="green"/>
+  <text x="1215" y="952" class="label">TrademarkCatalogRuntime</text>
+
+  <rect x="35" y="1032" width="20" height="3" fill="#315b83"/><text x="65" y="1039" class="small">Implemented request or data flow</text>
+  <rect x="334" y="1026" width="28" height="15" rx="3" class="host"/><text x="374" y="1039" class="small">Deployment boundary</text>
+  <circle cx="596" cy="1033" r="14" class="step"/><text x="596" y="1033" class="steptext">1</text><text x="620" y="1039" class="small">Request step in sequence</text>
+  <text x="830" y="1039" class="small">USPTO converter logic is documented but unverified against real source files.</text>
+</svg>
