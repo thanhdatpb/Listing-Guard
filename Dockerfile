@@ -11,6 +11,7 @@ COPY trademark-scanner trademark-scanner
 COPY variation-checks variation-checks
 COPY personalization-screening personalization-screening
 COPY image-checker image-checker
+COPY client client
 COPY api api
 COPY mcp-server mcp-server
 COPY contract-tools contract-tools
