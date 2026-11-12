@@ -57,6 +57,9 @@ jobs:
         with:
           context: .
           load: true
+          # X-Listing-Guard-Version of the API (ADR-022): the tag without its v
+          build-args: |
+            LISTING_GUARD_RELEASE=${{ steps.metadata.outputs.version }}
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
 
@@ -97,5 +100,88 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            LISTING_GUARD_RELEASE=${{ steps.metadata.outputs.version }}
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+
+  # The API contract of the release (ADR-022, section 8), attached to the GitHub Release of the tag at a stable address:
+  # https://github.com/thanhdatpb/Listing-Guard/releases/download/<tag>/<asset>
+  publish-contract:
+    needs: verify-and-publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Check the baseline against its release tag
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          baselines=(docs/api/baseline/openapi-v*.json)
+          if [ "${#baselines[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one docs/api/baseline/openapi-v*.json, found ${#baselines[@]} (ADR-022)"; exit 1
+          fi
+          baseline="${baselines[0]}"
+          version="$(basename "$baseline" .json)"
+          version="${version#openapi-}"
+          if [ "$version" = "$TAG" ]; then
+            echo "::error::The baseline is the release itself ($TAG); it must be the previous release (ADR-022)"; exit 1
+          fi
+          if ! git rev-parse -q --verify "refs/tags/$version" > /dev/null; then
+            echo "::error::The baseline names $version, which is not a tag of this repository"; exit 1
+          fi
+          if ! git merge-base --is-ancestor "$version" "$TAG"; then
+            echo "::error::The baseline $version is not an ancestor of $TAG"; exit 1
+          fi
+          if ! git show "$version:docs/api/openapi.json" | cmp -s - "$baseline"; then
+            echo "::error::$baseline is not docs/api/openapi.json of $version byte for byte"; exit 1
+          fi
+          for input in docs/api/baseline/input-schema-v*.json; do
+            if ! git show "$version:docs/api/input-schema.json" | cmp -s - "$input"; then
+              echo "::error::$input is not docs/api/input-schema.json of $version byte for byte"; exit 1
+            fi
+          done
+          echo "Baseline $version checked."
+
+      - name: Run the compatibility check
+        run: ./mvnw -B -pl contract-tools verify
+
+      - name: Build the contract assets
+        run: |
+          set -euo pipefail
+          mkdir -p contract-assets
+          cp docs/api/openapi.json docs/api/input-schema.json contract-tools/target/contract/compatibility-report.md contract-assets/
+          cd contract-assets
+          sha256sum openapi.json input-schema.json > contract-sha256.txt
+          sha256sum -c contract-sha256.txt
+
+      - name: Attach the contract to the GitHub Release
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            # no Release yet: create a draft for the maintainer to review and publish
+            notes="docs/releases/$TAG.md"
+            if [ -f "$notes" ]; then
+              gh release create "$TAG" --draft --verify-tag --title "$TAG" --notes-file "$notes"
+            else
+              gh release create "$TAG" --draft --verify-tag --title "$TAG" \
+                --notes "Draft created by the release workflow with the API contract attached. Write the notes, then publish."
+            fi
+          fi
+          gh release upload "$TAG" --clobber contract-assets/openapi.json contract-assets/input-schema.json \
+            contract-assets/contract-sha256.txt contract-assets/compatibility-report.md
