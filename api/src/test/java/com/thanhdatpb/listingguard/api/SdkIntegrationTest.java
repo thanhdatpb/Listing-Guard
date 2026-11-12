@@ -52,9 +52,15 @@ import org.springframework.context.annotation.Import;
  * The Java client SDK against the real API on a random port (ADR-023): PostgreSQL in Testcontainers and the test clients of
  * {@link TestcontainersConfig}, a default deployment (no trademark catalog, plans and fixes off). Every typed method, a 304, the
  * problem types of a bad request, an unknown marketplace and a bad key, and that the answers carry no member the SDK does not
- * map.
+ * map. {@code GET /api/v1/usage} is declared deprecated in this context (ADR-022, section 6), so the SDK's listener is checked
+ * against the real {@code X-Listing-Guard-Version}, {@code Deprecation}, {@code Sunset} and {@code Link} headers.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "listing-guard.api.deprecation.endpoints[0].method=GET",
+        "listing-guard.api.deprecation.endpoints[0].path=/api/v1/usage",
+        "listing-guard.api.deprecation.endpoints[0].deprecated-at=2027-01-01",
+        "listing-guard.api.deprecation.endpoints[0].sunset-at=2027-07-01T00:00:00Z",
+        "listing-guard.api.deprecation.endpoints[0].link=https://example.test/migrate"})
 @Import(TestcontainersConfig.class)
 class SdkIntegrationTest {
 
@@ -102,6 +108,40 @@ class SdkIntegrationTest {
         Set<String> members = new HashSet<>();
         body.fieldNames().forEachRemaining(members::add);
         assertThat(names(record)).as(record.getSimpleName()).containsAll(members);
+    }
+
+    @Test
+    void theContractHeadersOfAdr022ReachTheListenerAsTheServerSendsThem() {
+        List<com.thanhdatpb.listingguard.client.ServerVersionNotice> versions = new CopyOnWriteArrayList<>();
+        List<com.thanhdatpb.listingguard.client.DeprecationNotice> deprecations = new CopyOnWriteArrayList<>();
+        try (ListingGuardClient client = ListingGuardClient.builder().baseUrl("http://127.0.0.1:" + port)
+                .apiKey(ApiTestKeys.KEY_1).listener(new ListingGuardListener() {
+                    @Override
+                    public void onServerVersion(com.thanhdatpb.listingguard.client.ServerVersionNotice notice) {
+                        versions.add(notice);
+                    }
+
+                    @Override
+                    public void onDeprecation(com.thanhdatpb.listingguard.client.DeprecationNotice notice) {
+                        deprecations.add(notice);
+                    }
+                }).build()) {
+            client.capabilities();
+            client.usage();
+            client.usage();
+
+            assertThat(versions).as("once per value").singleElement().satisfies(v -> {
+                assertThat(v.serverVersion()).as("a test build has no release version").isEqualTo("dev");
+                assertThat(v.operation()).isEqualTo(Operation.CAPABILITIES);
+            });
+            assertThat(deprecations).as("only the deprecated operation, once").singleElement().satisfies(d -> {
+                assertThat(d.operation()).isEqualTo(Operation.USAGE);
+                assertThat(d.deprecatedAt()).contains(java.time.Instant.parse("2027-01-01T00:00:00Z"));
+                assertThat(d.sunsetAt()).contains(java.time.Instant.parse("2027-07-01T00:00:00Z"));
+                assertThat(d.link()).contains("<https://example.test/migrate>").contains("rel=\"deprecation\"");
+                assertThat(d.requestId()).isNotBlank();
+            });
+        }
     }
 
     @Test

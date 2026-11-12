@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.client;
 import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.annotation.JsonEnumDefaultValue;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,6 +20,7 @@ import com.thanhdatpb.listingguard.client.model.PersonalizationScreeningRequest;
 import com.thanhdatpb.listingguard.client.model.PersonalizationScreeningResult;
 import com.thanhdatpb.listingguard.client.model.PersonalizationTrademark;
 import com.thanhdatpb.listingguard.client.model.PersonalizationTrademarkFinding;
+import com.thanhdatpb.listingguard.client.model.PersonalizationValue;
 import com.thanhdatpb.listingguard.client.model.PlansCapability;
 import com.thanhdatpb.listingguard.client.model.Readiness;
 import com.thanhdatpb.listingguard.client.model.RiskAdjustment;
@@ -32,6 +34,8 @@ import com.thanhdatpb.listingguard.client.model.TrademarkCheckResult;
 import com.thanhdatpb.listingguard.client.model.Usage;
 import com.thanhdatpb.listingguard.client.model.VariationCheckRequest;
 import com.thanhdatpb.listingguard.client.model.VariationCheckResult;
+import com.thanhdatpb.listingguard.client.model.VariationChild;
+import com.thanhdatpb.listingguard.client.model.VariationParent;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
@@ -51,6 +55,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -59,31 +64,42 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * The SDK's records against {@code docs/api/openapi.json} (ADR-023): the same member names, a compatible Java type, a boxed
- * type for a nullable member, enum constants equal to the schema's values plus {@code UNRECOGNIZED}; every schema reachable
- * from the seven operations is mapped; every example of those operations is read without an unrecognized value, and every
- * documented problem becomes the exception of its code.
+ * The SDK's records against the contract documents of ADR-022, as they are now (ADR-023). It is the client side of the contract:
+ * {@code contract-tools} holds the documents compatible with the latest release (the server side), and this test holds the SDK
+ * to the documents, so the two checks do not overlap.
+ *
+ * <ul>
+ *   <li>Responses follow {@code docs/api/openapi.json}: the same member names, a compatible Java type, a boxed type for a nullable
+ *       member, enum constants equal to the schema's values plus {@code UNRECOGNIZED}; every schema reachable from the seven
+ *       operations' {@code 200} answers is mapped; every example of those answers is read without an unrecognized value; every
+ *       documented problem becomes the exception of its code.</li>
+ *   <li>Requests follow {@code docs/api/input-schema.json}, the machine-readable request formats of ADR-022 (the OpenAPI document
+ *       types four request members that are JSON values as strings, see the README Roadmap): the same member names and
+ *       compatible types, every definition reachable from the four request bodies is mapped, and each operation's OpenAPI request
+ *       body names the same definition.</li>
+ * </ul>
+ *
+ * <p>It is strict on purpose: a new response member or enum value is additive for an API client (ADR-022) but fails here until
+ * the SDK maps it, so the official SDK follows the API in the same pull request. A breaking change is stopped first by
+ * {@code contract-tools}.
  */
-class OpenApiContractTest {
+class ContractConformanceTest {
 
     private static final Path OPENAPI = Path.of("../docs/api/openapi.json");
+    private static final Path INPUT_SCHEMA = Path.of("../docs/api/input-schema.json");
 
-    /** Each SDK record and the schema it follows. */
-    static final Map<Class<?>, String> SCHEMAS = Map.ofEntries(
-            entry(CheckRequest.class, "CheckRequest"),
+    /** Each SDK response record and the OpenAPI schema it follows. */
+    static final Map<Class<?>, String> RESPONSES = Map.ofEntries(
             entry(CheckResult.class, "CheckResult"),
             entry(Finding.class, "FindingView"),
             entry(Fix.class, "FixView"),
             entry(Readiness.class, "ReadinessView"),
             entry(Summary.class, "Summary"),
-            entry(TrademarkCheckRequest.class, "TrademarkCheckRequest"),
             entry(TrademarkCheckResult.class, "TrademarkCheckResult"),
             entry(TrademarkCheckFinding.class, "TrademarkCheckFindingView"),
             entry(RiskAdjustment.class, "RiskAdjustmentView"),
             entry(SourceLink.class, "SourceLinkView"),
-            entry(VariationCheckRequest.class, "VariationCheckRequest"),
             entry(VariationCheckResult.class, "VariationCheckResult"),
-            entry(PersonalizationScreeningRequest.class, "PersonalizationScreeningRequest"),
             entry(PersonalizationScreeningResult.class, "PersonalizationScreeningResult"),
             entry(CharacterFinding.class, "CharacterFindingView"),
             entry(PersonalizationTrademark.class, "TrademarkView"),
@@ -97,113 +113,73 @@ class OpenApiContractTest {
             entry(FixesCapability.class, "FixesCapability"),
             entry(Usage.class, "Usage"));
 
-    /**
-     * Request members that are JSON values (an object or an array) but that the document types as {@code string}: springdoc
-     * writes a {@code JsonNode} member with a {@code type = "string"} hint that way. The SDK follows docs/input-schema.md for
-     * them (typed records and lists). A known difference of the document, not of the API.
-     */
-    static final Set<String> DOCUMENT_TYPES_A_JSON_VALUE_AS_STRING = Set.of(
-            "VariationCheckRequest.parent",
-            "VariationCheckRequest.children",
-            "VariationCheckRequest.variation_properties",
-            "PersonalizationScreeningRequest.values");
+    /** Each SDK request record and the input-schema definition it follows. */
+    static final Map<Class<?>, String> REQUESTS = Map.ofEntries(
+            entry(CheckRequest.class, "CheckRequest"),
+            entry(TrademarkCheckRequest.class, "TrademarkCheckRequest"),
+            entry(VariationCheckRequest.class, "VariationCheckRequest"),
+            entry(VariationParent.class, "VariationParent"),
+            entry(VariationChild.class, "VariationChild"),
+            entry(PersonalizationScreeningRequest.class, "PersonalizationScreeningRequest"),
+            entry(PersonalizationValue.class, "PersonalizationValue"));
 
-    /** The schema of a free JSON value: the SDK takes any object for it. */
-    private static final String FREE_JSON = "JsonNode";
+    /** The request record each POST operation sends. */
+    static final Map<Operation, Class<?>> REQUEST_OF = Map.of(
+            Operation.CHECKS, CheckRequest.class,
+            Operation.TRADEMARK_CHECKS, TrademarkCheckRequest.class,
+            Operation.VARIATION_CHECKS, VariationCheckRequest.class,
+            Operation.PERSONALIZATION_SCREENINGS, PersonalizationScreeningRequest.class);
 
     private static JsonNode doc;
     private static JsonNode schemas;
+    private static JsonNode defs;
 
     @BeforeAll
-    static void readDocument() throws Exception {
-        doc = new ObjectMapper().readTree(Files.readString(OPENAPI));
+    static void readDocuments() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        doc = mapper.readTree(Files.readString(OPENAPI));
         schemas = doc.at("/components/schemas");
+        defs = mapper.readTree(Files.readString(INPUT_SCHEMA)).path("$defs");
     }
 
-    // ---- members and types --------------------------------------------------------------------------------------------
+    // ---- responses: openapi.json ------------------------------------------------------------------------------------
 
     @Test
-    void everyRecordHasExactlyTheMembersOfItsSchema() {
-        for (Map.Entry<Class<?>, String> e : SCHEMAS.entrySet()) {
+    void everyResponseRecordHasExactlyTheMembersOfItsSchema() {
+        for (Map.Entry<Class<?>, String> e : RESPONSES.entrySet()) {
             JsonNode schema = schemas.get(e.getValue());
             assertThat(schema).as("schema %s", e.getValue()).isNotNull();
-            Set<String> documented = new TreeSet<>();
-            schema.path("properties").fieldNames().forEachRemaining(documented::add);
             assertThat(new TreeSet<>(jsonNames(e.getKey()).keySet())).as("%s vs %s", e.getKey().getSimpleName(), e.getValue())
-                    .isEqualTo(documented);
+                    .isEqualTo(names(schema));
         }
     }
 
     @Test
-    void everyMemberHasACompatibleTypeAndEveryNullableOneIsBoxed() {
+    void everyResponseMemberHasACompatibleTypeAndEveryNullableOneIsBoxed() {
         List<String> problems = new ArrayList<>();
-        for (Map.Entry<Class<?>, String> e : SCHEMAS.entrySet()) {
+        for (Map.Entry<Class<?>, String> e : RESPONSES.entrySet()) {
             JsonNode properties = schemas.get(e.getValue()).path("properties");
-            for (Map.Entry<String, RecordComponent> member : jsonNames(e.getKey()).entrySet()) {
-                String where = e.getValue() + "." + member.getKey();
-                JsonNode property = properties.get(member.getKey());
-                if (property == null || DOCUMENT_TYPES_A_JSON_VALUE_AS_STRING.contains(where)) {
-                    continue;
+            jsonNames(e.getKey()).forEach((name, component) -> {
+                JsonNode property = properties.get(name);
+                if (property != null) {
+                    checkResponse(e.getValue() + "." + name, property, component.getGenericType(), problems);
                 }
-                check(where, property, member.getValue().getGenericType(), problems);
-            }
+            });
         }
         assertThat(problems).isEmpty();
     }
 
     @Test
-    void theKnownDifferencesOfTheDocumentAreStillThere() {
-        // When the document is fixed, this fails: remove the entry and let the type check cover the member.
-        for (String where : DOCUMENT_TYPES_A_JSON_VALUE_AS_STRING) {
-            String[] parts = where.split("\\.");
-            JsonNode property = schemas.get(parts[0]).path("properties").get(parts[1]);
-            assertThat(types(property)).as(where).contains("string");
-        }
-    }
-
-    @Test
-    void everySchemaReachableFromTheSevenOperationsIsMapped() {
-        Set<String> mapped = new HashSet<>(SCHEMAS.values());
+    void everySchemaReachableFromTheSevenAnswersIsMapped() {
         Set<String> reachable = new LinkedHashSet<>();
         for (Operation operation : Operation.values()) {
-            JsonNode op = operation(operation);
             Deque<JsonNode> todo = new ArrayDeque<>();
-            todo.add(op.at("/requestBody/content/application~1json/schema"));
-            todo.add(op.at("/responses/200/content/application~1json/schema"));
-            while (!todo.isEmpty()) {
-                JsonNode node = todo.poll();
-                if (node == null || node.isMissingNode()) {
-                    continue;
-                }
-                if (node.has("$ref")) {
-                    String name = node.get("$ref").asText().replace("#/components/schemas/", "");
-                    if (reachable.add(name)) {
-                        todo.add(schemas.get(name));
-                    }
-                    continue;
-                }
-                node.path("properties").forEach(todo::add);
-                todo.add(node.path("items"));
-                node.path("anyOf").forEach(todo::add);
-                node.path("oneOf").forEach(todo::add);
-                if (node.path("additionalProperties").isObject()) {
-                    todo.add(node.get("additionalProperties"));
-                }
-            }
+            todo.add(operation(operation).at("/responses/200/content/application~1json/schema"));
+            walk(todo, reachable, "#/components/schemas/", schemas);
         }
-        reachable.remove(FREE_JSON);
-        assertThat(reachable).as("schemas the seven operations use").isNotEmpty();
-        assertThat(mapped).containsAll(reachable);
+        assertThat(reachable).as("schemas the seven answers use").isNotEmpty();
+        assertThat(new HashSet<>(RESPONSES.values())).containsAll(reachable);
     }
-
-    @Test
-    void theOperationsOfTheSdkAreTheDocumentedOnes() {
-        for (Operation operation : Operation.values()) {
-            assertThat(operation(operation).isMissingNode()).as(operation.toString()).isFalse();
-        }
-    }
-
-    // ---- examples -----------------------------------------------------------------------------------------------------
 
     @Test
     void everySuccessExampleOfTheSevenOperationsIsReadWithoutAnUnrecognizedValue() throws Exception {
@@ -211,13 +187,12 @@ class OpenApiContractTest {
         int read = 0;
         for (Operation operation : Operation.values()) {
             JsonNode content = operation(operation).at("/responses/200/content/application~1json");
-            Class<?> type = SCHEMAS.entrySet().stream()
+            Class<?> type = RESPONSES.entrySet().stream()
                     .filter(e -> content.at("/schema/$ref").asText().endsWith("/" + e.getValue()))
                     .map(Map.Entry::getKey).findFirst().orElseThrow();
             for (JsonNode example : examples(content)) {
-                Object value = sdk.treeToValue(example, type);
                 List<String> unrecognized = new ArrayList<>();
-                findUnrecognized(operation + "", value, unrecognized);
+                findUnrecognized(operation.toString(), sdk.treeToValue(example, type), unrecognized);
                 assertThat(unrecognized).as("%s example", operation).isEmpty();
                 read++;
             }
@@ -231,8 +206,7 @@ class OpenApiContractTest {
         int read = 0;
         for (Operation operation : Operation.values()) {
             for (Map.Entry<String, JsonNode> response : operation(operation).path("responses").properties()) {
-                JsonNode content = response.getValue().at("/content/application~1problem+json");
-                for (JsonNode example : examples(content)) {
+                for (JsonNode example : examples(response.getValue().at("/content/application~1problem+json"))) {
                     RawResponse raw = new RawResponse(Integer.parseInt(response.getKey()), sdk.writeValueAsString(example),
                             HttpHeaders.of(Map.of(), (a, b) -> true));
                     ListingGuardApiException e = Problems.exception(sdk, raw, Instant.now());
@@ -245,6 +219,64 @@ class OpenApiContractTest {
             }
         }
         assertThat(read).as("problem examples read").isGreaterThan(10);
+    }
+
+    // ---- requests: input-schema.json --------------------------------------------------------------------------------
+
+    @Test
+    void everyRequestRecordHasExactlyTheMembersOfItsDefinition() {
+        for (Map.Entry<Class<?>, String> e : REQUESTS.entrySet()) {
+            JsonNode definition = defs.get(e.getValue());
+            assertThat(definition).as("definition %s", e.getValue()).isNotNull();
+            assertThat(new TreeSet<>(jsonNames(e.getKey()).keySet())).as("%s vs %s", e.getKey().getSimpleName(), e.getValue())
+                    .isEqualTo(names(definition));
+        }
+    }
+
+    @Test
+    void everyRequestMemberHasACompatibleType() {
+        List<String> problems = new ArrayList<>();
+        for (Map.Entry<Class<?>, String> e : REQUESTS.entrySet()) {
+            JsonNode properties = defs.get(e.getValue()).path("properties");
+            jsonNames(e.getKey()).forEach((name, component) ->
+                    checkRequest(e.getValue() + "." + name, properties.get(name), component.getGenericType(), problems));
+        }
+        assertThat(problems).isEmpty();
+    }
+
+    @Test
+    void everyDefinitionReachableFromTheFourRequestBodiesIsMapped() {
+        Set<String> reachable = new LinkedHashSet<>();
+        Deque<JsonNode> todo = new ArrayDeque<>();
+        for (Class<?> request : REQUEST_OF.values()) {
+            todo.add(defs.get(REQUESTS.get(request)));
+        }
+        walk(todo, reachable, "#/$defs/", defs);
+        reachable.removeIf(name -> !defs.get(name).path("type").asText().equals("object"));
+        assertThat(new HashSet<>(REQUESTS.values())).containsAll(reachable);
+    }
+
+    @Test
+    void eachPostOperationNamesTheSameRequestInBothDocuments() {
+        REQUEST_OF.forEach((operation, record) -> assertThat(
+                operation(operation).at("/requestBody/content/application~1json/schema/$ref").asText())
+                .as(operation.toString()).isEqualTo("#/components/schemas/" + REQUESTS.get(record)));
+    }
+
+    @Test
+    void theRequiredMembersOfARequestAreMembersOfTheRecord() {
+        for (Map.Entry<Class<?>, String> e : REQUESTS.entrySet()) {
+            Set<String> required = new TreeSet<>();
+            defs.get(e.getValue()).path("required").forEach(r -> required.add(r.asText()));
+            assertThat(jsonNames(e.getKey()).keySet()).as(e.getValue()).containsAll(required);
+        }
+    }
+
+    @Test
+    void theOperationsOfTheSdkAreTheDocumentedOnes() {
+        for (Operation operation : Operation.values()) {
+            assertThat(operation(operation).isMissingNode()).as(operation.toString()).isFalse();
+        }
     }
 
     // ---- helpers ------------------------------------------------------------------------------------------------------
@@ -261,7 +293,38 @@ class OpenApiContractTest {
     }
 
     private static JsonNode operation(Operation operation) {
-        return doc.path("paths").path(operation.path()).path(operation.method().toLowerCase(java.util.Locale.ROOT));
+        return doc.path("paths").path(operation.path()).path(operation.method().toLowerCase(Locale.ROOT));
+    }
+
+    private static Set<String> names(JsonNode schema) {
+        Set<String> out = new TreeSet<>();
+        schema.path("properties").fieldNames().forEachRemaining(out::add);
+        return out;
+    }
+
+    /** Follows $ref, properties, items, anyOf, oneOf and additionalProperties; not allOf/if/then (a listing format choice). */
+    private static void walk(Deque<JsonNode> todo, Set<String> reachable, String prefix, JsonNode named) {
+        while (!todo.isEmpty()) {
+            JsonNode node = todo.poll();
+            if (node == null || node.isMissingNode()) {
+                continue;
+            }
+            if (node.has("$ref")) {
+                String name = node.get("$ref").asText().replace(prefix, "");
+                if (reachable.add(name)) {
+                    todo.add(named.get(name));
+                }
+                continue;
+            }
+            node.path("properties").forEach(todo::add);
+            todo.add(node.path("items"));
+            node.path("anyOf").forEach(todo::add);
+            node.path("oneOf").forEach(todo::add);
+            if (node.path("additionalProperties").isObject()) {
+                todo.add(node.get("additionalProperties"));
+            }
+        }
+        reachable.remove("JsonNode");
     }
 
     private static List<JsonNode> examples(JsonNode content) {
@@ -310,14 +373,12 @@ class OpenApiContractTest {
         return out;
     }
 
-    private static void check(String where, JsonNode property, Type javaType, List<String> problems) {
+    private static void checkResponse(String where, JsonNode property, Type javaType, List<String> problems) {
         Set<String> types = types(property);
-        boolean nullable = types.contains("null");
         Class<?> raw = rawClass(javaType);
-        if (nullable && raw.isPrimitive()) {
+        if (types.contains("null") && raw.isPrimitive()) {
             problems.add(where + ": nullable in the document but primitive " + raw.getSimpleName() + " in the SDK");
         }
-
         JsonNode ref = property.has("$ref") ? property : null;
         for (JsonNode alt : property.path("anyOf")) {
             if (alt.has("$ref")) {
@@ -326,19 +387,12 @@ class OpenApiContractTest {
         }
         if (ref != null) {
             String name = ref.get("$ref").asText().replace("#/components/schemas/", "");
-            if (FREE_JSON.equals(name)) {
-                if (raw != Object.class) {
-                    problems.add(where + ": a free JSON value must be Object, is " + raw.getSimpleName());
-                }
-                return;
-            }
-            if (!name.equals(SCHEMAS.get(raw))) {
+            if (!name.equals(RESPONSES.get(raw))) {
                 problems.add(where + ": refers to " + name + " but the SDK type " + raw.getSimpleName() + " follows "
-                        + SCHEMAS.get(raw));
+                        + RESPONSES.get(raw));
             }
             return;
         }
-
         String format = property.path("format").asText("");
         if (types.contains("string")) {
             if (property.has("enum")) {
@@ -363,19 +417,55 @@ class OpenApiContractTest {
         } else if (types.contains("boolean")) {
             expect(where, raw, problems, boolean.class, Boolean.class);
         } else if (types.contains("array")) {
-            if (!List.class.equals(raw)) {
-                problems.add(where + ": an array must be a List, is " + raw.getSimpleName());
-                return;
+            if (expect(where, raw, problems, List.class)) {
+                checkResponse(where + "[]", property.get("items"), typeArgument(javaType, 0), problems);
             }
-            check(where + "[]", property.get("items"), typeArgument(javaType, 0), problems);
         } else if (types.contains("object") && property.path("additionalProperties").isObject()) {
-            if (!Map.class.equals(raw)) {
-                problems.add(where + ": a map must be a Map, is " + raw.getSimpleName());
-                return;
+            if (expect(where, raw, problems, Map.class)) {
+                checkResponse(where + "{}", property.get("additionalProperties"), typeArgument(javaType, 1), problems);
             }
-            check(where + "{}", property.get("additionalProperties"), typeArgument(javaType, 1), problems);
         } else {
             problems.add(where + ": a document type the test does not know: " + types);
+        }
+    }
+
+    /** A request member the SDK writes: its Java type must produce a value the definition accepts. */
+    private static void checkRequest(String where, JsonNode property, Type javaType, List<String> problems) {
+        Class<?> raw = rawClass(javaType);
+        if (property.has("$ref")) {
+            String name = property.get("$ref").asText().replace("#/$defs/", "");
+            JsonNode definition = defs.get(name);
+            if (definition.path("type").asText().equals("object")) {
+                if (!name.equals(REQUESTS.get(raw))) {
+                    problems.add(where + ": refers to " + name + " but the SDK type " + raw.getSimpleName() + " follows "
+                            + REQUESTS.get(raw));
+                }
+                return;
+            }
+            checkRequest(where, definition, javaType, problems);
+            return;
+        }
+        Set<String> types = types(property);
+        if (types.contains("object") && !property.has("properties") && !property.path("additionalProperties").isObject()) {
+            expect(where, raw, problems, Object.class); // a listing: any object Jackson writes as JSON
+        } else if (types.contains("object")) {
+            if (expect(where, raw, problems, Map.class)) {
+                checkRequest(where + "{}", property.get("additionalProperties"), typeArgument(javaType, 1), problems);
+            }
+        } else if (types.contains("array")) {
+            if (expect(where, raw, problems, List.class)) {
+                checkRequest(where + "[]", property.get("items"), typeArgument(javaType, 0), problems);
+            }
+        } else if (types.contains("string")) {
+            expect(where, raw, problems, String.class);
+        } else if (types.contains("integer")) {
+            expect(where, raw, problems, Integer.class, Long.class);
+        } else if (types.contains("number")) {
+            expect(where, raw, problems, Double.class, BigDecimal.class);
+        } else if (types.contains("boolean")) {
+            expect(where, raw, problems, Boolean.class);
+        } else {
+            problems.add(where + ": a definition type the test does not know: " + types);
         }
     }
 
@@ -396,7 +486,7 @@ class OpenApiContractTest {
         }
         try {
             Field unrecognized = raw.getField("UNRECOGNIZED");
-            if (unrecognized.getAnnotation(com.fasterxml.jackson.annotation.JsonEnumDefaultValue.class) == null) {
+            if (unrecognized.getAnnotation(JsonEnumDefaultValue.class) == null) {
                 problems.add(where + ": UNRECOGNIZED of " + raw.getSimpleName() + " is not the default value");
             }
         } catch (NoSuchFieldException e) {
@@ -404,11 +494,13 @@ class OpenApiContractTest {
         }
     }
 
-    private static void expect(String where, Class<?> raw, List<String> problems, Class<?>... allowed) {
+    private static boolean expect(String where, Class<?> raw, List<String> problems, Class<?>... allowed) {
         if (!Arrays.asList(allowed).contains(raw)) {
             problems.add(where + ": expected one of " + Arrays.stream(allowed).map(Class::getSimpleName).toList() + ", is "
                     + raw.getSimpleName());
+            return false;
         }
+        return true;
     }
 
     private static Class<?> rawClass(Type type) {

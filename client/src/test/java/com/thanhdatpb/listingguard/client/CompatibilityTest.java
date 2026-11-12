@@ -89,6 +89,8 @@ class CompatibilityTest {
                 assertThat(d.deprecation()).isEqualTo("@1798761600");
                 assertThat(d.sunset()).isEqualTo("Fri, 01 Jan 2027 00:00:00 GMT");
                 assertThat(d.link()).contains("rel=\"deprecation\"");
+                assertThat(d.deprecatedAt()).contains(java.time.Instant.ofEpochSecond(1798761600L));
+                assertThat(d.sunsetAt()).contains(java.time.Instant.parse("2027-01-01T00:00:00Z"));
                 assertThat(d.requestId()).isNotNull();
             });
         }
