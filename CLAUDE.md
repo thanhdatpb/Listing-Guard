@@ -50,7 +50,20 @@ It never edits a listing, never publishes, and does no SEO.
   Nice classes 9, 14, 16, 18, 20, 21, 24, 25, 26, 28, the live status codes and text marks. A file that cannot be read or a
   record with no serial number or `transaction-date` is reported with its file and place; without `--strict` the run ends
   `INCOMPLETE`, with it the first problem stops it. **The converter is unverified against real data**: it follows the public
-  DTD and documentation named in ADR-009 and has never read a real file. The next step is A4 (evaluation). **Product classes, source links and generic words
+  DTD and documentation named in ADR-009 and has never read a real file. **USPTO sync (A2d, done)**: V31
+  `trademark_catalog_activation` (append-only log; `CatalogActivations`) and V32 `uspto_sync_run` + `uspto_sync_file`; with
+  `listing-guard.trademark.activation.follow=true` (never together with `catalog-version`, which stops the start-up)
+  `TrademarkCatalogRuntime` serves the latest activation, re-read every minute by the API (`TrademarkActivationRefreshSchedule`)
+  and swapped in one step; a DEMO catalog is never activated or served this way. Admin `catalog list|activate|rollback`
+  (`CatalogAdminCommands`). The `uspto-sync` job (`api/.../trademark/sync/`, profile and compose service, own profile in prod)
+  registers zips from `--input-dir` (`--backfile` for the annual set) or downloads them from the ODP when
+  `listing-guard.trademark.uspto.sync.download.enabled` (off by default; **every ODP endpoint, field and file name is
+  unverified**, all are settings), reads each XML entry inside the zip (`UsptoArchive`, trademark-scanner: nothing extracted,
+  unsafe names, size, ratio and CRC refused), converts the newest complete backfile set plus every later daily file strictly,
+  imports the catalog its own manifest names (`catalogs/raw/uspto-sync/catalog/<label>/`), activates it (not with
+  `--no-activate`, not after a rollback, not when below `min-loaded-ratio` of the served one) and prunes its versions beyond
+  `keep-versions`. Oracle: `deploy/oracle/uspto-sync.sh` (flock, disk check), cron line commented. The next step is A4
+  (evaluation). **Product classes, source links and generic words
   (A5, done)**: the API serves ruleset `trademark-risk-2026-11b` (`2026-11` is kept unchanged, a test pins its hash), which
   adds three optional sections, all `unverified`: `product_classes` (the request may carry a top-level `product_type`, a key
   of `types`; a mark with Nice classes, none the product type's, drops `out_of_class_downgrade_levels`, a mark with none is not
@@ -537,6 +550,15 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
   with the default `none`, `admin` does not (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
+- **USPTO sync** (ADR-009 "Scheduled USPTO sync"): the served catalog changes only by an explicit row of
+  `trademark_catalog_activation` (the sync after a successful import from a `COMPLETE` strict conversion, or the admin job),
+  never by "latest import"; the log is append-only. The advisory-lock pair `(1279743315, 1398361667)` is reserved for the sync
+  and the admin catalog commands. The ODP key comes only from `LISTING_GUARD_USPTO_ODP_API_KEY`, goes only in its header to the
+  `base-url` host, and never into a log, a message, the database or `toString`; redirects are followed by hand to allowed
+  hosts only. Never mark an ODP endpoint, field or file name verified without reading the official page, and never fetch
+  around a block. A name from a listing becomes a path only when it is a plain file name matching the patterns. Archives are
+  never extracted to disk. Tests use `FakeOdpServer` (JDK `HttpServer` on the loopback address) and synthetic zips, never the
+  real ODP.
 - **Clients** (ADR-007): everything but `/health` needs `X-API-Key`, and every key belongs to one client. Clients
   and keys are rows (`client`, `api_key`, only the SHA-256 of a key is stored), managed by the `admin` job
   (`docker compose run --rm admin ...`) which audit-logs client, key id and time and never a secret. Everything a

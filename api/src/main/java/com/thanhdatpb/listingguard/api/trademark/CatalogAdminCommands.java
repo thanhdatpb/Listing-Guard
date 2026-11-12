@@ -67,10 +67,12 @@ public class CatalogAdminCommands {
             out.println("No catalog version is stored.");
         } else {
             out.println("Catalog versions, newest first (* = the version of the latest activation):");
-            out.println(String.format("  %-56s %10s  %-11s  %s", "VERSION", "ENTRIES", "SOURCE DATE", "IMPORTED"));
+            out.println(String.format("  %-56s %10s  %-11s  %-6s  %s", "VERSION", "ENTRIES", "SOURCE DATE", "MADE BY",
+                    "IMPORTED"));
             for (CatalogVersion version : versions) {
-                out.println(String.format("%s %-56s %10d  %-11s  %s", served != null && served == version.id() ? "*" : " ",
-                        version.version(), version.entries(), version.sourceDate(), version.importedAt()));
+                out.println(String.format("%s %-56s %10d  %-11s  %-7s  %s", served != null && served == version.id() ? "*"
+                        : " ", version.version(), version.entries(), version.sourceDate(),
+                        version.madeBySync() ? "sync" : "import", version.importedAt()));
             }
         }
         List<Activation> history = activations.history(HISTORY);

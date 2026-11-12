@@ -375,3 +375,103 @@ switching the Cloudflare Tunnel connector/origin. If the replacement is ARM64 or
 image manifest selects the matching image. Keep the existing hostname and Access policy where possible; rotate
 database, API and tunnel credentials if the old VM may be compromised. Do not depend on the old boot volume for
 catalogs, reports, environment secrets or backups.
+
+## 8. Keep a USPTO trademark catalog up to date (`uspto-sync`)
+
+The `uspto-sync` job (ADR-009, "Scheduled USPTO sync") turns USPTO bulk files into a catalog version, activates it after
+the import succeeded, keeps the newest versions for a rollback and never puts data in the repository. It runs in its own
+container and profile, never inside the API. **Read the status first:** the converter is unverified against real USPTO
+files, and the download from the USPTO Open Data Portal (ODP) is off by default and unverified end to end, because no ODP
+page could be read and there is no API key yet. Until then, use the offline mode: you download the files yourself and the
+job reads them from a folder.
+
+**What you need in `.env`** (see `deploy/env.prod.example`):
+
+```dotenv
+USPTO_SYNC_LICENSE=USPTO bulk data, public domain (checked by <who> on <date>)   # required; stored with every version
+TRADEMARK_FOLLOW_ACTIVATION=true      # the api serves the activated version ...
+TRADEMARK_CATALOG_VERSION=            # ... so this must be empty, or the api does not start
+# optional: USPTO_SYNC_KEEP_VERSIONS=3, USPTO_SYNC_MEM_LIMIT=3g, USPTO_MAX_DISTINCT_SERIALS=20000000,
+#           USPTO_SYNC_WARN_FREE_GB=30, USPTO_SYNC_MIN_FREE_GB=15
+# later, once the download is verified: LISTING_GUARD_USPTO_ODP_API_KEY=..., USPTO_SYNC_DOWNLOAD_ENABLED=true
+```
+
+Switch `TRADEMARK_FOLLOW_ACTIVATION` on only after the first catalog is activated, or trademark checks are `DISABLED`
+until then (a DEMO catalog cannot be served through the activation log; keep it on `TRADEMARK_CATALOG_VERSION` until the
+real one is ready). Recreate the api after changing either (`docker compose --profile prod up -d --no-deps api`). From
+then on the api reads the log every minute; a new activation or a rollback needs no restart.
+
+**First catalog: the backfile.** A daily file holds only the changes of one day, so the first catalog needs the annual
+applications set. Put its zips (believed to be named `apc18840407-YYYYMMDD-NN.zip`; unverified) in a folder of
+`catalogs/raw/`, owned by uid 10001, and run it without activating, so you can look at it first:
+
+```bash
+mkdir -p catalogs/raw/uspto-inbox/backfile catalogs/raw/uspto-inbox/daily   # copy the zips in with scp or rsync
+sudo chown -R 10001:10001 catalogs/raw
+./deploy/oracle/uspto-sync.sh --backfile --input-dir=uspto-inbox/backfile --dry-run      # what would be registered
+./deploy/oracle/uspto-sync.sh --backfile --input-dir=uspto-inbox/backfile --no-activate
+```
+
+If the names do not say the last day covered, add `--backfile-through=YYYY-MM-DD`. The job checks every archive (no entry
+that could leave a folder, size and compression limits, CRC-32), copies the files to `catalogs/raw/uspto-sync/files/`,
+converts them strictly and imports the catalog. Then check it and activate it:
+
+```bash
+cat catalogs/raw/uspto-sync/catalog/*/raw/*.report.json | head -60      # completeness, recordsRead, recordsWritten, files
+docker compose --profile prod --profile admin run --rm admin catalog list
+docker compose --profile prod --profile admin run --rm admin catalog activate <version>
+```
+
+After that the originals in `uspto-inbox/backfile/` can be deleted.
+
+**Daily files, offline.** Put the new `apcYYMMDD.zip` files (unverified name) in `catalogs/raw/uspto-inbox/daily/` and run
+`./deploy/oracle/uspto-sync.sh --input-dir=uspto-inbox/daily`. Files already stored are skipped; a file with a stored name
+and other content is refused. Each run converts the backfile plus every daily file after it and activates the result, unless
+a rollback is in force, the new version has fewer than 90 % of the served version's entries (it is then imported and the
+script exits non-zero), or you pass `--no-activate`. Give the daily files in order: offline, the job cannot know that a day is
+missing; it warns when two stored days are more than four days apart.
+
+**Check on the host:**
+
+```bash
+docker compose --profile prod --profile admin run --rm admin catalog list         # versions, the served one, activations
+ls -t logs/uspto-sync/ | head -3                                                   # one log per run
+docker compose --profile prod exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "SELECT id, started_at, mode, status, catalog_version, left(message, 120) FROM uspto_sync_run ORDER BY id DESC LIMIT 5"'
+docker compose --profile prod exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "SELECT kind, file_name, data_date, status, size_bytes, stored_at, left(error, 80) FROM uspto_sync_file ORDER BY data_date DESC LIMIT 10"'
+curl -s -H "X-API-Key: $LISTING_GUARD_API_KEY" http://127.0.0.1:<API_PORT>/api/v1/capabilities   # trademarkCatalog: READY, demo: false
+df -h / /opt/listing-guard; du -sh catalogs/raw/uspto-sync
+```
+
+**Rollback.** `admin catalog rollback` serves the version activated before the current one (`--to=<version>` names one);
+the api follows within a minute. While a rollback is in force the sync still imports new versions but does not activate them;
+`admin catalog activate <version>` ends that. The sync keeps `USPTO_SYNC_KEEP_VERSIONS` versions it made (at least 2), the
+served one and any version served in the last day; older ones are deleted with their folder under `catalog/`.
+
+**Disk and memory.** Nothing here is measured yet: the backfile, the conversion time on the A1 machine and the size of a
+catalog version are unknown. The archives stay compressed (nothing is extracted), but every retained version is a full copy
+of the entries in PostgreSQL and in every backup, R2 included; watch `df` and the dump size after the first import. The
+script refuses to start below `USPTO_SYNC_MIN_FREE_GB` (15) free on `catalogs/raw` or the Docker data root and warns below
+`USPTO_SYNC_WARN_FREE_GB` (30); the job itself stops before a copy, a download or a conversion that would leave less than
+5 GB. Backfile sets and daily files that a newer backfile replaced are listed at the end of a run and stay until you delete
+them. The conversion holds one number per serial number: raise `USPTO_SYNC_MEM_LIMIT` with `USPTO_MAX_DISTINCT_SERIALS` if
+the job stops on that limit.
+
+**The download, once you have an ODP key.** Follow "Verification steps when the key exists" in ADR-009. In short: open the
+ODP pages it lists, put the key in `.env`, write any difference of paths, parameters or field names into
+`catalogs/raw/uspto-sync.override.yml` (keys under `listing-guard.trademark.uspto.sync.download`), then list without
+downloading and fetch one file:
+
+```bash
+docker compose --profile prod --profile uspto-sync run --rm -e LISTING_GUARD_TRADEMARK_USPTO_SYNC_DOWNLOAD_ENABLED=true \
+  uspto-sync --dry-run
+docker compose --profile prod --profile uspto-sync run --rm -e LISTING_GUARD_TRADEMARK_USPTO_SYNC_DOWNLOAD_ENABLED=true \
+  uspto-sync --max-files=1 --no-activate
+```
+
+Only then set `USPTO_SYNC_DOWNLOAD_ENABLED=true` and enable the commented `uspto-sync.sh` line of
+`deploy/oracle/crontab.example` (daily at 11:00 UTC; the USPTO release time is unverified, adjust it). A run with nothing new
+ends `NO_CHANGE`; a failed file is tried again by the next run, and files already stored are never fetched again. A file that
+stays missing or broken blocks the activation; after checking it, leave it out on purpose with
+`--ignore-file=<name> --reason=<why>`. The key is sent only to the API host, never logged and never stored.

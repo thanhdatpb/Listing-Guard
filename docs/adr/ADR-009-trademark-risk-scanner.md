@@ -986,9 +986,13 @@ settings, so a wrong one is fixed in configuration, without a build:
 ### Storage
 
 - Files under `catalogs/raw/uspto-sync/` (`listing-guard.trademark.uspto.sync.dir`): `files/backfile/`, `files/daily/` (the
-  archives as stored), `catalog/raw/<label>-<digest>.jsonl` with its `.report.json` (the A2c report), and `catalog/manifest.yaml`,
-  written by the job with one `sources:` entry (`source_key: uspto`, so `sourceLinks` work) per retained catalog it made. The
-  import reads that manifest like the `trademark-import` job does, so a catalog can also be imported by hand from it.
+  archives as stored) and one folder per catalog the sync made, `catalog/<label>/`, with `manifest.yaml` (one `sources:` entry,
+  `source_key: uspto`, so `sourceLinks` work) and `raw/<label>.jsonl` with its `.report.json` (the A2c report). The label is
+  `uspto-<YYYYMMDD of the newest input>-<8 hex digits of the input digest>`. The import reads that manifest like the
+  `trademark-import` job does, so a catalog can also be imported by hand from its folder; the retention deletes the folder
+  with the version.
+- Corrections of the ODP settings go in `catalogs/raw/uspto-sync.override.yml`, which the compose service reads
+  (`SPRING_CONFIG_ADDITIONAL_LOCATION`), not in code.
 - Database: V31 and V32, plus the catalog versions themselves (each holds its entries and their trigram index). The size of a
   real catalog, of a backfile and of the database dumps it adds are **unmeasured**; each retained version is a full copy of the
   entries, so `keep-versions` multiplies the catalog's share of the database and of every backup (R2 included).
@@ -998,8 +1002,9 @@ settings, so a wrong one is fixed in configuration, without a build:
 ### Rollback
 
 `docker compose ... run --rm admin catalog list` shows every catalog version (served one marked, entries, import time, source date,
-whether the sync made it) and the latest activations. `catalog rollback` activates the version served before the current one
-(skipping versions that are gone), `catalog rollback --to=<version>` a named one, and `catalog activate <version>` any stored
+whether the sync made it) and the latest activations. `catalog rollback` activates the version that was activated (by the sync or by hand,
+not by a rollback) before the served one, in the order of the log and skipping versions that are gone, so a second rollback
+goes one step further back; `catalog rollback --to=<version>` activates a named one, and `catalog activate <version>` any stored
 version that is not DEMO and whose normalization identity is the active one. Each writes a row of the log; an API that follows the
 log serves it within the refresh interval, with no restart. A rollback does not delete anything and does not touch the files.
 With `follow=false` the log changes nothing and the commands say so.
@@ -1027,8 +1032,9 @@ With `follow=false` the log changes nothing and the commands say so.
    download redirects and to which host, the rate limits, the file names of both products, the release time and the terms.
 2. Put the key in `.env` as `LISTING_GUARD_USPTO_ODP_API_KEY` (never in a command line), and compare step 1 with the table of
    Decision 5. Write each difference into `catalogs/raw/uspto-sync.override.yml` (read by the compose service), not into code.
-3. `uspto-sync --dry-run` with `USPTO_SYNC_DOWNLOAD_ENABLED=true` for that one command: it must list the daily files of the period
-   and say which are missing. A wrong path or field gives a message that names the setting.
+3. `uspto-sync --dry-run` with the download switched on for that one command (`docker compose run -e
+   LISTING_GUARD_TRADEMARK_USPTO_SYNC_DOWNLOAD_ENABLED=true ...`): it must list the daily files of the period and say which are
+   missing. A wrong path or field gives a message that names the setting.
 4. Download one file: `--max-files=1`. Check the stored size and SHA-256 against the portal's figures.
 5. If the download stops on a redirect to a host that is not allowed, decide whether that host may be added to `allowed-hosts`.
 6. Run the backfile (`--backfile`, or offline with the files from the portal) with `--no-activate`, read the `.report.json`

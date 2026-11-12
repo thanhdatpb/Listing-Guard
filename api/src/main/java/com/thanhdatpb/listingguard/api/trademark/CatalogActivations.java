@@ -41,18 +41,24 @@ public class CatalogActivations {
                              String note, Instant activatedAt) {
     }
 
-    /** A stored catalog version. */
+    /**
+     * A stored catalog version.
+     *
+     * @param madeBySync true when a {@code uspto-sync} run made it (only those are deleted by the sync's retention)
+     */
     public record CatalogVersion(long id, String version, String label, LocalDate sourceDate, Instant importedAt,
-                                 int entries, NormalizationIdentity normalization) {
+                                 int entries, NormalizationIdentity normalization, boolean madeBySync) {
     }
 
     static final int MAX_NOTE_CHARS = 500;
 
     private static final Logger log = LoggerFactory.getLogger(CatalogActivations.class);
 
+    /** The columns of a version, read through the alias {@code v}; whether a uspto-sync run made it (V32). */
     private static final String VERSION_COLUMNS = """
-            id, version, label, source_date, imported_at, records_loaded, pack_id, normalization_version,
-            normalization_hash""";
+            v.id, v.version, v.label, v.source_date, v.imported_at, v.records_loaded, v.pack_id, v.normalization_version,
+            v.normalization_hash,
+            EXISTS (SELECT 1 FROM uspto_sync_run r WHERE r.catalog_version_id = v.id) AS made_by_sync""";
 
     private static final RowMapper<Activation> ACTIVATION = (rs, i) -> new Activation(rs.getLong("id"),
             nullableLong(rs, "catalog_version_id"), rs.getString("catalog_version"), Reason.valueOf(rs.getString("reason")),
@@ -62,7 +68,7 @@ public class CatalogActivations {
             rs.getString("version"), rs.getString("label"), rs.getDate("source_date").toLocalDate(),
             rs.getTimestamp("imported_at").toInstant(), rs.getInt("records_loaded"),
             new NormalizationIdentity(rs.getString("pack_id"), rs.getString("normalization_version"),
-                    rs.getString("normalization_hash").trim()));
+                    rs.getString("normalization_hash").trim()), rs.getBoolean("made_by_sync"));
 
     private final JdbcTemplate jdbc;
     private final TrademarkRulesets rulesets;
@@ -90,16 +96,16 @@ public class CatalogActivations {
 
     /** Every stored catalog version, newest first. */
     public List<CatalogVersion> catalogs() {
-        return jdbc.query("SELECT " + VERSION_COLUMNS + " FROM trademark_catalog_version ORDER BY id DESC", VERSION);
+        return jdbc.query("SELECT " + VERSION_COLUMNS + " FROM trademark_catalog_version v ORDER BY v.id DESC", VERSION);
     }
 
     public Optional<CatalogVersion> find(String version) {
-        return jdbc.query("SELECT " + VERSION_COLUMNS + " FROM trademark_catalog_version WHERE version = ?", VERSION,
+        return jdbc.query("SELECT " + VERSION_COLUMNS + " FROM trademark_catalog_version v WHERE v.version = ?", VERSION,
                 version).stream().findFirst();
     }
 
     public Optional<CatalogVersion> find(long id) {
-        return jdbc.query("SELECT " + VERSION_COLUMNS + " FROM trademark_catalog_version WHERE id = ?", VERSION, id)
+        return jdbc.query("SELECT " + VERSION_COLUMNS + " FROM trademark_catalog_version v WHERE v.id = ?", VERSION, id)
                 .stream().findFirst();
     }
 
@@ -159,8 +165,10 @@ public class CatalogActivations {
     }
 
     /**
-     * Activates the newest version older than the served one that was served before and can still be served, or the named
-     * one, as a {@link Reason#ROLLBACK}.
+     * Activates, as a {@link Reason#ROLLBACK}, the named version, or else the version that was activated (by the sync or by
+     * hand, not by a rollback) before the served one was, skipping versions that are gone or cannot be served. The order is
+     * the order of the log, not of the catalog ids (a version a sync reused keeps its older id). So a second rollback goes
+     * one step further back, and never forward to the version the first one left.
      *
      * @param toVersion the version to serve; null for the one before
      * @throws IllegalStateException    when nothing was ever activated, or there is no earlier version to serve
@@ -177,15 +185,28 @@ public class CatalogActivations {
             }
             return activate(target, Reason.ROLLBACK, null, note);
         }
-        long below = current.catalogVersionId() == null ? Long.MAX_VALUE : current.catalogVersionId();
+        // the served version's own place in the log: its latest activation that was not a rollback, or this activation
+        Long boundary = current.catalogVersionId() == null ? null : jdbc.queryForObject("""
+                SELECT max(id) FROM trademark_catalog_activation WHERE catalog_version_id = ? AND reason <> 'ROLLBACK'""",
+                Long.class, current.catalogVersionId());
+        long before = boundary == null ? current.id() : boundary;
+        long served = current.catalogVersionId() == null ? -1 : current.catalogVersionId();
         List<String> skipped = new ArrayList<>();
-        for (CatalogVersion candidate : jdbc.query("SELECT " + VERSION_COLUMNS + """
-                 FROM trademark_catalog_version v
-                WHERE v.id < ? AND EXISTS (SELECT 1 FROM trademark_catalog_activation a WHERE a.catalog_version_id = v.id)
-                ORDER BY v.id DESC""", VERSION, below)) {
-            String problem = problem(candidate);
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        for (Long candidateId : jdbc.queryForList("""
+                SELECT catalog_version_id FROM trademark_catalog_activation
+                WHERE id < ? AND reason <> 'ROLLBACK' AND catalog_version_id IS NOT NULL AND catalog_version_id <> ?
+                ORDER BY id DESC""", Long.class, before, served)) {
+            if (!seen.add(candidateId)) {
+                continue;
+            }
+            Optional<CatalogVersion> candidate = find(candidateId);
+            if (candidate.isEmpty()) {
+                continue;
+            }
+            String problem = problem(candidate.get());
             if (problem == null) {
-                return activate(candidate, Reason.ROLLBACK, null, note);
+                return activate(candidate.get(), Reason.ROLLBACK, null, note);
             }
             skipped.add(problem);
         }

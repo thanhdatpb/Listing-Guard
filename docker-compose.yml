@@ -48,6 +48,8 @@ services:
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       # Trademark catalog version to serve (ADR-009), as the trademark-import job printed it. Empty: trademark checks off.
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
+      LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
       # Client plans and the monthly quota (ADR-013): off by default, so nothing about a plan is read or enforced.
       # Give every client its plan first: docker compose run --rm admin plan set <client> <FREE|SELLER|PRO>
       LISTING_GUARD_PLANS_ENABLED: ${PLANS_ENABLED:-false}
@@ -180,6 +182,32 @@ services:
       # only raw/ is mounted, and writable: the job reads the XML there and writes the jsonl-1 file and its report there
       - ./catalogs/raw:/catalogs/raw
 
+  # Keeps a catalog of USPTO marks up to date (ADR-009, PR A2d); see docker-compose.prod.yml and docs/deploy-oracle.md.
+  # Offline: put the zips you downloaded in a folder of catalogs/raw/ and pass it as --input-dir (first with --backfile).
+  # The ODP download stays off unless USPTO_SYNC_DOWNLOAD_ENABLED=true (every endpoint UNVERIFIED). Set USPTO_SYNC_LICENSE.
+  #   docker compose --profile uspto-sync run --rm uspto-sync --backfile --input-dir=uspto-inbox/backfile [--no-activate] [--dry-run]
+  uspto-sync:
+    image: listing-guard-api:dev
+    profiles: ["uspto-sync"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: uspto-sync
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
+      DB_USER: ${POSTGRES_USER:-listingguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+      CATALOGS_DIR: /catalogs
+      LISTING_GUARD_TRADEMARK_USPTO_MAX_DISTINCT_SERIALS: ${USPTO_MAX_DISTINCT_SERIALS:-20000000}
+      LISTING_GUARD_TRADEMARK_USPTO_FILTERS: ${USPTO_FILTERS:-classpath:uspto/uspto-convert-filters-2026-11.yaml}
+      LISTING_GUARD_TRADEMARK_USPTO_SYNC_CATALOG_LICENSE: ${USPTO_SYNC_LICENSE:-}
+      LISTING_GUARD_TRADEMARK_USPTO_SYNC_KEEP_VERSIONS: ${USPTO_SYNC_KEEP_VERSIONS:-3}
+      LISTING_GUARD_TRADEMARK_USPTO_SYNC_DOWNLOAD_ENABLED: ${USPTO_SYNC_DOWNLOAD_ENABLED:-false}
+      LISTING_GUARD_USPTO_ODP_API_KEY: ${LISTING_GUARD_USPTO_ODP_API_KEY:-}
+      SPRING_CONFIG_ADDITIONAL_LOCATION: optional:file:/catalogs/raw/uspto-sync.override.yml
+    volumes:
+      - ./catalogs/raw:/catalogs/raw
+
   # Checks every listing of a CSV export (rules and trademark) and writes findings.csv, listings.csv and summary.html
   # (docs/batch-check.md). Local files and the database only: no network, no embedding provider. Put the export in
   # batch/input/ and a mapping in batch/mappings/; the reports go to batch/out/ unless --out says otherwise.
@@ -199,6 +227,8 @@ services:
       DB_USER: ${POSTGRES_USER:-listingguard}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
+      LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
       # The same setting as the api: with plans on the batch is charged like the API and needs the `batch` pack (ADR-013).
       LISTING_GUARD_PLANS_ENABLED: ${PLANS_ENABLED:-false}
       # The same setting as the api: with fixes on, listings.csv adds readiness_score and ready and summary.html adds the
@@ -227,6 +257,8 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
       # The same setting as the api: the report names the trademark catalog this deployment serves.
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
+      LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
       HEALTH_REPORT_DIR: /health-report
     volumes:
       - ./health-report:/health-report

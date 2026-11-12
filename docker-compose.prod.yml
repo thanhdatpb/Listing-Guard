@@ -53,6 +53,8 @@ services:
       LISTING_GUARD_EMBEDDING_API_KEY: ${LISTING_GUARD_EMBEDDING_API_KEY:-}
       # Trademark catalog version to serve (ADR-009), as the trademark-import job printed it. Empty: trademark checks off.
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
+      LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
       # Client plans and the monthly quota (ADR-013): off by default, so nothing about a plan is read or enforced.
       # Give every client its plan first: docker compose run --rm admin plan set <client> <plan>
       LISTING_GUARD_PLANS_ENABLED: ${LISTING_GUARD_PLANS_ENABLED:-false}
@@ -149,6 +151,43 @@ services:
       # only raw/ is mounted, and writable: the job reads the XML there and writes the jsonl-1 file and its report there
       - ./catalogs/raw:/catalogs/raw
 
+  # Keeps a catalog of USPTO marks up to date (ADR-009, PR A2d): registers files you downloaded (--input-dir, no network)
+  # or, when USPTO_SYNC_DOWNLOAD_ENABLED=true, downloads them from the USPTO Open Data Portal (every endpoint UNVERIFIED);
+  # converts the backfile and every later daily file (latest transaction wins), imports a new catalog version and activates
+  # it after the import succeeded. The api serves it only with TRADEMARK_FOLLOW_ACTIVATION=true. Its own profile, never
+  # started by `up`. Files go to catalogs/raw/uspto-sync/ (git-ignored, writable by uid 10001). deploy/oracle/uspto-sync.sh
+  # adds a host lock and a disk check. You are responsible for the terms of the data (USPTO_SYNC_LICENSE).
+  #   docker compose -f docker-compose.prod.yml --profile prod --profile uspto-sync run --rm uspto-sync --backfile --input-dir=uspto-inbox/backfile --no-activate
+  #   docker compose -f docker-compose.prod.yml --profile prod --profile uspto-sync run --rm uspto-sync --input-dir=uspto-inbox/daily
+  uspto-sync:
+    image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
+    profiles: ["uspto-sync"]
+    mem_limit: ${USPTO_SYNC_MEM_LIMIT:-3g}
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: uspto-sync
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      JAVA_TOOL_OPTIONS: ${USPTO_SYNC_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75.0}
+      CATALOGS_DIR: /catalogs
+      # the backfile holds every serial number; the default 12,000,000 of uspto-convert may be too few (unmeasured)
+      LISTING_GUARD_TRADEMARK_USPTO_MAX_DISTINCT_SERIALS: ${USPTO_MAX_DISTINCT_SERIALS:-20000000}
+      LISTING_GUARD_TRADEMARK_USPTO_FILTERS: ${USPTO_FILTERS:-classpath:uspto/uspto-convert-filters-2026-11.yaml}
+      LISTING_GUARD_TRADEMARK_USPTO_SYNC_CATALOG_LICENSE: ${USPTO_SYNC_LICENSE:-}
+      LISTING_GUARD_TRADEMARK_USPTO_SYNC_KEEP_VERSIONS: ${USPTO_SYNC_KEEP_VERSIONS:-3}
+      LISTING_GUARD_TRADEMARK_USPTO_SYNC_DOWNLOAD_ENABLED: ${USPTO_SYNC_DOWNLOAD_ENABLED:-false}
+      # the ODP key; sent only to the API host, never logged. Empty while the download is off.
+      LISTING_GUARD_USPTO_ODP_API_KEY: ${LISTING_GUARD_USPTO_ODP_API_KEY:-}
+      # ODP paths, field names and file name patterns are settings: put corrections in this file, not in code
+      SPRING_CONFIG_ADDITIONAL_LOCATION: optional:file:/catalogs/raw/uspto-sync.override.yml
+    volumes:
+      # raw/ only, writable: the input folders, the store (raw/uspto-sync/) and the converted catalogs
+      - ./catalogs/raw:/catalogs/raw
+
   # Checks every listing of a CSV export (rules and trademark) and writes findings.csv, listings.csv and summary.html to
   # batch/out/ (docs/batch-check.md). The client must exist and be active. The three settings below must equal the ones
   # of the api, or the batch counts and answers differently from the API.
@@ -167,6 +206,8 @@ services:
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
+      LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
       LISTING_GUARD_PLANS_ENABLED: ${LISTING_GUARD_PLANS_ENABLED:-false}
       LISTING_GUARD_FIXES_ENABLED: ${LISTING_GUARD_FIXES_ENABLED:-false}
       BATCH_DIR: /batch
@@ -193,6 +234,8 @@ services:
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
+      LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
       HEALTH_REPORT_DIR: /health-report
     volumes:
       - ./health-report:/health-report

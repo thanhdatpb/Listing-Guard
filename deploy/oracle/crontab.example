@@ -8,5 +8,11 @@
 # Weekly report for every active client, saved under health-report/out/.
 0 3 * * 1 cd /opt/listing-guard && docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm health-report --all-clients
 
+# USPTO catalog sync (ADR-009, PR A2d; docs/deploy-oracle.md section 8). Leave it commented until the ODP download is
+# verified and USPTO_SYNC_DOWNLOAD_ENABLED=true: offline runs (--input-dir) are started by hand. Once a day, after the
+# USPTO has published the day's file; the release time is unverified, 11:00 UTC is a guess to adjust. The script holds a
+# lock (a run still converting makes the next one exit with 75), checks free disk and logs to logs/uspto-sync/.
+# 0 11 * * * cd /opt/listing-guard && ./deploy/oracle/uspto-sync.sh
+
 # Remove dangling image layers only; tagged previous releases remain available for rollback.
 30 4 * * 0 cd /opt/listing-guard && docker image prune --force

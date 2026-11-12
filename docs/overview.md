@@ -362,7 +362,7 @@ Implemented capabilities are summarized in [Status](#status). The next confirmed
 - [ADR-006: Category rulesets and Amazon severity](adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](adr/ADR-007-multi-client-model.md)
 - [ADR-008: Image compliance checker](adr/ADR-008-image-compliance-checker.md) (Proposed; the core, the endpoint, the tables and the plan pack are implemented, off by default; the bounded decode service, the upload staging and every marketplace threshold remain)
-- [ADR-009: Trademark risk scanner](adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3, A2b and A5 (product classes, source links, generic words) are implemented; the USPTO converter is unverified against real data)
+- [ADR-009: Trademark risk scanner](adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3, A2b, A2c, A2d (the `uspto-sync` job and the catalog activation log) and A5 (product classes, source links, generic words) are implemented; the USPTO converter and the ODP download are unverified against real data)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
 - [ADR-011: Policy-grounded analyzer](adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
 - [ADR-012: Embeddings default to an external API](adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)
