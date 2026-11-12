@@ -8,3 +8,5 @@ mvnw text eol=lf
 Dockerfile text eol=lf
 # The DEMO trademark data is checked against a sha256 in its manifest; keep it LF on every checkout (CRLF changes the hash)
 catalogs/demo/raw/*.jsonl text eol=lf
+# The published API contract (ADR-022): contract-sha256.txt hashes LF files; keep every checkout byte for byte the release asset
+docs/api/**/*.json text eol=lf

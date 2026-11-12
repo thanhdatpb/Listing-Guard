@@ -1,0 +1,4071 @@
+{
+  "components" : {
+    "schemas" : {
+      "CatalogView" : {
+        "properties" : {
+          "state" : {
+            "description" : "`READY`, `DISABLED` (no catalog is configured) or `REFUSED` (the configured one cannot be served).",
+            "example" : "READY",
+            "type" : "string"
+          },
+          "version" : {
+            "description" : "The catalog version, only while the state is `READY`.",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "CharacterFindingView" : {
+        "properties" : {
+          "end" : {
+            "description" : "End of the span (UTF-16 code units, exclusive).",
+            "example" : 2,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "field" : {
+            "description" : "Which value the finding is about.",
+            "example" : "personalization[0]",
+            "type" : "string"
+          },
+          "kind" : {
+            "description" : "The case inside the rule; stable like ruleId.",
+            "example" : "character_not_allowed",
+            "type" : "string"
+          },
+          "label" : {
+            "description" : "The label the client gave the value, or null.",
+            "example" : "name",
+            "type" : [ "string", "null" ]
+          },
+          "message" : {
+            "description" : "Human text, currently Vietnamese, with the real characters, positions and numbers.",
+            "type" : "string"
+          },
+          "ruleId" : {
+            "description" : "Stable identifier of the rule.",
+            "example" : "unsupported_characters",
+            "type" : "string"
+          },
+          "severity" : {
+            "description" : "WARNING (worth a look before production) or INFO. No ERROR: nothing here is backed by an official source.",
+            "enum" : [ "ERROR", "WARNING", "INFO" ],
+            "type" : "string"
+          },
+          "sourceStatus" : {
+            "description" : "How well the rule is backed by documentation. Always UNVERIFIED today: it is an internal print policy.",
+            "enum" : [ "VERIFIED", "SECONDARY", "UNVERIFIED" ],
+            "type" : "string"
+          },
+          "start" : {
+            "description" : "Start of the span in the text as sent (UTF-16 code units, inclusive).",
+            "example" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "suggestion" : {
+            "description" : "Human text, currently Vietnamese. Never proposes a replacement value.",
+            "type" : "string"
+          },
+          "value" : {
+            "description" : "The offending characters, at most a few; null for a finding that keeps no text (too long, spaces).",
+            "example" : "Đạ",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "CheckRequest" : {
+        "properties" : {
+          "listing" : {
+            "$ref" : "#/components/schemas/JsonNode",
+            "description" : "The listing in the marketplace's own JSON format (for Etsy, Open API v3 style snake_case fields; for Amazon, title, brand, bullet_points, description, search_terms, product_type, price, quantity, images). Must be a JSON object.",
+            "type" : "object"
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, case-insensitive. Supported: ETSY, AMAZON.",
+            "example" : "ETSY",
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "listing", "marketplace" ],
+        "type" : "object"
+      },
+      "CheckResult" : {
+        "properties" : {
+          "analysisVersion" : {
+            "description" : "Version of the whole analysis that produced the result. Currently equal to rulesetVersion; it will also change when other analyzers (for example an LLM step) are added. Two checks with the same marketplace, contentHash and analysisVersion have the same result.",
+            "example" : "etsy-2026-12",
+            "type" : [ "string", "null" ]
+          },
+          "cached" : {
+            "description" : "True when an identical listing had already been checked with the same analysisVersion and the stored result is returned instead of a new check.",
+            "type" : "boolean"
+          },
+          "checkId" : {
+            "description" : "Identifier of the stored check; use it with GET /api/v1/checks/{id}.",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "contentHash" : {
+            "description" : "SHA-256 of the normalized listing content.",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "description" : "When the check was first stored.",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "findings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FindingView"
+            },
+            "type" : "array"
+          },
+          "fixesComputed" : {
+            "description" : "Whether verified fixes were computed for this result.",
+            "type" : [ "boolean", "null" ]
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, upper case.",
+            "example" : "ETSY",
+            "type" : "string"
+          },
+          "readiness" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/ReadinessView"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "Readiness from the listing-rules pack only; null when this legacy result has not been enriched."
+          },
+          "rulesetVersion" : {
+            "description" : "Version of the ruleset that produced the findings. Null for checks stored before versions were recorded.",
+            "example" : "etsy-2026-12",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "PENDING", "COMPLETED", "FAILED" ],
+            "type" : "string"
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/Summary"
+          }
+        },
+        "type" : "object"
+      },
+      "CoverageView" : {
+        "properties" : {
+          "complete" : {
+            "description" : "True when every pack that deletes results can still show every day of the period.",
+            "type" : "boolean"
+          },
+          "retention" : {
+            "description" : "The packs that delete their results; `listing-rules` is not among them: its results are not deleted.",
+            "items" : {
+              "$ref" : "#/components/schemas/RetentionView"
+            },
+            "type" : "array"
+          },
+          "text" : {
+            "description" : "A sentence that says it in words.",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FindingView" : {
+        "properties" : {
+          "field" : {
+            "description" : "Field path, see the integration guide.",
+            "example" : "tags[1]",
+            "type" : "string"
+          },
+          "fix" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/FixView"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "A verified suggestion for this finding; null when no certain fix exists."
+          },
+          "message" : {
+            "example" : "Tag 'a tag that is far too long...' dài 38 ký tự, tối đa 20.",
+            "type" : "string"
+          },
+          "ruleId" : {
+            "example" : "tag_length",
+            "type" : "string"
+          },
+          "severity" : {
+            "enum" : [ "ERROR", "WARNING", "INFO" ],
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "RULE", "LLM" ],
+            "type" : "string"
+          },
+          "suggestion" : {
+            "example" : "Rút ngắn tag này ít nhất 18 ký tự.",
+            "type" : "string"
+          },
+          "value" : {
+            "description" : "The value that caused the finding; null when no single value applies (a missing field).",
+            "example" : "a tag that is far too long for the limit",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "FixView" : {
+        "properties" : {
+          "action" : {
+            "enum" : [ "REPLACE", "REMOVE" ],
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "proposedValue" : {
+            "description" : "Proposed replacement; null for REMOVE.",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "HealthReport" : {
+        "properties" : {
+          "byWeek" : {
+            "description" : "The same numbers per ISO week, in order, without gaps (a week with no result is all zeros). The first and the last week are clipped to the period and marked `partial` when the ISO week is longer.",
+            "items" : {
+              "$ref" : "#/components/schemas/WeekView"
+            },
+            "type" : "array"
+          },
+          "coverageNote" : {
+            "$ref" : "#/components/schemas/CoverageView",
+            "description" : "Which packs delete their results, after how long, and so from which day their numbers are complete."
+          },
+          "generatedAt" : {
+            "description" : "When the report was computed. A result of a pack that deletes results is counted only if it was still stored at this instant.",
+            "example" : "2026-11-09T03:00:00Z",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "marketplace" : {
+            "description" : "The marketplace the counts are limited to (`ETSY` or `AMAZON`), or null for all.",
+            "example" : "ETSY",
+            "type" : [ "string", "null" ]
+          },
+          "packs" : {
+            "$ref" : "#/components/schemas/PacksView",
+            "description" : "The numbers of each pack over the whole period."
+          },
+          "period" : {
+            "$ref" : "#/components/schemas/PeriodView",
+            "description" : "The days counted, in UTC, both ends included."
+          },
+          "versions" : {
+            "$ref" : "#/components/schemas/VersionsView",
+            "description" : "What runs now. Results of the period may have been made under older versions."
+          }
+        },
+        "type" : "object"
+      },
+      "JsonNode" : { },
+      "LimitView" : {
+        "properties" : {
+          "enabled" : {
+            "description" : "False when the rule is switched off for this product type: nothing is enforced and the number is only on record. A counter should not enforce a limit that is not enabled.",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "field" : {
+            "description" : "The field of the standard input (`docs/input-schema.md`) the limit applies to, such as `title`, `tags`, `bullet_points` or `search_terms`. For a list field, `MAX_COUNT` limits the list and `MAX_LENGTH` or `MAX_BYTES` limit each item. A field inside the Etsy `personalization` block is a path: `[]` stands for every question, and `[type=DROPDOWN]` or `[type=UPLOAD]` for the questions of that type, for example `personalization.questions[].question_text`.",
+            "example" : "title",
+            "type" : "string"
+          },
+          "kind" : {
+            "description" : "What is limited: `MAX_LENGTH` (length of a text, or of each item of a list), `MAX_COUNT` (number of items of a list, or of words of a text), `MAX_BYTES` (size in UTF-8 bytes) or `MAX_OCCURRENCES` (how often the same word or character may appear).",
+            "enum" : [ "MAX_LENGTH", "MAX_COUNT", "MAX_BYTES", "MAX_OCCURRENCES" ],
+            "example" : "MAX_LENGTH",
+            "type" : "string"
+          },
+          "ruleId" : {
+            "description" : "The rule that enforces the limit; the `ruleId` of its findings.",
+            "example" : "title_length",
+            "type" : "string"
+          },
+          "severity" : {
+            "description" : "How a finding that breaks the limit is rated.",
+            "enum" : [ "ERROR", "WARNING", "INFO" ],
+            "example" : "ERROR",
+            "type" : "string"
+          },
+          "sourceStatus" : {
+            "description" : "How well the number is backed by the marketplace's documentation: `VERIFIED`, `SECONDARY` or `UNVERIFIED`.",
+            "enum" : [ "VERIFIED", "SECONDARY", "UNVERIFIED" ],
+            "example" : "VERIFIED",
+            "type" : "string"
+          },
+          "unit" : {
+            "description" : "What is counted, as the rule counts it: `CODE_POINTS` (an emoji counts once, not the UTF-16 length of a JavaScript string), `ITEMS`, `WORDS`, `UTF8_BYTES` or `OCCURRENCES`.",
+            "enum" : [ "CODE_POINTS", "ITEMS", "WORDS", "UTF8_BYTES", "OCCURRENCES" ],
+            "example" : "CODE_POINTS",
+            "type" : "string"
+          },
+          "value" : {
+            "description" : "The limit.",
+            "example" : 140,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ListingRulesView" : {
+        "description" : "Results of `POST /api/v1/checks`. A result is a stored one: a cached answer creates no row, so a listing checked again with the same analysis is counted once.",
+        "properties" : {
+          "checks" : {
+            "description" : "Stored results created in the period.",
+            "example" : 120,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "findings" : {
+            "description" : "Findings per severity; the three severities are always present.",
+            "items" : {
+              "$ref" : "#/components/schemas/SeverityCountView"
+            },
+            "type" : "array"
+          },
+          "pack" : {
+            "description" : "The pack id; present on the period totals only.",
+            "example" : "listing-rules",
+            "type" : "string"
+          },
+          "readiness" : {
+            "$ref" : "#/components/schemas/ReadinessSummaryView",
+            "description" : "The publish readiness stored with the results (ADR-014)."
+          },
+          "statuses" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per stored status; every status is present.",
+            "example" : {
+              "COMPLETED" : 120,
+              "FAILED" : 0,
+              "PENDING" : 0
+            },
+            "type" : "object"
+          },
+          "topRules" : {
+            "$ref" : "#/components/schemas/RuleRankingView",
+            "description" : "The rules with the most findings; present on the period totals only."
+          }
+        },
+        "type" : "object"
+      },
+      "MarkCountView" : {
+        "description" : "A mark of the trademark catalog (the catalog's own display text, never text from a listing).",
+        "properties" : {
+          "checksAffected" : {
+            "description" : "Results with at least one finding for this mark.",
+            "example" : 5,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "findings" : {
+            "example" : 6,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "highestRisk" : {
+            "description" : "The highest risk among the findings for this mark.",
+            "example" : "HIGH",
+            "type" : "string"
+          },
+          "mark" : {
+            "description" : "The catalog's display mark.",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MarkRankingView" : {
+        "properties" : {
+          "distinctMarks" : {
+            "description" : "Every different mark in the period, before the list is cut.",
+            "example" : 5,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "items" : {
+            "description" : "Most findings first, then most results affected, then the mark by code point.",
+            "items" : {
+              "$ref" : "#/components/schemas/MarkCountView"
+            },
+            "type" : "array"
+          },
+          "limit" : {
+            "example" : 10,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PacksView" : {
+        "properties" : {
+          "listingRules" : {
+            "$ref" : "#/components/schemas/ListingRulesView"
+          },
+          "personalizationScreening" : {
+            "$ref" : "#/components/schemas/PersonalizationView"
+          },
+          "trademarkRisk" : {
+            "$ref" : "#/components/schemas/TrademarkRiskView"
+          },
+          "variationChecks" : {
+            "$ref" : "#/components/schemas/VariationChecksView"
+          }
+        },
+        "type" : "object"
+      },
+      "PeriodView" : {
+        "properties" : {
+          "days" : {
+            "description" : "Days covered, both ends counted.",
+            "example" : 7,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "from" : {
+            "example" : "2026-11-02",
+            "format" : "date",
+            "type" : "string"
+          },
+          "to" : {
+            "example" : "2026-11-08",
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PersonalizationScreeningRequest" : {
+        "properties" : {
+          "marketplace" : {
+            "description" : "Marketplace code, case-insensitive. Supported: ETSY, AMAZON.",
+            "example" : "ETSY",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "print_profile" : {
+            "description" : "The code of a print profile declared in the ruleset. Absent means the ruleset's default profile. An undeclared code is a 400 (`unknown-print-profile`), never replaced by the default.",
+            "example" : "latin_basic",
+            "type" : [ "string", "null" ]
+          },
+          "product_type" : {
+            "description" : "Free text naming the product, for example \"jersey\". Hashed and not read by any rule yet.",
+            "example" : "jersey",
+            "type" : [ "string", "null" ]
+          },
+          "values" : {
+            "description" : "What the buyer typed, one entry per field of the order: objects with `label` (optional, the name of the field, for example \"name\") and `text`. The text is NOT trimmed: spaces are reported, not removed. Entries that are not objects or have no text are dropped.",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "marketplace" ],
+        "type" : "object"
+      },
+      "PersonalizationScreeningResult" : {
+        "properties" : {
+          "analysisVersion" : {
+            "description" : "Version of everything that decides the result (ruleset, code versions, trademark ruleset and catalog). Opaque: compare for equality only. Two screenings of one client with the same marketplace, the same values and the same analysisVersion have the same result.",
+            "example" : "9a4e1c7d03b85f26e1d0c9b8a7f6e5d4c3b2a19087766554433221100ffeeddc",
+            "type" : "string"
+          },
+          "cached" : {
+            "description" : "True when the stored result of an identical earlier screening is returned instead of a new analysis. Only a COMPLETE result is ever returned from the cache.",
+            "type" : "boolean"
+          },
+          "checkId" : {
+            "description" : "Identifier of the stored screening; use it with GET /api/v1/personalization-screenings/{id} until expiresAt.",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "completeness" : {
+            "description" : "COMPLETE when every character rule ran and the trademark scan finished. INCOMPLETE when a character rule failed (failedRuleIds names it), the trademark scan failed, or no trademark catalog is served (trademark.status NOT_CONFIGURED): the findings that were established are kept. An INCOMPLETE result is never a clean result, is never reused and costs no quota.",
+            "enum" : [ "COMPLETE", "INCOMPLETE" ],
+            "type" : "string"
+          },
+          "createdAt" : {
+            "description" : "When the screening was first stored (UTC).",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "disclaimer" : {
+            "description" : "Statement that the result is a reference warning and not a statement of the print workshop, a marketplace or a court. Show it with the result.",
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "description" : "When the stored result stops being readable (UTC). After this instant GET answers 404 and the same values are analysed again.",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failedRuleIds" : {
+            "description" : "Character rules that failed; empty when none did.",
+            "example" : [ ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "findings" : {
+            "description" : "The findings of the character rules, value by value.",
+            "items" : {
+              "$ref" : "#/components/schemas/CharacterFindingView"
+            },
+            "type" : "array"
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, upper case.",
+            "example" : "ETSY",
+            "type" : "string"
+          },
+          "printProfile" : {
+            "description" : "The print profile that was used; the ruleset's default when the request named none.",
+            "example" : "latin_basic",
+            "type" : "string"
+          },
+          "rulesetVersion" : {
+            "description" : "Version of the personalization ruleset that produced the result.",
+            "example" : "personalization-screening-2026-11",
+            "type" : "string"
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/Summary",
+            "description" : "Number of character findings per severity (the trademark findings are counted by their risk level)."
+          },
+          "trademark" : {
+            "$ref" : "#/components/schemas/TrademarkView",
+            "description" : "The trademark scan of the same values. Show it next to the character findings: neither replaces the other."
+          }
+        },
+        "type" : "object"
+      },
+      "PersonalizationView" : {
+        "description" : "Results of `POST /api/v1/personalization-screenings` that are still retained. `findings` and `topRules` are the character rules only; what the trademark scan found is in `trademarkRiskLevels`. No mark is listed: it would say something about what a buyer typed.",
+        "properties" : {
+          "checks" : {
+            "example" : 25,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "completeness" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per completeness; both values are present.",
+            "type" : "object"
+          },
+          "findings" : {
+            "description" : "Character-rule findings per severity; the three severities are always present.",
+            "items" : {
+              "$ref" : "#/components/schemas/SeverityCountView"
+            },
+            "type" : "array"
+          },
+          "pack" : {
+            "description" : "The pack id; present on the period totals only.",
+            "example" : "personalization-screening",
+            "type" : "string"
+          },
+          "topRules" : {
+            "$ref" : "#/components/schemas/RuleRankingView",
+            "description" : "The character rules with the most findings; present on the period totals only."
+          },
+          "trademarkRiskLevels" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per risk level of their trademark scan; `UNKNOWN` is never counted as `LOW`.",
+            "type" : "object"
+          },
+          "trademarkStatus" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per state of their trademark scan: `COMPLETE`, `INCOMPLETE` or `NOT_CONFIGURED` (no catalog was served).",
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "ProblemDetail" : {
+        "properties" : {
+          "detail" : {
+            "type" : [ "string", "null" ]
+          },
+          "instance" : {
+            "format" : "uri",
+            "type" : [ "string", "null" ]
+          },
+          "properties" : {
+            "additionalProperties" : { },
+            "type" : [ "object", "null" ]
+          },
+          "status" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : [ "string", "null" ]
+          },
+          "type" : {
+            "format" : "uri",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ReadinessSummaryView" : {
+        "description" : "Only results stored with a readiness count here: it is written when `listing-guard.fixes.enabled` is on or by the console editor. The others are in `checksWithoutReadiness` and are skipped, never counted as zero.",
+        "properties" : {
+          "averageScore" : {
+            "description" : "The mean score of the scored results, one decimal; null when there are none.",
+            "example" : 82.4,
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "checksWithReadiness" : {
+            "description" : "Results with a readiness: scored plus incomplete.",
+            "example" : 40,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "checksWithoutReadiness" : {
+            "description" : "Results with no readiness stored.",
+            "example" : 80,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "incompleteChecks" : {
+            "description" : "Results whose readiness is `INCOMPLETE` (a rule failed): stored as not ready, with no score.",
+            "example" : 2,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "readyChecks" : {
+            "description" : "Results that are ready.",
+            "example" : 30,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "readyRate" : {
+            "description" : "`readyChecks / checksWithReadiness`, four decimals; null when there is no readiness.",
+            "example" : 0.75,
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "scoredChecks" : {
+            "description" : "Results with a score.",
+            "example" : 38,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "versions" : {
+            "description" : "The readiness versions found in the period; present on the period totals only. A mean over two versions is not a trend.",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ReadinessView" : {
+        "properties" : {
+          "ready" : {
+            "type" : "boolean"
+          },
+          "score" : {
+            "description" : "Null when status is INCOMPLETE.",
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RetentionView" : {
+        "properties" : {
+          "coveredFrom" : {
+            "description" : "The first day for which every result of the pack is still stored.",
+            "example" : "2026-10-11",
+            "format" : "date",
+            "type" : "string"
+          },
+          "pack" : {
+            "example" : "trademark-risk",
+            "type" : "string"
+          },
+          "period" : {
+            "description" : "How long a result is kept, as an ISO-8601 duration, from the configuration.",
+            "example" : "P30D",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RuleCountView" : {
+        "properties" : {
+          "checksAffected" : {
+            "description" : "Results with at least one such finding.",
+            "example" : 12,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "findings" : {
+            "example" : 12,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "ruleId" : {
+            "example" : "title_length",
+            "type" : "string"
+          },
+          "severity" : {
+            "description" : "A rule stored at two severities appears twice.",
+            "example" : "ERROR",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RuleRankingView" : {
+        "properties" : {
+          "distinctRules" : {
+            "description" : "Every different rule and severity in the period, before the list is cut.",
+            "example" : 14,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "items" : {
+            "description" : "Most findings first, then most results affected, then the rule id by code point, then the severity.",
+            "items" : {
+              "$ref" : "#/components/schemas/RuleCountView"
+            },
+            "type" : "array"
+          },
+          "limit" : {
+            "description" : "The most items the list holds.",
+            "example" : 10,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RulesetLimitsResult" : {
+        "properties" : {
+          "limits" : {
+            "description" : "Every numeric limit of the ruleset's rules, in rule order. A rule that is switched off is listed with `enabled` false. Read the limits you need by `field` and `kind`, and ignore the ones you do not know.",
+            "items" : {
+              "$ref" : "#/components/schemas/LimitView"
+            },
+            "type" : "array"
+          },
+          "marketplace" : {
+            "description" : "The marketplace code, in upper case.",
+            "example" : "ETSY",
+            "type" : "string"
+          },
+          "productType" : {
+            "description" : "The product type asked for, trimmed and as sent; null when none was asked for.",
+            "example" : "LUGGAGE",
+            "type" : [ "string", "null" ]
+          },
+          "rulesetVersion" : {
+            "description" : "The version of the ruleset the limits come from; the same value as `rulesetVersion` of a check. Opaque: compare for equality, do not parse.",
+            "example" : "etsy-2026-12",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RulesetView" : {
+        "properties" : {
+          "marketplace" : {
+            "example" : "ETSY",
+            "type" : "string"
+          },
+          "pack" : {
+            "example" : "listing-rules",
+            "type" : "string"
+          },
+          "version" : {
+            "example" : "etsy-2026-12",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SeverityCountView" : {
+        "properties" : {
+          "checksAffected" : {
+            "description" : "Results with at least one finding of this severity.",
+            "example" : 18,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "findings" : {
+            "description" : "Findings of this severity.",
+            "example" : 30,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "severity" : {
+            "example" : "ERROR",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Summary" : {
+        "properties" : {
+          "errors" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "infos" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "warnings" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkCheckResult" : {
+        "properties" : {
+          "analysisVersion" : {
+            "description" : "Version of everything that decides the result (ruleset, algorithms, catalog, database). Opaque: compare for equality only. Two checks of one client with the same marketplace, the same listing text and the same analysisVersion have the same result.",
+            "example" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+            "type" : "string"
+          },
+          "cached" : {
+            "description" : "True when the stored result of an identical earlier check is returned instead of a new analysis. Only a COMPLETE result is ever returned from the cache.",
+            "type" : "boolean"
+          },
+          "catalogVersion" : {
+            "description" : "Version of the trademark catalog the text was compared with. Opaque.",
+            "example" : "synthetic-2026-11-0123456789ab",
+            "type" : "string"
+          },
+          "checkId" : {
+            "description" : "Identifier of the stored check; use it with GET /api/v1/trademark-checks/{id} until expiresAt.",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "completeness" : {
+            "description" : "COMPLETE when every rule ran. INCOMPLETE when a rule failed: the findings of the rules that succeeded are kept, failedRuleIds names the others, and riskLevel is the highest established level or UNKNOWN.",
+            "enum" : [ "COMPLETE", "INCOMPLETE" ],
+            "type" : "string"
+          },
+          "createdAt" : {
+            "description" : "When the check was first stored (UTC).",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "disclaimer" : {
+            "description" : "Statement that the result is a reference warning and not a legal conclusion. Show it with the result.",
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "description" : "When the stored result stops being readable (UTC). After this instant GET answers 404 and the same listing is analysed again.",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failedRuleIds" : {
+            "description" : "Rules that failed; empty for a COMPLETE result.",
+            "example" : [ ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "findings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FindingView"
+            },
+            "type" : "array"
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, upper case.",
+            "example" : "ETSY",
+            "type" : "string"
+          },
+          "riskLevel" : {
+            "description" : "The highest level among the findings (LOW when a complete check found nothing above LOW). UNKNOWN means the risk could not be determined because the check is INCOMPLETE; it is never reported as LOW.",
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
+            "type" : "string"
+          },
+          "rulesetVersion" : {
+            "description" : "Version of the trademark ruleset that produced the result.",
+            "example" : "trademark-risk-2026-11",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkFindingView" : {
+        "properties" : {
+          "end" : {
+            "description" : "End of the span (UTF-16 code units, exclusive).",
+            "example" : 10,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "field" : {
+            "description" : "Which value the finding is about.",
+            "example" : "personalization[0]",
+            "type" : "string"
+          },
+          "insideColorPhrase" : {
+            "description" : "The match lies inside a color phrase; this explains the finding and never lowers its risk.",
+            "type" : "boolean"
+          },
+          "label" : {
+            "description" : "The label the client gave the value, or null.",
+            "example" : "team",
+            "type" : [ "string", "null" ]
+          },
+          "mark" : {
+            "description" : "The catalog mark that matched (catalog data); null for a finding without a mark.",
+            "example" : "Zibblefrax",
+            "type" : [ "string", "null" ]
+          },
+          "matchType" : {
+            "description" : "How the finding was found.",
+            "enum" : [ "EXACT", "PHRASE", "FUZZY", "CONTEXT" ],
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "Human text, currently Vietnamese. Names the mark and the position, not the buyer's text.",
+            "type" : "string"
+          },
+          "otherRuleIds" : {
+            "description" : "Other rules that matched an overlapping span and lost to this one.",
+            "example" : [ ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "risk" : {
+            "description" : "Risk of this finding: LOW, MEDIUM or HIGH.",
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
+            "type" : "string"
+          },
+          "ruleId" : {
+            "description" : "The trademark rule.",
+            "example" : "catalog_exact",
+            "type" : "string"
+          },
+          "score" : {
+            "description" : "Similarity from 0 to 1 for a fuzzy match, 1 for an exact or phrase match; null otherwise.",
+            "example" : 1.0,
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "sourceIds" : {
+            "description" : "Ids of the source records of the matched catalog mark.",
+            "example" : [ "DEMO-001" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "start" : {
+            "description" : "Start of the span in the text as sent (UTF-16 code units, inclusive).",
+            "example" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "suggestion" : {
+            "description" : "Human text, currently Vietnamese. Never proposes a replacement value.",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkRiskView" : {
+        "description" : "Results of `POST /api/v1/trademark-checks` that are still retained. `UNKNOWN` is its own level and is never counted as `LOW`.",
+        "properties" : {
+          "checks" : {
+            "example" : 90,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "completeness" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per completeness; both values are present.",
+            "example" : {
+              "COMPLETE" : 88,
+              "INCOMPLETE" : 2
+            },
+            "type" : "object"
+          },
+          "pack" : {
+            "description" : "The pack id; present on the period totals only.",
+            "example" : "trademark-risk",
+            "type" : "string"
+          },
+          "riskLevels" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per stored risk level; the four levels are always present.",
+            "example" : {
+              "HIGH" : 4,
+              "LOW" : 70,
+              "MEDIUM" : 9,
+              "UNKNOWN" : 7
+            },
+            "type" : "object"
+          },
+          "topMarks" : {
+            "$ref" : "#/components/schemas/MarkRankingView",
+            "description" : "The catalog marks matched most often; present on the period totals only."
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkView" : {
+        "properties" : {
+          "catalogVersion" : {
+            "description" : "The catalog version the scan used; null when it did not run.",
+            "type" : [ "string", "null" ]
+          },
+          "failedRuleIds" : {
+            "description" : "Trademark rules that failed; empty when none did.",
+            "example" : [ ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "findings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TrademarkFindingView"
+            },
+            "type" : "array"
+          },
+          "riskLevel" : {
+            "description" : "LOW, MEDIUM, HIGH or UNKNOWN. UNKNOWN means the risk could not be determined and is never LOW. No finding means only that the scanner found nothing in its catalog; it is no legal conclusion.",
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
+            "type" : "string"
+          },
+          "rulesetVersion" : {
+            "description" : "Version of the trademark ruleset the scan used; null when it did not run.",
+            "example" : "trademark-risk-2026-11",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "description" : "COMPLETE; INCOMPLETE (a trademark rule failed, findings kept); NOT_CONFIGURED (no catalog is served, so the scan did not run).",
+            "enum" : [ "COMPLETE", "INCOMPLETE", "NOT_CONFIGURED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Usage" : {
+        "properties" : {
+          "enforced" : {
+            "description" : "Whether plans are on in this deployment. When false the quota and the packs are not applied: `monthlyQuota` and `remaining` are null and `packs` lists every pack.",
+            "type" : "boolean"
+          },
+          "monthlyQuota" : {
+            "description" : "Results the plan allows per UTC month; null means unlimited. One unit is one new result that is stored, per endpoint: a cached result costs nothing, and a full check of one listing (rules and trademark) is two units.",
+            "example" : 1000,
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "packs" : {
+            "description" : "The packs the client may use.",
+            "example" : [ "batch", "listing-rules", "personalization-screening", "sheet-connector", "trademark-risk", "variation-checks" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "periodStart" : {
+            "description" : "First day of the current UTC month.",
+            "example" : "2026-11-01",
+            "format" : "date",
+            "type" : "string"
+          },
+          "plan" : {
+            "description" : "The client's plan code: FREE, SELLER or PRO.",
+            "example" : "SELLER",
+            "type" : "string"
+          },
+          "remaining" : {
+            "description" : "Units left this month; null when the quota is unlimited or not applied.",
+            "example" : 958,
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "resetAt" : {
+            "description" : "The instant the quota resets: the start of the next UTC month.",
+            "example" : "2026-12-01T00:00:00Z",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "used" : {
+            "description" : "Units used so far in the current UTC month.",
+            "example" : 42,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "VariationCheckRequest" : {
+        "properties" : {
+          "children" : {
+            "description" : "The children: objects with sku, parent_sku (Amazon only), title and attributes, a map from an attribute name to its value. Entries that are not objects or are empty are dropped.",
+            "type" : [ "string", "null" ]
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, case-insensitive. Supported: ETSY, AMAZON.",
+            "example" : "AMAZON",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "parent" : {
+            "description" : "Amazon: the parent, an object with sku, product_type, variation_theme and title (all optional). Ignored for Etsy, where the listing is its own parent.",
+            "type" : [ "string", "null" ]
+          },
+          "variation_properties" : {
+            "description" : "Etsy: the names of the variation types, for example [\"Primary color\", \"Size\"]. Ignored for Amazon.",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "marketplace" ],
+        "type" : "object"
+      },
+      "VariationCheckResult" : {
+        "properties" : {
+          "analysisVersion" : {
+            "description" : "Version of everything that decides the result (ruleset, comparison logic, input format). Opaque: compare for equality only. Two checks of one client with the same marketplace, the same family and the same analysisVersion have the same result.",
+            "example" : "5b0e3d79c1a24f6e8d7c9b0a1f2e3d4c5b6a79881726354453627180911a2b3c",
+            "type" : "string"
+          },
+          "cached" : {
+            "description" : "True when the stored result of an identical earlier check is returned instead of a new analysis. Only a COMPLETE result is ever returned from the cache.",
+            "type" : "boolean"
+          },
+          "checkId" : {
+            "description" : "Identifier of the stored check; use it with GET /api/v1/variation-checks/{id} until expiresAt.",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "completeness" : {
+            "description" : "COMPLETE when every rule ran. INCOMPLETE when a rule failed: the findings of the rules that succeeded are kept and failedRuleIds names the others. An INCOMPLETE result is never a clean result.",
+            "enum" : [ "COMPLETE", "INCOMPLETE" ],
+            "type" : "string"
+          },
+          "createdAt" : {
+            "description" : "When the check was first stored (UTC).",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "disclaimer" : {
+            "description" : "Statement that the result is a reference warning and not a statement of the marketplace. Show it with the result.",
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "description" : "When the stored result stops being readable (UTC). After this instant GET answers 404 and the same family is analysed again.",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failedRuleIds" : {
+            "description" : "Rules that failed; empty for a COMPLETE result.",
+            "example" : [ ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "findings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FindingView"
+            },
+            "type" : "array"
+          },
+          "marketplace" : {
+            "description" : "Marketplace code, upper case.",
+            "example" : "AMAZON",
+            "type" : "string"
+          },
+          "rulesetVersion" : {
+            "description" : "Version of the variation ruleset that produced the result.",
+            "example" : "variation-checks-2026-11",
+            "type" : "string"
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/Summary"
+          }
+        },
+        "type" : "object"
+      },
+      "VariationChecksView" : {
+        "description" : "Results of `POST /api/v1/variation-checks` that are still retained.",
+        "properties" : {
+          "checks" : {
+            "example" : 30,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "completeness" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Results per completeness; both values are present.",
+            "type" : "object"
+          },
+          "findings" : {
+            "description" : "Findings per severity; the three severities are always present.",
+            "items" : {
+              "$ref" : "#/components/schemas/SeverityCountView"
+            },
+            "type" : "array"
+          },
+          "pack" : {
+            "description" : "The pack id; present on the period totals only.",
+            "example" : "variation-checks",
+            "type" : "string"
+          },
+          "topRules" : {
+            "$ref" : "#/components/schemas/RuleRankingView",
+            "description" : "The rules with the most findings; present on the period totals only."
+          }
+        },
+        "type" : "object"
+      },
+      "VersionsView" : {
+        "properties" : {
+          "rulesets" : {
+            "description" : "The active ruleset of each pack for each marketplace.",
+            "items" : {
+              "$ref" : "#/components/schemas/RulesetView"
+            },
+            "type" : "array"
+          },
+          "trademarkCatalog" : {
+            "$ref" : "#/components/schemas/CatalogView",
+            "description" : "The trademark catalog this deployment serves."
+          }
+        },
+        "type" : "object"
+      },
+      "WeekView" : {
+        "properties" : {
+          "from" : {
+            "description" : "The first day of the week that is inside the period.",
+            "example" : "2026-11-02",
+            "format" : "date",
+            "type" : "string"
+          },
+          "isoWeek" : {
+            "description" : "The ISO week.",
+            "example" : "2026-W45",
+            "type" : "string"
+          },
+          "listingRules" : {
+            "$ref" : "#/components/schemas/ListingRulesView"
+          },
+          "partial" : {
+            "description" : "True when the ISO week reaches beyond the period, so it has fewer results: compare rates, not counts.",
+            "type" : "boolean"
+          },
+          "personalizationScreening" : {
+            "$ref" : "#/components/schemas/PersonalizationView"
+          },
+          "to" : {
+            "description" : "The last day of the week that is inside the period.",
+            "example" : "2026-11-08",
+            "format" : "date",
+            "type" : "string"
+          },
+          "trademarkRisk" : {
+            "$ref" : "#/components/schemas/TrademarkRiskView"
+          },
+          "variationChecks" : {
+            "$ref" : "#/components/schemas/VariationChecksView"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    "securitySchemes" : {
+      "ApiKeyAuth" : {
+        "description" : "Service-to-service API key issued to a client. A client can hold several keys at once to allow rotation; checks, cached results and the rate limit belong to the client, not to the key.",
+        "in" : "header",
+        "name" : "X-API-Key",
+        "type" : "apiKey"
+      }
+    }
+  },
+  "info" : {
+    "description" : "Checks a marketplace listing before it is published and returns findings with suggestions. It only checks and suggests: it never edits a listing and never publishes anything.\n\nEvery endpoint except GET /health needs the X-API-Key header. Errors are RFC 7807 problem responses (application/problem+json) with a stable `code`; quote the `requestId` when reporting one. See docs/integration-guide.md for the calling flow, error table and field path conventions.",
+    "title" : "Listing Guard API",
+    "version" : "v1"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/api/v1/checks" : {
+      "post" : {
+        "description" : "Normalizes the listing, runs the marketplace's rules and stores the result. If the same listing content was already checked by the calling client with the same analysisVersion, the stored result is returned instead and `cached` is true (no new check is created); results are never shared between clients. A new result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached one costs nothing. The listing is the marketplace's own format; for Etsy it is the Open API v3 style JSON with snake_case fields, for Amazon the simple format with title, brand, bullet_points, description, search_terms, product_type, price, quantity and images.",
+        "operationId" : "check_2",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "examples" : {
+                "amazon-listing" : {
+                  "description" : "amazon-listing",
+                  "summary" : "An Amazon listing with problems",
+                  "value" : {
+                    "listing" : {
+                      "brand" : "Roadster",
+                      "bullet_points" : [ "Lightweight polycarbonate shell", "Four 360-degree spinner wheels", "TSA-approved lock", "Expandable main compartment", "Interior packing straps", "Contact us at www.roadster.example" ],
+                      "description" : "A durable hardside suitcase for short trips.",
+                      "images" : [ "https://example.com/luggage-1.jpg" ],
+                      "price" : {
+                        "amount" : 89.99,
+                        "currency_code" : "USD"
+                      },
+                      "product_type" : "LUGGAGE",
+                      "quantity" : 12,
+                      "search_terms" : "carry on suitcase cabin bag spinner",
+                      "title" : "Hardside Carry-On Luggage Luggage Spinner Luggage! 20 Inch"
+                    },
+                    "marketplace" : "AMAZON"
+                  }
+                },
+                "etsy-listing" : {
+                  "description" : "etsy-listing",
+                  "summary" : "An Etsy listing with problems",
+                  "value" : {
+                    "listing" : {
+                      "description" : "Hand-thrown stoneware mug, 350 ml.",
+                      "images" : [ "https://example.com/mug-1.jpg" ],
+                      "materials" : [ "stoneware" ],
+                      "price" : {
+                        "amount" : 1999,
+                        "currency_code" : "USD",
+                        "divisor" : 100
+                      },
+                      "quantity" : 0,
+                      "tags" : [ "mug", "Mug", "gift_idea" ],
+                      "taxonomy_path" : [ "Home & Living", "Kitchen & Dining", "Mugs" ],
+                      "title" : "Handmade Ceramic Mug"
+                    },
+                    "marketplace" : "ETSY"
+                  }
+                }
+              },
+              "schema" : {
+                "$ref" : "#/components/schemas/CheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "amazon-findings" : {
+                    "description" : "amazon-findings",
+                    "summary" : "A fresh Amazon check with findings",
+                    "value" : {
+                      "analysisVersion" : "amazon-2026-12b",
+                      "cached" : false,
+                      "checkId" : "0d7f2c1d-9a11-4a58-9c6e-7f0c2f3e6a52",
+                      "contentHash" : "9c1e5f0a62b7d34e8a1f0c5d7b2e4a6893d1c0f5e7a2b4d6c8e0f1a3b5d7c9e1",
+                      "createdAt" : "2026-10-28T09:20:11.482913Z",
+                      "findings" : [ {
+                        "field" : "title",
+                        "message" : "Từ 'Luggage' xuất hiện 3 lần trong tiêu đề, tối đa 2 lần.",
+                        "ruleId" : "title_repeated_words",
+                        "severity" : "WARNING",
+                        "source" : "RULE",
+                        "suggestion" : "Bỏ bớt 1 lần xuất hiện của từ 'Luggage' trong tiêu đề.",
+                        "value" : "Luggage"
+                      }, {
+                        "field" : "title",
+                        "message" : "Tiêu đề chứa ký tự không được phép: '!'.",
+                        "ruleId" : "title_forbidden_chars",
+                        "severity" : "WARNING",
+                        "source" : "RULE",
+                        "suggestion" : "Xoá ký tự '!' khỏi tiêu đề (chỉ được giữ khi nó là một phần của tên brand).",
+                        "value" : "!"
+                      }, {
+                        "field" : "bullet_points",
+                        "message" : "Listing có 6 bullet point, tối đa 5.",
+                        "ruleId" : "bullet_count",
+                        "severity" : "WARNING",
+                        "source" : "RULE",
+                        "suggestion" : "Bỏ bớt 1 bullet point, giữ lại các ý quan trọng nhất.",
+                        "value" : "6"
+                      }, {
+                        "field" : "bullet_points[5]",
+                        "message" : "Phát hiện url trong bullet_points[5]: 'www.roadster.example'.",
+                        "ruleId" : "prohibited_content",
+                        "severity" : "WARNING",
+                        "source" : "RULE",
+                        "suggestion" : "Xoá url khỏi nội dung listing; không đưa liên kết ngoài hay thông tin liên hệ vào tiêu đề, bullet point hoặc mô tả.",
+                        "value" : "www.roadster.example"
+                      } ],
+                      "marketplace" : "AMAZON",
+                      "rulesetVersion" : "amazon-2026-12b",
+                      "status" : "COMPLETED",
+                      "summary" : {
+                        "errors" : 0,
+                        "infos" : 0,
+                        "warnings" : 4
+                      }
+                    }
+                  },
+                  "cached" : {
+                    "description" : "cached",
+                    "summary" : "The same listing again: stored result",
+                    "value" : {
+                      "analysisVersion" : "etsy-2026-12",
+                      "cached" : true,
+                      "checkId" : "5331208a-583a-4ff3-a990-99a7440ae59f",
+                      "contentHash" : "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
+                      "createdAt" : "2026-10-28T09:15:30.123456Z",
+                      "findings" : [ ],
+                      "marketplace" : "ETSY",
+                      "rulesetVersion" : "etsy-2026-12",
+                      "status" : "COMPLETED",
+                      "summary" : {
+                        "errors" : 0,
+                        "infos" : 0,
+                        "warnings" : 0
+                      }
+                    }
+                  },
+                  "findings" : {
+                    "description" : "findings",
+                    "summary" : "A fresh Etsy check with findings",
+                    "value" : {
+                      "analysisVersion" : "etsy-2026-12",
+                      "cached" : false,
+                      "checkId" : "5331208a-583a-4ff3-a990-99a7440ae59f",
+                      "contentHash" : "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
+                      "createdAt" : "2026-10-28T09:15:30.123456Z",
+                      "findings" : [ {
+                        "field" : "who_made",
+                        "message" : "Thiếu trường bắt buộc 'who_made'.",
+                        "ruleId" : "required_fields",
+                        "severity" : "ERROR",
+                        "source" : "RULE",
+                        "suggestion" : "Bổ sung giá trị cho trường 'who_made' trước khi publish.",
+                        "value" : null
+                      }, {
+                        "field" : "when_made",
+                        "message" : "Thiếu trường bắt buộc 'when_made'.",
+                        "ruleId" : "required_fields",
+                        "severity" : "ERROR",
+                        "source" : "RULE",
+                        "suggestion" : "Bổ sung giá trị cho trường 'when_made' trước khi publish.",
+                        "value" : null
+                      }, {
+                        "field" : "quantity",
+                        "message" : "Số lượng là 0, phải lớn hơn 0.",
+                        "ruleId" : "price_quantity_positive",
+                        "severity" : "ERROR",
+                        "source" : "RULE",
+                        "suggestion" : "Nhập số lượng lớn hơn 0.",
+                        "value" : "0"
+                      }, {
+                        "field" : "tags[2]",
+                        "message" : "Tag 'gift_idea' chứa ký tự không hợp lệ: '_'.",
+                        "ruleId" : "tag_characters",
+                        "severity" : "ERROR",
+                        "source" : "RULE",
+                        "suggestion" : "Xoá hoặc thay các ký tự không hợp lệ trong tag này.",
+                        "value" : "gift_idea"
+                      }, {
+                        "field" : "tags[1]",
+                        "message" : "Tag 'Mug' trùng với tag ở vị trí 1.",
+                        "ruleId" : "duplicate_tags",
+                        "severity" : "WARNING",
+                        "source" : "RULE",
+                        "suggestion" : "Xoá tag trùng hoặc thay bằng một tag khác để tận dụng đủ chỗ.",
+                        "value" : "Mug"
+                      } ],
+                      "marketplace" : "ETSY",
+                      "rulesetVersion" : "etsy-2026-12",
+                      "status" : "COMPLETED",
+                      "summary" : {
+                        "errors" : 4,
+                        "infos" : 0,
+                        "warnings" : 1
+                      }
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/CheckResult"
+                }
+              }
+            },
+            "description" : "The check result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-request" : {
+                    "description" : "invalid-request",
+                    "value" : {
+                      "code" : "invalid-request",
+                      "detail" : "The request is not valid; see errors.",
+                      "errors" : [ {
+                        "field" : "listing",
+                        "message" : "must not be null"
+                      } ],
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-request"
+                    }
+                  },
+                  "unknown-marketplace" : {
+                    "description" : "unknown-marketplace",
+                    "value" : {
+                      "code" : "unknown-marketplace",
+                      "detail" : "Unknown marketplace: NOPE. Supported: AMAZON, ETSY.",
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:unknown-marketplace"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request (code `invalid-request`) or unknown marketplace (`unknown-marketplace`)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "plan-not-allowed",
+                  "detail" : "The FREE plan does not include trademark-risk. Ask the operator for a plan that does.",
+                  "instance" : "/api/v1/trademark-checks",
+                  "pack" : "trademark-risk",
+                  "plan" : "FREE",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 403,
+                  "title" : "Forbidden",
+                  "type" : "urn:listing-guard:problem:plan-not-allowed"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The client's plan does not include this pack (code `plan-not-allowed`; only where plans are on). Retrying does not help."
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "payload-too-large",
+                  "detail" : "The request body is larger than the limit of 262144 bytes.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 413,
+                  "title" : "Payload Too Large",
+                  "type" : "urn:listing-guard:problem:payload-too-large"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request body is over the size limit (256 KB)."
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not application/json (code `unsupported-media-type`)."
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "marketplace-not-yet-supported",
+                  "detail" : "Marketplace WALMART is planned but not supported yet. Supported: AMAZON, ETSY.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 422,
+                  "title" : "Unprocessable Entity",
+                  "type" : "urn:listing-guard:problem:marketplace-not-yet-supported"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`). No marketplace is planned today."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "quota-exceeded" : {
+                    "description" : "quota-exceeded",
+                    "value" : {
+                      "code" : "quota-exceeded",
+                      "detail" : "The monthly quota of the FREE plan is used up (20 of 20). It resets at 2026-12-01T00:00:00Z. Results already stored are still answered from the cache.",
+                      "instance" : "/api/v1/checks",
+                      "plan" : "FREE",
+                      "quota" : 20,
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "resetAt" : "2026-12-01T00:00:00Z",
+                      "status" : 429,
+                      "title" : "Too Many Requests",
+                      "type" : "urn:listing-guard:problem:quota-exceeded",
+                      "used" : 20
+                    }
+                  },
+                  "rate-limited" : {
+                    "description" : "rate-limited",
+                    "value" : {
+                      "code" : "rate-limited",
+                      "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 429,
+                      "title" : "Too Many Requests",
+                      "type" : "urn:listing-guard:problem:rate-limited"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Two different answers, told apart by `code`. `rate-limited`: too many requests for the calling client; retry after the Retry-After header. `quota-exceeded` (only where plans are on): the month's quota of the client's plan is used up; there is no Retry-After, and retrying before `resetAt` does not help. A result already stored is still answered."
+          }
+        },
+        "summary" : "Check a listing",
+        "tags" : [ "Checks" ]
+      }
+    },
+    "/api/v1/checks/{id}" : {
+      "get" : {
+        "description" : "Returns the stored result of an earlier check of the calling client, in the same shape as the POST response (`cached` is false).",
+        "operationId" : "get_2",
+        "parameters" : [ {
+          "description" : "checkId returned by POST /api/v1/checks",
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "analysisVersion" : "etsy-2026-12",
+                  "cached" : false,
+                  "checkId" : "5331208a-583a-4ff3-a990-99a7440ae59f",
+                  "contentHash" : "4a4c5b26f7cd836c45d914b623e5aa16b8c5e58690b685485a85bec74ca8bd08",
+                  "createdAt" : "2026-10-28T09:15:30.123456Z",
+                  "findings" : [ {
+                    "field" : "who_made",
+                    "message" : "Thiếu trường bắt buộc 'who_made'.",
+                    "ruleId" : "required_fields",
+                    "severity" : "ERROR",
+                    "source" : "RULE",
+                    "suggestion" : "Bổ sung giá trị cho trường 'who_made' trước khi publish.",
+                    "value" : null
+                  }, {
+                    "field" : "when_made",
+                    "message" : "Thiếu trường bắt buộc 'when_made'.",
+                    "ruleId" : "required_fields",
+                    "severity" : "ERROR",
+                    "source" : "RULE",
+                    "suggestion" : "Bổ sung giá trị cho trường 'when_made' trước khi publish.",
+                    "value" : null
+                  }, {
+                    "field" : "quantity",
+                    "message" : "Số lượng là 0, phải lớn hơn 0.",
+                    "ruleId" : "price_quantity_positive",
+                    "severity" : "ERROR",
+                    "source" : "RULE",
+                    "suggestion" : "Nhập số lượng lớn hơn 0.",
+                    "value" : "0"
+                  }, {
+                    "field" : "tags[2]",
+                    "message" : "Tag 'gift_idea' chứa ký tự không hợp lệ: '_'.",
+                    "ruleId" : "tag_characters",
+                    "severity" : "ERROR",
+                    "source" : "RULE",
+                    "suggestion" : "Xoá hoặc thay các ký tự không hợp lệ trong tag này.",
+                    "value" : "gift_idea"
+                  }, {
+                    "field" : "tags[1]",
+                    "message" : "Tag 'Mug' trùng với tag ở vị trí 1.",
+                    "ruleId" : "duplicate_tags",
+                    "severity" : "WARNING",
+                    "source" : "RULE",
+                    "suggestion" : "Xoá tag trùng hoặc thay bằng một tag khác để tận dụng đủ chỗ.",
+                    "value" : "Mug"
+                  } ],
+                  "marketplace" : "ETSY",
+                  "rulesetVersion" : "etsy-2026-12",
+                  "status" : "COMPLETED",
+                  "summary" : {
+                    "errors" : 4,
+                    "infos" : 0,
+                    "warnings" : 1
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/CheckResult"
+                }
+              }
+            },
+            "description" : "The stored check result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The id is not a UUID."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "check-not-found",
+                  "detail" : "No check with id 5331208a-583a-4ff3-a990-99a7440ae59f",
+                  "instance" : "/api/v1/checks/5331208a-583a-4ff3-a990-99a7440ae59f",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 404,
+                  "title" : "Not Found",
+                  "type" : "urn:listing-guard:problem:check-not-found"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No check with this id for the calling client (code `check-not-found`). A check of another client gives the same answer."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read a stored check",
+        "tags" : [ "Checks" ]
+      }
+    },
+    "/api/v1/personalization-screenings" : {
+      "post" : {
+        "description" : "Takes the text a buyer typed for a custom product (a name, a number), one entry per field of the order, and a print profile (see docs/input-schema.md, \"Personalization screening\"). It is meant for the step before an order goes into production, not for listings. Two independent answers: the character rules (characters the print profile cannot print, a text that is too long, stray spaces) in `findings`, and the trademark scan of the same text in `trademark`. Show both; neither replaces the other. If no trademark catalog is served, the character rules still run and `trademark.status` is NOT_CONFIGURED with `riskLevel` UNKNOWN (UNKNOWN is never LOW), and the result is INCOMPLETE. The result is a reference warning built on an internal print policy and a catalog, not a statement of the print workshop, a marketplace or a court; show the `disclaimer` with it. It proposes no replacement and changes no text. The answer never repeats the text; use the offsets (UTF-16 code units) to find a finding in it. If the same client already sent the same values with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result is stored so its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time (`expiresAt`); the text the buyer typed is never stored, only its hash and the result.",
+        "operationId" : "screenPersonalization",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "examples" : {
+                "jersey-order" : {
+                  "description" : "jersey-order",
+                  "summary" : "A name and a number (synthetic)",
+                  "value" : {
+                    "marketplace" : "ETSY",
+                    "print_profile" : "latin_basic",
+                    "product_type" : "jersey",
+                    "values" : [ {
+                      "label" : "name",
+                      "text" : "Đạt"
+                    }, {
+                      "label" : "number",
+                      "text" : "1234"
+                    } ]
+                  }
+                }
+              },
+              "schema" : {
+                "$ref" : "#/components/schemas/PersonalizationScreeningRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "cached" : {
+                    "description" : "cached",
+                    "summary" : "The same values again: the stored result",
+                    "value" : {
+                      "analysisVersion" : "9a4e1c7d03b85f26e1d0c9b8a7f6e5d4c3b2a19087766554433221100ffeeddc",
+                      "cached" : true,
+                      "checkId" : "5e1b7d90-2c4f-4a8e-b3d6-9f0a1c2e4b58",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-11-06T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo theo hồ sơ in nội bộ và danh mục nhãn hiệu tham chiếu, không phải kết luận của xưởng in, của sàn hay kết luận pháp lý. Không có cảnh báo chỉ có nghĩa là các quy tắc này không phát hiện gì.",
+                      "expiresAt" : "2026-12-06T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "end" : 2,
+                        "field" : "personalization[0]",
+                        "kind" : "character_not_allowed",
+                        "label" : "name",
+                        "message" : "personalization[0] (name): ký tự 'Đạ' (U+0110 U+1EA1) từ ký tự thứ 1 nằm ngoài tập ký tự của hồ sơ in 'latin_basic'.",
+                        "ruleId" : "unsupported_characters",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "UNVERIFIED",
+                        "start" : 0,
+                        "suggestion" : "Hỏi lại khách về nội dung này hoặc đối chiếu với xưởng trước khi đưa đơn vào sản xuất. Hệ thống không tự sửa nội dung.",
+                        "value" : "Đạ"
+                      }, {
+                        "end" : 4,
+                        "field" : "personalization[1]",
+                        "kind" : "too_long",
+                        "label" : "number",
+                        "message" : "personalization[1] (number) dài 4 ký tự, vượt giới hạn 3 của hồ sơ in 'latin_basic' (1 ký tự cuối, từ ký tự thứ 4).",
+                        "ruleId" : "too_long",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "UNVERIFIED",
+                        "start" : 3,
+                        "suggestion" : "Hỏi lại khách hoặc xưởng xem nội dung có vừa vùng in không. Hệ thống không tự rút gọn nội dung.",
+                        "value" : null
+                      } ],
+                      "marketplace" : "ETSY",
+                      "printProfile" : "latin_basic",
+                      "rulesetVersion" : "personalization-screening-2026-11",
+                      "summary" : {
+                        "errors" : 0,
+                        "infos" : 0,
+                        "warnings" : 2
+                      },
+                      "trademark" : {
+                        "catalogVersion" : "demo-2026-11-0a1b2c3d4e5f",
+                        "failedRuleIds" : [ ],
+                        "findings" : [ ],
+                        "riskLevel" : "LOW",
+                        "rulesetVersion" : "trademark-risk-2026-11",
+                        "status" : "COMPLETE"
+                      }
+                    }
+                  },
+                  "findings" : {
+                    "description" : "findings",
+                    "summary" : "A fresh screening with findings",
+                    "value" : {
+                      "analysisVersion" : "9a4e1c7d03b85f26e1d0c9b8a7f6e5d4c3b2a19087766554433221100ffeeddc",
+                      "cached" : false,
+                      "checkId" : "5e1b7d90-2c4f-4a8e-b3d6-9f0a1c2e4b58",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-11-06T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo theo hồ sơ in nội bộ và danh mục nhãn hiệu tham chiếu, không phải kết luận của xưởng in, của sàn hay kết luận pháp lý. Không có cảnh báo chỉ có nghĩa là các quy tắc này không phát hiện gì.",
+                      "expiresAt" : "2026-12-06T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "end" : 2,
+                        "field" : "personalization[0]",
+                        "kind" : "character_not_allowed",
+                        "label" : "name",
+                        "message" : "personalization[0] (name): ký tự 'Đạ' (U+0110 U+1EA1) từ ký tự thứ 1 nằm ngoài tập ký tự của hồ sơ in 'latin_basic'.",
+                        "ruleId" : "unsupported_characters",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "UNVERIFIED",
+                        "start" : 0,
+                        "suggestion" : "Hỏi lại khách về nội dung này hoặc đối chiếu với xưởng trước khi đưa đơn vào sản xuất. Hệ thống không tự sửa nội dung.",
+                        "value" : "Đạ"
+                      }, {
+                        "end" : 4,
+                        "field" : "personalization[1]",
+                        "kind" : "too_long",
+                        "label" : "number",
+                        "message" : "personalization[1] (number) dài 4 ký tự, vượt giới hạn 3 của hồ sơ in 'latin_basic' (1 ký tự cuối, từ ký tự thứ 4).",
+                        "ruleId" : "too_long",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "UNVERIFIED",
+                        "start" : 3,
+                        "suggestion" : "Hỏi lại khách hoặc xưởng xem nội dung có vừa vùng in không. Hệ thống không tự rút gọn nội dung.",
+                        "value" : null
+                      } ],
+                      "marketplace" : "ETSY",
+                      "printProfile" : "latin_basic",
+                      "rulesetVersion" : "personalization-screening-2026-11",
+                      "summary" : {
+                        "errors" : 0,
+                        "infos" : 0,
+                        "warnings" : 2
+                      },
+                      "trademark" : {
+                        "catalogVersion" : "demo-2026-11-0a1b2c3d4e5f",
+                        "failedRuleIds" : [ ],
+                        "findings" : [ ],
+                        "riskLevel" : "LOW",
+                        "rulesetVersion" : "trademark-risk-2026-11",
+                        "status" : "COMPLETE"
+                      }
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/PersonalizationScreeningResult"
+                }
+              }
+            },
+            "description" : "The screening result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-request" : {
+                    "description" : "invalid-request",
+                    "value" : {
+                      "code" : "invalid-request",
+                      "detail" : "The request is not valid; see errors.",
+                      "errors" : [ {
+                        "field" : "listing",
+                        "message" : "must not be null"
+                      } ],
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-request"
+                    }
+                  },
+                  "unknown-print-profile" : {
+                    "description" : "unknown-print-profile",
+                    "value" : {
+                      "code" : "unknown-print-profile",
+                      "detail" : "Unknown print profile 'latin_fancy'; declared profiles: [latin_basic, latin_extended]",
+                      "instance" : "/api/v1/personalization-screenings",
+                      "known" : [ "latin_basic", "latin_extended" ],
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:unknown-print-profile"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request (code `invalid-request`), unknown marketplace (`unknown-marketplace`) or a print profile the ruleset does not declare (`unknown-print-profile`, with the declared codes in `known`)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "plan-not-allowed",
+                  "detail" : "The FREE plan does not include trademark-risk. Ask the operator for a plan that does.",
+                  "instance" : "/api/v1/trademark-checks",
+                  "pack" : "trademark-risk",
+                  "plan" : "FREE",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 403,
+                  "title" : "Forbidden",
+                  "type" : "urn:listing-guard:problem:plan-not-allowed"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The client's plan does not include this pack (code `plan-not-allowed`; only where plans are on). Retrying does not help."
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "payload-too-large",
+                  "detail" : "The request body is larger than the limit of 262144 bytes.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 413,
+                  "title" : "Payload Too Large",
+                  "type" : "urn:listing-guard:problem:payload-too-large"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request body is over the size limit (256 KB)."
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not application/json (code `unsupported-media-type`)."
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`)."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "quota-exceeded" : {
+                    "description" : "quota-exceeded",
+                    "value" : {
+                      "code" : "quota-exceeded",
+                      "detail" : "The monthly quota of the FREE plan is used up (20 of 20). It resets at 2026-12-01T00:00:00Z. Results already stored are still answered from the cache.",
+                      "instance" : "/api/v1/checks",
+                      "plan" : "FREE",
+                      "quota" : 20,
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "resetAt" : "2026-12-01T00:00:00Z",
+                      "status" : 429,
+                      "title" : "Too Many Requests",
+                      "type" : "urn:listing-guard:problem:quota-exceeded",
+                      "used" : 20
+                    }
+                  },
+                  "rate-limited" : {
+                    "description" : "rate-limited",
+                    "value" : {
+                      "code" : "rate-limited",
+                      "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 429,
+                      "title" : "Too Many Requests",
+                      "type" : "urn:listing-guard:problem:rate-limited"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Two different answers, told apart by `code`. `rate-limited`: too many requests for the calling client (the same limit as the other endpoints); retry after the Retry-After header. `quota-exceeded` (only where plans are on): the month's quota of the client's plan is used up; there is no Retry-After, and retrying before `resetAt` does not help. A result already stored is still answered."
+          }
+        },
+        "summary" : "Screen the personalization text of an order",
+        "tags" : [ "Personalization screening" ]
+      }
+    },
+    "/api/v1/personalization-screenings/{id}" : {
+      "get" : {
+        "description" : "Returns the stored result of an earlier screening of the calling client while it is retained, in the same shape as the POST response (`cached` is false). After `expiresAt`, for an unknown id and for another client's screening the answer is the same 404.",
+        "operationId" : "getPersonalizationScreening",
+        "parameters" : [ {
+          "description" : "checkId returned by POST /api/v1/personalization-screenings",
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "analysisVersion" : "9a4e1c7d03b85f26e1d0c9b8a7f6e5d4c3b2a19087766554433221100ffeeddc",
+                  "cached" : false,
+                  "checkId" : "5e1b7d90-2c4f-4a8e-b3d6-9f0a1c2e4b58",
+                  "completeness" : "COMPLETE",
+                  "createdAt" : "2026-11-06T09:15:30.123456Z",
+                  "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo theo hồ sơ in nội bộ và danh mục nhãn hiệu tham chiếu, không phải kết luận của xưởng in, của sàn hay kết luận pháp lý. Không có cảnh báo chỉ có nghĩa là các quy tắc này không phát hiện gì.",
+                  "expiresAt" : "2026-12-06T09:15:30.123456Z",
+                  "failedRuleIds" : [ ],
+                  "findings" : [ {
+                    "end" : 2,
+                    "field" : "personalization[0]",
+                    "kind" : "character_not_allowed",
+                    "label" : "name",
+                    "message" : "personalization[0] (name): ký tự 'Đạ' (U+0110 U+1EA1) từ ký tự thứ 1 nằm ngoài tập ký tự của hồ sơ in 'latin_basic'.",
+                    "ruleId" : "unsupported_characters",
+                    "severity" : "WARNING",
+                    "sourceStatus" : "UNVERIFIED",
+                    "start" : 0,
+                    "suggestion" : "Hỏi lại khách về nội dung này hoặc đối chiếu với xưởng trước khi đưa đơn vào sản xuất. Hệ thống không tự sửa nội dung.",
+                    "value" : "Đạ"
+                  }, {
+                    "end" : 4,
+                    "field" : "personalization[1]",
+                    "kind" : "too_long",
+                    "label" : "number",
+                    "message" : "personalization[1] (number) dài 4 ký tự, vượt giới hạn 3 của hồ sơ in 'latin_basic' (1 ký tự cuối, từ ký tự thứ 4).",
+                    "ruleId" : "too_long",
+                    "severity" : "WARNING",
+                    "sourceStatus" : "UNVERIFIED",
+                    "start" : 3,
+                    "suggestion" : "Hỏi lại khách hoặc xưởng xem nội dung có vừa vùng in không. Hệ thống không tự rút gọn nội dung.",
+                    "value" : null
+                  } ],
+                  "marketplace" : "ETSY",
+                  "printProfile" : "latin_basic",
+                  "rulesetVersion" : "personalization-screening-2026-11",
+                  "summary" : {
+                    "errors" : 0,
+                    "infos" : 0,
+                    "warnings" : 2
+                  },
+                  "trademark" : {
+                    "catalogVersion" : "demo-2026-11-0a1b2c3d4e5f",
+                    "failedRuleIds" : [ ],
+                    "findings" : [ ],
+                    "riskLevel" : "LOW",
+                    "rulesetVersion" : "trademark-risk-2026-11",
+                    "status" : "COMPLETE"
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/PersonalizationScreeningResult"
+                }
+              }
+            },
+            "description" : "The stored result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The id is not a UUID."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "personalization-screening-not-found",
+                  "detail" : "No personalization screening with id 5e1b7d90-2c4f-4a8e-b3d6-9f0a1c2e4b58 was found for this client.",
+                  "instance" : "/api/v1/personalization-screenings/5e1b7d90-2c4f-4a8e-b3d6-9f0a1c2e4b58",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 404,
+                  "title" : "Not Found",
+                  "type" : "urn:listing-guard:problem:personalization-screening-not-found"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No retained personalization screening with this id for the calling client (code `personalization-screening-not-found`). A screening of another client, an id that never existed and an expired screening give the same answer."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read a stored personalization screening",
+        "tags" : [ "Personalization screening" ]
+      }
+    },
+    "/api/v1/reports/summary" : {
+      "get" : {
+        "description" : "Adds up what the client has stored: results per pack, the rules with the most findings, the trademark risk levels and the catalog marks matched most often, and the same numbers per ISO week. It counts; it never returns or reads text a client typed (a listing, a tag, a buyer's text): only counts, enumerations, rule ids, catalog marks and version strings.\n\n`from` and `to` are UTC dates, both included, and both are required. The longest period is set by the deployment (92 days by default). A period with no data is a `200` with zeros.\n\nA \"check\" is a stored result: a cached answer creates no row, so a listing checked again with the same analysis is counted once, and there is no cache-hit number. The packs `trademark-risk`, `variation-checks` and `personalization-screening` delete their results after a retention period and count only what is still stored; `coverageNote` says from which day their numbers are complete. `listing-rules` results are not deleted.\n\nIt is read only, needs no plan pack, costs no unit of the quota and is never cached (`Cache-Control: no-store`).",
+        "operationId" : "getReportSummary",
+        "parameters" : [ {
+          "description" : "The first day, a UTC date written as `YYYY-MM-DD`.",
+          "example" : "2026-11-02",
+          "in" : "query",
+          "name" : "from",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "The last day, included, a UTC date written as `YYYY-MM-DD`.",
+          "example" : "2026-11-08",
+          "in" : "query",
+          "name" : "to",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "`ETSY` or `AMAZON`, case-insensitive. Optional: without it every marketplace is counted.",
+          "example" : "ETSY",
+          "in" : "query",
+          "name" : "marketplace",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "week-report" : {
+                    "description" : "week-report",
+                    "summary" : "A week",
+                    "value" : {
+                      "byWeek" : [ {
+                        "from" : "2026-11-02",
+                        "isoWeek" : "2026-W45",
+                        "listingRules" : {
+                          "checks" : 12,
+                          "findings" : [ {
+                            "checksAffected" : 3,
+                            "findings" : 4,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 5,
+                            "findings" : 6,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 2,
+                            "severity" : "INFO"
+                          } ],
+                          "readiness" : {
+                            "averageScore" : 78.5,
+                            "checksWithReadiness" : 8,
+                            "checksWithoutReadiness" : 4,
+                            "incompleteChecks" : 0,
+                            "readyChecks" : 5,
+                            "readyRate" : 0.625,
+                            "scoredChecks" : 8
+                          },
+                          "statuses" : {
+                            "COMPLETED" : 12,
+                            "FAILED" : 0,
+                            "PENDING" : 0
+                          }
+                        },
+                        "partial" : false,
+                        "personalizationScreening" : {
+                          "checks" : 6,
+                          "completeness" : {
+                            "COMPLETE" : 5,
+                            "INCOMPLETE" : 1
+                          },
+                          "findings" : [ {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 3,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "INFO"
+                          } ],
+                          "trademarkRiskLevels" : {
+                            "HIGH" : 0,
+                            "LOW" : 5,
+                            "MEDIUM" : 0,
+                            "UNKNOWN" : 1
+                          },
+                          "trademarkStatus" : {
+                            "COMPLETE" : 5,
+                            "INCOMPLETE" : 0,
+                            "NOT_CONFIGURED" : 1
+                          }
+                        },
+                        "to" : "2026-11-08",
+                        "trademarkRisk" : {
+                          "checks" : 9,
+                          "completeness" : {
+                            "COMPLETE" : 8,
+                            "INCOMPLETE" : 1
+                          },
+                          "riskLevels" : {
+                            "HIGH" : 1,
+                            "LOW" : 5,
+                            "MEDIUM" : 2,
+                            "UNKNOWN" : 1
+                          }
+                        },
+                        "variationChecks" : {
+                          "checks" : 4,
+                          "completeness" : {
+                            "COMPLETE" : 4,
+                            "INCOMPLETE" : 0
+                          },
+                          "findings" : [ {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 2,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 1,
+                            "findings" : 1,
+                            "severity" : "INFO"
+                          } ]
+                        }
+                      } ],
+                      "coverageNote" : {
+                        "complete" : true,
+                        "retention" : [ {
+                          "coveredFrom" : "2026-10-11",
+                          "pack" : "trademark-risk",
+                          "period" : "P30D"
+                        }, {
+                          "coveredFrom" : "2026-10-11",
+                          "pack" : "variation-checks",
+                          "period" : "P30D"
+                        }, {
+                          "coveredFrom" : "2026-10-11",
+                          "pack" : "personalization-screening",
+                          "period" : "P30D"
+                        } ],
+                        "text" : "Every pack covers the whole period. Results of trademark-risk (kept P30D), variation-checks (kept P30D), personalization-screening (kept P30D) are deleted after the time in brackets; listing-rules results are not deleted."
+                      },
+                      "generatedAt" : "2026-11-09T03:00:00Z",
+                      "marketplace" : null,
+                      "packs" : {
+                        "listingRules" : {
+                          "checks" : 12,
+                          "findings" : [ {
+                            "checksAffected" : 3,
+                            "findings" : 4,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 5,
+                            "findings" : 6,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 2,
+                            "severity" : "INFO"
+                          } ],
+                          "pack" : "listing-rules",
+                          "readiness" : {
+                            "averageScore" : 78.5,
+                            "checksWithReadiness" : 8,
+                            "checksWithoutReadiness" : 4,
+                            "incompleteChecks" : 0,
+                            "readyChecks" : 5,
+                            "readyRate" : 0.625,
+                            "scoredChecks" : 8,
+                            "versions" : [ "readiness-2026-11" ]
+                          },
+                          "statuses" : {
+                            "COMPLETED" : 12,
+                            "FAILED" : 0,
+                            "PENDING" : 0
+                          },
+                          "topRules" : {
+                            "distinctRules" : 3,
+                            "items" : [ {
+                              "checksAffected" : 3,
+                              "findings" : 3,
+                              "ruleId" : "title_length",
+                              "severity" : "ERROR"
+                            } ],
+                            "limit" : 10
+                          }
+                        },
+                        "personalizationScreening" : {
+                          "checks" : 6,
+                          "completeness" : {
+                            "COMPLETE" : 5,
+                            "INCOMPLETE" : 1
+                          },
+                          "findings" : [ {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 3,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "INFO"
+                          } ],
+                          "pack" : "personalization-screening",
+                          "topRules" : {
+                            "distinctRules" : 1,
+                            "items" : [ {
+                              "checksAffected" : 2,
+                              "findings" : 3,
+                              "ruleId" : "unsupported_characters",
+                              "severity" : "WARNING"
+                            } ],
+                            "limit" : 10
+                          },
+                          "trademarkRiskLevels" : {
+                            "HIGH" : 0,
+                            "LOW" : 5,
+                            "MEDIUM" : 0,
+                            "UNKNOWN" : 1
+                          },
+                          "trademarkStatus" : {
+                            "COMPLETE" : 5,
+                            "INCOMPLETE" : 0,
+                            "NOT_CONFIGURED" : 1
+                          }
+                        },
+                        "trademarkRisk" : {
+                          "checks" : 9,
+                          "completeness" : {
+                            "COMPLETE" : 8,
+                            "INCOMPLETE" : 1
+                          },
+                          "pack" : "trademark-risk",
+                          "riskLevels" : {
+                            "HIGH" : 1,
+                            "LOW" : 5,
+                            "MEDIUM" : 2,
+                            "UNKNOWN" : 1
+                          },
+                          "topMarks" : {
+                            "distinctMarks" : 2,
+                            "items" : [ {
+                              "checksAffected" : 2,
+                              "findings" : 3,
+                              "highestRisk" : "HIGH",
+                              "mark" : "ZORVEX"
+                            } ],
+                            "limit" : 10
+                          }
+                        },
+                        "variationChecks" : {
+                          "checks" : 4,
+                          "completeness" : {
+                            "COMPLETE" : 4,
+                            "INCOMPLETE" : 0
+                          },
+                          "findings" : [ {
+                            "checksAffected" : 0,
+                            "findings" : 0,
+                            "severity" : "ERROR"
+                          }, {
+                            "checksAffected" : 2,
+                            "findings" : 2,
+                            "severity" : "WARNING"
+                          }, {
+                            "checksAffected" : 1,
+                            "findings" : 1,
+                            "severity" : "INFO"
+                          } ],
+                          "pack" : "variation-checks",
+                          "topRules" : {
+                            "distinctRules" : 2,
+                            "items" : [ {
+                              "checksAffected" : 2,
+                              "findings" : 2,
+                              "ruleId" : "duplicate_sku",
+                              "severity" : "WARNING"
+                            } ],
+                            "limit" : 10
+                          }
+                        }
+                      },
+                      "period" : {
+                        "days" : 7,
+                        "from" : "2026-11-02",
+                        "to" : "2026-11-08"
+                      },
+                      "versions" : {
+                        "rulesets" : [ {
+                          "marketplace" : "ETSY",
+                          "pack" : "listing-rules",
+                          "version" : "etsy-2026-12"
+                        }, {
+                          "marketplace" : "ETSY",
+                          "pack" : "trademark-risk",
+                          "version" : "trademark-risk-2026-11"
+                        } ],
+                        "trademarkCatalog" : {
+                          "state" : "READY",
+                          "version" : "synthetic-2026-11-0123456789ab"
+                        }
+                      }
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthReport"
+                }
+              }
+            },
+            "description" : "The report."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-report-period" : {
+                    "description" : "invalid-report-period",
+                    "value" : {
+                      "code" : "invalid-report-period",
+                      "detail" : "from must not be after to.",
+                      "instance" : "/api/v1/reports/summary",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-report-period"
+                    }
+                  },
+                  "report-period-too-long" : {
+                    "description" : "report-period-too-long",
+                    "value" : {
+                      "code" : "report-period-too-long",
+                      "detail" : "The period covers 120 days, more than the 92 a report may cover (both ends count). Ask for a shorter period.",
+                      "instance" : "/api/v1/reports/summary",
+                      "maxDays" : 92,
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "requestedDays" : 120,
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:report-period-too-long"
+                    }
+                  },
+                  "unknown-marketplace" : {
+                    "description" : "unknown-marketplace",
+                    "value" : {
+                      "code" : "unknown-marketplace",
+                      "detail" : "Unknown marketplace: NOPE. Supported: AMAZON, ETSY.",
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:unknown-marketplace"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "`from` or `to` is missing, malformed or reversed (code `invalid-report-period`), the period is longer than the limit (code `report-period-too-long`, with `maxDays` and `requestedDays`), or the marketplace is unknown (code `unknown-marketplace`)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "marketplace-not-yet-supported",
+                  "detail" : "Marketplace WALMART is planned but not supported yet. Supported: AMAZON, ETSY.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 422,
+                  "title" : "Unprocessable Entity",
+                  "type" : "urn:listing-guard:problem:marketplace-not-yet-supported"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`)."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read the health report of the calling client over a period",
+        "tags" : [ "Reports" ]
+      }
+    },
+    "/api/v1/rulesets/{marketplace}/limits" : {
+      "get" : {
+        "description" : "Returns the numeric limits of the ruleset that `POST /api/v1/checks` applies to the marketplace, each with the field it applies to, the rule that enforces it, what it counts (`unit`), its severity, how well it is sourced and whether it is enabled. Every number comes from the loaded ruleset, so it is the number the check uses; use it for a character counter instead of copying the numbers. `rulesetVersion` is the version of the ruleset; when it changes, read the limits again.\n\nFor Amazon, `productType` applies that product type's override of the ruleset, as the check does; a product type with no override, and any product type for Etsy, gets the defaults. A rule that is switched off is listed with `enabled: false`. The answer is the same for every client, carries an `ETag` and may be cached for five minutes; it costs no quota and needs no plan pack. Call it from your backend: the API key must not be put in browser code.",
+        "operationId" : "limits",
+        "parameters" : [ {
+          "description" : "`ETSY` or `AMAZON`, case-insensitive.",
+          "example" : "ETSY",
+          "in" : "path",
+          "name" : "marketplace",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Amazon product type whose override applies, for example `LUGGAGE`; matched ignoring case. Optional: without it, or with a product type that has no override, the defaults are returned.",
+          "in" : "query",
+          "name" : "productType",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "etsy-limits" : {
+                    "description" : "etsy-limits",
+                    "summary" : "The Etsy limits",
+                    "value" : {
+                      "limits" : [ {
+                        "enabled" : true,
+                        "field" : "title",
+                        "kind" : "MAX_LENGTH",
+                        "ruleId" : "title_length",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "CODE_POINTS",
+                        "value" : 140
+                      }, {
+                        "enabled" : true,
+                        "field" : "title",
+                        "kind" : "MAX_OCCURRENCES",
+                        "ruleId" : "title_repeated_special_chars",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "SECONDARY",
+                        "unit" : "OCCURRENCES",
+                        "value" : 1
+                      }, {
+                        "enabled" : true,
+                        "field" : "title",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "title_word_count",
+                        "severity" : "INFO",
+                        "sourceStatus" : "SECONDARY",
+                        "unit" : "WORDS",
+                        "value" : 15
+                      }, {
+                        "enabled" : true,
+                        "field" : "title",
+                        "kind" : "MAX_OCCURRENCES",
+                        "ruleId" : "title_repeated_words",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "SECONDARY",
+                        "unit" : "OCCURRENCES",
+                        "value" : 1
+                      }, {
+                        "enabled" : true,
+                        "field" : "tags",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "tag_count",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "SECONDARY",
+                        "unit" : "ITEMS",
+                        "value" : 13
+                      }, {
+                        "enabled" : true,
+                        "field" : "tags",
+                        "kind" : "MAX_LENGTH",
+                        "ruleId" : "tag_length",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "SECONDARY",
+                        "unit" : "CODE_POINTS",
+                        "value" : 20
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "personalization_question_count",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "ITEMS",
+                        "value" : 5
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[type=UPLOAD]",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "personalization_question_count",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "ITEMS",
+                        "value" : 1
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[].question_text",
+                        "kind" : "MAX_LENGTH",
+                        "ruleId" : "personalization_question_text",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "CODE_POINTS",
+                        "value" : 45
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[type=DROPDOWN].options",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "personalization_dropdown_options",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "ITEMS",
+                        "value" : 30
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[type=DROPDOWN].options",
+                        "kind" : "MAX_LENGTH",
+                        "ruleId" : "personalization_dropdown_options",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "CODE_POINTS",
+                        "value" : 20
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[type=UPLOAD].max_files",
+                        "kind" : "MAX_COUNT",
+                        "ruleId" : "personalization_upload_files",
+                        "severity" : "ERROR",
+                        "sourceStatus" : "VERIFIED",
+                        "unit" : "ITEMS",
+                        "value" : 10
+                      }, {
+                        "enabled" : true,
+                        "field" : "personalization.questions[].instructions",
+                        "kind" : "MAX_LENGTH",
+                        "ruleId" : "personalization_instructions_length",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "SECONDARY",
+                        "unit" : "CODE_POINTS",
+                        "value" : 120
+                      } ],
+                      "marketplace" : "ETSY",
+                      "productType" : null,
+                      "rulesetVersion" : "etsy-2026-12"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/RulesetLimitsResult"
+                }
+              }
+            },
+            "description" : "The limits of the ruleset."
+          },
+          "304" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RulesetLimitsResult"
+                }
+              }
+            },
+            "description" : "The `If-None-Match` header matches the `ETag`: nothing changed, there is no body."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "ruleset-not-found",
+                  "detail" : "No ruleset is active for marketplace WALMART. Supported: AMAZON, ETSY.",
+                  "instance" : "/api/v1/rulesets/WALMART/limits",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 404,
+                  "title" : "Not Found",
+                  "type" : "urn:listing-guard:problem:ruleset-not-found"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No ruleset is active for the marketplace (code `ruleset-not-found`); `detail` lists the supported ones."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read the limits of a marketplace's ruleset",
+        "tags" : [ "Rulesets" ]
+      }
+    },
+    "/api/v1/trademark-checks" : {
+      "post" : {
+        "description" : "Takes the same request as `POST /api/v1/checks` (`marketplace` and `listing` in the marketplace's own format), so a client can send one JSON to both endpoints. Compares the listing's text with the configured trademark catalog and returns findings with evidence: the field, the span in the text the API worked on (after trimming and Unicode NFC, UTF-16 offsets), the matched mark and how it matched. The result is a reference warning, not a legal conclusion; show the `disclaimer` with it. If the same client already sent the same listing text with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time (`expiresAt`); only the listing's hash and the result are stored, not the listing text.",
+        "operationId" : "check_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "examples" : {
+                "etsy-listing" : {
+                  "description" : "etsy-listing",
+                  "summary" : "An Etsy listing (synthetic names)",
+                  "value" : {
+                    "listing" : {
+                      "description" : "Soft cotton jersey.",
+                      "price" : {
+                        "amount" : 2999,
+                        "currency_code" : "USD",
+                        "divisor" : 100
+                      },
+                      "quantity" : 5,
+                      "tags" : [ "jersey", "royal blue white pinstripe" ],
+                      "title" : "Zorvex Style Northvale Baseball Jersey"
+                    },
+                    "marketplace" : "ETSY"
+                  }
+                }
+              },
+              "schema" : {
+                "$ref" : "#/components/schemas/CheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "cached" : {
+                    "description" : "cached",
+                    "summary" : "The same listing again: the stored result",
+                    "value" : {
+                      "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+                      "cached" : true,
+                      "catalogVersion" : "synthetic-2026-11-0123456789ab",
+                      "checkId" : "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-10-30T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+                      "expiresAt" : "2026-11-29T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "end" : 6,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : "ZORVEX",
+                        "matchType" : "EXACT",
+                        "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "HIGH",
+                        "ruleId" : "catalog_exact",
+                        "score" : 1.0,
+                        "snippet" : "Zorvex",
+                        "sourceIds" : [ "S-001", "S-002" ],
+                        "start" : 0,
+                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                      }, {
+                        "end" : 31,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : null,
+                        "matchType" : "CONTEXT",
+                        "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "MEDIUM",
+                        "ruleId" : "geo_sport_combination",
+                        "score" : null,
+                        "snippet" : "Northvale Baseball",
+                        "sourceIds" : [ ],
+                        "start" : 13,
+                        "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                      }, {
+                        "end" : 26,
+                        "field" : "tags[1]",
+                        "insideColorPhrase" : false,
+                        "mark" : null,
+                        "matchType" : "CONTEXT",
+                        "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "LOW",
+                        "ruleId" : "pure_color_description",
+                        "score" : null,
+                        "snippet" : "royal blue white pinstripe",
+                        "sourceIds" : [ ],
+                        "start" : 0,
+                        "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                      } ],
+                      "marketplace" : "ETSY",
+                      "riskLevel" : "HIGH",
+                      "rulesetVersion" : "trademark-risk-2026-11"
+                    }
+                  },
+                  "findings" : {
+                    "description" : "findings",
+                    "summary" : "A fresh check with findings",
+                    "value" : {
+                      "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+                      "cached" : false,
+                      "catalogVersion" : "synthetic-2026-11-0123456789ab",
+                      "checkId" : "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-10-30T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+                      "expiresAt" : "2026-11-29T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "end" : 6,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : "ZORVEX",
+                        "matchType" : "EXACT",
+                        "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "HIGH",
+                        "ruleId" : "catalog_exact",
+                        "score" : 1.0,
+                        "snippet" : "Zorvex",
+                        "sourceIds" : [ "S-001", "S-002" ],
+                        "start" : 0,
+                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                      }, {
+                        "end" : 31,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : null,
+                        "matchType" : "CONTEXT",
+                        "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "MEDIUM",
+                        "ruleId" : "geo_sport_combination",
+                        "score" : null,
+                        "snippet" : "Northvale Baseball",
+                        "sourceIds" : [ ],
+                        "start" : 13,
+                        "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                      }, {
+                        "end" : 26,
+                        "field" : "tags[1]",
+                        "insideColorPhrase" : false,
+                        "mark" : null,
+                        "matchType" : "CONTEXT",
+                        "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
+                        "otherRuleIds" : [ ],
+                        "risk" : "LOW",
+                        "ruleId" : "pure_color_description",
+                        "score" : null,
+                        "snippet" : "royal blue white pinstripe",
+                        "sourceIds" : [ ],
+                        "start" : 0,
+                        "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                      } ],
+                      "marketplace" : "ETSY",
+                      "riskLevel" : "HIGH",
+                      "rulesetVersion" : "trademark-risk-2026-11"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/TrademarkCheckResult"
+                }
+              }
+            },
+            "description" : "The trademark check result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-request" : {
+                    "description" : "invalid-request",
+                    "value" : {
+                      "code" : "invalid-request",
+                      "detail" : "The request is not valid; see errors.",
+                      "errors" : [ {
+                        "field" : "listing",
+                        "message" : "must not be null"
+                      } ],
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-request"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request (code `invalid-request`) or unknown marketplace (`unknown-marketplace`)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "plan-not-allowed",
+                  "detail" : "The FREE plan does not include trademark-risk. Ask the operator for a plan that does.",
+                  "instance" : "/api/v1/trademark-checks",
+                  "pack" : "trademark-risk",
+                  "plan" : "FREE",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 403,
+                  "title" : "Forbidden",
+                  "type" : "urn:listing-guard:problem:plan-not-allowed"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The client's plan does not include this pack (code `plan-not-allowed`; only where plans are on). Retrying does not help."
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "payload-too-large",
+                  "detail" : "The request body is larger than the limit of 262144 bytes.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 413,
+                  "title" : "Payload Too Large",
+                  "type" : "urn:listing-guard:problem:payload-too-large"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request body is over the size limit (256 KB)."
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not application/json (code `unsupported-media-type`)."
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`)."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "quota-exceeded" : {
+                    "description" : "quota-exceeded",
+                    "value" : {
+                      "code" : "quota-exceeded",
+                      "detail" : "The monthly quota of the FREE plan is used up (20 of 20). It resets at 2026-12-01T00:00:00Z. Results already stored are still answered from the cache.",
+                      "instance" : "/api/v1/checks",
+                      "plan" : "FREE",
+                      "quota" : 20,
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "resetAt" : "2026-12-01T00:00:00Z",
+                      "status" : 429,
+                      "title" : "Too Many Requests",
+                      "type" : "urn:listing-guard:problem:quota-exceeded",
+                      "used" : 20
+                    }
+                  },
+                  "rate-limited" : {
+                    "description" : "rate-limited",
+                    "value" : {
+                      "code" : "rate-limited",
+                      "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 429,
+                      "title" : "Too Many Requests",
+                      "type" : "urn:listing-guard:problem:rate-limited"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Two different answers, told apart by `code`. `rate-limited`: too many requests for the calling client (the same limit as the other endpoints); retry after the Retry-After header. `quota-exceeded` (only where plans are on): the month's quota of the client's plan is used up; there is no Retry-After, and retrying before `resetAt` does not help. A result already stored is still answered."
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "trademark-not-configured",
+                  "detail" : "Trademark checks are unavailable: no catalog version is configured (listing-guard.trademark.catalog-version)",
+                  "instance" : "/api/v1/trademark-checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 503,
+                  "title" : "Service Unavailable",
+                  "type" : "urn:listing-guard:problem:trademark-not-configured"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Trademark checks are not available on this server: no catalog is configured or the configured one is refused (code `trademark-not-configured`). `POST /api/v1/checks` is not affected. Retrying does not help; an operator must configure a catalog."
+          }
+        },
+        "summary" : "Check a listing for possible trademark references",
+        "tags" : [ "Trademark checks" ]
+      }
+    },
+    "/api/v1/trademark-checks/{id}" : {
+      "get" : {
+        "description" : "Returns the stored result of an earlier trademark check of the calling client while it is retained, in the same shape as the POST response (`cached` is false). After `expiresAt`, for an unknown id and for another client's check the answer is the same 404.",
+        "operationId" : "get_1",
+        "parameters" : [ {
+          "description" : "checkId returned by POST /api/v1/trademark-checks",
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
+                  "cached" : false,
+                  "catalogVersion" : "synthetic-2026-11-0123456789ab",
+                  "checkId" : "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+                  "completeness" : "COMPLETE",
+                  "createdAt" : "2026-10-30T09:15:30.123456Z",
+                  "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+                  "expiresAt" : "2026-11-29T09:15:30.123456Z",
+                  "failedRuleIds" : [ ],
+                  "findings" : [ {
+                    "end" : 6,
+                    "field" : "title",
+                    "insideColorPhrase" : false,
+                    "mark" : "ZORVEX",
+                    "matchType" : "EXACT",
+                    "message" : "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
+                    "otherRuleIds" : [ ],
+                    "risk" : "HIGH",
+                    "ruleId" : "catalog_exact",
+                    "score" : 1.0,
+                    "snippet" : "Zorvex",
+                    "sourceIds" : [ "S-001", "S-002" ],
+                    "start" : 0,
+                    "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                  }, {
+                    "end" : 31,
+                    "field" : "title",
+                    "insideColorPhrase" : false,
+                    "mark" : null,
+                    "matchType" : "CONTEXT",
+                    "message" : "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
+                    "otherRuleIds" : [ ],
+                    "risk" : "MEDIUM",
+                    "ruleId" : "geo_sport_combination",
+                    "score" : null,
+                    "snippet" : "Northvale Baseball",
+                    "sourceIds" : [ ],
+                    "start" : 13,
+                    "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                  }, {
+                    "end" : 26,
+                    "field" : "tags[1]",
+                    "insideColorPhrase" : false,
+                    "mark" : null,
+                    "matchType" : "CONTEXT",
+                    "message" : "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
+                    "otherRuleIds" : [ ],
+                    "risk" : "LOW",
+                    "ruleId" : "pure_color_description",
+                    "score" : null,
+                    "snippet" : "royal blue white pinstripe",
+                    "sourceIds" : [ ],
+                    "start" : 0,
+                    "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                  } ],
+                  "marketplace" : "ETSY",
+                  "riskLevel" : "HIGH",
+                  "rulesetVersion" : "trademark-risk-2026-11"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/TrademarkCheckResult"
+                }
+              }
+            },
+            "description" : "The stored result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The id is not a UUID."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "trademark-check-not-found",
+                  "detail" : "No trademark check with id 0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+                  "instance" : "/api/v1/trademark-checks/0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 404,
+                  "title" : "Not Found",
+                  "type" : "urn:listing-guard:problem:trademark-check-not-found"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No retained trademark check with this id for the calling client (code `trademark-check-not-found`). A check of another client, an id that never existed and an expired check give the same answer."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read a stored trademark check",
+        "tags" : [ "Trademark checks" ]
+      }
+    },
+    "/api/v1/usage" : {
+      "get" : {
+        "description" : "Returns the client's plan, its quota per UTC month, how much of the current month is used and when it resets. One unit is one new result that is stored, per endpoint: a result answered from the cache (`cached: true`) costs nothing, and a full check of one listing (rules and trademark) is two units. `enforced` is false on a deployment where plans are off; then nothing is limited, `monthlyQuota` and `remaining` are null and `packs` lists every pack. This call is never refused for plan or quota and costs no unit.",
+        "operationId" : "usage",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "enforced" : true,
+                  "monthlyQuota" : 1000,
+                  "packs" : [ "batch", "listing-rules", "personalization-screening", "sheet-connector", "trademark-risk", "variation-checks" ],
+                  "periodStart" : "2026-11-01",
+                  "plan" : "SELLER",
+                  "remaining" : 958,
+                  "resetAt" : "2026-12-01T00:00:00Z",
+                  "used" : 42
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Usage"
+                }
+              }
+            },
+            "description" : "The plan and the usage of the current UTC month."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read the plan and the monthly usage of the calling client",
+        "tags" : [ "Usage" ]
+      }
+    },
+    "/api/v1/variation-checks" : {
+      "post" : {
+        "description" : "Takes a variation family: for Amazon a `parent` and its `children`, for Etsy the `variation_properties` and the `children` (see docs/input-schema.md, \"Variation checks\"). It is not the `/checks` envelope: a family is not a listing. Checks that the parent and its children are consistent (parent SKU, theme and its attributes, apparel size attributes, repeated combinations and SKUs, children that look like different products) and, for Etsy, the limits on variation types. The result is a reference warning built on secondary sources and internal heuristics, not a statement of the marketplace; show the `disclaimer` with it. It proposes no fix and no replacement value. If the same client already sent the same family with the same analysisVersion and the stored result is complete and still retained, it is returned with `cached: true`. An INCOMPLETE result (a rule failed) is stored so its id can be read again, and is never reused for another request. A new complete result counts one unit of the client's monthly quota where plans are on (see `GET /api/v1/usage`); a cached or an INCOMPLETE one costs nothing. Results are kept for a limited time (`expiresAt`); only the family's hash and the result are stored, not the family itself.",
+        "operationId" : "check",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "examples" : {
+                "amazon-family" : {
+                  "description" : "amazon-family",
+                  "summary" : "An Amazon parent with two children (synthetic)",
+                  "value" : {
+                    "children" : [ {
+                      "attributes" : {
+                        "body_type" : "regular",
+                        "color" : "Red",
+                        "size" : "S",
+                        "size_class" : "alpha",
+                        "size_system" : "as1"
+                      },
+                      "parent_sku" : "TEE-P",
+                      "sku" : "TEE-RED-S",
+                      "title" : "Retro Sunset Tee - Red - S"
+                    }, {
+                      "attributes" : {
+                        "body_type" : "regular",
+                        "color" : "Red",
+                        "size" : "M",
+                        "size_class" : "alpha",
+                        "size_system" : "as1"
+                      },
+                      "parent_sku" : "TEE-X",
+                      "sku" : "TEE-RED-M",
+                      "title" : "Retro Sunset Tee - Red - M"
+                    } ],
+                    "marketplace" : "AMAZON",
+                    "parent" : {
+                      "product_type" : "SHIRT",
+                      "sku" : "TEE-P",
+                      "title" : "Retro Sunset Tee",
+                      "variation_theme" : "Color-Size"
+                    }
+                  }
+                },
+                "etsy-family" : {
+                  "description" : "etsy-family",
+                  "summary" : "An Etsy listing with three variation types (synthetic)",
+                  "value" : {
+                    "children" : [ {
+                      "attributes" : {
+                        "Holiday" : "Christmas",
+                        "Primary color" : "Red",
+                        "Size" : "S"
+                      },
+                      "sku" : "TEE-RED-S"
+                    }, {
+                      "attributes" : {
+                        "Holiday" : "Christmas",
+                        "Primary color" : "Red",
+                        "Size" : "M"
+                      },
+                      "sku" : "TEE-RED-M"
+                    } ],
+                    "marketplace" : "ETSY",
+                    "variation_properties" : [ "Primary color", "Size", "Holiday" ]
+                  }
+                }
+              },
+              "schema" : {
+                "$ref" : "#/components/schemas/VariationCheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "cached" : {
+                    "description" : "cached",
+                    "summary" : "The same family again: the stored result",
+                    "value" : {
+                      "analysisVersion" : "d1f0b7c4e9a3582b6c0e4f7a1d9b3c5e8f2a4b6d0c1e3f5a7b9d1c3e5f708192",
+                      "cached" : true,
+                      "checkId" : "3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-11-06T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo dựa trên nguồn thứ cấp và quy tắc nội bộ, không phải xác nhận hay kết luận của Amazon hoặc Etsy.",
+                      "expiresAt" : "2026-12-06T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "field" : "children[1].parent_sku",
+                        "kind" : "child_parent_sku_mismatch",
+                        "message" : "Child thứ 2 có parent_sku 'TEE-X', khác SKU của parent 'TEE-P'.",
+                        "relatedFields" : [ "parent.sku" ],
+                        "ruleId" : "parent_child_structure",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "SECONDARY",
+                        "suggestion" : "Sửa parent_sku của child này cho trùng SKU của parent 'TEE-P', hoặc đưa child sang parent đúng.",
+                        "value" : "TEE-X"
+                      } ],
+                      "marketplace" : "AMAZON",
+                      "rulesetVersion" : "variation-checks-2026-11",
+                      "summary" : {
+                        "errors" : 0,
+                        "infos" : 0,
+                        "warnings" : 1
+                      }
+                    }
+                  },
+                  "findings" : {
+                    "description" : "findings",
+                    "summary" : "A fresh check with a finding",
+                    "value" : {
+                      "analysisVersion" : "d1f0b7c4e9a3582b6c0e4f7a1d9b3c5e8f2a4b6d0c1e3f5a7b9d1c3e5f708192",
+                      "cached" : false,
+                      "checkId" : "3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+                      "completeness" : "COMPLETE",
+                      "createdAt" : "2026-11-06T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo dựa trên nguồn thứ cấp và quy tắc nội bộ, không phải xác nhận hay kết luận của Amazon hoặc Etsy.",
+                      "expiresAt" : "2026-12-06T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "field" : "children[1].parent_sku",
+                        "kind" : "child_parent_sku_mismatch",
+                        "message" : "Child thứ 2 có parent_sku 'TEE-X', khác SKU của parent 'TEE-P'.",
+                        "relatedFields" : [ "parent.sku" ],
+                        "ruleId" : "parent_child_structure",
+                        "severity" : "WARNING",
+                        "sourceStatus" : "SECONDARY",
+                        "suggestion" : "Sửa parent_sku của child này cho trùng SKU của parent 'TEE-P', hoặc đưa child sang parent đúng.",
+                        "value" : "TEE-X"
+                      } ],
+                      "marketplace" : "AMAZON",
+                      "rulesetVersion" : "variation-checks-2026-11",
+                      "summary" : {
+                        "errors" : 0,
+                        "infos" : 0,
+                        "warnings" : 1
+                      }
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/VariationCheckResult"
+                }
+              }
+            },
+            "description" : "The variation check result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-request" : {
+                    "description" : "invalid-request",
+                    "value" : {
+                      "code" : "invalid-request",
+                      "detail" : "The request is not valid; see errors.",
+                      "errors" : [ {
+                        "field" : "listing",
+                        "message" : "must not be null"
+                      } ],
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-request"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request (code `invalid-request`) or unknown marketplace (`unknown-marketplace`)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "plan-not-allowed",
+                  "detail" : "The FREE plan does not include trademark-risk. Ask the operator for a plan that does.",
+                  "instance" : "/api/v1/trademark-checks",
+                  "pack" : "trademark-risk",
+                  "plan" : "FREE",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 403,
+                  "title" : "Forbidden",
+                  "type" : "urn:listing-guard:problem:plan-not-allowed"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The client's plan does not include this pack (code `plan-not-allowed`; only where plans are on). Retrying does not help."
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "payload-too-large",
+                  "detail" : "The request body is larger than the limit of 262144 bytes.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 413,
+                  "title" : "Payload Too Large",
+                  "type" : "urn:listing-guard:problem:payload-too-large"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request body is over the size limit (256 KB)."
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not application/json (code `unsupported-media-type`)."
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`)."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "quota-exceeded" : {
+                    "description" : "quota-exceeded",
+                    "value" : {
+                      "code" : "quota-exceeded",
+                      "detail" : "The monthly quota of the FREE plan is used up (20 of 20). It resets at 2026-12-01T00:00:00Z. Results already stored are still answered from the cache.",
+                      "instance" : "/api/v1/checks",
+                      "plan" : "FREE",
+                      "quota" : 20,
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "resetAt" : "2026-12-01T00:00:00Z",
+                      "status" : 429,
+                      "title" : "Too Many Requests",
+                      "type" : "urn:listing-guard:problem:quota-exceeded",
+                      "used" : 20
+                    }
+                  },
+                  "rate-limited" : {
+                    "description" : "rate-limited",
+                    "value" : {
+                      "code" : "rate-limited",
+                      "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 429,
+                      "title" : "Too Many Requests",
+                      "type" : "urn:listing-guard:problem:rate-limited"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Two different answers, told apart by `code`. `rate-limited`: too many requests for the calling client (the same limit as the other endpoints); retry after the Retry-After header. `quota-exceeded` (only where plans are on): the month's quota of the client's plan is used up; there is no Retry-After, and retrying before `resetAt` does not help. A result already stored is still answered."
+          }
+        },
+        "summary" : "Check the variation structure of a listing",
+        "tags" : [ "Variation checks" ]
+      }
+    },
+    "/api/v1/variation-checks/{id}" : {
+      "get" : {
+        "description" : "Returns the stored result of an earlier variation check of the calling client while it is retained, in the same shape as the POST response (`cached` is false). After `expiresAt`, for an unknown id and for another client's check the answer is the same 404.",
+        "operationId" : "get",
+        "parameters" : [ {
+          "description" : "checkId returned by POST /api/v1/variation-checks",
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "analysisVersion" : "d1f0b7c4e9a3582b6c0e4f7a1d9b3c5e8f2a4b6d0c1e3f5a7b9d1c3e5f708192",
+                  "cached" : false,
+                  "checkId" : "3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+                  "completeness" : "COMPLETE",
+                  "createdAt" : "2026-11-06T09:15:30.123456Z",
+                  "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo dựa trên nguồn thứ cấp và quy tắc nội bộ, không phải xác nhận hay kết luận của Amazon hoặc Etsy.",
+                  "expiresAt" : "2026-12-06T09:15:30.123456Z",
+                  "failedRuleIds" : [ ],
+                  "findings" : [ {
+                    "field" : "children[1].parent_sku",
+                    "kind" : "child_parent_sku_mismatch",
+                    "message" : "Child thứ 2 có parent_sku 'TEE-X', khác SKU của parent 'TEE-P'.",
+                    "relatedFields" : [ "parent.sku" ],
+                    "ruleId" : "parent_child_structure",
+                    "severity" : "WARNING",
+                    "sourceStatus" : "SECONDARY",
+                    "suggestion" : "Sửa parent_sku của child này cho trùng SKU của parent 'TEE-P', hoặc đưa child sang parent đúng.",
+                    "value" : "TEE-X"
+                  } ],
+                  "marketplace" : "AMAZON",
+                  "rulesetVersion" : "variation-checks-2026-11",
+                  "summary" : {
+                    "errors" : 0,
+                    "infos" : 0,
+                    "warnings" : 1
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/VariationCheckResult"
+                }
+              }
+            },
+            "description" : "The stored result."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The id is not a UUID."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "variation-check-not-found",
+                  "detail" : "No variation check with id 3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73 was found for this client.",
+                  "instance" : "/api/v1/variation-checks/3c7a91f2-5d84-4b16-8e0a-6f2b9d4c1e73",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 404,
+                  "title" : "Not Found",
+                  "type" : "urn:listing-guard:problem:variation-check-not-found"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No retained variation check with this id for the calling client (code `variation-check-not-found`). A check of another client, an id that never existed and an expired check give the same answer."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client."
+          }
+        },
+        "summary" : "Read a stored variation check",
+        "tags" : [ "Variation checks" ]
+      }
+    },
+    "/health" : {
+      "get" : {
+        "description" : "200 when PostgreSQL can be queried, 503 otherwise. No API key needed.",
+        "operationId" : "health",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Health",
+        "tags" : [ "health-controller" ]
+      }
+    }
+  },
+  "security" : [ {
+    "ApiKeyAuth" : [ ]
+  } ],
+  "tags" : [ {
+    "description" : "Possible trademark references in a listing's text, as a reference warning.",
+    "name" : "Trademark checks"
+  }, {
+    "description" : "Counts of the calling client's stored results over a period.",
+    "name" : "Reports"
+  }, {
+    "description" : "Structure of a listing's parent/child variations, as a reference warning.",
+    "name" : "Variation checks"
+  }, {
+    "description" : "Check a listing and read stored results.",
+    "name" : "Checks"
+  }, {
+    "description" : "The text a buyer typed for a custom product: can it be printed, and does it look like a protected name.",
+    "name" : "Personalization screening"
+  }, {
+    "description" : "The limits of the rules that check a listing.",
+    "name" : "Rulesets"
+  }, {
+    "description" : "The calling client's plan and monthly quota.",
+    "name" : "Usage"
+  } ]
+}

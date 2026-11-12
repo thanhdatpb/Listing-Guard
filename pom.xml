@@ -21,6 +21,7 @@
         <module>image-checker</module>
         <module>api</module>
         <module>mcp-server</module>
+        <module>contract-tools</module>
     </modules>
 
     <properties>
@@ -36,6 +37,12 @@
             repository moves to Jackson 3 (ADR-020).
         -->
         <jackson-2-bom.version>2.23.0</jackson-2-bom.version>
+        <!--
+            The release version of this build, sent by the API as X-Listing-Guard-Version (ADR-022). `dev` unless the build
+            names one: the release workflow builds the image with -Dlisting-guard.release=<tag without the v> (Dockerfile
+            argument LISTING_GUARD_RELEASE). The project version stays 0.1.0-SNAPSHOT; it is not the release.
+        -->
+        <listing-guard.release>dev</listing-guard.release>
     </properties>
 
     <dependencyManagement>
