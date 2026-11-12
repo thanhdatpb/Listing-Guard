@@ -240,5 +240,28 @@ services:
     volumes:
       - ./health-report:/health-report
 
+  # Compares maintainer-saved policy documents with the stored hash snapshot; it never downloads or calls a model.
+  #   docker compose -f docker-compose.prod.yml --profile prod --profile policy-diff run --rm policy-diff [--dry-run]
+  policy-diff:
+    image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
+    profiles: ["policy-diff"]
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: policy-diff
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      LISTING_GUARD_POLICY_MONITOR_MANIFEST: /policies/manifest.yaml
+      LISTING_GUARD_POLICY_MONITOR_RAW_DIR: /policies/raw
+      LISTING_GUARD_POLICY_MONITOR_REPORT_DIR: /policy-monitor
+      LISTING_GUARD_POLICY_MONITOR_STALE_DAYS: ${POLICY_MONITOR_STALE_DAYS:-90}
+      LISTING_GUARD_POLICY_MONITOR_KEEP_REPORTS: ${POLICY_MONITOR_KEEP_REPORTS:-12}
+    volumes:
+      - ./policies:/policies:ro
+      - ./policy-monitor:/policy-monitor
+
 volumes:
   listing_guard_postgres_data:

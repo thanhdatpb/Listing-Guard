@@ -1,0 +1,14 @@
+# One-shot local-file job: no web server and no network client.
+spring:
+  main:
+    web-application-type: none
+
+listing-guard:
+  embedding:
+    provider: hashing
+  policy-monitor:
+    manifest: /policies/manifest.yaml
+    raw-dir: /policies/raw
+    report-dir: /policy-monitor
+    stale-days: 90
+    keep-reports: ${POLICY_MONITOR_KEEP_REPORTS:12}

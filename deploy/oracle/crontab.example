@@ -14,5 +14,8 @@
 # lock (a run still converting makes the next one exit with 75), checks free disk and logs to logs/uspto-sync/.
 # 0 11 * * * cd /opt/listing-guard && ./deploy/oracle/uspto-sync.sh
 
+# Policy changes are saved by a maintainer first; this monthly job only compares local files and writes reports.
+# 0 5 1 * * cd /opt/listing-guard && ./deploy/oracle/policy-diff.sh
+
 # Remove dangling image layers only; tagged previous releases remain available for rollback.
 30 4 * * 0 cd /opt/listing-guard && docker image prune --force
