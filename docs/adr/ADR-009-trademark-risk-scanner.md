@@ -799,12 +799,260 @@ Nice classes per product type are right, and whether a product type needs more t
 touch class 16 or 25); (6) the TSDR address (above); (7) whether `product_type` should come from the listing itself where the
 marketplace has a field for it.
 
+## Scheduled USPTO sync (job `uspto-sync`, PR A2d)
+
+A deployment needs a catalog of real marks that is **updated on a schedule**, can be **rolled back**, and never puts data in
+the repository. PR A2d adds the one-shot job `uspto-sync` (profile and compose service of that name, off unless run, never
+part of the API process), two additive migrations (V31, the catalog activation log; V32, the sync state), a mode of the
+trademark runtime that follows the activation log, and admin commands that list and roll back catalog versions. It changes
+nothing in `/checks`, the trademark ruleset, the matcher, the canonical input hash, `jsonl-1`, the merge rule of the import or
+the A2c conversion rules.
+
+**Status (2026-11-12).** Written and tested with synthetic data only. The maintainer has **no USPTO Open Data Portal (ODP)
+API key yet** (the ID.me identity check is pending), and none of the ODP pages could be read (below), so **the download part
+is unverified from end to end and off by default**. The offline modes (`--input-dir`, `--backfile`) are the supported path
+until a key exists. The converter it runs is still unverified against a real file (A2b, A2c).
+
+### Sources
+
+| Data | Product (ODP identifier) | Files | Status |
+|---|---|---|---|
+| Daily applications: the changes of one day, TDXF (DTD V2.0, the format of A2b) | Trademark Full Text XML Data (No Images), Daily Applications, `TRTDXFAP` | one zip a day, `apcYYMMDD.zip`, holding the XML | identifier and names **unverified** (from memory of the bulk-data product; no page was readable) |
+| Annual applications: the whole register up to the end of a year (the backfile) | Trademark Full Text XML Data (No Images), Annual Applications, `TRTYRAP` | several zips, `apc18840407-YYYYMMDD-NN.zip`, `YYYYMMDD` the last day covered, `NN` the part | identifier, names, the part numbering and the claim that the annual set has the same DTD as the daily files are **unverified** |
+
+The patterns that read a date from a name are settings (`daily-name-pattern`, `backfile-name-pattern`), not Java, so a
+different real name is a configuration change. A daily file holds changes only (A2b), which is why a backfile comes first.
+
+**Pages tried on 2026-11-12, none readable.** Each answered HTTP 200 with an empty body (the portal is a JavaScript page; a plain
+fetch gets no text). Nothing was fetched around that, and nothing was taken from a mirror or a third party. These are the pages
+the maintainer opens in a browser to settle what is marked unverified here:
+
+- <https://data.uspto.gov/apis/getting-started> (base URL, the key, the header)
+- <https://data.uspto.gov/apis/bulk-data/search>, <https://data.uspto.gov/apis/bulk-data/product> and
+  <https://data.uspto.gov/apis/bulk-data/download> (paths, parameters, response fields, redirects)
+- <https://data.uspto.gov/apis/api-rate-limits> (limits, 429, `Retry-After`)
+- <https://data.uspto.gov/swagger/index.html> (the OpenAPI description)
+- <https://data.uspto.gov/bulkdata/datasets/trtdxfap> and <https://data.uspto.gov/bulkdata/datasets/trtyrap> (identifiers, names,
+  release time, sizes, number of annual files)
+- <https://data.uspto.gov/terms-of-use> and <https://www.uspto.gov/terms-use-uspto-websites> (terms of the data and of the API)
+
+### Terms
+
+The maintainer states that USPTO bulk data is in the public domain. No terms page could be read (above), so that statement is
+**unverified here** and the terms of the API itself (automated use, rate, attribution) are unknown. The job refuses to run until
+the operator writes the terms they checked in `listing-guard.trademark.uspto.sync.catalog.license` (`USPTO_SYNC_LICENSE`); that
+text is stored with every catalog version (`trademark_catalog_version.source_license`, `trademark_catalog_source.license`), as
+the manifest has always required. The data stays in `catalogs/raw/` (git-ignored); the repository holds code and synthetic
+test files only.
+
+### Decision 1: a catalog is the conversion of one backfile set and every daily file after it
+
+A2c rejected state kept between runs: a catalog version is a reproducible conversion of named files. The sync keeps that.
+Each run that has new input converts, in one A2c run (latest transaction wins, the filters), the **active backfile set**
+(every file of the newest complete set) and **every stored daily file whose date is after the last day the backfile covers**,
+then imports the output as a new catalog version. Same files, same filters, status map and normalization: same output, same
+SHA-256, same catalog version (the import finds it and writes nothing).
+
+- *Cost.* Every run with new input reads every input twice (A2c). The size of the backfile and the time a run takes on the A1
+  machine are **unmeasured**. A run with no new input does not convert: the job compares a digest of its inputs (names, SHA-256,
+  kinds, the versions and hashes of the filters and status map, the normalization identity and the catalog settings) with the
+  runs before and reuses the catalog version those inputs made.
+- *Bound.* A2c reads at most 1,023 files in one run; one zip entry is one file. A new annual backfile (yearly) restarts the
+  daily list, which keeps runs bounded; the job refuses a run over the limit and says to load a newer backfile.
+- *Rejected:* converting only the new daily files and merging them into the previous catalog (a catalog would depend on the
+  history of runs, A2c Decision 2); a "base snapshot" of the backfile's latest records that daily runs merge into (it keeps
+  reproducibility and cuts the cost, but it is a new intermediate format in the converter; it is the follow-up if a full run is
+  too slow on the A1 machine).
+
+### Decision 2: files are kept as downloaded and read inside the zip; nothing is extracted
+
+The sync stores each zip as it came and the converter reads each XML entry as a stream from the zip (`UsptoArchive`), so the
+disk holds the compressed size, not the XML. Extracting a backfile would need many times its compressed size (unmeasured).
+Every archive is checked when it is stored (downloaded or copied) and again when it is read:
+
+- at most `archive.max-entries` entries (16); a duplicate name, an encrypted entry or an archive with no `.xml` entry is refused;
+- an entry name that is absolute, has a drive letter, a `..` segment, a backslash or a control character is refused. Nothing is
+  written from an archive, so a "zip slip" cannot write a file anyway; the names are still refused so a crafted archive never
+  passes as a USPTO file;
+- an entry whose declared size is over `archive.max-entry-size` (64 GB) or whose declared ratio is over `archive.max-ratio`
+  (200 to 1) is refused, and the stream that reads it stops at the same limits whatever the header claims;
+- the whole archive is read once at storage and every entry's CRC-32 is compared, so a damaged file is found before it is
+  used; a damaged file is retried (download), an unsafe one is not.
+
+A plain `.xml` file (an operator who unzipped) is accepted too and read as it is.
+
+### Decision 3: the sync state is in the database (V32)
+
+- `uspto_sync_file`: one row per file the sync knows, unique by kind (`DAILY`, `BACKFILE`) and name: the date its name gives
+  (daily: the day; backfile: the last day covered), origin (`DOWNLOAD`, `OFFLINE`), size and SHA-256 of the stored file, the size
+  and checksum the source listed (when it lists them), status (`PENDING`, `STORED`, `FAILED`, `IGNORED`, `REMOVED`), attempts, the
+  last error (bounded, never a key or a URL with a secret), `stored_at` (when the verified file was stored) and `updated_at`.
+- `uspto_sync_run`: one row per run: mode (`OFFLINE`, `DOWNLOAD`, `STORE`), whether it loaded a backfile, the status (`RUNNING`,
+  `ACTIVATED`, `IMPORTED`, `NO_CHANGE`, `BLOCKED`, `FAILED`), counts, the input digest, the conversion totals, the catalog version
+  it made or reused and a bounded message. A run left `RUNNING` by a crash is marked `FAILED` by the next one.
+- A file that is `STORED` is never fetched or copied again. A file with the same name and another SHA-256 is refused (a stored
+  file does not change; if the USPTO republishes a file under the same name the operator decides, question 4 below). `PENDING` and
+  `FAILED` files are retried by the next run, so **a run after a failure fetches only what is missing**.
+- A **daily** file after the backfile that is `PENDING` or `FAILED` **blocks** the run (`BLOCKED`): converting without it could
+  let an older record win (A2c). `--ignore-file=<name> --reason=<text>` marks one `IGNORED` on purpose (recorded with the
+  reason), and it is then left out. A backfile set is used only when complete: no file of it `PENDING` or `FAILED`.
+- **Offline**, the job cannot know that a file is missing. A backfile given with `--backfile` is registered all or nothing; when
+  the name pattern has a `part` group the parts must run from 1 without a gap (the last part cannot be checked). For daily files
+  the job warns when two stored days are more than `daily-gap-warning-days` (4) apart; the USPTO release calendar is unknown, so it
+  is a warning, not a block.
+
+### Decision 4: which catalog is served is an activation log (V31) that the runtime can follow
+
+Until now the served catalog was named in `listing-guard.trademark.catalog-version` and changed with a restart. That stays the
+default and is unchanged. **A new opt-in mode** serves what the activation log says:
+
+- `trademark_catalog_activation` is append-only: catalog version id and its name (kept as text, so the history survives a
+  deleted version), reason (`SYNC`, `ROLLBACK`, `MANUAL`), the sync run, the time and a note. The latest row names the served
+  version. It is not "latest import": only an explicit activation changes it, after the import succeeded.
+- `listing-guard.trademark.activation.follow=true` (`TRADEMARK_FOLLOW_ACTIVATION`) makes `TrademarkCatalogRuntime` read the log
+  instead of `catalog-version`; both set at once stops the start-up (one source of truth). The API re-reads the log every
+  `activation.refresh-interval` (1 minute) and swaps the scanner and fingerprint in one step, so a request uses one consistent
+  catalog; a job (batch, report) reads it once at start-up. The normalization guard of A2 still applies (`REFUSED`), and with no
+  activation the state is `DISABLED`. `GET /api/v1/capabilities` reads the runtime as before, so it shows the new state with no
+  change to the endpoint.
+- **A DEMO catalog cannot be activated**, and the runtime refuses one found in the log: the DEMO flag of `/capabilities` and of
+  the console is decided from `catalog-version` (`TrademarkProperties.isDemo`), so serving a `demo-` version through the log would hide
+  the banner. A DEMO catalog is served through `catalog-version` only, as before.
+- **When the sync activates**: only after an import that succeeded from a conversion that is `COMPLETE` (the sync always converts
+  `strict`, so a problem stops the run before anything is imported); only when a backfile set is active (`require-backfile`, on);
+  not when the new version has fewer than `min-loaded-ratio` (0.9) of the entries of the served one (a sign of a lost file), unless
+  `--force-activate`; not with `--no-activate` (import, review, then activate by hand); and **not after a rollback**: while the
+  latest activation is a `ROLLBACK`, the sync imports and leaves the activation to the operator, so a scheduled run does not undo
+  a rollback. `catalog activate <version>` (a `MANUAL` activation) ends that hold.
+- **Retention.** The sync keeps the `keep-versions` (3, at least 2) newest catalog versions it made, the served one whatever its
+  age, and any version that was activated within `prune-grace` (1 day), so an API that has not refreshed yet never loses its
+  catalog. An older one is deleted (entries, then the version; its source rows go by cascade) with its `jsonl-1` file; a version
+  that a retained trademark result still names cannot be deleted (foreign key of V17) and is left for a later run. A catalog
+  imported by hand is never deleted by the sync.
+- **One at a time.** The job holds the PostgreSQL advisory lock `(1279743315, 1398361667)` ("LGUS", "SYNC"), reserved for the USPTO
+  sync and the catalog admin commands, for its whole run on its own connection; the admin commands `catalog activate` and
+  `catalog rollback` take it too and refuse while a sync runs. The Oracle script adds a host lock (`flock`).
+
+### Decision 5: the download, off by default
+
+When `download.enabled` is true and no `--input-dir` is given, the job lists the files of the daily product (or, with `--backfile`,
+of the annual product) and downloads what is missing. **Every endpoint, parameter and field name below is unverified**; they are
+settings, so a wrong one is fixed in configuration, without a build:
+
+| Setting (`listing-guard.trademark.uspto.sync.download.`) | Default | What it is |
+|---|---|---|
+| `base-url` | `https://api.uspto.gov` | the API host; the key is sent to this host only |
+| `api-key-header` | `X-API-KEY` | the header of the key (the name the maintainer gave) |
+| `product-path` | `/api/v1/datasets/products/{product}` | lists a product's files |
+| `daily-product`, `backfile-product` | `TRTDXFAP`, `TRTYRAP` | the two products |
+| `daily-query` | `fileDataFromDate={from}&fileDataToDate={to}&includeFiles=true` | the query of a daily listing, ISO dates, in windows of `list-window-days` (31) |
+| `backfile-query` | `includeFiles=true` | the query of the backfile listing; the newest complete set by last day is taken |
+| `files-pointer` | `/bulkDataProductBag/0/productFileBag/fileDataBag` | JSON pointer to the list of files in the answer |
+| `fields.name`, `fields.size`, `fields.url`, `fields.checksum` | `fileName`, `fileSize`, `fileDownloadURI`, none | the fields of one file; a checksum is checked only when a field is named (`checksum-algorithm`, `SHA-256` or `MD5`) |
+| `file-path` | `/api/v1/datasets/products/files/{product}/{file}` | the download path when an entry has no URL |
+| `allowed-hosts` | `api.uspto.gov` | the only hosts a download URL or a redirect may name |
+
+- **The key** comes only from the environment (`LISTING_GUARD_USPTO_ODP_API_KEY`), goes only in the header to the `base-url`
+  host over HTTPS, and is never logged, printed, stored or put in an error (a message that would contain it has it replaced). The
+  settings' `toString` hides it. A `401` or `403` stops the run and says to check the key.
+- **Redirects** are followed by the job, not by the HTTP client: at most `max-redirects` (5), HTTPS only, only to an allowed host,
+  and the key header is dropped as soon as the host differs from `base-url`. A redirect to another host stops with a message that
+  names the host, so the operator decides whether to allow it (verification step 5).
+- **Names** from the listing are used only when they match the daily or backfile pattern and are plain file names; anything else is
+  skipped and reported, never used as a path.
+- **Rate and retries.** At least `min-interval` (2 seconds) between the start of two requests. `429`, `500`, `502`, `503`, `504`, a
+  timeout, a connection lost in the middle of a body, a size or checksum that differs and a damaged archive are retried up to
+  `max-attempts` (5) with a delay that doubles from `initial-backoff` (5 seconds) to `max-backoff` (5 minutes); a `Retry-After` is
+  honored, and one longer than `max-backoff` ends the run (the next run continues). A `404` marks the file `FAILED` at once; an
+  unsafe archive is not retried. `connect-timeout` (30 seconds) and `read-timeout` (120 seconds without a byte) bound a stalled
+  connection. At most `max-files-per-run` (60) files per run (`--max-files`), and no file over `max-file-size` (20 GB).
+- **Partial files** go to `<name>.part` and are renamed only after the size, the checksum (if any) and the archive checks pass, so
+  a crash never leaves a file that looks complete. A download does not resume from the middle; it starts again.
+- **Free disk.** Before a download, a copy or a conversion the job checks that `min-free-disk` (5 GB) plus the expected size is free
+  and stops otherwise; the Oracle script also warns and refuses to start below its own thresholds.
+- `--dry-run` lists what the source offers and what is missing (or, offline, what would be registered), downloads nothing and
+  writes nothing.
+
+### Schedule
+
+- **Offline** (now): the operator runs the job by hand after placing files in a folder of `catalogs/raw/` (first `--backfile`,
+  then daily files). No network.
+- **With the download** (after verification): once a day, after the USPTO has published the day's file. The release time is
+  **unverified**; the example cron of `deploy/oracle/` runs at 11:00 UTC and is commented out until the download is verified. A run
+  with nothing new costs one listing request and ends `NO_CHANGE`. A missed day is caught by the next run (the listing is by date
+  range from the backfile on, not "today").
+- Never two at once: `flock` on the host and the advisory lock in the database.
+
+### Storage
+
+- Files under `catalogs/raw/uspto-sync/` (`listing-guard.trademark.uspto.sync.dir`): `files/backfile/`, `files/daily/` (the
+  archives as stored), `catalog/raw/<label>-<digest>.jsonl` with its `.report.json` (the A2c report), and `catalog/manifest.yaml`,
+  written by the job with one `sources:` entry (`source_key: uspto`, so `sourceLinks` work) per retained catalog it made. The
+  import reads that manifest like the `trademark-import` job does, so a catalog can also be imported by hand from it.
+- Database: V31 and V32, plus the catalog versions themselves (each holds its entries and their trigram index). The size of a
+  real catalog, of a backfile and of the database dumps it adds are **unmeasured**; each retained version is a full copy of the
+  entries, so `keep-versions` multiplies the catalog's share of the database and of every backup (R2 included).
+- A superseded backfile set and the daily files before it stay on disk (they are no longer read) until the operator removes them;
+  the job lists them and their size at the end of a run.
+
+### Rollback
+
+`docker compose ... run --rm admin catalog list` shows every catalog version (served one marked, entries, import time, source date,
+whether the sync made it) and the latest activations. `catalog rollback` activates the version served before the current one
+(skipping versions that are gone), `catalog rollback --to=<version>` a named one, and `catalog activate <version>` any stored
+version that is not DEMO and whose normalization identity is the active one. Each writes a row of the log; an API that follows the
+log serves it within the refresh interval, with no restart. A rollback does not delete anything and does not touch the files.
+With `follow=false` the log changes nothing and the commands say so.
+
+### Risks
+
+- The ODP endpoints, parameters, fields, file names, release time, limits and terms are unverified: the first download may fail
+  or list nothing. The settings and `--dry-run` exist for that.
+- The converter is unverified against real data (A2b, A2c). The sync converts `strict`, so a real file that breaks an assumption
+  (for example records without `transaction-date`, A2c question 4) stops the sync with a message and the served catalog stays as
+  it was. That is the safe failure, but the sync is then stuck until the converter is fixed.
+- A full conversion of the backfile may take long and use the heap of `max-distinct-serials` (the job's heap is a compose setting).
+- Disk: archives, one `jsonl-1` per retained version, the versions in the database and their share of the backups. The job and the
+  script check free space; nothing is measured yet.
+- Offline mode cannot know that a daily file is missing; the gap warning is a heuristic.
+- A catalog that loses many entries at once is held by the ratio gate; one that loses a few is not, which is what daily changes
+  look like.
+- The served catalog changes under a running API (by design); results already stored keep the version that made them, and the
+  cache identity contains the catalog version, so no result of one version is returned for another.
+
+### Verification steps when the key exists
+
+1. Open the pages listed under "Sources" in a browser and write down: base URL, the key header, the listing path and its
+   parameters (date format), the JSON path of the file list and the fields of a file (name, size, URL, any checksum), whether a
+   download redirects and to which host, the rate limits, the file names of both products, the release time and the terms.
+2. Put the key in `.env` as `LISTING_GUARD_USPTO_ODP_API_KEY` (never in a command line), and compare step 1 with the table of
+   Decision 5. Write each difference into `catalogs/raw/uspto-sync.override.yml` (read by the compose service), not into code.
+3. `uspto-sync --dry-run` with `USPTO_SYNC_DOWNLOAD_ENABLED=true` for that one command: it must list the daily files of the period
+   and say which are missing. A wrong path or field gives a message that names the setting.
+4. Download one file: `--max-files=1`. Check the stored size and SHA-256 against the portal's figures.
+5. If the download stops on a redirect to a host that is not allowed, decide whether that host may be added to `allowed-hosts`.
+6. Run the backfile (`--backfile`, or offline with the files from the portal) with `--no-activate`, read the `.report.json`
+   (`completeness`, `recordErrors`, `files`), check a few marks with `admin catalog list` and a trademark check, then
+   `admin catalog activate <version>`.
+7. Switch the API to `TRADEMARK_FOLLOW_ACTIVATION=true` (and empty `TRADEMARK_CATALOG_VERSION`), check `GET /api/v1/capabilities`
+   (`READY`, `demo: false`), then enable the cron line.
+
+### Questions for the maintainer
+
+(1) Is `keep-versions` 3 right for the database and backup size, once a real catalog is measured? (2) Should the job also delete
+superseded backfile files and daily files by itself? (3) Is a strict conversion right for the sync (one bad record stops it), or
+should a bounded number of record errors be accepted? (4) What should happen when the USPTO republishes a file under the same name
+with other content (now: refused until the operator acts)? (5) Is the ratio gate of 0.9 right? (6) Should the TSDR links and the
+release time be checked as part of the first real run?
+
 ## Offline data and source governance
 
 The importer accepts only local files and is a one-shot administrative job. It validates the
 declared format, source/rights metadata and file hash before writing a batch. Re-importing the same
 source/version/hash is idempotent; a changed file or source version creates a new catalog version.
-No API call or external fetch occurs during checking or importing.
+No API call or external fetch occurs during checking or importing. The `uspto-sync` job (above) may
+download files in a separate step of its own when its download is switched on; the checks and the
+import itself still never fetch.
 
 Only manifest metadata is committed. Raw source files are kept outside the repository or under a
 git-ignored raw-data directory, following the `policies/` convention where applicable; never commit
@@ -879,6 +1127,7 @@ ruleset that an earlier PR did not already contain.
 | A3 | `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}`, result tables, cache identity, retention and cleanup, OpenAPI and integration guide (done; see "Endpoint (PR A3)"). | A2 |
 | A4 | Synthetic tuning and held-out datasets, the evaluation run and its gate. | A2 (may run in parallel with A3) |
 | A5 | Product types with Nice classes, `sourceLinks` and generic words in ruleset `trademark-risk-2026-11b`, V28; see "Product classes, source links and generic words" (done). | A3 |
+| A2d | The `uspto-sync` job (offline folders and a backfile first, the ODP download off by default and unverified), the sync state (V32), the catalog activation log that the runtime can follow (V31) and the admin commands to list and roll back catalog versions; see "Scheduled USPTO sync (job `uspto-sync`, PR A2d)". | A2c |
 
 Acceptance criteria below are met by the PR that owns the code they test: Unicode, homoglyph/leet,
 boundaries, matching, context rules, aggregation, incomplete results, input hash, evidence spans and the
