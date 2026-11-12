@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.api.client;
 
 import com.thanhdatpb.listingguard.api.plan.PlanCode;
+import com.thanhdatpb.listingguard.api.trademark.CatalogAdminCommands;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
@@ -15,6 +16,7 @@ import org.springframework.boot.ApplicationArguments;
  * client activate &lt;name&gt;         client deactivate &lt;name&gt;
  * key create &lt;client&gt; [--label=&lt;text&gt;]     key list &lt;client&gt;     key revoke &lt;keyId&gt;
  * plan set &lt;client&gt; &lt;plan&gt;      (ADR-013: FREE, SELLER or PRO)
+ * catalog list     catalog activate &lt;version&gt;     catalog rollback [--to=&lt;version&gt;]   (ADR-009, PR A2d)
  * </pre>
  */
 public final class AdminCommands {
@@ -28,13 +30,22 @@ public final class AdminCommands {
               key create <client> [--label=<text>]
               key list <client>
               key revoke <keyId>
-              plan set <client> <plan>   (plan: FREE, SELLER or PRO)""";
+              plan set <client> <plan>   (plan: FREE, SELLER or PRO)
+            """ + CatalogAdminCommands.USAGE;
 
     private final ClientProvisioning provisioning;
+    private final CatalogAdminCommands catalog;
     private final PrintStream out;
 
+    /** Without the {@code catalog} commands. */
     public AdminCommands(ClientProvisioning provisioning, PrintStream out) {
+        this(provisioning, null, out);
+    }
+
+    /** @param catalog the {@code catalog} commands (ADR-009, PR A2d); null leaves them out */
+    public AdminCommands(ClientProvisioning provisioning, CatalogAdminCommands catalog, PrintStream out) {
         this.provisioning = provisioning;
+        this.catalog = catalog;
         this.out = out;
     }
 
@@ -67,6 +78,16 @@ public final class AdminCommands {
                 out.println("Key " + key.getKeyId() + " is revoked; it stops working within the cache time.");
             }
             case "plan set" -> setPlan(argument(args, 2, "a client name"), argument(args, 3, "a plan"));
+            case "catalog list", "catalog activate", "catalog rollback" -> {
+                if (catalog == null) {
+                    throw usage("The catalog commands are not available here.");
+                }
+                try {
+                    catalog.execute(command, args.subList(2, args.size()), arguments, out);
+                } catch (IllegalArgumentException e) {
+                    throw usage(e.getMessage());
+                }
+            }
             default -> throw usage("Unknown command '" + group + " " + command + "'.");
         }
     }

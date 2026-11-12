@@ -48,6 +48,14 @@ listing-guard:
     # import changes nothing until this value changes. It must have been imported with the active ruleset, or trademark
     # checks are refused.
     catalog-version: ${LISTING_GUARD_TRADEMARK_CATALOG_VERSION:}
+    activation:
+      # true serves the catalog version of the latest row of the activation log (ADR-009, PR A2d) instead of catalog-version
+      # above, which must then be empty: the uspto-sync job activates a version after an import that succeeded, and the admin
+      # job's `catalog activate` and `catalog rollback` change it by hand. Off by default: catalog-version decides, as before.
+      # A DEMO catalog is never served this way.
+      follow: ${LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW:false}
+      # How often the API reads the log again; a new activation is served at the latest after this, without a restart.
+      refresh-interval: 1m
     # manifest.yaml and raw/ for the import job
     catalogs-dir: ${CATALOGS_DIR:catalogs}
     uspto:
