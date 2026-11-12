@@ -554,6 +554,38 @@ docker compose -f docker-compose.prod.yml --profile prod --profile tools run --r
 
 See [batch-check.md](batch-check.md) for the mapping, the options and the reports.
 
+### USPTO sync and the catalog activation log (ADR-009, PR A2d)
+
+Two additive migrations run at start-up. **V31** creates `trademark_catalog_activation`, an append-only log of which catalog
+version is served (a trigger refuses `UPDATE` and `DELETE`; the one change allowed is the foreign key setting the version id to
+`NULL` when that version is deleted). **V32** creates `uspto_sync_run` and `uspto_sync_file`, the state of the `uspto-sync` job,
+and adds the foreign key from an activation to its run. Nothing changes for a deployment that does nothing:
+`listing-guard.trademark.catalog-version` still decides what is served.
+
+- `listing-guard.trademark.activation.follow=true` (`TRADEMARK_FOLLOW_ACTIVATION`; read by the `api`, `batch-check` and
+  `health-report` services) serves the version of the latest activation instead. `catalog-version` must then be empty, or the
+  application does not start. The API reads the log again every `activation.refresh-interval` (1 minute) and swaps the
+  scanner in one step; the jobs read it once. A DEMO catalog is never served this way (it is refused), so the DEMO banner and
+  the `demo` flag of `/api/v1/capabilities`, which come from `catalog-version`, stay true to what is served.
+- The admin job has `catalog list`, `catalog activate <version>` and `catalog rollback [--to=<version>]`. The last two take the
+  advisory lock `(1279743315, 1398361667)`, reserved for the USPTO sync and these commands, and refuse while a sync runs.
+- The `uspto-sync` job (profile and compose service of that name, never part of the API process) registers USPTO bulk zips
+  from a folder of `catalogs/raw/` (`--input-dir`, with `--backfile` for the annual set) or, when
+  `listing-guard.trademark.uspto.sync.download.enabled` is true, downloads them from the USPTO Open Data Portal (off by default,
+  every endpoint unverified; the key only from `LISTING_GUARD_USPTO_ODP_API_KEY`). It converts the newest complete backfile set
+  and every later daily file in one strict run, imports the catalog its manifest (`catalogs/raw/uspto-sync/catalog/<label>/`)
+  names, activates it unless told not to, after a rollback or when it is much smaller than the served one, and deletes the
+  versions it made beyond `keep-versions` (3). It needs `listing-guard.trademark.uspto.sync.catalog.license`
+  (`USPTO_SYNC_LICENSE`). Options: `--input-dir`, `--backfile`, `--backfile-through`, `--no-activate`, `--force-activate`,
+  `--ignore-file` with `--reason`, `--max-files`, `--dry-run`.
+- Rolling back the migrations (only before the sync was used): `DROP TABLE uspto_sync_file; ALTER TABLE
+  trademark_catalog_activation DROP CONSTRAINT fk_trademark_catalog_activation_sync_run; DROP TABLE uspto_sync_run;
+  DROP TABLE trademark_catalog_activation; DROP FUNCTION trademark_catalog_activation_append_only();` and delete the two rows of
+  `flyway_schema_history`. Catalog versions the sync made are ordinary versions and stay.
+
+The Oracle runbook, the host script with its lock and disk checks, and the commands to check a run are in
+[deploy-oracle.md](deploy-oracle.md#8-keep-a-uspto-trademark-catalog-up-to-date-uspto-sync).
+
 ## Trademark results and their retention (ADR-009, PR A3)
 
 Migration V17 creates `trademark_check` and `trademark_check_finding`. It adds tables only, so it applies on any

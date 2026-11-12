@@ -123,7 +123,12 @@ Before you rely on it:
   converts USPTO Trademark Daily XML applications files you downloaded yourself to the `jsonl-1` format (the latest record of
   each serial number, only the marks of your product classes that are live), but it is
   **unverified against real data**: it was written from the public DTD V2.0 and tested with synthetic XML only, and a daily
-  file holds changes, not the whole register. For any other source you convert your data to `jsonl-1` yourself.
+  file holds changes, not the whole register. For any other source you convert your data to `jsonl-1` yourself. The
+  `uspto-sync` job keeps such a catalog current from USPTO zips you place in a folder (a backfile first, then daily files):
+  it converts, imports, activates the new version after a successful import and keeps the previous ones for
+  `admin catalog rollback` (an API with `TRADEMARK_FOLLOW_ACTIVATION=true` follows within a minute). Its download from the
+  USPTO Open Data Portal is **off by default and unverified** (see
+  [deploy-oracle.md](docs/deploy-oracle.md#8-keep-a-uspto-trademark-catalog-up-to-date-uspto-sync)).
 - **No accuracy has been measured on real data.** The evaluation of the trademark check (ADR-009, PR A4) has not been
   run, and every threshold and word list of the trademark ruleset is marked `unverified`. `batch-check` can count how
   often listings you labelled were flagged (`--label-column`); that is a measurement on a small set, not an accuracy.
@@ -667,7 +672,7 @@ What follows, in this order, is **not built yet**:
 - [ADR-006: Category rulesets and Amazon severity](docs/adr/ADR-006-category-rulesets-and-amazon-severity.md)
 - [ADR-007: Multi-client model](docs/adr/ADR-007-multi-client-model.md)
 - [ADR-008: Image compliance checker](docs/adr/ADR-008-image-compliance-checker.md) (Proposed; the core, the endpoint, the tables and the plan pack are implemented, off by default; the bounded decode service, the upload staging and every marketplace threshold remain)
-- [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3, A2b and A5 (product classes, source links, generic words) are implemented; the USPTO converter is unverified against real data)
+- [ADR-009: Trademark risk scanner](docs/adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3, A2b, A2c, A2d (the `uspto-sync` job and the catalog activation log) and A5 (product classes, source links, generic words) are implemented; the USPTO converter and the ODP download are unverified against real data)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](docs/adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
 - [ADR-011: Policy-grounded analyzer](docs/adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 and 2 are implemented, no real model is called)
 - [ADR-012: Embeddings default to an external API](docs/adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)

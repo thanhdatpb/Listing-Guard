@@ -1,8 +1,36 @@
 # Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, and the USPTO converter's latest-transaction rule and filters below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities` and the schema of the trademark check's findings (see the sections below). There are three migrations: V28 (trademark) and V29 and V30 (image checks), all additive.
+Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, and the USPTO converter's latest-transaction rule and filters below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities` and the schema of the trademark check's findings (see the sections below). There are five migrations: V28 (trademark), V29 and V30 (image checks), and V31 and V32 (USPTO sync), all additive.
 
 ## What is new
+
+### `uspto-sync`: a USPTO trademark catalog kept up to date, with rollback (ADR-009, PR A2d)
+
+A new one-shot job, `uspto-sync` (its own profile and compose service, never part of the API), keeps a catalog of USPTO marks
+current. It registers the USPTO bulk zips you downloaded from a folder of `catalogs/raw/` (`--input-dir`; first the annual set
+with `--backfile`, then daily files), checks every archive (no entry name that could leave a folder, size, compression ratio,
+CRC-32; nothing is extracted to disk), converts the backfile and every later daily file in one strict run (latest transaction
+wins, A2c), imports the catalog and **activates it only after the import succeeded**. It does not activate after a rollback,
+with `--no-activate`, or when the new version has fewer than 90 % of the served version's entries. It keeps the three newest
+versions it made for a rollback. Its state (each file's name, date, size, SHA-256, time stored and result; each run) is in the
+database, so a run after a failure fetches only what is missing. `--dry-run` shows what would happen.
+
+The download from the USPTO Open Data Portal is written (rate limit, retries with backoff on 429 and 5xx, size and checksum
+checks, the key only in its header to the API host) but **off by default and unverified**: no ODP page could be read and no
+key was available, so every path, parameter, field and file name is a setting. ADR-009 lists the pages to open and the steps
+to check it.
+
+**Which catalog is served.** New migration V31 adds an append-only activation log. With `TRADEMARK_FOLLOW_ACTIVATION=true`
+(`listing-guard.trademark.activation.follow`) the api, `batch-check` and `health-report` serve the latest activation instead of
+`TRADEMARK_CATALOG_VERSION` (which must then be empty); the api reads the log every minute, so a new catalog or a rollback
+needs no restart, and `GET /api/v1/capabilities` shows `READY` with no change to that endpoint. A DEMO catalog is never served
+this way. The admin job gains `catalog list`, `catalog activate <version>` and `catalog rollback [--to=<version>]`. V32 holds
+the sync state. Nothing changes for a deployment that does not switch it on.
+
+No ruleset, matcher, canonical input hash, `jsonl-1`, API request or response changes. See
+[deploy-oracle.md](../deploy-oracle.md#8-keep-a-uspto-trademark-catalog-up-to-date-uspto-sync),
+[deployment](../deployment.md#uspto-sync-and-the-catalog-activation-log-adr-009-pr-a2d) and
+[ADR-009](../adr/ADR-009-trademark-risk-scanner.md).
 
 ### `uspto-convert`: the latest transaction of a serial number wins, and conversion filters (ADR-009, PR A2c)
 
