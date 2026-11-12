@@ -612,6 +612,27 @@ and adds the foreign key from an activation to its run. Nothing changes for a de
 The Oracle runbook, the host script with its lock and disk checks, and the commands to check a run are in
 [deploy-oracle.md](deploy-oracle.md#8-keep-a-uspto-trademark-catalog-up-to-date-uspto-sync).
 
+### TSDR status check (ADR-009, "TSDR status check")
+
+One additive migration, **V34**, creates `tsdr_status_run` and `tsdr_status` (append-only: a trigger refuses `UPDATE` and
+`DELETE`). Nothing existing changes, and nothing is written to a catalog table. The `tsdr-status` job (profile and compose service
+of that name, off unless run, never part of the API process) picks marks of the served catalog that recent findings name (it
+needs the same `TRADEMARK_CATALOG_VERSION` or `TRADEMARK_FOLLOW_ACTIVATION` as the api), asks the USPTO TSDR about them or reads
+TSDR files saved by hand (`--input-dir`), stores the answers and writes `catalogs/raw/tsdr/out/<UTC timestamp>/report.json` and
+`dead-marks.csv`, which only propose leaving dead marks out of the next catalog. It takes the advisory lock `(1414743122,
+1398030676)`, reserved for it. Options: `--input-dir`, `--max-marks`, `--dry-run`.
+
+- Environment: `TSDR_DOWNLOAD_ENABLED` (false), `LISTING_GUARD_TSDR_API_KEY` (a secret, only for the TSDR host, never logged),
+  `TSDR_MAX_MARKS` (100), `TSDR_UNMATCHED_PER_RUN` (0), `TSDR_RECHECK_INTERVAL` (30d), `TSDR_STATUS_MEM_LIMIT`,
+  `TSDR_STATUS_LOG_RETENTION` (the script), and, for the api, `TSDR_FINDING_STATUS_ENABLED` (false: adds the last status to
+  each trademark finding; off, the answer is unchanged). Every other setting is under `listing-guard.trademark.tsdr` in
+  `TsdrProperties` and can be put in `catalogs/raw/tsdr.override.yml`. The key header, the field names and the answer for an
+  unknown serial number are unverified.
+- Rolling back the migration (before the job was used): `DROP TABLE tsdr_status; DROP FUNCTION tsdr_status_append_only(); DROP
+  TABLE tsdr_status_run;` and delete the row of V34 from `flyway_schema_history`.
+
+Runbook: [deploy-oracle.md](deploy-oracle.md#8a-check-the-status-of-catalog-marks-tsdr-status).
+
 ## Trademark results and their retention (ADR-009, PR A3)
 
 Migration V17 creates `trademark_check` and `trademark_check_finding`. It adds tables only, so it applies on any

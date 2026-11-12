@@ -22,6 +22,9 @@ import java.util.List;
  * @param riskAdjustments   why the level is lower than the match alone would give
  * @param message           what was found
  * @param suggestion        what to consider
+ * @param tsdrStatuses      the last USPTO TSDR status of the source records, with the date it was checked. Empty when the
+ *                          deployment does not show it (it is off by default) or none of the source records was checked; the
+ *                          API leaves the member out in the first case and the SDK, a tolerant reader, reads it as empty
  */
 public record TrademarkCheckFinding(
         String ruleId,
@@ -39,9 +42,11 @@ public record TrademarkCheckFinding(
         List<SourceLink> sourceLinks,
         List<RiskAdjustment> riskAdjustments,
         String message,
-        String suggestion) {
+        String suggestion,
+        List<TsdrStatus> tsdrStatuses) {
 
     public TrademarkCheckFinding {
+        tsdrStatuses = Copies.list(tsdrStatuses);
         otherRuleIds = Copies.list(otherRuleIds);
         sourceIds = Copies.list(sourceIds);
         sourceLinks = Copies.list(sourceLinks);

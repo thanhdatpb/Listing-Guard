@@ -63,7 +63,23 @@ It never edits a listing, never publishes, and does no SEO.
   imports the catalog its own manifest names (`catalogs/raw/uspto-sync/catalog/<label>/`), activates it (not with
   `--no-activate`, not after a rollback, not when below `min-loaded-ratio` of the served one) and prunes its versions beyond
   `keep-versions`. Oracle: `deploy/oracle/uspto-sync.sh` (flock, disk check), cron line commented. The next step is A4
-  (evaluation). **Product classes, source links and generic words
+  (evaluation). **TSDR status check (done, V34, off by default)**: the one-shot job `tsdr-status` (`api/.../trademark/tsdr/`,
+  profile and compose service, never in the API) picks marks of the **served** catalog that carry a source id `uspto:<8 digits>`
+  (`trademark_entry.source_ids` is an array), the most named by recent retained findings first (it reads only
+  `trademark_check_finding.source_ids` and the check's dates, never text), asks the USPTO TSDR one serial number at a time
+  (`TsdrClient`: 2 s apart, backoff for 429/5xx, no redirect, a refused key, a lasting limit or 5 failures in a row end the run),
+  or reads TSDR files saved by hand (`--input-dir`, XML or JSON, no key), stores status, date, check time and call result in the
+  append-only `tsdr_status` (and `tsdr_status_run`), and writes `catalogs/raw/tsdr/out/<UTC>/report.json` and `dead-marks.csv`:
+  **a proposal to leave dead marks out at the next sync, nothing is removed.** A mark answered is not asked again within
+  `recheck-interval` (30d, 1d after a failure); advisory lock `(1414743122, 1398030676)`. The status class comes only from
+  `uspto-status-map-2026-11` (`UNKNOWN` is never LIVE or DEAD). **Unverified**: the key header `USPTO-API-KEY`, the status field
+  names, the 404 for an unknown serial number and the status code table (only the base URL, the XML path and the 60/min limit are
+  from a USPTO page); all are settings (`listing-guard.trademark.tsdr`, `catalogs/raw/tsdr.override.yml`); the TSDR API key is
+  `LISTING_GUARD_TSDR_API_KEY` (none exists yet, the ID.me check is pending). Optional and **off by default**
+  (`listing-guard.trademark.tsdr.finding-status.enabled`): `TsdrStatusOverlay` adds `tsdrStatuses` to a trademark finding when
+  the answer is built (`@JsonInclude(NON_NULL)`, so off means the same bytes); it is never stored, so `analysisVersion`, the input
+  hash, the ruleset, the matcher and every level are unchanged. Weekly `deploy/oracle/tsdr-status.sh`, cron line commented.
+  **Product classes, source links and generic words
   (A5, done)**: the API serves ruleset `trademark-risk-2026-11b` (`2026-11` is kept unchanged, a test pins its hash), which
   adds three optional sections, all `unverified`: `product_classes` (the request may carry a top-level `product_type`, a key
   of `types`; a mark with Nice classes, none the product type's, drops `out_of_class_downgrade_levels`, a mark with none is not
@@ -562,8 +578,9 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   reused. Replacing an expired result deletes it and inserts in one transaction; only the unique violation of
   `uq_trademark_check_cache` counts as a cache race. The advisory-lock key pair `(1279746628, 1380271182)` is reserved for
   retention cleanup (trademark, variation and personalization results, ADR-010, ADR-015, ADR-016): no other kind of query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
-- Ingest, eval, admin, trademark-import, batch-check, health-report and policy-diff are one-shot jobs (profiles `ingest`,
-  `eval-retrieval`, `admin`, `trademark-import`, `batch-check`, `health-report`, `policy-diff`), not HTTP endpoints.
+- Ingest, eval, admin, trademark-import, batch-check, health-report, policy-diff and tsdr-status are one-shot jobs (profiles
+  `ingest`, `eval-retrieval`, `admin`, `trademark-import`, `batch-check`, `health-report`, `policy-diff`, `tsdr-status`), not
+  HTTP endpoints.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
   with the default `none`, `admin` does not (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
@@ -576,6 +593,18 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   around a block. A name from a listing becomes a path only when it is a plain file name matching the patterns. Archives are
   never extracted to disk. Tests use `FakeOdpServer` (JDK `HttpServer` on the loopback address) and synthetic zips, never the
   real ODP.
+- **TSDR status check** (ADR-009 "TSDR status check"): the job only proposes. It never writes a catalog table, activates a
+  version, edits a finding or removes a mark, and `tsdr_status` is append-only (a trigger). The key comes only from
+  `LISTING_GUARD_TSDR_API_KEY`, goes only in its header to the `base-url` host, and never into a log, a message, the database, a
+  report or `toString`; no redirect is followed; only an eight-digit serial number enters a path. Never mark the key header, a
+  field name, a path other than the one USPTO's page shows, the 404 or the status code table verified without reading the
+  official page, and never fetch around a block (the developer.uspto.gov pages redirect to a JavaScript page: list them for the
+  maintainer). A class is decided by the status map from the code, never from the description; an answer with no code is
+  `UNPARSEABLE`, never alive. The selection reads only source ids and dates of retained checks. The advisory-lock pair
+  `(1414743122, 1398030676)` is reserved for this job. `TsdrStatusOverlay` is the one place that adds a status to an answer: it
+  must stay out of the stored result, the cache identity and every fingerprint, change no level, and add nothing (not even a
+  `null` member) while `finding-status.enabled` is false. A change to `tsdrStatuses` updates `docs/api/openapi.json`, the SDK's
+  `TsdrStatus` and `docs/integration-guide.md`. Tests use `FakeTsdrServer` and synthetic documents, never the real TSDR.
 - **Clients** (ADR-007): everything but `/health` needs `X-API-Key`, and every key belongs to one client. Clients
   and keys are rows (`client`, `api_key`, only the SHA-256 of a key is stored), managed by the `admin` job
   (`docker compose run --rm admin ...`) which audit-logs client, key id and time and never a secret. Everything a

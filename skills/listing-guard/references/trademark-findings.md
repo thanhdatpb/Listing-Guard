@@ -6,7 +6,9 @@ in `get_capabilities` must be called out and its trademark risk described as unk
 is not evidence about a production catalog.
 
 For each finding, retain `ruleId`, `risk`, `field`, offsets, `snippet`, `mark`, `matchType`, `score`, `sourceIds`,
-`sourceLinks`, `riskAdjustments`, `message`, and `suggestion` when present. Show the top-level `disclaimer` next to the result.
+`sourceLinks`, `riskAdjustments`, `tsdrStatuses`, `message`, and `suggestion` when present. Show the top-level `disclaimer` next to
+the result. `tsdrStatuses` (only when the deployment turned it on) is the last USPTO status of a source record with the date it
+was checked: report the date with it, treat `UNKNOWN` as not known, and never take `DEAD` as permission to use a mark.
 Do not treat a match as a legal conclusion or a non-match as legal clearance. `product_type` can change a finding's level only
 when the API reports a `riskAdjustments` entry; never make that adjustment yourself.
 

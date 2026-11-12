@@ -50,6 +50,9 @@ services:
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
       # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
       LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
+      # true adds the last USPTO TSDR status and its check date to each trademark finding (ADR-009, "TSDR status check"): an
+      # optional member, never stored. Off by default: the answer is unchanged. Fill it with the tsdr-status job first.
+      LISTING_GUARD_TRADEMARK_TSDR_FINDING_STATUS_ENABLED: ${TSDR_FINDING_STATUS_ENABLED:-false}
       # Client plans and the monthly quota (ADR-013): off by default, so nothing about a plan is read or enforced.
       # Give every client its plan first: docker compose run --rm admin plan set <client> <FREE|SELLER|PRO>
       LISTING_GUARD_PLANS_ENABLED: ${PLANS_ENABLED:-false}
@@ -206,6 +209,40 @@ services:
       LISTING_GUARD_USPTO_ODP_API_KEY: ${LISTING_GUARD_USPTO_ODP_API_KEY:-}
       SPRING_CONFIG_ADDITIONAL_LOCATION: optional:file:/catalogs/raw/uspto-sync.override.yml
     volumes:
+      - ./catalogs/raw:/catalogs/raw
+
+  # Checks the status of the marks of the served catalog against the USPTO TSDR (ADR-009, "TSDR status check") and reports the
+  # ones recent findings still name although the TSDR says they are dead: a proposal for the next catalog sync, nothing is
+  # changed. Its own profile, never started by `up`, never part of the api. The calls are off (TSDR_DOWNLOAD_ENABLED) and need
+  # a key (LISTING_GUARD_TSDR_API_KEY); without them it reads TSDR files you saved yourself. The key header and the status
+  # field names are UNVERIFIED; correct them in catalogs/raw/tsdr.override.yml, not in code. The catalog settings below must
+  # equal the api's, or the job picks marks from another catalog. Reports go to catalogs/raw/tsdr/out/.
+  #   docker compose --profile tsdr-status run --rm tsdr-status --dry-run
+  #   docker compose --profile tsdr-status run --rm tsdr-status --input-dir=tsdr-saved
+  #   docker compose --profile tsdr-status run --rm tsdr-status [--max-marks=<n>]
+  tsdr-status:
+    image: listing-guard-api:dev
+    profiles: ["tsdr-status"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: tsdr-status
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
+      DB_USER: ${POSTGRES_USER:-listingguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+      CATALOGS_DIR: /catalogs
+      LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
+      LISTING_GUARD_TSDR_DOWNLOAD_ENABLED: ${TSDR_DOWNLOAD_ENABLED:-false}
+      # the TSDR key; sent only to the TSDR host, never logged. Empty while the calls are off.
+      LISTING_GUARD_TSDR_API_KEY: ${LISTING_GUARD_TSDR_API_KEY:-}
+      LISTING_GUARD_TRADEMARK_TSDR_MAX_MARKS_PER_RUN: ${TSDR_MAX_MARKS:-100}
+      LISTING_GUARD_TRADEMARK_TSDR_UNMATCHED_PER_RUN: ${TSDR_UNMATCHED_PER_RUN:-0}
+      LISTING_GUARD_TRADEMARK_TSDR_RECHECK_INTERVAL: ${TSDR_RECHECK_INTERVAL:-30d}
+      SPRING_CONFIG_ADDITIONAL_LOCATION: optional:file:/catalogs/raw/tsdr.override.yml
+    volumes:
+      # raw/ only, writable: the folders of saved TSDR files and the reports (raw/tsdr/out/)
       - ./catalogs/raw:/catalogs/raw
 
   # Checks every listing of a CSV export (rules and trademark) and writes findings.csv, listings.csv and summary.html

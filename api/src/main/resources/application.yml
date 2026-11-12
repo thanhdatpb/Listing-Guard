@@ -93,6 +93,19 @@ listing-guard:
           enabled: false
           # The USPTO Open Data Portal key, only from this environment variable; sent only to the API host, never logged.
           api-key: ${LISTING_GUARD_USPTO_ODP_API_KEY:}
+    # The TSDR status check (ADR-009, "TSDR status check"): the tsdr-status job and the optional status next to a finding;
+    # every setting and its default is in TsdrProperties. Nothing here changes the ruleset, the matcher, a hash or a fingerprint.
+    tsdr:
+      download:
+        # Off by default: the job then only reads TSDR files you saved yourself (--input-dir), or lists marks (--dry-run).
+        # The key header and the status field names are unverified (ADR-009).
+        enabled: ${LISTING_GUARD_TSDR_DOWNLOAD_ENABLED:false}
+        # The TSDR key, only from this environment variable; sent only to the TSDR host, never logged.
+        api-key: ${LISTING_GUARD_TSDR_API_KEY:}
+      finding-status:
+        # true adds the last TSDR status and its check date to each trademark finding (an optional member, read when the answer
+        # is built and never stored). Off: the answer is unchanged.
+        enabled: ${LISTING_GUARD_TRADEMARK_TSDR_FINDING_STATUS_ENABLED:false}
     retention:
       # How long a trademark result, its input hash and its evidence are kept (ADR-009). An operational proposal, not a
       # legal guarantee. GET and the cache lookup treat a row past this as absent whether or not the cleanup has run.

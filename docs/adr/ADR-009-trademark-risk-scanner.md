@@ -1051,6 +1051,195 @@ should a bounded number of record errors be accepted? (4) What should happen whe
 with other content (now: refused until the operator acts)? (5) Is the ratio gate of 0.9 right? (6) Should the TSDR links and the
 release time be checked as part of the first real run?
 
+## TSDR status check (job `tsdr-status`)
+
+A catalog of USPTO marks goes stale: a mark that was live when its bulk file was written can be abandoned, cancelled or expired
+a week later, and a catalog built from "applications" files does not say so until the next conversion happens to meet the
+change. A finding that names a dead mark is a warning the seller may reasonably ignore, but nobody should be told about a dead
+mark as if it were live. This section adds a job that asks the USPTO TSDR (Trademark Status and Document Retrieval) for the
+status of the marks that recent findings still name, keeps the answers, and reports the dead ones. **It only proposes. It
+changes no catalog, activates no version, edits no finding and removes no mark;** a catalog version stays immutable and only the
+next `uspto-sync`, after the operator decides, can leave a mark out. It changes nothing in `/checks`, the trademark ruleset
+(`trademark-risk-2026-11b`), the matcher, the canonical input hash (`trademark-input/v2`), `jsonl-1`, the converter or the sync.
+
+**Status (2026-11-12).** Written and tested with synthetic data and a stand-in HTTP server only. The maintainer has **no TSDR
+API key yet** (the ID.me identity check is pending). Nothing here has talked to the real TSDR. The calls are off by default and
+the offline mode (TSDR files saved by hand) is the supported path until a key exists.
+
+### What was read, and what was not
+
+Pages tried on 2026-11-12. A page that could not be read is not a source: nothing was fetched around a block and nothing was
+taken from a mirror.
+
+| Fact | Where it comes from | Status |
+|---|---|---|
+| Base URL `https://tsdrapi.uspto.gov/ts/cd/`; the XML status document of a serial number is `casestatus/sn<serial>/info.xml` (an HTML one is `casestatus/sn<serial>/content`) | <https://tsdr.uspto.gov/faqview>, read: example addresses in its answers | **verified** (a USPTO page; the path as an example, not as a specification) |
+| Registration is required since 2020-10-02, and a key is issued by <https://account.uspto.gov/api-manager/> | the same page | **verified** (the page says so; the key-manager page itself was not opened) |
+| Rate limit: 60 requests per API key per minute; 4 per minute for PDF and ZIP downloads | the same page | **verified** (the job waits 2 s between requests, so at most 30 a minute, and uses only the status document) |
+| The key goes in the header `USPTO-API-KEY` | a third-party README (<https://github.com/mustberuss/TSDR-Swagger>) and a search snippet that quotes the key-manager guide; **the official guide could not be read** | **unverified** (a setting: `download.api-key-header`) |
+| A JSON status document, `casestatus/sn<serial>/info.json` | a third-party README | **unverified**, and not used: the default path is the XML one, which the official page shows (`download.status-path` can be changed) |
+| The names of the elements or fields that hold the status code, its description and its date (`MarkCurrentStatusCode`, `MarkCurrentStatusExternalDescriptionText`, `MarkCurrentStatusDate`, and the lower-camel JSON names `status`, `extStatusDesc`, `statusDate`) | the maintainer's memory of the document format; **no official page that shows a document could be read** | **unverified** (settings: `fields.status-code-names` and two more) |
+| The status codes of the TSDR are the codes of Table 1 of the bulk-data documentation, so `uspto-status-map-2026-11` classifies them | an assumption: both are the USPTO's status-code table | **unverified**; the map is itself `unverified` (A2b) |
+| An unknown serial number answers `404` | an assumption | **unverified**; if it answers `200` with an empty document the answer is `UNPARSEABLE`, never "alive" |
+
+**Pages the maintainer opens** (each answered with a redirect to a JavaScript page, `https://data.uspto.gov/home`, that a plain
+fetch cannot read): <https://developer.uspto.gov/api-catalog/tsdr-data-api> (the API's description),
+<https://developer.uspto.gov/files/tsdr-api-key-manager-user-guide> (the key header, the rate-limit guidance),
+<https://developer.uspto.gov/swagger/tsdr-api-v1> (the paths and, above all, the fields of a status document),
+<https://account.uspto.gov/api-manager/> (the key). Also save one real document for a serial number you know (`.xml`) as
+`catalogs/raw/tsdr-saved/sn<serial>.xml` and run the offline mode on it: that settles the field names and the status codes in one
+step, before any key is spent.
+
+### Choosing the marks
+
+The job picks marks from the **catalog the API serves** (the runtime's `catalog-version`, or the latest activation; a job started
+with other catalog settings than the API's picks from another catalog, so compose passes the same two variables). A mark is
+asked about only if it holds a source id `uspto:<8 digits>` (a catalog entry holds the ids of every record merged into it).
+Order:
+
+1. **Marks that recent findings named, the most named first.** It counts, per source id, the findings of trademark checks that
+   are still retained (`expires_at` after now) and were made within `match-window` (30 days; a result is kept 30 days, so a
+   longer window changes nothing). **It reads only `trademark_check_finding.source_ids` and `trademark_check.created_at` and
+   `expires_at`** (no other column is named in the query: not the snippet, the field, the matched text, the input hash, the
+   check id or the client), across all clients and without a client id: a count of findings, not of listings or of clients.
+2. **Then, up to `unmatched-per-run` (0 by default), marks of the catalog no recent finding named**, in catalog order, so a
+   later run reaches different ones.
+3. At most `max-marks-per-run` (100) in total; `--max-marks` can lower it for one run, never raise it.
+4. **Not marks asked about recently** (below).
+
+The catalog is read in one pass per run (an entry's source ids are expanded and joined to the small set of named ones) because
+`trademark_entry.source_ids` has no index; a catalog of several million entries makes that a seconds-long scan, not one scan per
+mark. No migration adds an index for it.
+
+### Asking the TSDR
+
+`TsdrClient` is a smaller sibling of `UsptoBulkClient` (same rules, one serial number at a time):
+
+- The serial number is checked to be eight digits before it enters the path; the address must be on `allowed-hosts` over HTTPS
+  (plain HTTP only to this machine, for the tests). **A redirect is not followed** (the status document has none), so the key is
+  never sent to another host. The key goes only in its header (`USPTO-API-KEY`, a setting), only to the host of `base-url`, and
+  never into a log, an exception, a stored value, a report or `toString`; a message that would carry it has it replaced.
+  It comes only from `LISTING_GUARD_TSDR_API_KEY`.
+- **Rate**: at least `min-interval` (2 s) between the starts of two requests. `408`, `429`, `500`, `502`, `503`, `504`, a timeout
+  and a broken connection are tried again, up to `max-attempts` (4), after a delay that doubles from `initial-backoff` (5 s) to
+  `max-backoff` (2 min). A `Retry-After` is honored; one longer than `max-backoff`, and a `429` that lasts through every attempt,
+  **end the run** (the next scheduled run continues; asking more would only make the limit worse). `401` and `403` end the run too.
+  `404` and `410` are "not found" and are not tried again. Nothing is done to get around a block.
+- A run also stops after `max-consecutive-failures` (5) marks in a row that failed, so a down TSDR or a wrong setting costs five
+  marks, not a hundred.
+- The answer is read up to `max-response-size` (4 MB). **It is never stored**: only the three values read from it (below) and,
+  for an offline file, its SHA-256.
+
+`TsdrStatusParser` reads the answer as XML (a stream, no DTD, no external entity) or JSON, told apart by the first character,
+and looks for the configured names anywhere in the document. It takes the first **plain** value of the first name in the list
+that has one (an element that holds other elements is not a value), reads the date in `2019-08-20`, `2019-08-20-04:00`,
+`2019-08-20T10:00:00Z` or `20190820` form, and never guesses: **no status code is an answer of its own kind, `UNPARSEABLE`,** and
+its message never quotes the answer.
+
+**Status class.** The code decides, through `uspto-status-map-2026-11` and nothing else (never the description): `REGISTERED`
+and `PENDING` are `LIVE`, `EXPIRED` and `CANCELLED` are `DEAD`, a code the map drops or does not list is `UNKNOWN`. `UNKNOWN`
+is never `LIVE` and never `DEAD`. The map is the maintainer's unverified reading, and the report says so.
+
+### Not asking twice
+
+A mark is not asked about again within `recheck-interval` (30 days) after an `OK` or `NOT_FOUND` answer, nor within
+`error-retry-interval` (1 day) after a failure (`RATE_LIMITED`, `TIMEOUT`, `REFUSED`, `ERROR`, `UNPARSEABLE`). Both look at every
+earlier row of the serial number, whichever run or source made it, so a run started again at once asks about nothing it has
+answers for. Two runs never overlap: the job holds a PostgreSQL advisory lock on the pair `(1414743122, 1398030676)` ("TSDR",
+"STAT"), which no other query may take, and `deploy/oracle/tsdr-status.sh` adds a host lock.
+
+### Storage (V34, additive)
+
+Two tables, nothing existing changed: `tsdr_status_run` (mode `LIVE` or `OFFLINE`, status, the catalog version it picked from,
+counts, a bounded message) and **`tsdr_status`**, append-only like `trademark_catalog_activation` (a trigger refuses `UPDATE` and
+`DELETE`; a newer check is a new row): `serial_number`, `source` (`API` or `FILE`), `call_result` (`OK`, `NOT_FOUND`,
+`RATE_LIMITED`, `TIMEOUT`, `REFUSED`, `ERROR`, `UNPARSEABLE`), `http_status`, `attempts`, `status_code`, `status_description`
+(cut to 300 characters), `status_date`, `status_class`, `status_map_version`, `payload_sha256`, `checked_at`, `error`. A check
+constraint says an `OK` row has its code, class and map version. **No catalog table is written**: a test compares the catalog
+(versions, entries, activations) before and after a run. The data is public register data (a serial number and a status); it
+holds no listing text and no client. There is no retention yet (about one row per mark per recheck interval); see the questions.
+
+### Offline mode
+
+`--input-dir=<folder inside catalogs/raw>` reads TSDR documents you saved by hand: plain file names `<8 digits>.xml|json` or
+`sn<8 digits>.xml|json` (a file named otherwise is left out and named in the notes), not recursive, no link followed, each at most
+`max-response-size`. No network and no key. Each file is parsed like an answer and stored with `source = FILE`; **the same bytes
+for the same serial number are not stored twice** (a changed file is a new check). `checked_at` is when the job read the file,
+not when the document was saved. The folder may not be the report folder or `catalogs/raw` itself.
+
+### The report
+
+`catalogs/raw/tsdr/out/<UTC timestamp>/report.json` and `dead-marks.csv` (the newest 12 are kept). Over **all marks recent
+findings named** (not only this run's), with their last `OK` status:
+
+- `proposedExclusions`: the last `OK` status is `DEAD`. Each has the source id, the mark, the catalog's own status, the number
+  of findings, the USPTO's code, description and date, when it was checked, `proposal: REMOVE_AT_NEXT_SYNC` and a Vietnamese
+  note that nothing was removed and that a person must look first. `dead-marks.csv` is the same list (a cell that starts like a
+  formula is defused).
+- `unknownStatus` (a code the map does not settle), `notFound` (the TSDR does not know the serial number), and counts: live, dead,
+  unknown, not found, last try failed, never checked.
+- the run's counts, the settings, and an `unverified` list.
+
+It holds marks of the public catalog, serial numbers, USPTO statuses and counts; never listing text, a client, a check id or an
+input hash. The exit code is non-zero when the run stopped early (`STOPPED`: a refused key, a limit that lasts) after it was
+recorded; failures of single marks end `INCOMPLETE` with code 0 and are in the report.
+
+### The optional status on a finding
+
+`listing-guard.trademark.tsdr.finding-status.enabled` (env `LISTING_GUARD_TRADEMARK_TSDR_FINDING_STATUS_ENABLED`, **off by
+default**). On, each trademark finding of `POST /api/v1/trademark-checks` and `GET /api/v1/trademark-checks/{id}` gets an optional
+member `tsdrStatuses`: for each of its source ids that has an `OK` row, `{sourceId, statusCode, statusDescription, statusClass,
+statusDate, checkedAt}` from the newest such row (a later failure does not hide it). Off, **the member is not in the answer at
+all** (`@JsonInclude(NON_NULL)` on a member that is `null`), so the answer is what it was, byte for byte (a test).
+
+- **It does not change `analysisVersion`**, the cache identity, the ruleset hash, the matcher version or the input hash, because
+  the status is **not part of the stored result**: it is read when the answer is built (`POST` cache hit, a new result and `GET`
+  alike), looked up by source id and never written to `trademark_check_finding`. Nothing that decides a finding changes, so the
+  analysis fingerprint has no reason to. Consequence the client must know: the same stored result read twice can show a newer
+  status the second time, and `checkedAt` says how old each status is. A fingerprint that included the status would make every
+  result stale after each run and every cached answer a miss.
+- **It changes no `risk` and no `riskLevel`.** A `DEAD` mark still counts as a finding; lowering it would be a ruleset decision
+  (a new ruleset version, `riskAdjustments`), and a status the maintainer has not verified must not do that silently. The
+  information is shown; the client decides.
+- A look-up that fails leaves the member out (logged as a warning): a check never depends on it.
+- The personalization pack's trademark part, the console editor and `batch-check` read through the same service; their
+  responses and reports do not use the member. The MCP server returns the API's answer verbatim, so it shows it when the API
+  does.
+- The contract change is additive (`TrademarkCheckFindingView.tsdrStatuses`, the new schema `TsdrStatusView`); the SDK maps it
+  (`TrademarkCheckFinding.tsdrStatuses`, empty when absent, `TsdrStatusClass` with `UNRECOGNIZED`), and the ADR-022 check reports
+  only an additive line.
+
+### Verification steps when the key exists
+
+1. Open the pages above and write down: the key header, the paths, the fields of a status document, the answer for an unknown
+   serial number, the rate limits and the terms of use. Compare with the table; write each difference into
+   `catalogs/raw/tsdr.override.yml` (keys under `listing-guard.trademark.tsdr`), not into code.
+2. Save one real document by hand and run `tsdr-status --input-dir=...`: check `status_code`, `status_class` and `status_date` in
+   `tsdr_status`, and fix `fields.*` or the status map (a new map version) until they are right.
+3. Put the key in `.env` as `LISTING_GUARD_TSDR_API_KEY` (never in a command line), then `tsdr-status --dry-run`, then one run
+   with `--max-marks=5` and `TSDR_DOWNLOAD_ENABLED=true`. Read the log, the rows and `report.json`.
+4. Run a full run by hand, read `proposedExclusions` against the register, and decide what the next sync should do.
+5. Enable the weekly line of `deploy/oracle/crontab.example`. Turn the finding status on (`TSDR_FINDING_STATUS_ENABLED`) only
+   after real statuses are stored and you have read a few answers.
+
+### Not done here, and risks
+
+- **Nothing reads the report back**: the sync does not take an exclusion list, so "leave it out at the next sync" is a decision
+  the operator carries out (a filter, an ignore list, or accepting the TSDR as the source of truth is a later design).
+- Nothing is verified against the real TSDR (above). Wrong field names give `UNPARSEABLE` rows (visible, never "alive"); a wrong
+  status map gives wrong classes (visible in the report's `unverified` list).
+- A mark is asked about by serial number only; a TSDR answer says nothing about marks that are not in the catalog.
+- `tsdr_status` grows with the marks asked about and has no retention yet.
+- Counts of findings across all clients decide the order only; a client's data is never read or shown.
+
+**Questions for the maintainer.** (1) Should a `DEAD` status ever lower a finding's level (a new ruleset version), or stay
+information as here? (2) Should the sync read an exclusion list (or the latest `DEAD` rows) and leave those marks out, and who
+reviews it? (3) Is 100 marks a run, a 30-day recheck and a 1-day retry right once the real limits and the real number of named
+marks are known? (4) Should `checked_at` of an offline file be the file's own date? (5) Retention of `tsdr_status` (keep the
+last row per serial number only?). (6) Should the `tsdr-status` job also run against marks that were never named, to warm the
+status before a finding needs it (`unmatched-per-run`)? (7) Are the terms of the TSDR API compatible with storing its statuses
+for this use?
+
 ## Offline data and source governance
 
 The importer accepts only local files and is a one-shot administrative job. It validates the

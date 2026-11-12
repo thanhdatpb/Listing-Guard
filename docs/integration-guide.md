@@ -978,6 +978,24 @@ list is empty for any other source (including a catalog imported in the one-file
 address pattern is `unverified`**: it was seen in a USPTO document and in third-party exports, not in documentation, and the
 API never opens a link. Open one by hand before you rely on it, and read the register itself for the status of the mark.
 
+#### `tsdrStatuses`: the last USPTO status of the source records (optional, off by default)
+
+A deployment that runs the `tsdr-status` job can also turn on `listing-guard.trademark.tsdr.finding-status.enabled`
+(ADR-009, "TSDR status check"). Then each finding has `tsdrStatuses`, a list with one entry for each of its `sourceIds` that
+has been checked: `{sourceId, statusCode, statusDescription, statusClass, statusDate, checkedAt}`. **When the deployment has not
+turned it on the member is not in the answer at all, and the answer is what it was.** When it is on the list can be empty
+(a source record that was never checked, or one that is not a USPTO serial number, has no entry).
+
+- `statusCode` and `statusDescription` are the USPTO's. `statusClass` is `LIVE` (registered or pending), `DEAD` (abandoned,
+  cancelled or expired) or `UNKNOWN` (a code the deployment's status map does not settle; never read it as `LIVE`). The class
+  comes from the code through a versioned map the maintainer wrote and has not verified, never from the description.
+- `checkedAt` is when the deployment asked the TSDR (or read a file saved from it); `statusDate` is the date the USPTO gave
+  for the status. **The status can be old: read `checkedAt`, and read the register itself before you rely on it.**
+- It is read when the answer is built and is not stored with the result. It does not change `risk`, `riskLevel`,
+  `analysisVersion` or the cache, so a stored result read again later can show a newer status. A `DEAD` status is information,
+  not a statement that the mark can be used. Ignore the member if you do not know it; clients must ignore unknown members
+  anyway (ADR-022).
+
 ### Highlighting a finding
 
 `field`, `start` and `end` locate a finding in **the text the API worked on**: the field's value after the cleaning of

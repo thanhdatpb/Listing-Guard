@@ -1304,6 +1304,13 @@
           "suggestion" : {
             "description" : "Human text, currently Vietnamese.",
             "type" : "string"
+          },
+          "tsdrStatuses" : {
+            "description" : "The last status the USPTO TSDR gave for the source records of the mark, one entry for each source id that has been checked. **Present only when the deployment turned it on (`listing-guard.trademark.tsdr.finding-status.enabled`); absent otherwise.** When present it can be empty. It is information read when this answer is built, not part of the stored result: it never changes `risk`, `analysisVersion` or the cache, and the same stored result can show a newer status later. Read `checkedAt`: the status can be old.",
+            "items" : {
+              "$ref" : "#/components/schemas/TsdrStatusView"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -1570,6 +1577,41 @@
             "description" : "COMPLETE; INCOMPLETE (a trademark rule failed, findings kept); NOT_CONFIGURED (no catalog is served, so the scan did not run).",
             "enum" : [ "COMPLETE", "INCOMPLETE", "NOT_CONFIGURED" ],
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TsdrStatusView" : {
+        "properties" : {
+          "checkedAt" : {
+            "description" : "When this deployment asked the TSDR (or read a file saved from it) (UTC).",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "sourceId" : {
+            "description" : "The source id the status is for.",
+            "example" : "uspto:12345678",
+            "type" : "string"
+          },
+          "statusClass" : {
+            "description" : "LIVE (registered or pending), DEAD (abandoned, cancelled or expired) or UNKNOWN (a code the deployment's status map does not settle). Decided from the code by a versioned, unverified map, never from the description; it is information and does not change the finding's level.",
+            "enum" : [ "LIVE", "DEAD", "UNKNOWN" ],
+            "type" : "string"
+          },
+          "statusCode" : {
+            "description" : "The status code the USPTO gave.",
+            "example" : "700",
+            "type" : "string"
+          },
+          "statusDate" : {
+            "description" : "The date of the status the USPTO gave (UTC date); null when the answer had none.",
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "statusDescription" : {
+            "description" : "The USPTO's own description of the status; null when the answer had none.",
+            "example" : "REGISTERED",
+            "type" : [ "string", "null" ]
           }
         },
         "type" : "object"
