@@ -476,6 +476,59 @@ ends `NO_CHANGE`; a failed file is tried again by the next run, and files alread
 stays missing or broken blocks the activation; after checking it, leave it out on purpose with
 `--ignore-file=<name> --reason=<why>`. The key is sent only to the API host, never logged and never stored.
 
+## 8a. Check the status of catalog marks (`tsdr-status`)
+
+The `tsdr-status` job (ADR-009, "TSDR status check") asks the USPTO TSDR whether the marks that recent trademark findings still
+name are dead (abandoned, cancelled, expired), keeps the answers in `tsdr_status` and writes a report. **It only proposes**: it
+changes no catalog, activates nothing and edits no finding. It runs in its own container and profile, never inside the API.
+**Read the status first:** nothing has talked to the real TSDR. The calls are off by default; the key header, the names of the
+fields that hold the status and the answer for an unknown serial number are unverified, and you have no TSDR key until the
+ID.me check is done (the key is issued at `https://account.uspto.gov/api-manager/`). Until then use the offline mode.
+
+**Without a key (offline).** Save TSDR status documents by hand (the XML or JSON of a serial number you open in a browser or
+fetch yourself) as `catalogs/raw/tsdr-saved/sn<8 digits>.xml` (or `.json`), then:
+
+```bash
+./deploy/oracle/tsdr-status.sh --input-dir=tsdr-saved
+```
+
+No network, no key. The same bytes for a serial number are not stored twice. Saving one real document first is also the cheapest
+way to settle the field names and the status codes (ADR-009, "Verification steps when the key exists").
+
+**With a key.** Put it in `.env` and keep the calls off until you have read a dry run:
+
+```bash
+# .env (a secret: readable only by trusted operators; never on a command line)
+# LISTING_GUARD_TSDR_API_KEY=...
+# TSDR_DOWNLOAD_ENABLED=true            # off by default
+./deploy/oracle/tsdr-status.sh --dry-run          # which marks, in which order; asks nothing, writes nothing
+./deploy/oracle/tsdr-status.sh --max-marks=5      # one small real run, then read the log, tsdr_status and the report
+```
+
+Any difference you find (the key header, the path, a field name) goes into `catalogs/raw/tsdr.override.yml` (keys under
+`listing-guard.trademark.tsdr`, read by the compose service), not into code. Then enable the commented weekly line of
+`deploy/oracle/crontab.example` (Sunday 12:30 UTC, after the daily USPTO sync). The script holds a host lock (a second run exits
+with 75), keeps the newest `TSDR_STATUS_LOG_RETENTION` (30) logs in `logs/tsdr-status/`, and exits non-zero when the run stopped
+early (a refused key, a limit that lasts, five failures in a row), so cron mails it.
+
+The job asks for at most `TSDR_MAX_MARKS` (100) marks a run, the most named by findings first, waits 2 seconds between
+requests (the TSDR allows 60 a minute), backs off on `429` and `5xx`, follows no redirect, and does not ask about a mark again
+within `TSDR_RECHECK_INTERVAL` (30 days; one day after a failure). It reads, from the findings of retained checks, only the
+source ids and the dates, never what a client typed.
+
+```bash
+ls catalogs/raw/tsdr/out/                                    # one folder per run; the newest 12 are kept
+cat catalogs/raw/tsdr/out/<UTC timestamp>/report.json        # proposedExclusions, unknownStatus, notFound, counts
+cat catalogs/raw/tsdr/out/<UTC timestamp>/dead-marks.csv     # the dead marks that findings still name
+docker compose --profile prod exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "SELECT id, started_at, mode, status, selected, recorded, failed FROM tsdr_status_run ORDER BY id DESC LIMIT 5"'
+```
+
+A mark in `proposedExclusions` is a proposal for you to check against the register: the status class comes from the code
+through a status map that is itself unverified. Nothing reads the report back; deciding to leave a mark out of the next catalog
+is yours. `TSDR_FINDING_STATUS_ENABLED=true` (off by default) adds the last status and its check date to each trademark finding
+of the API; turn it on only after real statuses are stored. The api container must be restarted for it to take effect.
+
 ## 9. Review saved marketplace policies (`policy-diff`)
 
 The monthly policy review uses the deterministic `policy-diff` profile (ADR-026). It reads only the local manifest and saved

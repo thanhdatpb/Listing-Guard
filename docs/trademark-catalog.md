@@ -60,3 +60,40 @@ result is a reference warning, not a legal conclusion. Only a hash of the listin
 are stored, for 30 days (`listing-guard.trademark.retention.period`); a scheduled cleanup in the API deletes expired
 results. Without a catalog the endpoint answers `503` (`trademark-not-configured`) and nothing else changes. See the
 [integration guide](integration-guide.md#trademark-checks) and [deployment](deployment.md).
+
+## Keeping the status of marks current: `tsdr-status`
+
+A catalog version is immutable, so a mark that was live when its bulk file was written can be abandoned, cancelled or expired
+later without the catalog knowing. The one-shot job `tsdr-status` (profile and Compose service of that name, off unless you run
+it, never part of the API; [ADR-009, "TSDR status check"](adr/ADR-009-trademark-risk-scanner.md#tsdr-status-check-job-tsdr-status))
+asks the USPTO TSDR for the status of the marks of the **served** catalog that recent trademark findings still name, the most
+named first, stores each answer (serial number, status code and date, when it was checked, the result of the call) in the
+append-only table `tsdr_status`, and writes a report to `catalogs/raw/tsdr/out/<UTC timestamp>/`: `report.json` and
+`dead-marks.csv`. **It only proposes.** A mark that is dead but still named is listed as `REMOVE_AT_NEXT_SYNC`; nothing is
+removed from a catalog, no version is activated and no finding changes. Leaving a mark out is your decision, carried out
+through the next catalog sync.
+
+```bash
+# which marks would be asked about (asks nothing, writes nothing)
+docker compose --profile tsdr-status run --rm tsdr-status --dry-run
+# no key yet: read TSDR documents you saved yourself (catalogs/raw/<folder>/sn<8 digits>.xml or .json)
+docker compose --profile tsdr-status run --rm tsdr-status --input-dir=tsdr-saved
+# ask the TSDR (TSDR_DOWNLOAD_ENABLED=true and LISTING_GUARD_TSDR_API_KEY in .env), a few marks first
+docker compose --profile tsdr-status run --rm tsdr-status --max-marks=5
+```
+
+- **Off by default and unverified.** The calls need `TSDR_DOWNLOAD_ENABLED=true` and a key (`LISTING_GUARD_TSDR_API_KEY`, a
+  secret, never on a command line). The base URL, the XML status path and the rate limit (60 requests per key per minute) come from
+  a USPTO page; **the key header, the names of the fields that hold the status and the answer for an unknown serial number do
+  not**, and no real answer has been read. Each is a setting you correct in `catalogs/raw/tsdr.override.yml`. The ADR lists the
+  USPTO pages to open and the steps to take once you have a key; saving one real document and running the offline mode on it
+  settles the field names before any key is used.
+- **Polite.** At least 2 seconds between requests, backoff for `429` and `5xx`, `Retry-After` honored, a run that stops after a
+  refused key, a limit that lasts or five failures in a row, no redirect followed, no more than `TSDR_MAX_MARKS` (100) marks a run,
+  and a mark that was answered is not asked about again within `TSDR_RECHECK_INTERVAL` (30 days; one day after a failure).
+- **Weekly.** `deploy/oracle/tsdr-status.sh` (host lock, one log per run) and a commented weekly line in
+  `deploy/oracle/crontab.example`; see [deploy-oracle.md](deploy-oracle.md#8a-check-the-status-of-catalog-marks-tsdr-status).
+- **Optional, off by default: the status on a finding.** `TSDR_FINDING_STATUS_ENABLED=true` adds the last TSDR status and the date
+  it was checked to each trademark finding (`tsdrStatuses`, see the [integration guide](integration-guide.md#tsdrstatuses-the-last-uspto-status-of-the-source-records-optional-off-by-default)).
+  Off, the answer is the same as before. On, it is read when the answer is built, never stored, and changes no level, cache
+  identity or `analysisVersion`.

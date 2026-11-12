@@ -1,6 +1,6 @@
 ﻿# Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), listing input adapters (ADR-025), the policy change monitor (ADR-026), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities`, `GET /api/v1/input-adapters` and the schema of the trademark check's findings (see the sections below). There are six additive migrations: V28 (trademark), V29 and V30 (image checks), V31 and V32 (USPTO sync), and V33 (policy snapshots).
+Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), listing input adapters (ADR-025), the policy change monitor (ADR-026), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, the TSDR status check, and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities`, `GET /api/v1/input-adapters` and the schema of the trademark check's findings (see the sections below). There are seven additive migrations: V28 (trademark), V29 and V30 (image checks), V31 and V32 (USPTO sync), V33 (policy snapshots), and V34 (TSDR status).
 
 ## What is new
 
@@ -39,10 +39,35 @@ ADR-022 compatibility report lines (`contract-tools/target/contract/compatibilit
 - `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).sourceIds`
 - `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).sourceLinks`
 - `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).start`
+- `response-property-added` at `schema TrademarkCheckFindingView (was FindingView).tsdrStatuses`
 - `request-optional-property-added` at `schema TrademarkCheckRequest (was CheckRequest).product_type`
 - `response-property-added` at `schema TrademarkCheckResult.productType`
 - `schema-renamed` at `POST /api/v1/trademark-checks request application/json $`: CheckRequest -> TrademarkCheckRequest
 - `schema-renamed` at `schema TrademarkCheckResult.findings[]`: FindingView -> TrademarkCheckFindingView
+
+### TSDR status check (ADR-009)
+
+The one-shot job `tsdr-status` (profile and compose service of that name, off unless run, never part of the API) asks the USPTO
+TSDR for the status of the marks of the served catalog that recent trademark findings still name, the most named first, or reads
+TSDR files saved by hand (`--input-dir`, no key). It stores status, status date, check time and call result in the new
+append-only tables of **V34** (`tsdr_status`, `tsdr_status_run`) and writes `catalogs/raw/tsdr/out/<UTC timestamp>/report.json`
+and `dead-marks.csv`: **a proposal to leave dead marks out at the next catalog sync; nothing is removed, no version is
+activated, no finding changes.** It waits 2 seconds between requests, backs off on `429` and `5xx`, follows no redirect, asks
+about at most 100 marks a run and not again within 30 days (one day after a failure). `deploy/oracle/tsdr-status.sh` and a
+commented weekly crontab line run it on the Oracle host. **Nothing has talked to the real TSDR** (no key yet): the key header
+`USPTO-API-KEY`, the names of the fields that hold the status, the answer for an unknown serial number and the status code table
+are unverified settings; only the base URL, the XML status path and the limit of 60 requests a minute come from a USPTO page.
+
+An optional setting, **off by default** (`TSDR_FINDING_STATUS_ENABLED`), adds the last status and its check date to each
+trademark finding as `tsdrStatuses`. Off, the response is unchanged byte for byte (the member is absent, not `null`). On, it is
+read when the answer is built and never stored, so `analysisVersion`, the cache identity, the ruleset, the matcher, the input hash
+and every risk level are unchanged. The change is additive (`TrademarkCheckFindingView.tsdrStatuses`, the schema
+`TsdrStatusView`); the Java SDK maps it (`TrademarkCheckFinding.tsdrStatuses`, `TsdrStatus`, `TsdrStatusClass`). Environment
+variables: `TSDR_DOWNLOAD_ENABLED`, `LISTING_GUARD_TSDR_API_KEY`, `TSDR_MAX_MARKS`, `TSDR_UNMATCHED_PER_RUN`,
+`TSDR_RECHECK_INTERVAL`, `TSDR_STATUS_MEM_LIMIT`, `TSDR_STATUS_LOG_RETENTION`, `TSDR_FINDING_STATUS_ENABLED`. See
+[ADR-009](../adr/ADR-009-trademark-risk-scanner.md#tsdr-status-check-job-tsdr-status),
+[trademark-catalog.md](../trademark-catalog.md) and
+[deploy-oracle.md](../deploy-oracle.md#8a-check-the-status-of-catalog-marks-tsdr-status).
 
 ### Policy change monitor (ADR-026)
 
