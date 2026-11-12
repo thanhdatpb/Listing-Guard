@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Listing Guard AI agent integration</title>
+  <desc id="desc">A user instructs an AI agent. An Agent Skill is planned. The read-only MCP server exposes seven fixed tools and calls the REST API through the Java client SDK. The API returns unchanged findings and disclaimers. Contract, evaluation and observability components support the integration; a server-side policy analyzer is planned and off by default.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#315b83"/></marker>
+    <style>
+      text{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#172b42}.title{font-size:30px;font-weight:700}.subtitle{font-size:16px;fill:#52677d}.head{font-size:22px;font-weight:700}.label{font-size:17px;font-weight:700}.body{font-size:15px}.small{font-size:14px;fill:#43596f}.tiny{font-size:14px;font-weight:700}
+      .card{fill:#fff;stroke:#5d7895;stroke-width:2}.soft{fill:#f2f7fb;stroke:#5d7895;stroke-width:2}.planned{fill:#fff;stroke:#647d94;stroke-width:2;stroke-dasharray:9 7}.green{fill:#e9f7f3;stroke:#328477;stroke-width:2}.line{fill:none;stroke:#315b83;stroke-width:2.5;marker-end:url(#arrow)}.dash{fill:none;stroke:#647d94;stroke-width:2;stroke-dasharray:9 7;marker-end:url(#arrow)}.icon{fill:none;stroke:#245b8f;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+    </style>
+  </defs>
+  <rect width="1600" height="1000" fill="#fff"/>
+  <text x="40" y="48" class="title">Listing Guard | AI agent integration</text>
+  <text x="40" y="77" class="subtitle">MCP is a thin, read-and-check client of the same REST API used by other integrations</text>
+
+  <rect x="36" y="137" width="1528" height="410" rx="24" fill="#f8fbfd" stroke="#b5c4d2" stroke-width="2"/>
+  <rect x="58" y="154" width="296" height="370" rx="18" class="soft"/>
+  <text x="82" y="190" class="head">People and agent</text>
+  <rect x="82" y="217" width="247" height="93" rx="15" class="card"/>
+  <circle cx="117" cy="263" r="22" class="icon"/><path d="M108 263h18M117 254v18M100 293c2-12 10-18 17-18s15 6 17 18" class="icon"/>
+  <text x="154" y="256" class="label">User</text><text x="154" y="283" class="small">Requests a check</text>
+  <path d="M205 310v27" class="line"/>
+  <rect x="82" y="337" width="247" height="128" rx="15" class="card"/>
+  <path d="M104 373h36v32h-36zM111 382h22M111 390h16M121 405v12M113 417h18" class="icon"/>
+  <text x="154" y="376" class="label">AI agent</text><text x="154" y="403" class="body">Claude Code / Desktop</text><text x="154" y="430" class="small">or a department agent</text>
+
+  <rect x="385" y="194" width="195" height="229" rx="17" class="planned"/>
+  <text x="409" y="229" class="label">Agent Skill</text>
+  <text x="409" y="260" class="body">Planned</text>
+  <path d="M431 286l31-13 31 13-31 13zM431 286v36l31 14 31-14v-36M462 299v37" class="icon"/>
+  <text x="409" y="369" class="small">Guidance for the agent</text><text x="409" y="393" class="small">Not in this repository</text>
+  <path d="M329 400h56" class="dash"/>
+
+  <rect x="610" y="154" width="414" height="370" rx="19" class="soft"/>
+  <text x="638" y="190" class="head">MCP server</text>
+  <text x="638" y="217" class="small">Own jar | STDIO default | HTTP private only</text>
+  <rect x="638" y="237" width="358" height="112" rx="15" class="card"/>
+  <path d="M662 264h30v34h-30zM668 271h18M668 279h18M668 287h12M672 309h20" class="icon"/>
+  <text x="710" y="272" class="label">Fixed tools from ToolCatalog</text>
+  <text x="710" y="300" class="small">check_listing · check_trademark</text>
+  <text x="710" y="326" class="small">check_variations · screen_personalization</text>
+  <text x="662" y="378" class="small">get_limits · get_usage · get_capabilities</text>
+  <rect x="638" y="400" width="358" height="88" rx="15" class="green"/>
+  <path d="M664 423h28v34h-28zM670 432h16M670 440h16M670 448h10" class="icon"/>
+  <text x="710" y="432" class="label">Read-only for listings</text>
+  <text x="710" y="460" class="small">Checks can store results and use quota</text>
+  <path d="M580 310h30" class="dash"/><text x="581" y="292" class="small">uses</text>
+
+  <rect x="1060" y="194" width="204" height="229" rx="17" class="card"/>
+  <text x="1084" y="229" class="label">Java client SDK</text>
+  <path d="M1110 265h103v57h-103zM1121 280h79M1121 291h60M1121 302h69" class="icon"/>
+  <text x="1084" y="358" class="body">listing-guard-client</text>
+  <text x="1084" y="386" class="small">JDK HttpClient + Jackson</text>
+  <text x="1084" y="410" class="small">RetryPolicy.none() for MCP</text>
+  <path d="M1024 310h36" class="line"/>
+
+  <rect x="1300" y="194" width="235" height="229" rx="17" class="card"/>
+  <text x="1324" y="229" class="label">Listing Guard API</text>
+  <path d="M1351 267h132v46h-132zM1364 279h106M1364 289h82M1364 299h93" class="icon"/>
+  <text x="1324" y="350" class="body">Findings + evidence</text>
+  <text x="1324" y="378" class="small">Disclaimer + versions</text>
+  <text x="1324" y="405" class="small">API key + client quota apply</text>
+  <path d="M1264 310h36" class="line"/>
+
+  <rect x="391" y="570" width="1144" height="110" rx="18" class="green"/>
+  <circle cx="430" cy="625" r="22" fill="#328477"/><path d="M419 625l8 8 15-18" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="471" y="611" class="head">The model does not decide</text>
+  <text x="471" y="642" class="body">The MCP server passes successful API responses through unchanged, including findings, disclaimer, versions and completeness.</text>
+  <text x="471" y="666" class="small">INCOMPLETE stays INCOMPLETE; UNKNOWN stays UNKNOWN. A check result is advice for a person.</text>
+
+  <rect x="58" y="727" width="443" height="179" rx="18" class="soft"/>
+  <text x="84" y="767" class="head">Contract compatibility</text>
+  <text x="84" y="800" class="body">ADR-022 | OpenAPI + input schema</text>
+  <text x="84" y="829" class="small">Build checks additive / breaking changes</text>
+  <text x="84" y="856" class="small">SDK conformance tests follow the contract</text>
+  <path d="M112 880h332" class="line"/>
+
+  <rect x="535" y="727" width="443" height="179" rx="18" class="soft"/>
+  <text x="561" y="767" class="head">Evaluation</text>
+  <text x="561" y="800" class="body">Retrieval query set + evaluation runner exist</text>
+  <text x="561" y="829" class="small">Measured retrieval results are still pending</text>
+  <text x="561" y="856" class="small">No production LLM evaluation yet</text>
+  <path d="M590 880h332" class="line"/>
+
+  <rect x="1012" y="727" width="523" height="179" rx="18" class="soft"/>
+  <text x="1038" y="767" class="head">Observability and reporting</text>
+  <text x="1038" y="800" class="body">GET /health | health-report job | deployment backups</text>
+  <text x="1038" y="829" class="small">Reports aggregate stored counts; they never read listing text</text>
+  <text x="1038" y="856" class="small">Oracle A1 + Cloudflare setup is documented in ADR-019</text>
+  <path d="M1065 880h416" class="line"/>
+
+  <rect x="1012" y="927" width="523" height="54" rx="14" class="planned"/>
+  <text x="1038" y="961" class="label">Server-side LLM / policy analyzer | ADR-011 | planned, off by default</text>
+</svg>
