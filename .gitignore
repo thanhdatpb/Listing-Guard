@@ -49,6 +49,7 @@ catalogs/raw/
 
 # deploy/oracle/uspto-sync.sh: its host lock and its run logs (ADR-009, PR A2d)
 .uspto-sync.lock
+.policy-diff.lock
 logs/
 
 # Batch check (docs/batch-check.md): real listing exports and the reports made from them are never committed; the
@@ -59,6 +60,9 @@ batch/out/
 
 # Health report (ADR-018): the reports a run of the health-report job writes are never committed (they name clients and counts)
 health-report/out/
+
+# Policy change monitor reports can contain short excerpts of copyrighted policy text.
+policy-monitor/out/
 
 # Claude Code local state
 .claude/

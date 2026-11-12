@@ -461,6 +461,13 @@ docker compose run --rm health-report (--client=<name|id> | --all-clients) [--fr
 # profile `health-report`; no network, no model, writes nothing to the database; ./health-report is mounted at /health-report
 ```
 
+Policy diff (see `docs/policy-monitor.md`; reads maintainer-saved `policies/raw/`, compares hashes in the DB, writes a report):
+
+```bash
+docker compose --profile prod --profile policy-diff run --rm policy-diff [--dry-run]
+# profile `policy-diff`; no web server, no network, no model; only hashes and section paths are stored
+```
+
 On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 
 ## Conventions
@@ -512,6 +519,10 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   committed. Tests and CI use small self-written HTML, never the real corpus. Never fetch policy pages
   around a 403, CAPTCHA or block (no curl tricks, proxies or mirrors): list the URLs and let the maintainer
   save the files.
+- **Policy change monitor** (ADR-026): `policy-diff` uses existing HTML/PDF parsers and compares manifest entries and local raw
+  files with the last DB snapshot. Never add network retrieval or an LLM to this job. The database holds document/section hashes
+  and section paths, never policy text. Reports can contain excerpts up to 200 characters and stay git-ignored. The job keeps
+  12 reports by default (`POLICY_MONITOR_KEEP_REPORTS`).
 - Ingest only reads local files and is idempotent; a document is redone when its file, manifest entry,
   `PolicyChunker.VERSION`/limits or `EmbeddingProvider.modelId()` changes. Bump `PolicyChunker.VERSION` when
   the chunking rules change. The manifest `version` must equal the page's "Last updated" date.
@@ -551,8 +562,8 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   reused. Replacing an expired result deletes it and inserts in one transaction; only the unique violation of
   `uq_trademark_check_cache` counts as a cache race. The advisory-lock key pair `(1279746628, 1380271182)` is reserved for
   retention cleanup (trademark, variation and personalization results, ADR-010, ADR-015, ADR-016): no other kind of query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
-- Ingest, eval, admin, trademark-import, batch-check and health-report are one-shot jobs (profiles `ingest`, `eval-retrieval`,
-  `admin`, `trademark-import`, `batch-check`, `health-report`), not HTTP endpoints.
+- Ingest, eval, admin, trademark-import, batch-check, health-report and policy-diff are one-shot jobs (profiles `ingest`,
+  `eval-retrieval`, `admin`, `trademark-import`, `batch-check`, `health-report`, `policy-diff`), not HTTP endpoints.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
   with the default `none`, `admin` does not (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.

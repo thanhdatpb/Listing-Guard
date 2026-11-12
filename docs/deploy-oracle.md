@@ -475,3 +475,27 @@ Only then set `USPTO_SYNC_DOWNLOAD_ENABLED=true` and enable the commented `uspto
 ends `NO_CHANGE`; a failed file is tried again by the next run, and files already stored are never fetched again. A file that
 stays missing or broken blocks the activation; after checking it, leave it out on purpose with
 `--ignore-file=<name> --reason=<why>`. The key is sent only to the API host, never logged and never stored.
+
+## 9. Review saved marketplace policies (`policy-diff`)
+
+The monthly policy review uses the deterministic `policy-diff` profile (ADR-026). It reads only the local manifest and saved
+files; it does not download pages, call a model or change rulesets. Raw files are copyrighted and git-ignored. Save them under
+`policies/raw/etsy/` or `policies/raw/amazon/`, update the manifest's `fetched_at` and page `version`, and preview before
+updating the database snapshot:
+
+```bash
+install -d -m 750 policies/raw/etsy policies/raw/amazon policy-monitor
+# Copy maintainer-reviewed files into policies/raw/<marketplace>/, then edit policies/manifest.yaml.
+./deploy/oracle/policy-diff.sh --dry-run
+ls -td policy-monitor/out/* | head -1
+# Read report.html and report.json; if the differences are expected:
+./deploy/oracle/policy-diff.sh
+```
+
+The first run reports each manifest document as new. A dry run never changes the snapshot; a normal run replaces it with current
+document and section hashes. The JSON and HTML reports contain section paths, hashes and excerpts no longer than 200
+characters, and are excluded from Git. Reports include changed-section rule candidates and their current ruleset `source.status`.
+Review those rules manually and create a new ruleset version if a change is needed. The monthly example in
+`deploy/oracle/crontab.example` runs only the comparison after an operator has saved pages and updated the manifest; it does
+not retrieve marketplace content. `POLICY_MONITOR_STALE_DAYS` controls the stale-save threshold (default 90).
+`POLICY_MONITOR_KEEP_REPORTS` controls report retention (default 12); each successful run removes older timestamped report folders.

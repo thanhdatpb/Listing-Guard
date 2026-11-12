@@ -1,6 +1,6 @@
-# Unreleased changes
+﻿# Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), listing input adapters (ADR-025), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities`, `GET /api/v1/input-adapters` and the schema of the trademark check's findings (see the sections below). There are five migrations: V28 (trademark), V29 and V30 (image checks), and V31 and V32 (USPTO sync), all additive.
+Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), listing input adapters (ADR-025), the policy change monitor (ADR-026), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities`, `GET /api/v1/input-adapters` and the schema of the trademark check's findings (see the sections below). There are six additive migrations: V28 (trademark), V29 and V30 (image checks), V31 and V32 (USPTO sync), and V33 (policy snapshots).
 
 ## What is new
 
@@ -43,6 +43,18 @@ ADR-022 compatibility report lines (`contract-tools/target/contract/compatibilit
 - `response-property-added` at `schema TrademarkCheckResult.productType`
 - `schema-renamed` at `POST /api/v1/trademark-checks request application/json $`: CheckRequest -> TrademarkCheckRequest
 - `schema-renamed` at `schema TrademarkCheckResult.findings[]`: FindingView -> TrademarkCheckFindingView
+
+### Policy change monitor (ADR-026)
+
+The one-shot `policy-diff` profile compares maintainer-saved policy HTML/PDF from git-ignored `policies/raw/` with the previous
+DB snapshot. It reports document/version and section changes, freshness/date warnings, and active rules that cite the changed
+policy URL with their current `source.status`. V33 stores document and section hashes and section paths only, never policy
+text. The report is `policy-monitor/out/<UTC timestamp>/report.json` and `report.html`; changed text can appear only as an
+excerpt of at most 200 characters. The job does not download pages or use a model, `--dry-run` leaves the DB snapshot
+unchanged, and the maintainer reviews rule changes by creating an immutable ruleset version. Retention defaults to the 12 newest
+reports and is configurable with `POLICY_MONITOR_KEEP_REPORTS`. Automatic page retrieval is deferred and remains an open
+question for future work. See [policy-monitor.md](../policy-monitor.md) and
+[deploy-oracle.md](../deploy-oracle.md#9-review-saved-marketplace-policies-policy-diff).
 
 ### API contract and compatibility policy (ADR-022)
 
@@ -196,3 +208,4 @@ Two migrations from the image checks run at start-up: **V29** (the `image-checks
 - The trademark ruleset the API serves is now `trademark-risk-2026-11b` (`listing-guard.trademark.ruleset`), registered at start-up. A catalog imported with `2026-11` is still served, because the `normalization` section is unchanged. Nothing to import again.
 - Results stored before are not returned for a new request (`analysisVersion` and the input hash changed); they stay readable by `GET` until they expire. Their findings read as no product type, no source link and no adjustment.
 - A client that parses a trademark result strictly must accept the new fields `productType`, `sourceLinks` and `riskAdjustments`.
+

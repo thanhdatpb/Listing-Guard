@@ -101,6 +101,7 @@ See the [detailed status and project guide](docs/overview.md) for implemented be
 - [Rulesets and sourcing](docs/rulesets.md)
 - [Trademark catalog and USPTO data](docs/trademark-catalog.md)
 - [Policy corpus and retrieval](docs/policy-corpus.md)
+- [Policy change monitor](docs/policy-monitor.md)
 - [Input schema](docs/input-schema.md)
 - [Listing health report and batch check](docs/batch-check.md)
 - [MCP server](docs/mcp.md)
