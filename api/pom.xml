@@ -143,6 +143,12 @@
             <artifactId>testcontainers-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Test scope only: SdkIntegrationTest calls this API on a random port with the Java client SDK (ADR-023). -->
+        <dependency>
+            <groupId>com.thanhdatpb.listingguard</groupId>
+            <artifactId>listing-guard-client</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

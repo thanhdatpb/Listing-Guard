@@ -14,6 +14,10 @@
 - Amended on 2026-11-11 by the `get_capabilities` tool and `GET /api/v1/capabilities` (see "Amendment" at the end); "six tools"
   and "six paths" below are now seven, and the sentence that the API and its OpenAPI document are not changed holds for the
   original pull request only.
+- Amended by: [ADR-023](ADR-023-java-client-sdk.md) (the Java client SDK). The server now makes its calls through the SDK
+  module `client` (artifact `listing-guard-client`) with no retry, and that is the one module of this repository it may depend
+  on; "it depends on no other module" below no longer holds, the rest does. `check_trademark` also takes an optional
+  `product_type`, passed on unchanged.
 - Acceptance convention: Keep Proposed until the PR implementing this ADR is approved and merged. Then set Status to
   Accepted and Date to the merge date.
 

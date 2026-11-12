@@ -3,6 +3,9 @@ package com.thanhdatpb.listingguard.mcp;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.thanhdatpb.listingguard.client.Operation;
+import com.thanhdatpb.listingguard.client.RawRequest;
+import com.thanhdatpb.listingguard.client.RawResponse;
 import com.thanhdatpb.listingguard.mcp.ApiStub.Reply;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -10,15 +13,20 @@ import java.net.URI;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
-class ListingGuardApiClientTest {
+/**
+ * The server's one way to the API, now a raw call of the Java client SDK (ADR-023). These are the scenarios of the former
+ * {@code ListingGuardApiClientTest}, with the same assertions; the unit test of the percent-encoding moved to the SDK
+ * ({@code TransportTest.percentEncodeKeepsOnlyUnreservedCharacters}), and the encoding is still checked here end to end.
+ */
+class ApiGatewayTest {
 
     @Test
     void aPostSendsTheKeyTheRequestIdAndTheBodyAsGiven() throws Exception {
         try (ApiStub stub = new ApiStub().replying(Reply.json(200, "{\"checkId\":\"c-1\"}"))) {
-            ListingGuardApiClient client = new ListingGuardApiClient(stub.config());
+            ApiGateway gateway = new ApiGateway(stub.config());
             String body = "{\"marketplace\":\"ETSY\",\"listing\":{\"title\":\"  Đạt  \"}}";
 
-            ApiResponse response = client.call(ApiRequest.post(Endpoint.CHECKS, body), "req-123");
+            RawResponse response = gateway.call(RawRequest.post(Operation.CHECKS, body), "req-123");
 
             ApiStub.Recorded recorded = stub.only();
             assertThat(recorded.method()).isEqualTo("POST");
@@ -30,14 +38,14 @@ class ListingGuardApiClientTest {
             assertThat(recorded.body()).isEqualTo(body);
             assertThat(response.status()).isEqualTo(200);
             assertThat(response.body()).isEqualTo("{\"checkId\":\"c-1\"}");
-            assertThat(response.requestIdHeader()).isEqualTo("req-123");
+            assertThat(response.requestId()).isEqualTo("req-123");
         }
     }
 
     @Test
     void aGetHasNoBodyAndNoContentType() throws Exception {
         try (ApiStub stub = new ApiStub()) {
-            new ListingGuardApiClient(stub.config()).call(ApiRequest.usage(), "r-1");
+            new ApiGateway(stub.config()).call(RawRequest.usage(), "r-1");
 
             ApiStub.Recorded recorded = stub.only();
             assertThat(recorded.method()).isEqualTo("GET");
@@ -51,9 +59,9 @@ class ListingGuardApiClientTest {
     @Test
     void theMarketplaceAndTheProductTypeAreEncodedSoNothingCanChangeThePath() throws Exception {
         try (ApiStub stub = new ApiStub()) {
-            ListingGuardApiClient client = new ListingGuardApiClient(stub.config());
+            ApiGateway gateway = new ApiGateway(stub.config());
 
-            client.call(ApiRequest.limits("ET SY/../x?y#z", "a b&c=d/é"), "r-1");
+            gateway.call(RawRequest.rulesetLimits("ET SY/../x?y#z", "a b&c=d/é"), "r-1");
 
             ApiStub.Recorded recorded = stub.only();
             assertThat(recorded.path()).isEqualTo("/api/v1/rulesets/ET%20SY%2F%2E%2E%2Fx%3Fy%23z/limits");
@@ -64,7 +72,7 @@ class ListingGuardApiClientTest {
     @Test
     void aPlainMarketplaceIsNotAltered() throws Exception {
         try (ApiStub stub = new ApiStub()) {
-            new ListingGuardApiClient(stub.config()).call(ApiRequest.limits("ETSY", null), "r-1");
+            new ApiGateway(stub.config()).call(RawRequest.rulesetLimits("ETSY", null), "r-1");
 
             assertThat(stub.only().target()).isEqualTo("/api/v1/rulesets/ETSY/limits");
         }
@@ -76,7 +84,7 @@ class ListingGuardApiClientTest {
             McpServerConfig config = new McpServerConfig(ApiStub.KEY, URI.create(stub.baseUri() + "/lg"),
                     Duration.ofSeconds(5), TransportKind.STDIO, InetAddress.getLoopbackAddress(), 0, false);
 
-            new ListingGuardApiClient(config).call(ApiRequest.usage(), "r-1");
+            new ApiGateway(config).call(RawRequest.usage(), "r-1");
 
             assertThat(stub.only().path()).isEqualTo("/lg/api/v1/usage");
         }
@@ -85,7 +93,7 @@ class ListingGuardApiClientTest {
     @Test
     void aRedirectIsNotFollowedSoTheKeyIsNeverSentElsewhere() throws Exception {
         try (ApiStub stub = new ApiStub().replying(r -> Reply.json(302, "").with("Location", "http://127.0.0.1:1/steal"))) {
-            ApiResponse response = new ListingGuardApiClient(stub.config()).call(ApiRequest.usage(), "r-1");
+            RawResponse response = new ApiGateway(stub.config()).call(RawRequest.usage(), "r-1");
 
             assertThat(response.status()).isEqualTo(302);
             assertThat(stub.requests()).hasSize(1);
@@ -94,11 +102,11 @@ class ListingGuardApiClientTest {
 
     @Test
     void anAnswerLargerThanTheLimitIsRefused() throws Exception {
-        String big = "{\"x\":\"" + "a".repeat(ListingGuardApiClient.MAX_RESPONSE_BYTES + 10) + "\"}";
+        String big = "{\"x\":\"" + "a".repeat(ApiGateway.MAX_RESPONSE_BYTES + 10) + "\"}";
         try (ApiStub stub = new ApiStub().replying(Reply.json(200, big))) {
-            ListingGuardApiClient client = new ListingGuardApiClient(stub.config());
+            ApiGateway gateway = new ApiGateway(stub.config());
 
-            assertThatThrownBy(() -> client.call(ApiRequest.usage(), "r-1"))
+            assertThatThrownBy(() -> gateway.call(RawRequest.usage(), "r-1"))
                     .isInstanceOfSatisfying(ApiCallException.class,
                             e -> assertThat(e.code()).isEqualTo(ApiCallException.INVALID_RESPONSE));
         }
@@ -106,9 +114,9 @@ class ListingGuardApiClientTest {
 
     @Test
     void anAnswerJustUnderTheLimitIsRead() throws Exception {
-        String body = "{\"x\":\"" + "a".repeat(ListingGuardApiClient.MAX_RESPONSE_BYTES - 100) + "\"}";
+        String body = "{\"x\":\"" + "a".repeat(ApiGateway.MAX_RESPONSE_BYTES - 100) + "\"}";
         try (ApiStub stub = new ApiStub().replying(Reply.json(200, body))) {
-            ApiResponse response = new ListingGuardApiClient(stub.config()).call(ApiRequest.usage(), "r-1");
+            RawResponse response = new ApiGateway(stub.config()).call(RawRequest.usage(), "r-1");
 
             assertThat(response.body()).hasSize(body.length());
         }
@@ -117,10 +125,10 @@ class ListingGuardApiClientTest {
     @Test
     void aSlowAnswerIsATimeout() throws Exception {
         try (ApiStub stub = new ApiStub().replying(Reply.json(200, "{}").after(Duration.ofSeconds(3)))) {
-            ListingGuardApiClient client = new ListingGuardApiClient(stub.config(Duration.ofMillis(300)));
+            ApiGateway gateway = new ApiGateway(stub.config(Duration.ofMillis(300)));
             long started = System.nanoTime();
 
-            assertThatThrownBy(() -> client.call(ApiRequest.usage(), "r-1"))
+            assertThatThrownBy(() -> gateway.call(RawRequest.usage(), "r-1"))
                     .isInstanceOfSatisfying(ApiCallException.class,
                             e -> assertThat(e.code()).isEqualTo(ApiCallException.TIMEOUT));
 
@@ -137,7 +145,7 @@ class ListingGuardApiClientTest {
         McpServerConfig config = new McpServerConfig(ApiStub.KEY, URI.create("http://127.0.0.1:" + port),
                 Duration.ofSeconds(2), TransportKind.STDIO, InetAddress.getLoopbackAddress(), 0, false);
 
-        assertThatThrownBy(() -> new ListingGuardApiClient(config).call(ApiRequest.usage(), "r-1"))
+        assertThatThrownBy(() -> new ApiGateway(config).call(RawRequest.usage(), "r-1"))
                 .isInstanceOfSatisfying(ApiCallException.class, e -> {
                     assertThat(e.code()).isEqualTo(ApiCallException.UNREACHABLE);
                     assertThat(e.getMessage()).doesNotContain(ApiStub.KEY);
@@ -149,19 +157,20 @@ class ListingGuardApiClientTest {
     void anEchoedKeyIsReplacedBeforeAnythingElseSeesTheAnswer() throws Exception {
         String body = "{\"detail\":\"bad key " + ApiStub.KEY + "\"}";
         try (ApiStub stub = new ApiStub().replying(Reply.problem(401, body).with("X-Request-Id", "id-" + ApiStub.KEY))) {
-            ApiResponse response = new ListingGuardApiClient(stub.config()).call(ApiRequest.usage(), "r-1");
+            RawResponse response = new ApiGateway(stub.config()).call(RawRequest.usage(), "r-1");
 
             assertThat(response.body()).doesNotContain(ApiStub.KEY).contains("<redacted>");
-            assertThat(response.requestIdHeader()).doesNotContain(ApiStub.KEY);
+            assertThat(response.requestId()).doesNotContain(ApiStub.KEY);
         }
     }
 
     @Test
-    void percentEncodeKeepsOnlyUnreservedCharacters() {
-        assertThat(ListingGuardApiClient.percentEncode("Az09-_", false)).isEqualTo("Az09-_");
-        assertThat(ListingGuardApiClient.percentEncode("a.b~c", false)).isEqualTo("a%2Eb%7Ec");
-        assertThat(ListingGuardApiClient.percentEncode("a.b~c", true)).isEqualTo("a.b~c");
-        assertThat(ListingGuardApiClient.percentEncode("Đ", false)).isEqualTo("%C4%90");
-        assertThat(ListingGuardApiClient.percentEncode("", false)).isEmpty();
+    void theRetryPolicyIsNoneSoA503IsAnsweredOnce() throws Exception {
+        try (ApiStub stub = new ApiStub().replying(Reply.problem(503, "{\"code\":\"service-unavailable\"}"))) {
+            RawResponse response = new ApiGateway(stub.config()).call(RawRequest.usage(), "r-1");
+
+            assertThat(response.status()).isEqualTo(503);
+            assertThat(stub.requests()).hasSize(1);
+        }
     }
 }

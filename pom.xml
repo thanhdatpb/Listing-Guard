@@ -19,6 +19,7 @@
         <module>variation-checks</module>
         <module>personalization-screening</module>
         <module>image-checker</module>
+        <module>client</module>
         <module>api</module>
         <module>mcp-server</module>
         <module>contract-tools</module>
@@ -94,6 +95,11 @@
             <dependency>
                 <groupId>com.thanhdatpb.listingguard</groupId>
                 <artifactId>image-checker</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.thanhdatpb.listingguard</groupId>
+                <artifactId>listing-guard-client</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

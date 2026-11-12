@@ -124,13 +124,16 @@ It never edits a listing, never publishes, and does no SEO.
 - **MCP server** (`mcp-server/`, ADR-017, Proposed; implemented, `docs/mcp.md`): a jar of its own for AI agents (Claude Code,
   Claude Desktop, a department's agent) over the Model Context Protocol. **It is only an HTTP client of the REST API**
   (`X-API-Key` from `LISTING_GUARD_MCP_API_KEY`, base URL from `LISTING_GUARD_MCP_BASE_URL`; it does not start without them and
-  never prints a value): no database, no internal service, no dependency on another module, no migration, no write and no logic of its own, so keys, rate limit, plans and quota (ADR-005, ADR-007, ADR-013) apply unchanged. Official MCP Java SDK
+  never prints a value): no database, no internal service, no migration, no write and no logic of its own, so keys, rate limit, plans and quota (ADR-005, ADR-007, ADR-013) apply unchanged. **Every call goes
+  through the Java client SDK** (`client`, the one module of this repository it may depend on, ADR-023): `ApiGateway` makes a raw call
+  with `RetryPolicy.none()` and turns the SDK's `ListingGuardTransportException` into the server's own codes. Official MCP Java SDK
   `io.modelcontextprotocol.sdk` **2.1.0** pinned exactly (`mcp-core` + `mcp-json-jackson2`; the aggregate `mcp` pulls Jackson 3;
   2.2.0-M2 is a milestone and is not used), **no Spring** (the Spring AI starter needs Spring Boot 4 and is not used; the repository itself is on Boot 4.1, ADR-020), the JDK
   `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Seven tools
   (`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`, `get_capabilities`
-  (`GET /api/v1/capabilities`, no arguments, read only); `Endpoint` is the
-  closed list of API calls, only `GET` and `POST`, no tool takes a path or a URL); **none writes, applies a fix or publishes**.
+  (`GET /api/v1/capabilities`, no arguments, read only); `check_trademark` takes an optional `product_type`, passed on unchanged;
+  `Endpoint` is the closed list of API calls, each an SDK `Operation`, only `GET` and `POST`, no tool takes a path or a URL);
+  **none writes, applies a fix or publishes**.
   **The model does not decide**: a `2xx` answer is returned verbatim (exact body as text, the same object as structured content,
   no `outputSchema`, nothing removed or summarized, `INCOMPLETE` and `UNKNOWN` never turned into anything else). API problems
   become tool errors (`isError`) with `code`, `status`, `requestId`, `retryable`, `hint` from a fixed member list (a `quota-exceeded`
@@ -150,6 +153,29 @@ It never edits a listing, never publishes, and does no SEO.
   catalog name, no secret setting and nothing about a client; a test holds the exact member list. `demo` comes from
   `TrademarkProperties.isDemo`, the one definition the console banner uses too. A new member needs the DTO, `ApiExamples.CAPABILITIES`,
   `docs/api/openapi.json` and `docs/integration-guide.md`.
+- **Java client SDK** (`client/`, ADR-023, Proposed; implemented, `client/README.md`): artifact
+  `com.thanhdatpb.listingguard:listing-guard-client`, packages `com.thanhdatpb.listingguard.client` and `.client.model`. **Java 21,
+  the JDK `HttpClient` and Jackson 2 (`jackson-databind`, `jackson-datatype-jsr310`) only**: no Spring, no logging framework, no other
+  module (its own records follow `docs/api/openapi.json`; no Jackson type in a public signature). `ListingGuardClient.builder()`
+  (`baseUrl`, `apiKey`, `timeout` 10 s, `retry`, `userAgent`, `cloudflareAccess`, `listener`, `requestIdSupplier`, `maxResponseBytes`
+  2 MiB, `allowInsecureHttp`) builds an immutable, thread-safe client with one `HttpClient`. Typed calls, blocking and
+  `CompletableFuture`: `checks`, `trademarkChecks` (optional `product_type`), `variationChecks`, `personalizationScreenings`,
+  `rulesetLimits` and `capabilities` (both with `If-None-Match`, `Conditional<T>` on `304`) and `usage`; `send(RawRequest)` returns any
+  answer unchanged (the MCP server uses it). `Operation` is the closed list (only `GET` and `POST`). Problems become
+  `QuotaExceededException`, `PlanNotAllowedException`, `RateLimitedException` (`Retry-After`), `NotConfiguredException`
+  (`*-not-configured`), `ValidationException` (`errors`), `UnknownProductTypeException` (`known`), else `ListingGuardApiException`
+  (`isProblem()` false for a proxy's answer); no usable answer is `ListingGuardTransportException` (`Kind`). `RetryPolicy.defaults()`:
+  3 attempts, retries only `429 rate-limited` (honoring `Retry-After` up to 30 s) and a `503` that is not `*-not-configured` or
+  `corpus-model-mismatch`; never `quota-exceeded`, another status, a network error or a timeout. No redirect, the answer bounded,
+  an echoed key or Access secret replaced, nothing logged. Tolerant reader: unknown members ignored, unknown enum values
+  `UNRECOGNIZED`, missing lists empty (ADR-022's tolerant reader); `X-Listing-Guard-Version`, `Deprecation`, `Sunset` and `Link`
+  (ADR-022 sections 6 and 7) go to the listener once per value. Tests: a JDK `HttpServer` stub (no Docker),
+  `ContractConformanceTest` (response records vs `docs/api/openapi.json` and its examples, request records vs
+  `docs/api/input-schema.json`; the client side of the contract, next to `contract-tools`, which holds the documents to the last
+  release), `SdkIntegrationTest` in `api` (test scope; the real API on a random port, its headers included). The `release-client`
+  workflow deploys it to GitHub Packages on a `v*.*.*` tag (version = tag, flattened POM, sources and Javadoc from the `release`
+  profile, address `maven.pkg.github.com/thanhdatpb/listing-guard` in lower case). Decided: GitHub Packages only, one version line,
+  no retry of network errors, timeouts or Cloudflare 502/524/530, Jackson 3 in the repository's migration PR.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Optional ADR-014 fix/readiness output is behind
@@ -259,7 +285,7 @@ It never edits a listing, never publishes, and does no SEO.
   the banner and the editor's trademark panel repeats it.
 - Current scope: Etsy and Amazon rule engines, the image checker (ADR-008: the core and the endpoint, off by default and without the bounded decode service), the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the listing health report (ADR-018), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
+  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12c.yaml`): simple input format (`title`, `brand`,
@@ -351,6 +377,11 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     delete the previous files, `baseline: v<new>` and no exceptions). Open questions are at the end of the ADR (the 180 days, a
     `CODEOWNERS` entry, attaching assets to v0.6.0 by hand, whether a renamed schema is breaking for a generated Java SDK).
 
+14. Java client SDK (ADR-023, Proposed): done as one PR (`feature/java-client-sdk`: ADR, `client/` module, the MCP server moved onto
+    it with `check_trademark` `product_type`, the contract and integration tests, the `release-client` workflow, docs). Open questions
+    the maintainer decides are at the end of the ADR (Maven Central, a version line of its own, more endpoints, retrying network errors
+    and Cloudflare `5xx`, joining the ADR-022 compatibility check, Jackson 3). Not planned: a method that writes, a caller-supplied `HttpClient`.
+
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
 
@@ -372,9 +403,10 @@ without it.
 
 ```bash
 ./mvnw -B verify                 # build + all tests (needs Docker for Testcontainers)
-./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening,mcp-server,contract-tools verify   # fast: no Docker needed
+./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening,image-checker,client,mcp-server,contract-tools verify   # fast: no Docker needed
 ./mvnw -B -pl contract-tools verify # API compatibility check against the latest release (ADR-022); report in contract-tools/target/contract/
-./mvnw -B -pl mcp-server package # -> mcp-server/target/listing-guard-mcp.jar (the MCP server; see docs/mcp.md)
+./mvnw -B -pl mcp-server -am package # -> mcp-server/target/listing-guard-mcp.jar (the MCP server, with the SDK; see docs/mcp.md)
+./mvnw -B -pl client -Prelease package -DskipTests # the SDK jar with its sources and Javadoc jars (client/README.md)
 docker compose up --build        # postgres + api (override ports: POSTGRES_PORT, API_PORT)
 ```
 
@@ -581,8 +613,18 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `ImageAnalysisFingerprint` decide findings and cache identity: changing one needs a new fingerprint component. Test rulesets with
   numbers live in `api/src/test/resources/image/` only. Do not enable the endpoint for an untrusted caller before the bounded decode
   service, the upload staging and the health effect exist.
-- **MCP server** (ADR-017): `mcp-server` stays a client of the REST API and depends on no other module (a test reads its POM and its
-  imports: no database, no Spring, no `core`, no `api`). A new tool means a new `Endpoint` entry, a `ToolSpec` with a schema that
+- **Java client SDK** (ADR-023): `client` depends on the JDK and Jackson 2 only (a test reads its POM and imports: no Spring, no
+  logging framework, no database, no other module, no Jackson type in a public signature) and issues only `GET` and `POST` to the
+  `Operation` list; a new endpoint is a new `Operation`, a typed method in both forms, its own records and a stub test, and a new
+  HTTP method needs an ADR. Response records follow `docs/api/openapi.json` and request records `docs/api/input-schema.json`: when
+  a schema reachable from an operation changes, even additively, `ContractConformanceTest` fails until the record changes too in
+  the same PR (a nullable member is boxed; an enum has the schema's values plus `UNRECOGNIZED` with `@JsonEnumDefaultValue`). Never fold an unknown value into a known one (`UNRECOGNIZED` is never `LOW` or
+  `COMPLETE`), never retry `quota-exceeded`, a `*-not-configured` 503, another `4xx` or a timed-out `POST`, never follow a redirect,
+  never log, never put the key, an Access secret, a listing or a buyer's text in a message or `toString()`. The SDK version is the
+  repository's (release tag); plugin versions in its POM are pinned.
+- **MCP server** (ADR-017, ADR-023): `mcp-server` stays a client of the REST API and depends on exactly one module, `client` (a test
+  reads its POM and its imports: no database, no Spring, no `core`, no `api`); it calls the API only through `ApiGateway` (an SDK raw
+  call with `RetryPolicy.none()`). A new tool means a new `Endpoint` entry, a `ToolSpec` with a schema that
   `ArgumentChecker` enforces, and a test of its method, path and header; **never a tool that writes, never a tool that takes a URL
   or a path**, and a new HTTP method needs an ADR. Do not decide, reword, summarize or "improve" an answer of the API in the server:
   the one object it builds itself is the `trademark-not-configured` result, and it says so (`derivedFrom`). Never put a value in a

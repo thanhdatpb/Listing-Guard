@@ -62,7 +62,7 @@ final class Launcher {
     static RunningServer start(McpServerConfig config, InputStream in, OutputStream out) throws Exception {
         var mapper = ToolResults.newMapper();
         ToolCatalog catalog = new ToolCatalog(mapper);
-        ToolRunner runner = new ToolRunner(new ListingGuardApiClient(config), new ToolResults(mapper), mapper);
+        ToolRunner runner = new ToolRunner(new ApiGateway(config), new ToolResults(mapper), mapper);
 
         if (config.insecureHttpAllowed() && "http".equals(config.baseUri().getScheme())
                 && !HostAddresses.isLoopbackHost(config.baseUri().getHost())) {
