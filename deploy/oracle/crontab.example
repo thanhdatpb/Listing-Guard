@@ -14,6 +14,15 @@
 # lock (a run still converting makes the next one exit with 75), checks free disk and logs to logs/uspto-sync/.
 # 0 11 * * * cd /opt/listing-guard && ./deploy/oracle/uspto-sync.sh
 
+# TSDR status check (ADR-009, "TSDR status check"; docs/deploy-oracle.md section 8a). Weekly, on Sunday after the USPTO sync, so
+# the marks it asks about come from the catalog the sync has just activated. Leave it commented until you have a TSDR key and
+# TSDR_DOWNLOAD_ENABLED=true (the key header and the status field names are unverified: run `--dry-run` and one small
+# `--max-marks=5` run by hand first). It only proposes: it reads the findings' source ids and the dates of retained checks,
+# writes catalogs/raw/tsdr/out/<UTC timestamp>/report.json and dead-marks.csv, and changes no catalog. The script holds a lock
+# (a second run exits with 75) and logs to logs/tsdr-status/. A non-zero exit means it stopped early (a refused key, a limit
+# that lasts): cron mails it.
+# 30 12 * * 0 cd /opt/listing-guard && ./deploy/oracle/tsdr-status.sh
+
 # Policy changes are saved by a maintainer first; this monthly job only compares local files and writes reports.
 # 0 5 1 * * cd /opt/listing-guard && ./deploy/oracle/policy-diff.sh
 
