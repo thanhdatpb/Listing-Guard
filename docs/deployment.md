@@ -255,6 +255,32 @@ upgrade. To roll back, set the previous image version and recreate the API in th
 version applied a migration incompatible with the previous image, restore the matching pre-upgrade database
 backup before starting the old version.
 
+Every `/api/v1` response names the release that answered in `X-Listing-Guard-Version` (ADR-022), so
+`curl -sI -H "X-API-Key: $KEY" https://<host>/api/v1/usage | grep -i x-listing-guard-version` confirms the upgrade. An image built
+from source says `dev` unless it was built with `--build-arg LISTING_GUARD_RELEASE=<version>`.
+
+### Announcing a deprecated operation (ADR-022)
+
+When a release deprecates an operation, a deployment can tell its clients on the wire. List it in the configuration (for example in
+an `application-prod.yml` next to the jar, or as `LISTING_GUARD_API_DEPRECATION_ENDPOINTS_0_METHOD=GET` and the like):
+
+```yaml
+listing-guard:
+  api:
+    deprecation:
+      endpoints:
+        - method: GET
+          path: /api/v1/checks/{id}          # exactly as docs/api/openapi.json writes it
+          deprecated-at: 2027-01-01           # a date (midnight UTC) or an ISO-8601 instant
+          sunset-at: 2027-07-01T00:00:00Z     # optional, at least 180 days after deprecated-at
+          link: https://github.com/thanhdatpb/Listing-Guard/blob/main/docs/integration-guide.md#compatibility-and-versions
+```
+
+Every response of that operation then carries `Deprecation: @1798761600`, `Sunset: Thu, 01 Jul 2027 00:00:00 GMT` and
+`Link: <...>; rel="deprecation"; type="text/html"`. The API refuses to start when an entry names no `/api/v1` operation (a typo would
+announce nothing), names one twice, has a Sunset less than 180 days after the Deprecation date, or a link that is not `https`. Nothing
+is deprecated by default.
+
 ## Pack identity contract (ADR-010, PR 0b)
 
 Migrations V8 to V14 make the pack identity of rulesets and checks mandatory (`pack_id`, `analysis_version` and

@@ -2,6 +2,8 @@ package com.thanhdatpb.listingguard.mcp;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thanhdatpb.listingguard.client.RawRequest;
+import com.thanhdatpb.listingguard.client.RawResponse;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import java.util.Map;
 import java.util.UUID;
@@ -18,11 +20,11 @@ final class ToolRunner {
 
     private static final Logger log = LoggerFactory.getLogger(ToolRunner.class);
 
-    private final ListingGuardApiClient api;
+    private final ApiGateway api;
     private final ToolResults results;
     private final ObjectMapper mapper;
 
-    ToolRunner(ListingGuardApiClient api, ToolResults results, ObjectMapper mapper) {
+    ToolRunner(ApiGateway api, ToolResults results, ObjectMapper mapper) {
         this.api = api;
         this.results = results;
         this.mapper = mapper;
@@ -39,7 +41,7 @@ final class ToolRunner {
                 return results.invalidArguments(problem, requestId);
             }
 
-            ApiResponse response = api.call(toRequest(tool, args), requestId);
+            RawResponse response = api.call(toRequest(tool, args), requestId);
             log.info("tool={} status={} requestId={} ms={}", tool.name(), response.status(), requestId, millis(started));
 
             if (tool.endpoint() == Endpoint.TRADEMARK_CHECKS && response.status() == 503) {
@@ -60,12 +62,13 @@ final class ToolRunner {
         }
     }
 
-    private ApiRequest toRequest(ToolSpec tool, Map<String, Object> args) throws JsonProcessingException {
+    /** The arguments of a check tool are the request body, passed on as the agent gave them (ADR-017). */
+    private RawRequest toRequest(ToolSpec tool, Map<String, Object> args) throws JsonProcessingException {
         return switch (tool.endpoint()) {
-            case RULESET_LIMITS -> ApiRequest.limits((String) args.get("marketplace"), (String) args.get("product_type"));
-            case USAGE -> ApiRequest.usage();
-            case CAPABILITIES -> ApiRequest.capabilities();
-            default -> ApiRequest.post(tool.endpoint(), mapper.writeValueAsString(args));
+            case RULESET_LIMITS -> RawRequest.rulesetLimits((String) args.get("marketplace"), (String) args.get("product_type"));
+            case USAGE -> RawRequest.usage();
+            case CAPABILITIES -> RawRequest.capabilities();
+            default -> RawRequest.post(tool.endpoint().operation(), mapper.writeValueAsString(args));
         };
     }
 

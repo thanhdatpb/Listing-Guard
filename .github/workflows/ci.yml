@@ -27,5 +27,15 @@ jobs:
           java-version: "21"
           cache: maven
 
+      # includes the API compatibility check of ADR-022 (contract-tools: ContractCompatibilityTest)
       - name: Build and test
         run: ./mvnw -B verify
+
+      - name: API compatibility report
+        if: always() && hashFiles('contract-tools/target/contract/compatibility-report.md') != ''
+        run: cat contract-tools/target/contract/compatibility-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      # The release-client workflow builds the SDK's Javadoc and sources jars; build them here too, so a Javadoc error is
+      # found before a tag is pushed.
+      - name: Java client SDK release jars
+        run: ./mvnw -B -pl client -Prelease package -DskipTests

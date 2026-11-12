@@ -6,7 +6,10 @@ before it is published and returns findings with suggestions. It never edits a l
 no SEO: what to do with a finding is the caller's decision.
 
 The machine-readable contract is [`docs/api/openapi.json`](api/openapi.json) (also served at
-`GET /v3/api-docs`, with a key). A test fails when the committed file no longer matches the code.
+`GET /v3/api-docs`, with a key), with the listing formats as a JSON Schema in
+[`docs/api/input-schema.json`](api/input-schema.json). A test fails when the committed file no longer matches the code, and
+another fails when it breaks a client of the latest release. Each release attaches both files to its GitHub Release; see
+[Compatibility and versions](#compatibility-and-versions) for the rules and how to download the contract of a release.
 
 ## Calling flow
 
@@ -72,6 +75,19 @@ curl -sS -i --connect-timeout 5 --max-time 10 \
   --data @check-request.json     # {"marketplace":"ETSY","listing":{...}}, as in "Create a check"
 ```
 
+With the Java client SDK, pass both values once to the builder; it sends them on every request and never shows them in a
+message or `toString()`:
+
+```java
+ListingGuardClient client = ListingGuardClient.builder()
+    .baseUrl(baseUrl).apiKey(apiKey)
+    .cloudflareAccess(accessClientId, accessClientSecret)
+    .build();
+```
+
+An Access refusal then arrives as a `ListingGuardApiException` whose `isProblem()` is false (no `code`, no `requestId` of ours),
+and a redirect to a login page as a `ListingGuardTransportException` of kind `REDIRECT`.
+
 With the Spring `RestClient` of "Create a check", read the two Access values from configuration and set them as default
 headers; `X-API-Key` stays as in the example:
 
@@ -83,9 +99,9 @@ RestClient listingGuard = RestClient.builder()
     .build();
 ```
 
-The MCP server ([`mcp.md`](mcp.md)) sends only `X-API-Key` (with `X-Request-Id`, `Accept` and `Content-Type`) and has no
-setting for other headers (ADR-017), so it cannot call a hostname that Access protects. Run it where it reaches the API
-without Access.
+The MCP server ([`mcp.md`](mcp.md)) sends only `X-API-Key` (with `X-Request-Id`, `Accept`, `Content-Type` and its
+`User-Agent`) and has no setting for other headers (ADR-017), so it cannot call a hostname that Access protects, although the
+SDK underneath it could. Run it where it reaches the API without Access.
 
 ### Who refused the request: Access or the API
 
@@ -136,6 +152,11 @@ second limit. Then:
 Retries are safe for your quota: a result already stored is answered from the cache at no cost, and two identical
 requests sent at the same time cost one unit (see "Plans and monthly quota"). Cap the total attempts, and remember that a
 check is advice, not a gate: if Listing Guard cannot be reached, the listing can still be published.
+
+The Java client SDK's default policy covers the `429 rate-limited` row and a `503` problem (at most 3 attempts). It does not retry
+a network error, a timeout or a Cloudflare `502`, `524` or `530` by itself: catch `ListingGuardTransportException` (kinds
+`UNREACHABLE`, `TIMEOUT`) or a `ListingGuardApiException` with `isProblem()` false and retry those yourself if you follow the
+table above.
 
 ## Request id
 
@@ -260,9 +281,28 @@ The fields that are read, their accepted forms and how values are cleaned are th
 list entries are dropped; nothing else is changed, because the rules must see what the seller wrote. If your own
 listing format differs, map it to this one on your side.
 
+### Java: the official client SDK
+
+From Java, use the official SDK `com.thanhdatpb.listingguard:listing-guard-client` ([`client/README.md`](../client/README.md),
+[ADR-023](adr/ADR-023-java-client-sdk.md)). It sends the headers above, follows no redirect, maps every problem below to a typed
+exception (`QuotaExceededException`, `PlanNotAllowedException`, `RateLimitedException` with `retryAfter()`,
+`NotConfiguredException`, `ValidationException` with `errors()`, `UnknownProductTypeException` with `known()`, otherwise
+`ListingGuardApiException` with `status`, `type`, `code` and `detail`), retries `429 rate-limited` and a retryable `503` within a
+bounded policy and reads new fields and enum values without failing. It needs Java 21 and Jackson only; each release tag
+publishes it to GitHub Packages.
+
+```java
+ListingGuardClient client = ListingGuardClient.builder()
+    .baseUrl("https://listing-guard.example")
+    .apiKey(apiKey)                       // from your secret store
+    .userAgent("shop-backend/1.4")
+    .build();                             // build once, share it, close it at shutdown
+CheckResult result = client.checks(CheckRequest.of("ETSY", listing));   // listing: a Map or object in the standard input
+```
+
 ### Java client (Spring `RestClient`)
 
-Keep the API key in server-side configuration or a secret manager. Send a request ID for support
+Without the SDK, a Spring `RestClient` works as below. Keep the API key in server-side configuration or a secret manager. Send a request ID for support
 correlation. Do not retry a `401` without fixing the key, or a `422` without handling the unsupported
 marketplace. On `429`, read `Retry-After` in seconds and schedule a retry after that delay rather than
 retrying immediately.
@@ -566,6 +606,91 @@ version) or another analyzer is added, it changes, old results are no longer reu
 stored. `GET /api/v1/checks/{id}` always returns the result as it was stored, with `cached: false`, even if a
 newer analysis version exists now. Treat `rulesetVersion` and `analysisVersion` as opaque strings: compare for
 equality, do not parse them.
+
+## Compatibility and versions
+
+Listing Guard is released as `vX.Y.Z`. Inside `/api/v1` every change is **additive**
+([ADR-022](adr/ADR-022-api-contract-and-compatibility.md)): a new endpoint, a new field in a response, a new optional field
+in a request, a new value of an enum in a response, a new header, a new error code. Nothing is removed or renamed, no type
+changes, no optional field or parameter becomes required, a response field that was never `null` does not become nullable,
+and a problem `code` keeps its HTTP status and its meaning. A breaking change goes to a new path prefix (`/api/v2`) that runs
+next to `/api/v1`. The rare exception is declared and reviewed in the repository and listed under "Breaking changes" in the
+release notes. The build compares every change with the contract of the latest release and fails on an undeclared break.
+
+### What your client must do
+
+Additive changes are safe only for a tolerant reader:
+
+- Ignore response fields you do not know; never fail on them.
+- Accept an enum value you do not know: show it as "other" or "unknown", never as an error, and never map it to the safest
+  value (an unknown risk level is not `LOW`).
+- Handle any `4xx` or `5xx` problem by its `code` (see [Errors](#errors)), and a `code` you do not know by its status class.
+- Treat `rulesetVersion`, `analysisVersion` and `X-Listing-Guard-Version` as opaque strings.
+- Do not depend on the order of fields, nor on a header that is not documented.
+
+### `X-Listing-Guard-Version`
+
+Every response under `/api/v1` carries the release of the server that answered, success or problem, `401` and `429` included:
+
+```text
+X-Listing-Guard-Version: 0.8.0
+```
+
+A build without a release version (a local build) says `dev`. Log it with the request id and show it in a diagnostics view; use
+it to download the contract of that release. Do not use it to decide which features exist: ask
+[`GET /api/v1/capabilities`](#capabilities). `GET /health` does not carry it.
+
+### Deprecation and Sunset
+
+An operation that is going away is first deprecated: `openapi.json` marks it `deprecated: true`, the release notes list it in
+"Deprecations" with its replacement, and a deployment that announces it adds two headers to every response of that operation
+(and a link to the notes):
+
+```text
+Deprecation: @1798761600
+Sunset: Thu, 01 Jul 2027 00:00:00 GMT
+Link: <https://github.com/thanhdatpb/Listing-Guard/blob/main/docs/integration-guide.md#compatibility-and-versions>; rel="deprecation"; type="text/html"
+```
+
+`Deprecation` is `@` and the time of the deprecation in seconds since 1970-01-01 UTC (RFC 9745); `Sunset` is the time after
+which the operation may stop working (RFC 8594), at least **180 days** after the deprecation. Alert on the presence of
+`Deprecation` in your client and move to the replacement before the Sunset date.
+
+### The contract of a release
+
+From the first release cut after ADR-022, each GitHub Release has these assets, at an address that never changes:
+
+| Asset | Content |
+|---|---|
+| `openapi.json` | `docs/api/openapi.json` at the tag, byte for byte |
+| `input-schema.json` | `docs/api/input-schema.json` at the tag: the listing formats and the request bodies as JSON Schema (draft 2020-12) |
+| `contract-sha256.txt` | the SHA-256 of the two files, in `sha256sum` format |
+| `compatibility-report.md` | the changes since the previous release: breaking (declared), additive, other |
+
+```bash
+TAG=v0.8.0
+BASE=https://github.com/thanhdatpb/Listing-Guard/releases/download/$TAG
+curl -fsSL -o openapi.json "$BASE/openapi.json"
+curl -fsSL -o input-schema.json "$BASE/input-schema.json"
+curl -fsSL -o contract-sha256.txt "$BASE/contract-sha256.txt"
+sha256sum -c contract-sha256.txt
+```
+
+The same bytes are at `https://raw.githubusercontent.com/thanhdatpb/Listing-Guard/<tag>/docs/api/openapi.json` (and
+`input-schema.json`); that is the way to read a release older than the assets (`v0.6.0` has `openapi.json` but no
+`input-schema.json`). The checksum only detects a damaged download; it is not a signature.
+
+Pin the tag in your repository, generate or check your types against the downloaded files, and move to a newer tag on purpose:
+read its `compatibility-report.md` for what is new. Because changes inside `/api/v1` are additive, a client built against an
+older tag keeps working against a newer server. A client generated from `openapi.json` keys its methods on `operationId`, which
+never changes inside `/api/v1`; a schema name may change (the report says `schema-renamed`) without any change on the wire, so
+regenerate when you move to a new tag.
+
+### `analysisVersion` is not the contract version
+
+`analysisVersion` names what decided the findings (the rulesets and analyzers) and is part of the cache key. It changes within one
+release and one contract whenever a ruleset changes, and a contract change does not change it unless findings change. A new
+`analysisVersion` is never a breaking change: expect it to change and compare it for equality only.
 
 ## Limits for a character counter
 

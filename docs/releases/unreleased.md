@@ -1,8 +1,67 @@
 # Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, and the USPTO converter's latest-transaction rule and filters below. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities` and the schema of the trademark check's findings (see the sections below). There are five migrations: V28 (trademark), V29 and V30 (image checks), and V31 and V32 (USPTO sync), all additive.
+Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities` and the schema of the trademark check's findings (see the sections below). There are five migrations: V28 (trademark), V29 and V30 (image checks), and V31 and V32 (USPTO sync), all additive.
 
 ## What is new
+
+### API contract and compatibility policy (ADR-022)
+
+[ADR-022](../adr/ADR-022-api-contract-and-compatibility.md) makes the API contract a released artifact with written rules. Inside
+`/api/v1` changes are **additive only**: a new endpoint, response field, optional request field, response enum value, header or
+error code. Removing or renaming a field, changing a type, making a response field nullable or optional, making a request field
+required, removing an endpoint, changing an `operationId`, or changing the status, `type` or meaning of a problem `code` is breaking
+and is not allowed in `/api/v1`. Clients must ignore unknown fields and accept unknown enum values.
+
+- **Compatibility check in the build.** A new module, `contract-tools` (Java and Jackson only), compares `docs/api/openapi.json` with
+  `docs/api/baseline/openapi-v0.6.0.json`, a byte copy of the last published release, with 69 rules, one synthetic test pair each.
+  `./mvnw verify` (and so CI) fails on a breaking change that `docs/api/breaking-changes.yaml` does not declare with a reason and an
+  ADR that names it. The report, with the additive changes for the release notes, is written to
+  `contract-tools/target/contract/compatibility-report.md` and shown in the CI job summary.
+- **The listing formats as JSON Schema.** `docs/api/input-schema.json` (draft 2020-12) is the machine-readable form of
+  `docs/input-schema.md`, which had none (the OpenAPI document describes the listing as a free-form object). A test holds every field
+  table of the page to the schema and validates every example of the page against it.
+- **The contract on every GitHub Release.** The release workflow attaches `openapi.json`, `input-schema.json`, `contract-sha256.txt`
+  and `compatibility-report.md` to the Release of the tag, at
+  `https://github.com/thanhdatpb/Listing-Guard/releases/download/<tag>/<asset>`; it creates a draft Release when none exists, and it
+  stops when the baseline is not the previous release's file byte for byte. After each release the baseline moves in a pull request.
+- **`X-Listing-Guard-Version`** on every `/api/v1` response (success, problem, `401`, `429`): the release of the server, `dev` for a
+  local build. It comes from the Maven property `listing-guard.release` (Dockerfile argument `LISTING_GUARD_RELEASE`), written into
+  `META-INF/build-info.properties`.
+- **Deprecation and Sunset headers by configuration.** `listing-guard.api.deprecation.endpoints[]` (method, path, `deprecated-at`,
+  optional `sunset-at` at least 180 days later, optional `https` link) adds `Deprecation` (RFC 9745), `Sunset` (RFC 8594) and
+  `Link rel="deprecation"` to every response of that operation. Nothing is deprecated by default; a wrong entry stops the start-up.
+- `docs/api/openapi.json` documents the three headers under `components.headers` and on every `/api/v1` response, and its
+  description states the policy. No endpoint, request, response body, status, migration or `analysisVersion` changes.
+
+Contract changes against v0.6.0, from the first report of the check (additive unless said otherwise): `GET /api/v1/capabilities`,
+`POST /api/v1/image-checks` and `GET /api/v1/image-checks/{id}`; the response headers `X-Listing-Guard-Version`, `Deprecation` and
+`Sunset`; the problem codes `image-check-not-found`, `image-checks-not-configured`, `too-many-images`, `unknown-image-profile` and
+`unknown-product-type`; `product_type` in the trademark check request and `productType` in its result; the members of
+`TrademarkCheckFindingView` (`start`, `end`, `snippet`, `mark`, `matchType`, `score`, `risk`, `insideColorPhrase`, `otherRuleIds`,
+`sourceIds`, `sourceLinks`, `riskAdjustments`); two renamed schemas (non-breaking: `CheckRequest` to `TrademarkCheckRequest` for the
+trademark request, `FindingView` to `TrademarkCheckFindingView` for its findings); and four declared breaking changes of the document,
+see [Breaking changes](#breaking-changes).
+
+### Java client SDK `listing-guard-client` (ADR-023)
+
+A new module `client/` is the official Java client of the API, artifact **`com.thanhdatpb.listingguard:listing-guard-client`**.
+`ListingGuardClient.builder().baseUrl(..).apiKey(..).timeout(..).retry(..).userAgent(..).build()` gives an immutable,
+thread-safe client that reuses one `HttpClient`, with blocking and `CompletableFuture` methods for `POST /api/v1/checks`,
+`/trademark-checks` (with `product_type`), `/variation-checks`, `/personalization-screenings`, `GET .../rulesets/{marketplace}/limits`
+and `/capabilities` (both with `If-None-Match` and `304`) and `/usage`, plus a raw call that returns any answer unchanged. Problem
+answers become typed exceptions (`QuotaExceededException`, `PlanNotAllowedException`, `RateLimitedException` with `Retry-After`,
+`NotConfiguredException`, `ValidationException` with the field errors, `UnknownProductTypeException` with `known`, otherwise
+`ListingGuardApiException`); `429 rate-limited` and a `503` that is not `*-not-configured` are retried within a bounded policy
+(3 attempts by default), and nothing else is. It follows no redirect, refuses an answer above 2 MiB, replaces an echoed key or
+Cloudflare Access secret, logs nothing, and reads unknown fields and enum values (`UNRECOGNIZED`) without failing; an optional
+listener hears `X-Listing-Guard-Version` and `Deprecation` (ADR-022, above). Java 21 and Jackson 2 only, no Spring, no other module. A contract test compares its records with `docs/api/openapi.json`
+and reads its examples; an integration test in `api` runs it against the real API. **Each release tag now also publishes it to
+GitHub Packages** (workflow `release-client`, version = tag, with sources and Javadoc jars); reading from GitHub Packages needs a
+token with `read:packages`. See [client/README.md](../../client/README.md).
+
+**The MCP server now makes its calls through the SDK** (its own HTTP client is deleted, the SDK is configured to retry nothing),
+and `check_trademark` takes an optional `product_type`, passed on unchanged. Nothing else an agent sees changes. See
+[docs/mcp.md](../mcp.md).
 
 ### `uspto-sync`: a USPTO trademark catalog kept up to date, with rollback (ADR-009, PR A2d)
 
@@ -50,7 +109,7 @@ A finding also gets **`sourceLinks`**: for a catalog imported with `source_key: 
 
 The ruleset also has a **`generic_words`** list (a mark that is also an ordinary word keeps its level only as an exact or phrase match in `brand` or `shop_name`; anywhere else it is capped at `LOW` with the original level shown). **The shipped list is empty**, so this changes nothing until the maintainer has reviewed each word. Personalization screenings behave exactly as before (a test compares them on the old and new ruleset). See [the integration guide](../integration-guide.md#trademark-checks), [input schema](../input-schema.md#trademark-checks) and [ADR-009](../adr/ADR-009-trademark-risk-scanner.md).
 
-The canonical input hash is now `listing-guard/trademark-input/v2` and the matcher `matcher-2`; V28 adds `trademark_check.product_type` and the `risk_adjustments` and `source_links` columns of a finding (constant defaults, no table rewrite). `trademark-risk-2026-11` is kept unchanged (its hash is pinned). The MCP tool `check_trademark` does not take `product_type` yet.
+The canonical input hash is now `listing-guard/trademark-input/v2` and the matcher `matcher-2`; V28 adds `trademark_check.product_type` and the `risk_adjustments` and `source_links` columns of a finding (constant defaults, no table rewrite). `trademark-risk-2026-11` is kept unchanged (its hash is pinned). The MCP tool `check_trademark` takes it too (see "Java client SDK" above).
 
 ### Amazon `description_length` (ruleset `amazon-2026-12c`)
 
@@ -77,11 +136,21 @@ In `docs/api/openapi.json`, `TrademarkCheckResult.findings` pointed at the schem
 ## Breaking changes
 
 None for the API. A client generated from `docs/api/openapi.json` should be generated again to get `TrademarkCheckFindingView`.
+The compatibility check of ADR-022 reports that fix as four breaking changes **of the document**, declared in
+`docs/api/breaking-changes.yaml` and ADR-022: `response-property-removed` at `schema TrademarkCheckFindingView (was FindingView)` for
+`fix`, `severity`, `source` and `value`. The v0.6.0 document typed these members on a trademark finding; the API never sent them.
 
 For the `uspto-convert` job (an operator tool): its report is now `v2` (a script that reads `recordsDropped`, `dropped` or the top-level `versionNo` must read `filteredTotal`, `filtered` and `files[]` instead); it keeps only the classes and live status codes of the filters file by default, where it used to write every record; a record with no serial number is now a counted error (and, with no `transaction-date`, also one) where it used to be a drop; and a file with a `version-no` other than 2.0 no longer stops a run of several files, it is left out and the run is `INCOMPLETE` (with `--strict` it stops as before). A catalog already imported is not affected.
 
 ## Upgrade notes
 
+- Every `/api/v1` response now has `X-Listing-Guard-Version`. An image you build yourself says `dev` unless you pass
+  `--build-arg LISTING_GUARD_RELEASE=<version>` (the release image carries its version). The Docker build now copies the
+  `contract-tools` module. Nothing to configure: `listing-guard.api.deprecation.endpoints` is empty by default.
+- Building from source or a Docker image: the repository has a new module `client/`; the `Dockerfile` copies it. The MCP jar now
+  contains the SDK classes; rebuild it with `./mvnw -B -pl mcp-server -am package`.
+- Java callers who want the SDK: add the GitHub Packages repository and `listing-guard-client` (see
+  [client/README.md](../../client/README.md)). Nothing changes for callers that keep their own HTTP code.
 - `uspto-convert` (only if you use it): convert **all** the daily files of one catalog in one run (`--input-dir=uspto --output=<name>.jsonl --strict`), unzip each `apcYYMMDD.zip` first and keep the XML names, read `completeness` and `files` in the report before you import, and list the output in the manifest with the printed `sha256`. Nothing to migrate: V28 to V30 are all there is, and `jsonl-1` and the importer are unchanged.
 Two migrations from the image checks run at start-up: **V29** (the `image-checks` pack in the plan pack `CHECK`, given to `SELLER` and `PRO`) and **V30** (the three image result tables), after V28 of the trademark product types. Both are additive. A deployment that does nothing gets the image endpoint switched off. `GET /api/v1/usage` lists `image-checks` among `packs`. The Docker build now copies the `image-checker` module.
 - The trademark ruleset the API serves is now `trademark-risk-2026-11b` (`listing-guard.trademark.ruleset`), registered at start-up. A catalog imported with `2026-11` is still served, because the `normalization` section is unchanged. Nothing to import again.

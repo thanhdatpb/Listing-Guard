@@ -11,10 +11,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.thanhdatpb.listingguard.api.web.ApiContractHeadersFilter;
+import com.thanhdatpb.listingguard.api.web.ServerVersion;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.info.BuildProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -42,6 +46,39 @@ class ApiContractIntegrationTest {
                 .andExpect(jsonPath("$.title").isNotEmpty())
                 .andExpect(jsonPath("$.detail").isNotEmpty())
                 .andExpect(jsonPath("$.requestId").isNotEmpty());
+    }
+
+    // ---- contract headers (ADR-022) -------------------------------------------------------------------
+
+    @Autowired
+    ServerVersion serverVersion;
+
+    @Autowired
+    ObjectProvider<BuildProperties> buildProperties;
+
+    @Test
+    void everyApiV1ResponseCarriesTheServerVersionAndNothingIsDeprecatedByDefault() throws Exception {
+        String version = serverVersion.value();
+        assertThat(version).matches("dev|\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?");
+        BuildProperties build = buildProperties.getIfAvailable();
+        if (build != null) {
+            assertThat(version).as("the release of META-INF/build-info.properties")
+                    .isEqualTo(ServerVersion.fromBuild(build.get("release")).value());
+        }
+
+        mvc.perform(get("/api/v1/usage").header(HEADER, KEY_1)).andExpect(status().isOk())
+                .andExpect(header().string(ApiContractHeadersFilter.VERSION_HEADER, version))
+                .andExpect(header().doesNotExist(ApiContractHeadersFilter.DEPRECATION_HEADER))
+                .andExpect(header().doesNotExist(ApiContractHeadersFilter.SUNSET_HEADER));
+        mvc.perform(get("/api/v1/usage")).andExpect(status().isUnauthorized())
+                .andExpect(header().string(ApiContractHeadersFilter.VERSION_HEADER, version));
+        mvc.perform(get("/api/v1/no-such-route").header(HEADER, KEY_1)).andExpect(status().isNotFound())
+                .andExpect(header().string(ApiContractHeadersFilter.VERSION_HEADER, version));
+        mvc.perform(post(CHECKS).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string(ApiContractHeadersFilter.VERSION_HEADER, version));
+        mvc.perform(get("/health")).andExpect(status().isOk())
+                .andExpect(header().doesNotExist(ApiContractHeadersFilter.VERSION_HEADER));
     }
 
     // ---- health ---------------------------------------------------------------------------------------

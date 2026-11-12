@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.thanhdatpb.listingguard.client.RawResponse;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -64,7 +65,7 @@ final class ToolResults {
         }
     }
 
-    CallToolResult fromResponse(ApiResponse response, String sentRequestId) {
+    CallToolResult fromResponse(RawResponse response, String sentRequestId) {
         int status = response.status();
         if (status >= 200 && status < 300) {
             JsonNode root = parseObject(response.body());
@@ -87,7 +88,7 @@ final class ToolResults {
         return problemResult(parseProblem(response, sentRequestId));
     }
 
-    Problem parseProblem(ApiResponse response, String sentRequestId) {
+    Problem parseProblem(RawResponse response, String sentRequestId) {
         JsonNode root = parseObject(response.body());
         JsonNode nested = root != null && root.path("properties").isObject() ? root.get("properties") : null;
         int status = response.status();
@@ -96,7 +97,7 @@ final class ToolResults {
         if (code == null) {
             code = fallbackCode(status);
         }
-        String requestId = firstRequestId(text(member(root, null, "requestId")), response.requestIdHeader(),
+        String requestId = firstRequestId(text(member(root, null, "requestId")), response.requestId(),
                 sentRequestId);
 
         Map<String, Object> members = new LinkedHashMap<>();
@@ -118,7 +119,7 @@ final class ToolResults {
         if (!known.isEmpty()) {
             members.put("known", known);
         }
-        return new Problem(status, code, requestId, members, retryAfter(response.retryAfterHeader()));
+        return new Problem(status, code, requestId, members, retryAfter(response.retryAfter()));
     }
 
     CallToolResult problemResult(Problem problem) {

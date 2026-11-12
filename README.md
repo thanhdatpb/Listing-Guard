@@ -86,6 +86,12 @@ Working end to end:
   at `/console/report`. All three use one service, so they show the same numbers.
 - Client API keys, per-client rate limits and per-client isolation; see the
   [integration guide](docs/integration-guide.md).
+- A published API contract with a compatibility policy ([ADR-022](docs/adr/ADR-022-api-contract-and-compatibility.md)). Inside
+  `/api/v1` changes are additive only; the build compares `docs/api/openapi.json` (and `docs/api/input-schema.json`, the listing
+  formats as a JSON Schema) with the contract of the latest release and fails on a breaking change that is not declared and
+  reviewed. Each release attaches `openapi.json`, `input-schema.json` and `contract-sha256.txt` to its GitHub Release, every
+  `/api/v1` response says which release answered (`X-Listing-Guard-Version`), and a deployment can announce a deprecated
+  operation with `Deprecation` and `Sunset` headers.
 - Client plans and a monthly quota ([ADR-013](docs/adr/ADR-013-client-plans-and-monthly-quota.md)), **off by default**
   (`listing-guard.plans.enabled=false`): the operator sets a client's plan with `admin plan set <client> <plan>`, a new
   stored result counts one unit per endpoint (a cached one costs nothing, so a full check of one listing is two units, three
@@ -114,6 +120,10 @@ Working end to end:
   rate limits, plans and the quota apply unchanged. The answer of the API reaches the agent verbatim with its disclaimer,
   versions and completeness: the model never decides. STDIO is the default; Streamable HTTP is optional and for loopback or a
   private network only (it has no login). No tool writes, applies a fix or publishes. See [docs/mcp.md](docs/mcp.md).
+- The Java client SDK ([ADR-023](docs/adr/ADR-023-java-client-sdk.md), `client/`, artifact `listing-guard-client`): typed calls of
+  the seven read and check endpoints for a Java backend, typed exceptions for the problem answers, a bounded retry of
+  `429 rate-limited` and `503`, a tolerant reader. Java 21 and Jackson only. Published to GitHub Packages by each release tag; the
+  MCP server makes its calls through it. See [client/README.md](client/README.md).
 
 Before you rely on it:
 
@@ -185,9 +195,12 @@ Client backend -- X-API-Key --> Listing Guard API (Spring Boot)
        -> CheckService + TrademarkCheckService (the same services as the endpoints)
        -> findings.csv, listings.csv, summary.html
 
+  Java client SDK (`client/`, listing-guard-client; Java 21 + Jackson, no Spring)
+  your Java backend -> typed calls, typed exceptions, bounded retry -> HTTP with X-API-Key to the API above
+
   MCP server (its own jar, `mcp-server/`; optional; no database, no internal service)
   AI agent -- STDIO (default) or Streamable HTTP on loopback only --> seven tools
-       -> HTTP calls with X-API-Key to the Listing Guard API above; its answers come back unchanged
+       -> raw calls of the Java client SDK (no retry) to the Listing Guard API above; its answers come back unchanged
 
   Policy ingest job (profile `ingest`)
   policies/manifest.yaml + policies/raw/<marketplace>/*.html|pdf
@@ -207,13 +220,15 @@ Modules:
 | `personalization-screening/` | Personalization screening core (ADR-016): the input of the text a buyer typed, its canonical hash, a strict ruleset loader, `personalization-screening-2026-11.yaml` (character classes and print profiles), the three character rules, the adapter that runs the trademark scanner on each value, the pack fingerprint, and `INCOMPLETE` when a rule fails or no catalog is served. No Spring, no database. |
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, hashing for tests), `PolicyRetriever`, retrieval metrics, and the `LlmProvider` contract with a scripted test provider and a `CitationVerifier` (no call to a real model is implemented). No Spring. |
 | `api/` | Spring Boot 4.1 REST app (Java 21, Spring Framework 7, Hibernate 7, PostgreSQL 16) and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, ruleset registration, the `/checks`, `/trademark-checks`, `/variation-checks` and `/personalization-screenings` endpoints with their retention cleanup, the PostgreSQL trademark catalog (`pg_trgm`) and `trademark-import` job, the `batch-check` job, policy ingest and pgvector retrieval, the optional `ApiEmbeddingProvider` (Google Gemini) |
-| `mcp-server/` | MCP server for AI agents (ADR-017): seven tools that call the REST API with a client's key and return its answers unchanged; STDIO by default, optional Streamable HTTP on loopback. The official MCP Java SDK (no Spring), a JDK HTTP client, no database, no dependency on another module. |
+| `client/` | Java client SDK (ADR-023, artifact `listing-guard-client`): `ListingGuardClient` with typed calls of the seven read and check endpoints, blocking and `CompletableFuture`, typed problem exceptions, a bounded retry, a raw call, its own request and response records that follow `docs/api/openapi.json`. Java 21, the JDK HTTP client and Jackson only; no Spring, no other module. |
+| `mcp-server/` | MCP server for AI agents (ADR-017): seven tools that call the REST API with a client's key and return its answers unchanged; STDIO by default, optional Streamable HTTP on loopback. The official MCP Java SDK (no Spring); its API calls go through the Java client SDK (`client/`, the one module it depends on; ADR-023), no database. |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
 | `batch/` | `mappings/` (example column mappings, committed); `input/` and `out/` (your exports and the reports, git-ignored) |
 | `policies/` | `manifest.yaml` (committed) and `raw/` (local files, git-ignored) |
 | `docs/adr/` | Architecture decision records |
-| `docs/api/` | `openapi.json`, the committed API contract (a test fails when it drifts from the code) |
+| `contract-tools/` | API compatibility check (ADR-022): compares the contract with the baseline of the latest release and classifies every change as breaking, additive or non-breaking; holds `docs/api/input-schema.json` to `docs/input-schema.md`. Java and Jackson only: no Spring, no database, no network. |
+| `docs/api/` | `openapi.json`, the committed API contract (a test fails when it drifts from the code); `input-schema.json`, the listing formats as JSON Schema; `baseline/`, the contract of the latest release; `breaking-changes.yaml`, the reviewed exceptions (ADR-022) |
 | `docs/integration-guide.md` | How a backend calls the API: auth, flow, field paths, errors |
 | `docs/batch-check.md` | How to check an export file and read the reports |
 | `docs/mcp.md` | How to use the checks from an AI agent: Claude Code and Claude Desktop setup, the seven tools, errors, limits |
@@ -285,7 +300,11 @@ This example reports the duplicate tag (`WARNING`), the `_` in `gift_idea` (`ERR
 returns the stored result with `cached: true`; `GET /api/v1/checks/{checkId}` reads it later. Errors are
 RFC 7807 problems. Everything about calling the API is in [docs/integration-guide.md](docs/integration-guide.md),
 the contract in [docs/api/openapi.json](docs/api/openapi.json) (after an intended API change refresh it with
-`./mvnw -B verify -Dopenapi.update=true`, then commit it).
+`./mvnw -B verify -Dopenapi.update=true`, then commit it). Every API change also runs the compatibility check of
+[ADR-022](docs/adr/ADR-022-api-contract-and-compatibility.md) (`./mvnw -B -pl contract-tools verify`, no Docker): it fails on a
+breaking change against the latest release and writes the additive ones to `contract-tools/target/contract/compatibility-report.md`
+for the release notes. A client downloads the contract of a release from its GitHub Release, see
+[Compatibility and versions](docs/integration-guide.md#compatibility-and-versions).
 
 ### Check a whole export without an integration
 
@@ -328,6 +347,25 @@ stored, and `trademark-risk`, `variation-checks` and `personalization-screening`
 period, so keep the files if you want a trend older than that. See the [integration guide](docs/integration-guide.md#health-report)
 for what each number means and [deployment.md](docs/deployment.md#weekly-health-report-adr-018) for running it.
 
+### Call the API from Java (SDK)
+
+A Java backend can use the official client SDK `com.thanhdatpb.listingguard:listing-guard-client` (module `client/`,
+[ADR-023](docs/adr/ADR-023-java-client-sdk.md)) instead of writing the HTTP calls: typed methods for the checks, the trademark
+check (with `product_type`), the variation checks, the personalization screening, the ruleset limits, the capabilities (with
+`ETag`) and the usage, each blocking or as a `CompletableFuture`; typed exceptions for the problem answers
+(`QuotaExceededException`, `PlanNotAllowedException`, `RateLimitedException`, `NotConfiguredException`, ...); a bounded retry of
+`429 rate-limited` and `503`. It needs Java 21 and Jackson only, no Spring. Each release tag publishes it to GitHub Packages;
+the MCP server uses it too.
+
+```java
+ListingGuardClient client = ListingGuardClient.builder()
+    .baseUrl("https://listing-api.example.com").apiKey(System.getenv("LISTING_GUARD_API_KEY")).build();
+CheckResult result = client.checks(CheckRequest.of("ETSY", Map.of("title", "Handmade blue mug", "tags", List.of("mug"))));
+```
+
+How to add the dependency, every method, the settings (Cloudflare Access included) and the exception table are in
+[client/README.md](client/README.md).
+
 ### Use the checks from an AI agent (MCP)
 
 An AI agent can call the checks through the Model Context Protocol with the `mcp-server` jar (ADR-017). It is a client of the
@@ -335,7 +373,7 @@ API above, not part of it: it needs a running API and the key of one client, and
 and point the agent's host at it (this needs JDK 21 and no Docker):
 
 ```bash
-./mvnw -B -pl mcp-server package        # -> mcp-server/target/listing-guard-mcp.jar
+./mvnw -B -pl mcp-server -am package    # -> mcp-server/target/listing-guard-mcp.jar (builds the Java client SDK too)
 claude mcp add listing-guard \
   --env LISTING_GUARD_MCP_API_KEY=<a client key> --env LISTING_GUARD_MCP_BASE_URL=http://localhost:8080 \
   -- java -jar /absolute/path/to/mcp-server/target/listing-guard-mcp.jar
@@ -642,7 +680,8 @@ What follows, in this order, is **not built yet**:
 10. Jackson 3 migration ([ADR-020](docs/adr/ADR-020-spring-boot-4.md)). The repository runs on Spring Boot 4.1 but its code still
     uses Jackson 2 (`com.fasterxml.jackson`), through the deprecated `spring-boot-jackson2` module. Spring Framework plans to disable
     Jackson 2 auto-detection in 7.1 and remove it in 7.2, so this migration (`tools.jackson`, a pull request of its own) has to
-    be done before the repository moves to Spring Boot 4.2.
+    be done before the repository moves to Spring Boot 4.2. The Java client SDK (`client/`, [ADR-023](docs/adr/ADR-023-java-client-sdk.md))
+    moves to Jackson 3 in the same pull request; it has no Jackson type in a public signature, so callers' code does not change.
 11. Remove the `ProblemDetail` customizer ([ADR-020](docs/adr/ADR-020-spring-boot-4.md)). `OpenApiConfig.nullableProblemDetailMembers`
     keeps four members of Spring's `ProblemDetail` nullable in `docs/api/openapi.json`, because Spring Framework 7 declares them with
     the JSpecify `@Nullable` and springdoc-openapi 3.2.0 does not read it. When springdoc does, delete the customizer and run the
@@ -654,12 +693,19 @@ What follows, in this order, is **not built yet**:
     candidate sources only PACER and CourtListener/RECAP hold lawsuits; WIPO's terms forbid automated use, and the terms of PACER (for
     storing data), CourtListener and EUIPO are **not verified**. The ADR lists the pages the maintainer has to save and ends with the
     questions to decide; nothing is built before they are answered.
+13. Correct four request types in `docs/api/openapi.json` ([ADR-023](docs/adr/ADR-023-java-client-sdk.md)). The document types
+    `parent`, `children` and `variation_properties` of `VariationCheckRequest` and `values` of `PersonalizationScreeningRequest` as
+    `string`, because springdoc writes a `JsonNode` member with a `type` hint that way; they are an object, two arrays of objects or
+    strings, as `docs/api/input-schema.json` and `docs/input-schema.md` say. A pull request of its own: fix the `@Schema` of the two
+    request records, run ADR-022's compatibility check (`contract-tools`) and declare what it reports in
+    `docs/api/breaking-changes.yaml` if needed. Clients should take these four types from `input-schema.json` meanwhile; the SDK does.
 
 ## Documentation
 
 - [Integration guide](docs/integration-guide.md): authentication, requests, responses, errors, plans and quota, the ruleset limits for a character counter, and client isolation.
 - [Input schema](docs/input-schema.md): accepted Etsy and Amazon listing fields, and the request of the variation checks.
 - [Batch check](docs/batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
+- [Java client SDK](client/README.md): call the API from a Java backend with `listing-guard-client`: dependency from GitHub Packages, the calls, the settings and the exceptions.
 - [MCP server](docs/mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the seven tools, errors and limits.
 - [Deployment](docs/deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
 - [Oracle ARM deployment](docs/deploy-oracle.md): deploy the production API and PostgreSQL on an Oracle Cloud Ampere A1 VM behind Cloudflare Tunnel.
@@ -683,6 +729,8 @@ What follows, in this order, is **not built yet**:
 - [ADR-018: Listing health report](docs/adr/ADR-018-listing-health-report.md) (Proposed; implemented: an endpoint, a weekly job and a console page that add up stored counts per client, never listing text; it ends with the questions the maintainer has to decide)
 - [ADR-021: Enforcement signal for the trademark pack](docs/adr/ADR-021-enforcement-signal.md) (Proposed; a design only, nothing is implemented: an offline catalog of court cases linked by review to marks, the sources and their terms as far as they could be read, and the questions the maintainer has to decide)
 - [ADR-019: Oracle A1 deployment behind Cloudflare Tunnel](docs/adr/ADR-019-oracle-a1-cloudflare-tunnel.md) (Proposed)
+- [ADR-022: API contract and compatibility policy](docs/adr/ADR-022-api-contract-and-compatibility.md) (Proposed; implemented: what is additive and what is breaking inside `/api/v1`, the compatibility check against the latest release, the reviewed exception file, deprecation with `Deprecation` and `Sunset`, `X-Listing-Guard-Version`, and the contract attached to each release; it ends with the questions the maintainer has to decide)
+- [ADR-023: Java client SDK](docs/adr/ADR-023-java-client-sdk.md) (Proposed; implemented: the `client` module, the MCP server on top of it, a contract test against the OpenAPI document and a release workflow to GitHub Packages; its tolerant reader and version headers follow ADR-022; it ends with the questions the maintainer has to decide)
 - [ADR-014: Listing Workspace](docs/adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor and API keys page are implemented, all off by default; saved listings and history are not designed yet)
 
 ## License

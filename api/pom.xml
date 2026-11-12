@@ -143,6 +143,12 @@
             <artifactId>testcontainers-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Test scope only: SdkIntegrationTest calls this API on a random port with the Java client SDK (ADR-023). -->
+        <dependency>
+            <groupId>com.thanhdatpb.listingguard</groupId>
+            <artifactId>listing-guard-client</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -158,6 +164,20 @@
                         <goals>
                             <goal>repackage</goal>
                         </goals>
+                    </execution>
+                    <!-- META-INF/build-info.properties with the release version: X-Listing-Guard-Version on every /api/v1
+                         response (ADR-022). No build time, so the jar of one release is the same on every build. -->
+                    <execution>
+                        <id>build-info</id>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                        <configuration>
+                            <time>off</time>
+                            <additionalProperties>
+                                <release>${listing-guard.release}</release>
+                            </additionalProperties>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

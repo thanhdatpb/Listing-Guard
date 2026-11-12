@@ -2,7 +2,9 @@
 
 The listing formats that `POST /api/v1/checks` accepts for each marketplace. This page is a public contract: a
 client can build against it and expect it to stay true. Mapping a client's own listing format to these formats is
-the client's job and happens on the client's side; Listing Guard has no code or data for any single client.
+the client's job and happens on the client's side; Listing Guard has no code or data for any single client. Its
+machine-readable form is the JSON Schema [`docs/api/input-schema.json`](api/input-schema.json), written from this page and
+attached to every release with `openapi.json` ([ADR-022](adr/ADR-022-api-contract-and-compatibility.md)).
 
 The request is always the same envelope; only the object under `listing` depends on the marketplace:
 
@@ -28,7 +30,8 @@ unit each is counted in, are read from `GET /api/v1/rulesets/{marketplace}/limit
 - **A missing or unreadable field is "absent", not an error.** The request still succeeds; whether an absent field
   is a problem is decided by the rules, which report it as a finding on that field.
 - **Additive changes only.** Inside `/api/v1`, new fields are optional and existing fields keep their meaning.
-  Removing a field, or reading an existing field differently, is a breaking change and gets a new API version.
+  Removing a field, or reading an existing field differently, is a breaking change and gets a new API version
+  ([ADR-022](adr/ADR-022-api-contract-and-compatibility.md); the build compares `input-schema.json` with the latest release).
 
 ## Prices
 
@@ -389,3 +392,9 @@ it), and so are the two variation examples (through the variation normalizer and
 the reader's members), so this page cannot drift from the code without the build failing. The machine-readable
 description of the request and response is
 [`docs/api/openapi.json`](api/openapi.json); how to call the API is in the [integration guide](integration-guide.md).
+
+[`docs/api/input-schema.json`](api/input-schema.json) is the JSON Schema form of this page. A test in `contract-tools`
+(`InputSchemaDocumentTest`) holds every field table above to its definition there (same fields, the type each table gives) and
+validates every JSON example above against it, so the schema cannot drift from this page either. It describes the documented
+types; the API is more lenient (a number is read as text, `null` counts as absent, unknown members are ignored except in the
+image `metadata`).
