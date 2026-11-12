@@ -56,10 +56,12 @@ jobs:
           ./mvnw -B -ntp org.codehaus.mojo:versions-maven-plugin:2.18.0:set
           -DnewVersion="$VERSION" -DprocessAllModules=true -DgenerateBackupPoms=false
 
+      # The Packages address is written in lower case (ADR-023): thanhdatpb/listing-guard, whatever the case of the repository name.
       - name: Test and publish listing-guard-client with sources and Javadoc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
-        run: >
-          ./mvnw -B -ntp -pl client -Prelease deploy
-          -DaltDeploymentRepository="github::https://maven.pkg.github.com/$REPOSITORY"
+        run: |
+          repository="${REPOSITORY,,}"
+          ./mvnw -B -ntp -pl client -Prelease deploy \
+            -DaltDeploymentRepository="github::https://maven.pkg.github.com/$repository"

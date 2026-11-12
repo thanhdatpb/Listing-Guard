@@ -8,9 +8,9 @@
   [ADR-009](ADR-009-trademark-risk-scanner.md) (`503 trademark-not-configured`, `product_type`, `unknown-product-type`),
   [ADR-015](ADR-015-variation-checks.md), [ADR-016](ADR-016-personalization-screening.md) (the buyer's text is personal data),
   [ADR-017](ADR-017-mcp-server.md) (the MCP server, which this record changes, see "Relation to the MCP server")
-- Relates to: ADR-022 (API contract and compatibility). **ADR-022 is not on `main` when this record is written** (no branch
-  holds it either). The compatibility rules the SDK needs are written below as this record's own assumptions; where ADR-022,
-  once merged, says something else, ADR-022 is right and the SDK follows it in a later pull request.
+  [ADR-022](ADR-022-api-contract-and-compatibility.md) (the API contract: what is additive inside `/api/v1`, the tolerant reader
+  every client must be, `X-Listing-Guard-Version`, `Deprecation`, `Sunset` and `Link`, `docs/api/input-schema.json`, the
+  compatibility check of `contract-tools`). The SDK is a client under that policy; see "Compatibility".
 - Changes: [ADR-017](ADR-017-mcp-server.md) "A client of the REST API, in a module of its own": the MCP server may now depend
   on exactly one module of this repository, `client`. Everything else in ADR-017 holds.
 - Acceptance convention: Keep Proposed until the PR implementing this ADR is approved and merged. Then set Status to Accepted
@@ -138,34 +138,56 @@ not come from the API; behind Cloudflare Access it is usually Access refusing th
   `429` that is not a Listing Guard problem only when it carries `Retry-After`; and `503`, unless its code ends in
   `-not-configured` or is `corpus-model-mismatch`, which no wait changes.
 - **Never retried:** `429 quota-exceeded` (not before `resetAt`, ADR-013; even if a proxy added `Retry-After`), every other
-  `4xx`, every other `5xx`, a network error or a timeout. A timed-out `POST` may have been stored, and the request named only
-  `429` and `503`. A retried check is safe for the quota: the API answers an identical stored result from its cache at no cost,
-  and a `429` or `503` stored nothing.
+  `4xx`, every other `5xx`, a network error or a timeout. **Decided (2026-11-12): a network error, a timeout and a Cloudflare
+  `502`, `524` or `530` (tunnel or origin down) are not retried by the SDK.** A timed-out `POST` may have been stored, and a
+  caller that wants the wider table of the integration guide wraps the call. A retried check is safe for the quota: the API
+  answers an identical stored result from its cache at no cost, and a `429` or `503` stored nothing.
 - When the retries run out, the last answer becomes its exception as usual (`RateLimitedException` keeps the last
   `Retry-After`). All attempts of one call carry the same `X-Request-Id`.
 
-### Compatibility (this record's assumptions until ADR-022 is merged)
+### Compatibility (the SDK under ADR-022)
 
-- **Tolerant reader.** A field the SDK does not know is ignored. An enum value it does not know is read as `UNRECOGNIZED`
-  (each enum has that constant), never as an error and never as another value: in particular an unknown risk level is not
+[ADR-022](ADR-022-api-contract-and-compatibility.md) is the policy; this section says how the SDK keeps it.
+
+- **Tolerant reader** (ADR-022 section 2). A field the SDK does not know is ignored. An enum value it does not know is read as
+  `UNRECOGNIZED` (each enum has that constant), "never as an error and never as the safest value": an unknown risk level is not
   `LOW` and an unknown completeness is not `COMPLETE`. A missing list is an empty list; a missing nullable member is `null`.
-  So a newer server that adds fields or values does not break an older SDK.
-- **Version headers.** The SDK reads `X-Listing-Guard-Version` and `Deprecation` (with `Sunset` and `Link` when present) on
-  every answer and tells the optional listener: the server's version once per value seen, a deprecation once per operation and
-  value. The server does not send these headers yet; their meaning and format are ADR-022's to define, so the SDK passes the
-  values on as text and decides nothing from them.
-- **Versioning.** The SDK is released with the repository: tag `vX.Y.Z` publishes `listing-guard-client` `X.Y.Z`. The SDK's
-  version describes its Java API (semantic versioning; while the repository is `0.x`, a minor version may break the SDK's API,
-  and the release notes say so). It speaks to `/api/v1`. An SDK works with a server of the same or a later release; with an
-  older server a method whose endpoint does not exist yet gets the server's `404 not-found` as a `ListingGuardApiException`
-  (`capabilities()` says what a deployment serves).
-- **Contract test.** A test compares every SDK record with its schema in `docs/api/openapi.json`: the same member names, a
-  compatible Java type, a boxed type for every nullable member and enum constants equal to the schema's values plus
-  `UNRECOGNIZED`; it also walks every schema reachable from the seven operations' responses, so a new nested schema fails it
-  until the SDK maps it, and it reads every example of those responses with the SDK. The OpenAPI document types four request
-  members that are JSON values (`parent`, `children`, `variation_properties`, `values`) as strings; the test lists them as known
-  differences of the document, and the SDK follows `docs/input-schema.md` for them. If ADR-022 adds a compatibility check of its
-  own, this test is meant to join it.
+  `rulesetVersion`, `analysisVersion` and `X-Listing-Guard-Version` are plain strings, never parsed or ordered. So an additive
+  change of the API does not break an SDK that is already deployed.
+- **Version and deprecation headers** (ADR-022 sections 6 and 7; checked against `ApiContractHeadersFilter`,
+  `ServerVersion` and `ApiDeprecations` on `main`). Every `/api/v1` answer carries `X-Listing-Guard-Version`: the release of the
+  server (`0.8.0`), or `dev` for a build without one. An operation a deployment deprecates
+  (`listing-guard.api.deprecation.endpoints`, empty by default) also carries `Deprecation: @<seconds since the epoch>` (RFC
+  9745), and when configured `Sunset` as an IMF-fixdate (RFC 8594) and `Link: <url>; rel="deprecation"; type="text/html"`. The
+  SDK reads the four headers on every answer, success or problem, and tells the optional listener: the version once per value
+  seen, a deprecation once per operation and value. `DeprecationNotice` carries the three values as sent and reads the two dates
+  (`deprecatedAt()`, `sunsetAt()`). The SDK decides nothing from them: the version is for logs and diagnostics, not for feature
+  detection (`capabilities()` says what a deployment serves), as ADR-022 says.
+- **Versioning** (decided 2026-11-12: one version line). The SDK is released with the repository: tag `vX.Y.Z` publishes
+  `listing-guard-client` `X.Y.Z`, the release whose contract (`openapi.json`, `input-schema.json`) ADR-022 attaches to the same
+  GitHub Release. The SDK's version describes its Java API (while the repository is `0.x`, a minor version may change it, and the
+  release notes say so); what keeps it working against a server is `/api/v1` and ADR-022, not the number. An SDK works with a
+  server of the same or a later release; with an older server a method whose endpoint does not exist yet gets the server's
+  `404 not-found` as a `ListingGuardApiException`.
+- **Two checks, two sides of the contract, no overlap.** ADR-022's check (`contract-tools`, `ContractCompatibilityTest`) holds the
+  documents to the latest release: it stops a breaking change of the API. The SDK's `ContractConformanceTest` (in `client`, where
+  the records are) holds the SDK to the documents as they are now, and repeats none of the 69 rules:
+  - **responses** against `docs/api/openapi.json`: the same member names, a compatible Java type, a boxed type for a nullable
+    member, enum constants equal to the schema's values plus `UNRECOGNIZED`; every schema reachable from the seven `200` answers
+    is mapped; every example of those answers is read without an unrecognized value; every documented problem becomes the
+    exception of its code;
+  - **requests** against `docs/api/input-schema.json`, the machine-readable request formats ADR-022 added: the same member names
+    and compatible types for the four request bodies and the definitions they reach, and each operation's OpenAPI request body
+    names the same definition.
+  It is strict on purpose: a new response member or enum value is additive for a client (and the deployed SDK ignores it) but
+  fails this test until the SDK maps it, so the official SDK follows the API in the pull request that changes it. It lives in
+  `client` and not in `contract-tools` because it reflects on the SDK's records, and `contract-tools` depends on Jackson only;
+  both run in `./mvnw verify` and in CI.
+- **A known difference of the OpenAPI document, not fixed here.** `openapi.json` types four request members that are JSON values
+  (`parent`, `children`, `variation_properties` of the variation check, `values` of the personalization screening) as `string`
+  (springdoc writes a `JsonNode` member with a `type` hint that way). `input-schema.json` types them correctly, which is why the
+  SDK's requests are checked against it. Correcting the document is a request-type change that ADR-022's check classifies and
+  that needs its own pull request (README Roadmap); this record does not touch `openapi.json`.
 
 ### Relation to the MCP server
 
@@ -185,9 +207,12 @@ not come from the API; behind Cloudflare Access it is usually Access refusing th
 ### Release
 
 - The `release-client` workflow runs on a `v*.*.*` tag: it sets the version from the tag, builds and tests the `client` module and
-  deploys **only that artifact** to GitHub Packages (Maven, `https://maven.pkg.github.com/thanhdatpb/listing-guard`) with its
-  sources jar and Javadoc jar. The published POM is flattened (no parent, versions written out), so a consumer needs nothing but
-  the artifact and Jackson. `docs/releases` gets one section per release as usual.
+  deploys **only that artifact** to GitHub Packages (Maven) with its sources jar and Javadoc jar. The published POM is flattened
+  (no parent, versions written out), so a consumer needs nothing but the artifact and Jackson. `docs/releases` gets one section
+  per release as usual.
+- **Decided (2026-11-12): GitHub Packages only**, no Maven Central. The repository address is written in lower case everywhere,
+  **`https://maven.pkg.github.com/thanhdatpb/listing-guard`** (the repository's name on GitHub is `Listing-Guard`; the workflow
+  lower-cases `github.repository` before it deploys, and the README gives the same address to consumers).
 - GitHub Packages needs a token with `read:packages` even to read a public package; `client/README.md` says how to configure it.
 
 ## Alternatives rejected
@@ -212,7 +237,9 @@ not come from the API; behind Cloudflare Access it is usually Access refusing th
   it until someone adds a method.
 - The MCP server's jar grows by the SDK classes (a few dozen small classes); its behavior does not change and its tests stay.
 - Publishing to GitHub Packages is free and next to the code, but every consumer needs a token even for a public package. Maven
-  Central would not need one and needs a namespace, signing and a Sonatype account; that is left as a question.
+  Central would not need one and needs a namespace, signing and a Sonatype account; the maintainer chose GitHub Packages only.
+- Because `ContractConformanceTest` is strict, a pull request that adds a response member or an enum value must also touch the
+  SDK. That is the cost of an SDK that is never behind the document.
 - The repository's single version line means an SDK release follows each server release even when the SDK did not change.
 
 ## Acceptance criteria (tests)
@@ -229,7 +256,8 @@ No SDK test needs Docker, a database or a real API, except the one integration t
 4. **Transport**: timeout, closed port, oversized answer, redirect not followed, non-JSON `2xx`, an echoed key or Access secret
    replaced; `ETag` sent as `If-None-Match` and `304` as "not modified".
 5. **Compatibility**: unknown fields and enum values are read; the listener gets the version and deprecation headers once.
-6. **Contract**: the SDK records against `docs/api/openapi.json` as described above.
+6. **Contract**: `ContractConformanceTest`, the SDK's response records against `docs/api/openapi.json` and its request records
+   against `docs/api/input-schema.json`, as described under "Compatibility".
 7. **Boundary**: only `GET` and `POST`, only the seven paths, no Spring and no other module in the sources or the POM.
 8. **MCP**: every existing MCP test passes (the tests of the deleted client move to the adapter with the same assertions), plus
    `product_type` on `check_trademark`.
@@ -237,17 +265,28 @@ No SDK test needs Docker, a database or a real API, except the one integration t
    configuration): a check, a variation check, a personalization screening, the limits, the capabilities with a `304`, the usage,
    the trademark check as `NotConfiguredException` on a default deployment, and the problem types of a bad request and a bad key.
 
+## Decisions (2026-11-12)
+
+The maintainer decided these; they are no longer questions.
+
+1. **Where it is published: GitHub Packages only.** No Maven Central release.
+2. **One version line.** The SDK has the repository's version and is released by the repository's tag; it gets no tags of its own.
+3. **No wider retry.** The SDK does not retry a network error, a timeout or a Cloudflare `502`, `524` or `530`; only
+   `429 rate-limited` and a retryable `503`, as under "Retry".
+4. **Jackson 3 with the repository.** The SDK moves from Jackson 2 to Jackson 3 in the same pull request that migrates the
+   repository (ADR-020, README Roadmap), not before and not in a separate major version. No Jackson type is in a public
+   signature, so callers' code does not change; their dependency does, and the release notes of that release say so.
+5. **The Packages address is lower case:** `https://maven.pkg.github.com/thanhdatpb/listing-guard`, in the workflow and in the
+   documentation.
+6. **ADR-022.** The SDK follows it as merged (see "Compatibility"): its headers are read as that record defines them, and the
+   SDK's contract test checks the client side only, next to ADR-022's check and not inside it.
+7. **The four request members `openapi.json` types as `string` are not corrected in this pull request**; the correction is a
+   Roadmap item.
+
 ## Open questions
 
-1. **Maven Central.** GitHub Packages needs a token for every reader. Is a Maven Central release (namespace, signing) wanted?
-   Assumed: GitHub Packages only.
-2. **Version line.** The SDK is released with every repository tag. Should it get its own tags (`client-v1.0.0`) and version line
-   instead? Assumed: one line.
-3. **More endpoints.** `GET .../{id}` for the four result types, image checks and the health report are not in the SDK. Wanted, and
+1. **More endpoints.** `GET .../{id}` for the four result types, image checks and the health report are not in the SDK. Wanted, and
    in which order? Assumed: added when a caller needs them.
-4. **Retry of network errors.** Assumed: not retried (above). A Cloudflare `502`, `524` or `530` (tunnel or origin down) is not a
-   `503` and is not retried either; should those be?
-5. **ADR-022.** When it is merged, does it define `X-Listing-Guard-Version` and `Deprecation` as assumed here, and does its
-   compatibility check take in this SDK's contract test?
-6. **Jackson 3.** When the repository moves to Jackson 3, should the SDK move with it (callers on Jackson 2 then pull Jackson 3), or
-   stay on Jackson 2 until a major version? Assumed: decided with that migration.
+2. **A renamed schema** (ADR-022's own open question: "should `schema-renamed` be breaking for the planned Java SDK, if it is
+   generated from the file?"). The SDK is written by hand, not generated: a rename does not reach a caller, it only fails
+   `ContractConformanceTest` until the test's table names the new schema. Assumed: `schema-renamed` stays non-breaking.

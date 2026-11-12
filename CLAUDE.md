@@ -168,11 +168,14 @@ It never edits a listing, never publishes, and does no SEO.
   3 attempts, retries only `429 rate-limited` (honoring `Retry-After` up to 30 s) and a `503` that is not `*-not-configured` or
   `corpus-model-mismatch`; never `quota-exceeded`, another status, a network error or a timeout. No redirect, the answer bounded,
   an echoed key or Access secret replaced, nothing logged. Tolerant reader: unknown members ignored, unknown enum values
-  `UNRECOGNIZED`, missing lists empty; `X-Listing-Guard-Version` and `Deprecation` go to the listener once per value. **ADR-022 is
-  not merged**: those rules are ADR-023's assumptions. Tests: a JDK `HttpServer` stub (no Docker), `OpenApiContractTest` (records vs
-  the OpenAPI document and its examples), `SdkIntegrationTest` in `api` (test scope; the real API on a random port). The
-  `release-client` workflow deploys it to GitHub Packages on a `v*.*.*` tag (version = tag, flattened POM, sources and Javadoc from
-  the `release` profile).
+  `UNRECOGNIZED`, missing lists empty (ADR-022's tolerant reader); `X-Listing-Guard-Version`, `Deprecation`, `Sunset` and `Link`
+  (ADR-022 sections 6 and 7) go to the listener once per value. Tests: a JDK `HttpServer` stub (no Docker),
+  `ContractConformanceTest` (response records vs `docs/api/openapi.json` and its examples, request records vs
+  `docs/api/input-schema.json`; the client side of the contract, next to `contract-tools`, which holds the documents to the last
+  release), `SdkIntegrationTest` in `api` (test scope; the real API on a random port, its headers included). The `release-client`
+  workflow deploys it to GitHub Packages on a `v*.*.*` tag (version = tag, flattened POM, sources and Javadoc from the `release`
+  profile, address `maven.pkg.github.com/thanhdatpb/listing-guard` in lower case). Decided: GitHub Packages only, one version line,
+  no retry of network errors, timeouts or Cloudflare 502/524/530, Jackson 3 in the repository's migration PR.
 - **API** (`api/`): Spring Boot REST. `POST /api/v1/checks` normalizes, runs the rule engine, stores a
   `listing_check` and its findings, returns them (an identical listing returns the stored result,
   `cached: true`); `GET /api/v1/checks/{id}` re-reads one. Optional ADR-014 fix/readiness output is behind
@@ -613,9 +616,9 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 - **Java client SDK** (ADR-023): `client` depends on the JDK and Jackson 2 only (a test reads its POM and imports: no Spring, no
   logging framework, no database, no other module, no Jackson type in a public signature) and issues only `GET` and `POST` to the
   `Operation` list; a new endpoint is a new `Operation`, a typed method in both forms, its own records and a stub test, and a new
-  HTTP method needs an ADR. Records follow `docs/api/openapi.json`: when a schema reachable from an operation changes,
-  `OpenApiContractTest` fails until the record changes too (a nullable member is boxed; an enum has the schema's values plus
-  `UNRECOGNIZED` with `@JsonEnumDefaultValue`). Never fold an unknown value into a known one (`UNRECOGNIZED` is never `LOW` or
+  HTTP method needs an ADR. Response records follow `docs/api/openapi.json` and request records `docs/api/input-schema.json`: when
+  a schema reachable from an operation changes, even additively, `ContractConformanceTest` fails until the record changes too in
+  the same PR (a nullable member is boxed; an enum has the schema's values plus `UNRECOGNIZED` with `@JsonEnumDefaultValue`). Never fold an unknown value into a known one (`UNRECOGNIZED` is never `LOW` or
   `COMPLETE`), never retry `quota-exceeded`, a `*-not-configured` 503, another `4xx` or a timed-out `POST`, never follow a redirect,
   never log, never put the key, an Access secret, a listing or a buyer's text in a message or `toString()`. The SDK version is the
   repository's (release tag); plugin versions in its POM are pinned.

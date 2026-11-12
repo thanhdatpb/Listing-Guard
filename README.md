@@ -675,7 +675,8 @@ What follows, in this order, is **not built yet**:
 10. Jackson 3 migration ([ADR-020](docs/adr/ADR-020-spring-boot-4.md)). The repository runs on Spring Boot 4.1 but its code still
     uses Jackson 2 (`com.fasterxml.jackson`), through the deprecated `spring-boot-jackson2` module. Spring Framework plans to disable
     Jackson 2 auto-detection in 7.1 and remove it in 7.2, so this migration (`tools.jackson`, a pull request of its own) has to
-    be done before the repository moves to Spring Boot 4.2.
+    be done before the repository moves to Spring Boot 4.2. The Java client SDK (`client/`, [ADR-023](docs/adr/ADR-023-java-client-sdk.md))
+    moves to Jackson 3 in the same pull request; it has no Jackson type in a public signature, so callers' code does not change.
 11. Remove the `ProblemDetail` customizer ([ADR-020](docs/adr/ADR-020-spring-boot-4.md)). `OpenApiConfig.nullableProblemDetailMembers`
     keeps four members of Spring's `ProblemDetail` nullable in `docs/api/openapi.json`, because Spring Framework 7 declares them with
     the JSpecify `@Nullable` and springdoc-openapi 3.2.0 does not read it. When springdoc does, delete the customizer and run the
@@ -687,6 +688,12 @@ What follows, in this order, is **not built yet**:
     candidate sources only PACER and CourtListener/RECAP hold lawsuits; WIPO's terms forbid automated use, and the terms of PACER (for
     storing data), CourtListener and EUIPO are **not verified**. The ADR lists the pages the maintainer has to save and ends with the
     questions to decide; nothing is built before they are answered.
+13. Correct four request types in `docs/api/openapi.json` ([ADR-023](docs/adr/ADR-023-java-client-sdk.md)). The document types
+    `parent`, `children` and `variation_properties` of `VariationCheckRequest` and `values` of `PersonalizationScreeningRequest` as
+    `string`, because springdoc writes a `JsonNode` member with a `type` hint that way; they are an object, two arrays of objects or
+    strings, as `docs/api/input-schema.json` and `docs/input-schema.md` say. A pull request of its own: fix the `@Schema` of the two
+    request records, run ADR-022's compatibility check (`contract-tools`) and declare what it reports in
+    `docs/api/breaking-changes.yaml` if needed. Clients should take these four types from `input-schema.json` meanwhile; the SDK does.
 
 ## Documentation
 

@@ -181,11 +181,16 @@ is `UNRECOGNIZED` (never one of the known values; an unknown risk is not `LOW`),
 })
 ```
 
-The server does not send these two headers yet; their meaning is the API contract's (ADR-022) to define.
+The headers are those of the API contract ([ADR-022](../docs/adr/ADR-022-api-contract-and-compatibility.md)): every `/api/v1`
+answer carries `X-Listing-Guard-Version` (the server's release, for example `0.8.0`, or `dev`); an operation the deployment
+deprecates also carries `Deprecation: @<seconds>`, and when configured `Sunset` (an HTTP date) and `Link: <url>; rel="deprecation"`.
+`DeprecationNotice.deprecatedAt()` and `sunsetAt()` read the two dates. Use the version for logs and diagnostics, not to detect
+features: `capabilities()` says what a deployment serves.
 
-The SDK is versioned with the repository: tag `vX.Y.Z` is SDK `X.Y.Z`, which speaks to `/api/v1`. Use an SDK no newer than your
-server's release; with an older server a method whose endpoint does not exist answers `404 not-found`. While the repository is
-`0.x`, a minor release may change the SDK's Java API; the release notes say so.
+The SDK is versioned with the repository: tag `vX.Y.Z` is SDK `X.Y.Z`, which speaks to `/api/v1`, and the GitHub Release of the
+same tag carries that release's contract (`openapi.json`, `input-schema.json`). Use an SDK no newer than your server's release;
+with an older server a method whose endpoint does not exist answers `404 not-found`. While the repository is `0.x`, a minor
+release may change the SDK's Java API; the release notes say so.
 
 ## Building and testing
 
@@ -194,5 +199,7 @@ server's release; with an older server a method whose endpoint does not exist an
 ./mvnw -B -pl client -Prelease package -DskipTests # + sources and Javadoc jars
 ```
 
-`OpenApiContractTest` compares every SDK record with `docs/api/openapi.json` and reads its examples; `SdkIntegrationTest` in
-the `api` module runs the SDK against the real API on a random port (Testcontainers, needs Docker).
+`ContractConformanceTest` holds the SDK to the contract documents of ADR-022: its response records to `docs/api/openapi.json`
+(and it reads the document's examples), its request records to `docs/api/input-schema.json`. ADR-022's own check in
+`contract-tools` holds those documents compatible with the latest release; the two do not overlap. `SdkIntegrationTest` in the
+`api` module runs the SDK against the real API on a random port (Testcontainers, needs Docker).
