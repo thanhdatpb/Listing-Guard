@@ -64,7 +64,7 @@ class ReadOnlyBoundaryTest {
     void noSourceReachesTheDatabaseOrAnotherModuleOfTheRepository() throws IOException {
         Pattern forbidden = Pattern.compile(
                 "import (java\\.sql|javax\\.sql|jakarta\\.persistence|org\\.springframework|org\\.postgresql"
-                        + "|com\\.thanhdatpb\\.listingguard\\.(?!mcp\\b))");
+                        + "|com\\.thanhdatpb\\.listingguard\\.(?!mcp\\b|client\\b))");
         for (Path source : mainSources()) {
             assertThat(forbidden.matcher(Files.readString(source)).find()).as(source.toString()).isFalse();
         }
@@ -76,9 +76,12 @@ class ReadOnlyBoundaryTest {
 
         assertThat(pom).doesNotContain("postgresql").doesNotContain("jdbc").doesNotContain("org.springframework")
                 .doesNotContain("spring-boot").doesNotContain("flyway");
-        // The only reference to the repository's own group is the parent.
+        // The references to the repository's own group are the parent and the Java client SDK (ADR-023), nothing else.
         long own = Pattern.compile("<groupId>com\\.thanhdatpb\\.listingguard</groupId>").matcher(pom).results().count();
-        assertThat(own).as("the parent only").isEqualTo(1);
+        assertThat(own).as("the parent and the SDK only").isEqualTo(2);
+        assertThat(Pattern.compile("<groupId>com\\.thanhdatpb\\.listingguard</groupId>\\s*<artifactId>([^<]+)</artifactId>")
+                .matcher(pom).results().map(m -> m.group(1)).toList())
+                .containsExactlyInAnyOrder("listing-guard", "listing-guard-client");
     }
 
     @Test

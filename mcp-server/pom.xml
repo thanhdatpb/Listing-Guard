@@ -21,6 +21,11 @@
     </properties>
 
     <dependencies>
+        <!-- The Java client SDK (ADR-023): the one module of this repository the server may depend on. It makes every API call. -->
+        <dependency>
+            <groupId>com.thanhdatpb.listingguard</groupId>
+            <artifactId>listing-guard-client</artifactId>
+        </dependency>
         <!-- mcp-core holds the server, the stdio transport and the servlet Streamable HTTP transport. The aggregate
              artifact "mcp" is not used: it pulls the Jackson 3 module, and this repository is on Jackson 2. -->
         <dependency>

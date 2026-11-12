@@ -59,7 +59,7 @@ class ToolRunnerTest {
     }
 
     private CallToolResult run(McpServerConfig config, String tool, Map<String, Object> args) {
-        ToolRunner runner = new ToolRunner(new ListingGuardApiClient(config), new ToolResults(M), M);
+        ToolRunner runner = new ToolRunner(new ApiGateway(config), new ToolResults(M), M);
         return runner.run(tool(tool), args);
     }
 
@@ -511,7 +511,7 @@ class ToolRunnerTest {
 
     @Test
     void anOversizedAnswerIsApiInvalidResponse() throws Exception {
-        String big = "{\"x\":\"" + "a".repeat(ListingGuardApiClient.MAX_RESPONSE_BYTES + 10) + "\"}";
+        String big = "{\"x\":\"" + "a".repeat(ApiGateway.MAX_RESPONSE_BYTES + 10) + "\"}";
         try (ApiStub stub = new ApiStub().replying(Reply.json(200, big))) {
             CallToolResult result = run(stub, "get_usage", map());
 
@@ -572,10 +572,76 @@ class ToolRunnerTest {
         }
     }
 
+    // ---- check_trademark product_type (ADR-023) -----------------------------------------------------------------
+
+    @Test
+    void checkTrademarkPassesTheProductTypeOnUnchanged() throws Exception {
+        try (ApiStub stub = new ApiStub().replying(Reply.json(200, "{\"ok\":true}"))) {
+            Map<String, Object> args = map("marketplace", "ETSY", "listing", map("title", "Zorvex mug"),
+                    "product_type", "Phone_Case ");
+            CallToolResult result = run(stub, "check_trademark", args);
+
+            JsonNode body = M.readTree(stub.only().body());
+            assertThat(body.get("product_type").asText()).as("not trimmed, not lower-cased").isEqualTo("Phone_Case ");
+            assertThat(body).isEqualTo(M.valueToTree(args));
+            assertThat(stub.only().target()).isEqualTo("/api/v1/trademark-checks");
+            assertThat(result.isError()).isFalse();
+        }
+    }
+
+    @Test
+    void checkTrademarkWithoutAProductTypeSendsNone() throws Exception {
+        try (ApiStub stub = new ApiStub().replying(Reply.json(200, "{\"ok\":true}"))) {
+            run(stub, "check_trademark", map("marketplace", "ETSY", "listing", map("title", "x")));
+
+            assertThat(M.readTree(stub.only().body()).has("product_type")).isFalse();
+        }
+    }
+
+    @Test
+    void anUnknownProductTypeIsTheApisToolErrorWithTheKnownKeys() throws Exception {
+        String extra = "\"known\":[\"apparel\",\"mug\"]";
+        try (ApiStub stub = new ApiStub().replying(Reply.problem(400, problem(400, "unknown-product-type", extra)))) {
+            CallToolResult result = run(stub, "check_trademark",
+                    map("marketplace", "ETSY", "listing", map("title", "x"), "product_type", "spaceship"));
+
+            JsonNode s = structured(result);
+            assertThat(result.isError()).isTrue();
+            assertThat(s.get("code").asText()).isEqualTo("unknown-product-type");
+            assertThat(s.get("status").asInt()).isEqualTo(400);
+            assertThat(s.get("known")).hasSize(2);
+            assertThat(s.get("retryable").asBoolean()).isFalse();
+        }
+    }
+
+    @Test
+    void aProductTypeThatIsNotAStringIsRefusedBeforeAnyCall() throws Exception {
+        try (ApiStub stub = new ApiStub()) {
+            CallToolResult result = run(stub, "check_trademark",
+                    map("marketplace", "ETSY", "listing", map(), "product_type", 5));
+
+            assertThat(result.isError()).isTrue();
+            assertThat(structured(result).get("code").asText()).isEqualTo("invalid-arguments");
+            assertThat(stub.requests()).isEmpty();
+        }
+    }
+
+    @Test
+    void theServerSendsItsOwnUserAgentAndRetriesNothing() throws Exception {
+        try (ApiStub stub = new ApiStub().replying(Reply.problem(429, problem(429, "rate-limited", ""))
+                .with("Retry-After", "1"))) {
+            CallToolResult result = run(stub, "get_usage", map());
+
+            assertThat(result.isError()).isTrue();
+            assertThat(stub.requests()).as("ADR-017: the agent sees the answer once").hasSize(1);
+            assertThat(stub.only().header("User-Agent")).startsWith(ListingGuardMcpServer.SERVER_NAME + "/");
+        }
+    }
+
     @Test
     void aNullArgumentMapIsTreatedAsNoArguments() throws Exception {
         try (ApiStub stub = new ApiStub()) {
-            ToolRunner runner = new ToolRunner(new ListingGuardApiClient(stub.config()), new ToolResults(M), M);
+            ToolRunner runner = new ToolRunner(new ApiGateway(stub.config()), new ToolResults(M), M);
 
             assertThat(runner.run(tool("get_usage"), null).isError()).isFalse();
             assertThat(runner.run(tool("check_listing"), null).isError()).isTrue();

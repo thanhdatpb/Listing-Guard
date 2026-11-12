@@ -35,6 +35,18 @@ final class ToolCatalog {
              "required": ["marketplace", "listing"],
              "additionalProperties": false}""".formatted(MARKETPLACE);
 
+    private static final String TRADEMARK_SCHEMA = """
+            {"type": "object",
+             "properties": {
+               %s,
+               "listing": {"type": "object",
+                 "description": "The listing in the marketplace's standard input format, exactly as for check_listing. Send what the seller wrote; do not correct or shorten it."},
+               "product_type": {"type": "string",
+                 "description": "Optional. What the listing sells, as a product type key the trademark ruleset declares (for example apparel, mug, poster), written exactly as declared. A mark whose Nice classes are not the product type's is reported one level lower and the finding says why. An undeclared key is refused by the API with unknown-product-type and the keys it knows. It is not the Amazon product_type inside listing. Leave it out when unsure."}
+             },
+             "required": ["marketplace", "listing"],
+             "additionalProperties": false}""".formatted(MARKETPLACE);
+
     private static final String VARIATIONS_SCHEMA = """
             {"type": "object",
              "properties": {
@@ -93,11 +105,11 @@ final class ToolCatalog {
                         Endpoint.CHECKS, false, schema(mapper, LISTING_SCHEMA)),
                 new ToolSpec(CHECK_TRADEMARK, "Check a listing for trademark references",
                         "Compare the text of a listing with the trademark catalog this Listing Guard deployment serves "
-                                + "(same input as check_listing). The result is a reference warning, not a legal "
-                                + "conclusion: show its disclaimer. riskLevel UNKNOWN or completeness INCOMPLETE is not "
-                                + "low risk. When the deployment has no catalog the answer is status NOT_CONFIGURED with "
-                                + "riskLevel UNKNOWN, not an error.",
-                        Endpoint.TRADEMARK_CHECKS, false, schema(mapper, LISTING_SCHEMA)),
+                                + "(same input as check_listing, plus an optional product_type). The result is a reference "
+                                + "warning, not a legal conclusion: show its disclaimer. riskLevel UNKNOWN or completeness "
+                                + "INCOMPLETE is not low risk. When the deployment has no catalog the answer is status "
+                                + "NOT_CONFIGURED with riskLevel UNKNOWN, not an error.",
+                        Endpoint.TRADEMARK_CHECKS, false, schema(mapper, TRADEMARK_SCHEMA)),
                 new ToolSpec(CHECK_VARIATIONS, "Check the variations of a listing",
                         "Check the structure of a listing with variations: for Amazon a parent and its children, for "
                                 + "Etsy the variation types and the children. A reference warning built on secondary "

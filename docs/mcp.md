@@ -16,7 +16,9 @@ Listing Guard through the [Model Context Protocol](https://modelcontextprotocol.
 - **It is a client of the API, nothing more.** It has no database and calls no internal service. It sends the client's
   `X-API-Key`, so key validity, the per-client rate limit, the plan and the monthly quota
   ([ADR-007](adr/ADR-007-multi-client-model.md), [ADR-013](adr/ADR-013-client-plans-and-monthly-quota.md)) apply exactly as
-  for any other caller.
+  for any other caller. Every call goes through the official Java client SDK
+  ([`client/`](../client/README.md), [ADR-023](adr/ADR-023-java-client-sdk.md)), the same one a Java backend uses, set to retry
+  nothing.
 
 ## What you need
 
@@ -141,6 +143,7 @@ Ask in your own words; the agent picks the tool and sends the listing in the mar
 
 - "Check this Etsy listing before I publish it: title ..., tags ..., price ..." (`check_listing`).
 - "Could this Amazon title be flagged as a trademark reference? Show the disclaimer." (`check_trademark`)
+- "Check this mug listing for trademark references, as product type `mug`." (`check_trademark` with `product_type`)
 - "Here is the parent and the children of my Amazon variation family. Is the structure consistent?" (`check_variations`)
 - "The buyer typed `  Đạt  ` and `1234` for name and number. Will it print on the `latin_basic` profile?"
   (`screen_personalization`; the text is sent exactly as typed)
@@ -153,7 +156,7 @@ Ask in your own words; the agent picks the tool and sends the listing in the mar
 | Tool | API call | Arguments | Counts against the quota (where plans are on) |
 |---|---|---|---|
 | `check_listing` | `POST /api/v1/checks` | `marketplace`, `listing` | one unit per new result |
-| `check_trademark` | `POST /api/v1/trademark-checks` | `marketplace`, `listing` | one unit per new complete result |
+| `check_trademark` | `POST /api/v1/trademark-checks` | `marketplace`, `listing`, optional `product_type` | one unit per new complete result |
 | `check_variations` | `POST /api/v1/variation-checks` | `marketplace`, optional `parent`, `variation_properties`, `children` | one unit per new complete result |
 | `screen_personalization` | `POST /api/v1/personalization-screenings` | `marketplace`, `values`, optional `print_profile`, `product_type` | one unit per new complete result |
 | `get_limits` | `GET /api/v1/rulesets/{marketplace}/limits` | `marketplace`, optional `product_type` | no |
@@ -165,6 +168,12 @@ marketplace, the state of the trademark catalog (`READY`, `DISABLED` or `REFUSED
 plans are on and whether checks return fix suggestions. It does not show the catalog's name, any secret setting or anything about
 your client (use `get_usage` for your plan and quota). Call it before a run to see which checks can answer: while the catalog is
 not `READY`, `check_trademark` gives an unknown risk, never a low one.
+
+`check_trademark` takes an optional `product_type`: a product type key the active trademark ruleset declares (`apparel`, `mug`,
+`poster`, ...; see the [integration guide](integration-guide.md#product_type-optional)). The server passes it on exactly as the
+agent wrote it, without trimming or changing case. A mark whose Nice classes are not the product type's is reported one level
+lower and the finding's `riskAdjustments` says why. A key the ruleset does not declare comes back as the API's
+`unknown-product-type` tool error with `known`, the declared keys. It is not the Amazon `product_type` inside `listing`.
 
 Each tool's schema is sent to the agent with its description. The arguments are checked against it before anything is sent
 (an unknown argument, a missing one, a value of the wrong kind is `invalid-arguments`); what is inside `listing`, `values` and
@@ -209,7 +218,8 @@ it came from the API's `503 trademark-not-configured`. The risk is unknown, not 
   Identical repeats are free cache hits. Use `get_usage` to see the position.
 - **The buyer's text is personal data.** It is sent to your API, which stores only a hash and short evidence; the server does
   not log it. Do not copy it into other tools or documents.
-- **No retries, no cache, no batching in the server.** To check a whole export use [`batch-check`](batch-check.md).
+- **No retries, no cache, no batching in the server.** The SDK underneath is configured with `RetryPolicy.none()`, so an agent
+  sees each answer once and decides. To check a whole export use [`batch-check`](batch-check.md).
 - **Not in this server:** reading a stored result by id, resources or prompts, a Docker image or compose service,
   authentication on the HTTP transport, mapping your own listing format to the standard input.
 
@@ -230,7 +240,9 @@ an argument and never the key.
 ## Tests
 
 The module's tests need no Docker, no database and no real API: the API is a stub HTTP server of the JDK, and the protocol is
-exercised through the SDK's own client over STDIO (a child process running the real `main`) and over Streamable HTTP.
+exercised through the MCP SDK's own client over STDIO (a child process running the real `main`) and over Streamable HTTP. The
+HTTP rules the server relies on (no redirect, the size limit, the redaction of an echoed key, the encoding of the path) are
+tested in the Java client SDK too, and `ApiGatewayTest` checks them again through the server.
 
 ```bash
 ./mvnw -B -pl mcp-server verify
