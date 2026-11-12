@@ -1,11 +1,13 @@
 package com.thanhdatpb.listingguard.api.trademark;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.MatchType;
 import com.thanhdatpb.listingguard.trademark.RiskLevel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,6 +56,12 @@ public record TrademarkCheckResult(
         Instant expiresAt,
         List<FindingView> findings) {
 
+    /** The same result with other findings (the TSDR status the answer adds, ADR-009). */
+    public TrademarkCheckResult withFindings(List<FindingView> other) {
+        return new TrademarkCheckResult(checkId, marketplace, productType, rulesetVersion, catalogVersion, analysisVersion,
+                cached, completeness, riskLevel, failedRuleIds, disclaimer, createdAt, expiresAt, other);
+    }
+
     /** A result with no product type. */
     public TrademarkCheckResult(UUID checkId, String marketplace, String rulesetVersion, String catalogVersion,
                                 String analysisVersion, boolean cached, Completeness completeness, RiskLevel riskLevel,
@@ -74,7 +82,7 @@ public record TrademarkCheckResult(
      */
     @Schema(name = "TrademarkCheckFindingView")
     @JsonPropertyOrder({"ruleId", "risk", "field", "start", "end", "snippet", "mark", "matchType", "score", "insideColorPhrase",
-            "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "message", "suggestion"})
+            "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "message", "suggestion", "tsdrStatuses"})
     public record FindingView(
             @Schema(example = "catalog_exact") String ruleId,
             @Schema(description = "Level of this finding: LOW (informational), MEDIUM or HIGH.") RiskLevel risk,
@@ -102,15 +110,55 @@ public record TrademarkCheckResult(
                     + "the original level (`from`) and the level that reason alone gives (`to`); `risk` is the lowest `to`.")
             List<RiskAdjustmentView> riskAdjustments,
             @Schema(description = "Human text, currently Vietnamese.") String message,
-            @Schema(description = "Human text, currently Vietnamese.") String suggestion) {
+            @Schema(description = "Human text, currently Vietnamese.") String suggestion,
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+                    description = "The last status the USPTO TSDR gave for the source records of the mark, one entry for each source "
+                            + "id that has been checked. **Present only when the deployment turned it on "
+                            + "(`listing-guard.trademark.tsdr.finding-status.enabled`); absent otherwise.** When present it can "
+                            + "be empty. It is information read when this answer is built, not part of the stored result: it "
+                            + "never changes `risk`, `analysisVersion` or the cache, and the same stored result can show a "
+                            + "newer status later. Read `checkedAt`: the status can be old.")
+            List<TsdrStatusView> tsdrStatuses) {
 
-        /** A finding with no source link and no adjustment. */
+        /** A finding with no source link, no adjustment and no TSDR status member. */
         public FindingView(String ruleId, RiskLevel risk, String field, int start, int end, String snippet, String mark,
                            MatchType matchType, Double score, boolean insideColorPhrase, List<String> otherRuleIds,
                            List<String> sourceIds, String message, String suggestion) {
             this(ruleId, risk, field, start, end, snippet, mark, matchType, score, insideColorPhrase, otherRuleIds, sourceIds,
-                    List.of(), List.of(), message, suggestion);
+                    List.of(), List.of(), message, suggestion, null);
         }
+
+        /** A finding as it is stored: the TSDR status member is not part of it. */
+        public FindingView(String ruleId, RiskLevel risk, String field, int start, int end, String snippet, String mark,
+                           MatchType matchType, Double score, boolean insideColorPhrase, List<String> otherRuleIds,
+                           List<String> sourceIds, List<SourceLinkView> sourceLinks, List<RiskAdjustmentView> riskAdjustments,
+                           String message, String suggestion) {
+            this(ruleId, risk, field, start, end, snippet, mark, matchType, score, insideColorPhrase, otherRuleIds, sourceIds,
+                    sourceLinks, riskAdjustments, message, suggestion, null);
+        }
+
+        /** The same finding with the TSDR status member set (ADR-009, "TSDR status check"). */
+        public FindingView withTsdrStatuses(List<TsdrStatusView> statuses) {
+            return new FindingView(ruleId, risk, field, start, end, snippet, mark, matchType, score, insideColorPhrase,
+                    otherRuleIds, sourceIds, sourceLinks, riskAdjustments, message, suggestion, statuses);
+        }
+    }
+
+    /** The last status the USPTO TSDR gave for one source record of a catalog mark. */
+    @JsonPropertyOrder({"sourceId", "statusCode", "statusDescription", "statusClass", "statusDate", "checkedAt"})
+    public record TsdrStatusView(
+            @Schema(description = "The source id the status is for.", example = "uspto:12345678") String sourceId,
+            @Schema(description = "The status code the USPTO gave.", example = "700") String statusCode,
+            @Schema(description = "The USPTO's own description of the status; null when the answer had none.",
+                    example = "REGISTERED", nullable = true) String statusDescription,
+            @Schema(description = "LIVE (registered or pending), DEAD (abandoned, cancelled or expired) or UNKNOWN (a code the "
+                    + "deployment's status map does not settle). Decided from the code by a versioned, unverified map, never from "
+                    + "the description; it is information and does not change the finding's level.",
+                    allowableValues = {"LIVE", "DEAD", "UNKNOWN"}) String statusClass,
+            @Schema(description = "The date of the status the USPTO gave (UTC date); null when the answer had none.",
+                    nullable = true) LocalDate statusDate,
+            @Schema(description = "When this deployment asked the TSDR (or read a file saved from it) (UTC).") Instant checkedAt) {
     }
 
     /** One reason a finding is reported lower than the level its rule assigned. */

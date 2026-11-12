@@ -5,6 +5,7 @@ import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.listing.Normalizer;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
+import com.thanhdatpb.listingguard.api.trademark.tsdr.TsdrStatusOverlay;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.trademark.CanonicalInput;
 import com.thanhdatpb.listingguard.trademark.Completeness;
@@ -15,6 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -45,10 +47,20 @@ public class TrademarkCheckService {
     private final TrademarkCheckStore store;
     private final TransactionTemplate transactions;
     private final PlanService plans;
+    private final TsdrStatusOverlay tsdrStatus;
 
+    /** A service whose answers never carry a TSDR status (the overlay is off). */
     public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
                                  TrademarkRulesets rulesets, TrademarkCheckStore store, TransactionTemplate transactions,
                                  PlanService plans) {
+        this(normalizers, runtime, rulesets, store, transactions, plans, null);
+    }
+
+    @Autowired
+    public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
+                                 TrademarkRulesets rulesets, TrademarkCheckStore store, TransactionTemplate transactions,
+                                 PlanService plans, TsdrStatusOverlay tsdrStatus) {
+        this.tsdrStatus = tsdrStatus;
         this.normalizers = normalizers;
         this.runtime = runtime;
         this.rulesets = rulesets;
@@ -77,6 +89,12 @@ public class TrademarkCheckService {
      *         the request is refused before the cache, the quota or any work, and before the catalog is looked at
      */
     public TrademarkCheckResult check(UUID clientId, CheckRequest request, String requestedProductType) {
+        // the last TSDR status is added to the answer only (ADR-009, "TSDR status check"): never stored, never cached, and
+        // nothing when the deployment has not turned it on
+        return withTsdrStatus(checkStored(clientId, request, requestedProductType));
+    }
+
+    private TrademarkCheckResult checkStored(UUID clientId, CheckRequest request, String requestedProductType) {
         PlanService.Admission admission = plans.requirePack(clientId, Pack.TRADEMARK_RISK);
         Normalizer normalizer = normalizers.get(request.marketplace());
         Listing listing = normalizer.normalize(request.listing());
@@ -122,7 +140,11 @@ public class TrademarkCheckService {
      * retention period are reported exactly alike, so the answer does not reveal which ids are in use.
      */
     public TrademarkCheckResult get(UUID clientId, UUID id) {
-        return store.find(clientId, id).orElseThrow(() -> new TrademarkCheckNotFoundException(id));
+        return withTsdrStatus(store.find(clientId, id).orElseThrow(() -> new TrademarkCheckNotFoundException(id)));
+    }
+
+    private TrademarkCheckResult withTsdrStatus(TrademarkCheckResult result) {
+        return tsdrStatus == null ? result : tsdrStatus.apply(result);
     }
 
     /**
