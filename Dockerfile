@@ -14,8 +14,10 @@ COPY image-checker image-checker
 COPY api api
 COPY mcp-server mcp-server
 COPY contract-tools contract-tools
+# The release version the API sends as X-Listing-Guard-Version (ADR-022); the release workflow passes the tag without its v.
+ARG LISTING_GUARD_RELEASE=dev
 RUN --mount=type=cache,target=/root/.m2 \
-    ./mvnw -B -q -DskipTests -pl api -am package
+    ./mvnw -B -q -DskipTests -Dlisting-guard.release=${LISTING_GUARD_RELEASE} -pl api -am package
 
 FROM --platform=$TARGETPLATFORM eclipse-temurin:25-jre
 RUN apt-get update \

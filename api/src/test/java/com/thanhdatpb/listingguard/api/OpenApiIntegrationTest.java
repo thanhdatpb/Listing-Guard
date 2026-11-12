@@ -239,6 +239,37 @@ class OpenApiIntegrationTest {
                 .isEqualTo("null");
     }
 
+    /** ADR-022: the contract headers are documented once and referenced from every response of every /api/v1 operation. */
+    @Test
+    void everyApiV1ResponseDocumentsTheContractHeaders() throws Exception {
+        JsonNode spec = mapper.readTree(generatedSpec());
+        List<String> headers = List.of("X-Listing-Guard-Version", "Deprecation", "Sunset");
+
+        assertThat(fieldNames(spec.at("/components/headers"))).containsExactlyInAnyOrderElementsOf(headers);
+        assertThat(spec.at("/components/headers/X-Listing-Guard-Version/required").asBoolean()).as("always there").isTrue();
+        assertThat(spec.at("/components/headers/Deprecation/required").asBoolean()).as("only when deprecated").isFalse();
+        int responses = 0;
+        for (String path : fieldNames(spec.at("/paths"))) {
+            JsonNode item = spec.get("paths").get(path);
+            for (String method : fieldNames(item)) {
+                JsonNode operationResponses = item.get(method).get("responses");
+                for (String status : fieldNames(operationResponses)) {
+                    JsonNode documented = operationResponses.get(status).path("headers");
+                    if (path.startsWith("/api/v1/")) {
+                        responses++;
+                        for (String header : headers) {
+                            assertThat(documented.at("/" + header + "/$ref").asText()).as(method + " " + path + " " + status)
+                                    .isEqualTo("#/components/headers/" + header);
+                        }
+                    } else {
+                        assertThat(documented.isMissingNode()).as(method + " " + path + " has no contract header").isTrue();
+                    }
+                }
+            }
+        }
+        assertThat(responses).isPositive();
+    }
+
     @Test
     void theEtsyExampleIsWhatTheEndpointReallyAnswers() throws Exception {
         JsonNode actual = mapper.readTree(mvc.perform(post("/api/v1/checks").header(HEADER, KEY_1)

@@ -12,6 +12,16 @@ listing-guard:
     max-body-bytes: 262144
     # Development only: serves Swagger UI and opens it and /v3/api-docs without an API key.
     swagger-ui-enabled: ${LISTING_GUARD_SWAGGER_UI:false}
+    deprecation:
+      # Operations this deployment announces as deprecated (ADR-022). Every response of one carries Deprecation (RFC 9745), and
+      # Sunset (RFC 8594) and Link rel="deprecation" when set. None by default. The start-up fails on an entry that names no
+      # /api/v1 operation, a Sunset less than 180 days after the Deprecation date, or a link that is not https. Example:
+      #   - method: GET
+      #     path: /api/v1/checks/{id}              # exactly as docs/api/openapi.json writes it
+      #     deprecated-at: 2027-01-01               # a date (midnight UTC) or an ISO-8601 instant
+      #     sunset-at: 2027-07-01T00:00:00Z         # optional
+      #     link: https://github.com/thanhdatpb/Listing-Guard/blob/main/docs/integration-guide.md#compatibility-and-versions
+      endpoints: []
   console:
     enabled: ${LISTING_GUARD_CONSOLE_ENABLED:false}
     base-url: ${LISTING_GUARD_CONSOLE_BASE_URL:}
