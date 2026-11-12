@@ -75,6 +75,19 @@ curl -sS -i --connect-timeout 5 --max-time 10 \
   --data @check-request.json     # {"marketplace":"ETSY","listing":{...}}, as in "Create a check"
 ```
 
+With the Java client SDK, pass both values once to the builder; it sends them on every request and never shows them in a
+message or `toString()`:
+
+```java
+ListingGuardClient client = ListingGuardClient.builder()
+    .baseUrl(baseUrl).apiKey(apiKey)
+    .cloudflareAccess(accessClientId, accessClientSecret)
+    .build();
+```
+
+An Access refusal then arrives as a `ListingGuardApiException` whose `isProblem()` is false (no `code`, no `requestId` of ours),
+and a redirect to a login page as a `ListingGuardTransportException` of kind `REDIRECT`.
+
 With the Spring `RestClient` of "Create a check", read the two Access values from configuration and set them as default
 headers; `X-API-Key` stays as in the example:
 
@@ -86,9 +99,9 @@ RestClient listingGuard = RestClient.builder()
     .build();
 ```
 
-The MCP server ([`mcp.md`](mcp.md)) sends only `X-API-Key` (with `X-Request-Id`, `Accept` and `Content-Type`) and has no
-setting for other headers (ADR-017), so it cannot call a hostname that Access protects. Run it where it reaches the API
-without Access.
+The MCP server ([`mcp.md`](mcp.md)) sends only `X-API-Key` (with `X-Request-Id`, `Accept`, `Content-Type` and its
+`User-Agent`) and has no setting for other headers (ADR-017), so it cannot call a hostname that Access protects, although the
+SDK underneath it could. Run it where it reaches the API without Access.
 
 ### Who refused the request: Access or the API
 
@@ -139,6 +152,11 @@ second limit. Then:
 Retries are safe for your quota: a result already stored is answered from the cache at no cost, and two identical
 requests sent at the same time cost one unit (see "Plans and monthly quota"). Cap the total attempts, and remember that a
 check is advice, not a gate: if Listing Guard cannot be reached, the listing can still be published.
+
+The Java client SDK's default policy covers the `429 rate-limited` row and a `503` problem (at most 3 attempts). It does not retry
+a network error, a timeout or a Cloudflare `502`, `524` or `530` by itself: catch `ListingGuardTransportException` (kinds
+`UNREACHABLE`, `TIMEOUT`) or a `ListingGuardApiException` with `isProblem()` false and retry those yourself if you follow the
+table above.
 
 ## Request id
 
@@ -263,9 +281,28 @@ The fields that are read, their accepted forms and how values are cleaned are th
 list entries are dropped; nothing else is changed, because the rules must see what the seller wrote. If your own
 listing format differs, map it to this one on your side.
 
+### Java: the official client SDK
+
+From Java, use the official SDK `com.thanhdatpb.listingguard:listing-guard-client` ([`client/README.md`](../client/README.md),
+[ADR-023](adr/ADR-023-java-client-sdk.md)). It sends the headers above, follows no redirect, maps every problem below to a typed
+exception (`QuotaExceededException`, `PlanNotAllowedException`, `RateLimitedException` with `retryAfter()`,
+`NotConfiguredException`, `ValidationException` with `errors()`, `UnknownProductTypeException` with `known()`, otherwise
+`ListingGuardApiException` with `status`, `type`, `code` and `detail`), retries `429 rate-limited` and a retryable `503` within a
+bounded policy and reads new fields and enum values without failing. It needs Java 21 and Jackson only; each release tag
+publishes it to GitHub Packages.
+
+```java
+ListingGuardClient client = ListingGuardClient.builder()
+    .baseUrl("https://listing-guard.example")
+    .apiKey(apiKey)                       // from your secret store
+    .userAgent("shop-backend/1.4")
+    .build();                             // build once, share it, close it at shutdown
+CheckResult result = client.checks(CheckRequest.of("ETSY", listing));   // listing: a Map or object in the standard input
+```
+
 ### Java client (Spring `RestClient`)
 
-Keep the API key in server-side configuration or a secret manager. Send a request ID for support
+Without the SDK, a Spring `RestClient` works as below. Keep the API key in server-side configuration or a secret manager. Send a request ID for support
 correlation. Do not retry a `401` without fixing the key, or a `422` without handling the unsupported
 marketplace. On `429`, read `Retry-After` in seconds and schedule a retry after that delay rather than
 retrying immediately.

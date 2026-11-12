@@ -28,7 +28,7 @@ Listing Guard through the [Model Context Protocol](https://modelcontextprotocol.
 - The jar. It is built from this repository; it is not published anywhere:
 
 ```bash
-./mvnw -B -pl mcp-server package        # needs no Docker; add -DskipTests to skip the tests
+./mvnw -B -pl mcp-server -am package    # builds the Java client SDK too; needs no Docker; add -DskipTests to skip the tests
 # -> mcp-server/target/listing-guard-mcp.jar
 ```
 
@@ -245,7 +245,7 @@ HTTP rules the server relies on (no redirect, the size limit, the redaction of a
 tested in the Java client SDK too, and `ApiGatewayTest` checks them again through the server.
 
 ```bash
-./mvnw -B -pl mcp-server verify
+./mvnw -B -pl client,mcp-server verify
 ```
 
 The SDK is the official Java SDK, version 2.1.0, pinned exactly; the module does not use Spring (see
