@@ -64,13 +64,26 @@ services:
       # Fix suggestions and the publish readiness score (ADR-014): off by default, so /checks keeps its current response.
       # The console editor shows them whatever this says.
       LISTING_GUARD_FIXES_ENABLED: ${LISTING_GUARD_FIXES_ENABLED:-false}
-      # Web console (ADR-014 B2): off by default. Enabling it requires HTTPS, a fixed base URL and SMTP.
+      # Web console (ADR-014 B2): off by default. Enabling it requires HTTPS and a fixed base URL, and SMTP unless the sign-in
+      # mode is CLOUDFLARE_ACCESS (ADR-027).
       LISTING_GUARD_CONSOLE_ENABLED: ${LISTING_GUARD_CONSOLE_ENABLED:-false}
       LISTING_GUARD_CONSOLE_BASE_URL: ${LISTING_GUARD_CONSOLE_BASE_URL:-}
       LISTING_GUARD_CONSOLE_COOKIE_SECURE: "true"
       LISTING_GUARD_CONSOLE_MAIL_FROM: ${LISTING_GUARD_CONSOLE_MAIL_FROM:-}
       # The most active API keys one console account may hold.
       LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS: ${LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS:-5}
+      # Console sign-in (ADR-027): MAGIC_LINK (default), CLOUDFLARE_ACCESS or BOTH, and the Cloudflare Access settings. They must
+      # be listed here: a variable of .env that this file does not name never reaches the container. The defaults equal the
+      # application's, so a deployment that sets none of them is unchanged.
+      LISTING_GUARD_CONSOLE_AUTH_MODE: ${LISTING_GUARD_CONSOLE_AUTH_MODE:-MAGIC_LINK}
+      LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN: ${LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN:-}
+      LISTING_GUARD_CONSOLE_ACCESS_AUD: ${LISTING_GUARD_CONSOLE_ACCESS_AUD:-}
+      LISTING_GUARD_CONSOLE_ACCESS_CERTS_URL: ${LISTING_GUARD_CONSOLE_ACCESS_CERTS_URL:-}
+      LISTING_GUARD_CONSOLE_ACCESS_CERT_CACHE_TTL: ${LISTING_GUARD_CONSOLE_ACCESS_CERT_CACHE_TTL:-1h}
+      LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_DOMAINS: ${LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_DOMAINS:-}
+      LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS: ${LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS:-}
+      LISTING_GUARD_CONSOLE_ACCESS_AUTO_CREATE: ${LISTING_GUARD_CONSOLE_ACCESS_AUTO_CREATE:-false}
+      LISTING_GUARD_CONSOLE_ACCESS_DEFAULT_CLIENT_NAME: ${LISTING_GUARD_CONSOLE_ACCESS_DEFAULT_CLIENT_NAME:-}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
