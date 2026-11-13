@@ -9,8 +9,8 @@ bạn: bạn tự dán cột kết quả vào Sheet. Trang cần đăng nhập c
 cho người vận hành). Quyết định thiết kế nằm trong [ADR-029](adr/ADR-029-console-bulk-check.md).
 
 > **Ảnh chụp.** Các ô `[Ảnh chụp: ...]` bên dưới là chỗ để ảnh. Chưa chụp được ở lần viết này; khi chụp, đặt file vào
-> `docs/images/bulk-check/` với đúng tên ghi trong từng ô và thay ô bằng `![mô tả](images/bulk-check/<tên>.png)`. Dùng listing
-> giả (ví dụ mục `Zibblefrax` của catalog DEMO), không dùng dữ liệu thật của khách.
+> `docs/images/bulk-check/` với đúng tên ghi trong từng ô và thay ô bằng một ảnh Markdown trỏ tới `images/bulk-check/` cùng tên
+> file đó. Dùng listing giả (ví dụ mục `Zibblefrax` của catalog DEMO), không dùng dữ liệu thật của khách.
 
 ## 1. Dán từ Sheet
 
