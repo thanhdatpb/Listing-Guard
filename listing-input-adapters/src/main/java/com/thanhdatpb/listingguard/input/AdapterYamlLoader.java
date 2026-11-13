@@ -66,8 +66,10 @@ public final class AdapterYamlLoader {
                     text(familyNode, "child_value"), text(familyNode, "sku_column"), text(familyNode, "parent_sku_column"));
         }
         Set<String> formats = delimiter == '\t' ? Set.of("text/csv", "text/tab-separated-values") : Set.of("text/csv");
+        String idColumn = null;
+        if (root.has("id_column")) idColumn = text(root, "id_column");
         return new ConfiguredCsvAdapter(id, marketplace, formats, delimiter, encoding, fields, multiFields, separators,
-                required, family);
+                required, family, idColumn);
     }
 
     private static String text(JsonNode node, String name) throws IOException {

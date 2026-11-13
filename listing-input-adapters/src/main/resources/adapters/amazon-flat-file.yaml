@@ -4,6 +4,7 @@ format: csv
 delimiter: tab
 encoding: UTF-8
 required_columns: [item_sku, item_name]
+id_column: item_sku
 family:
   role_column: parentage
   parent_value: parent

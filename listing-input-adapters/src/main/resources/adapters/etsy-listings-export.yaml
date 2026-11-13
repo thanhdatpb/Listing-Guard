@@ -4,6 +4,7 @@ format: csv
 delimiter: ','
 encoding: UTF-8
 required_columns: [SKU, TITLE]
+id_column: SKU
 fields:
   title: TITLE
   description: DESCRIPTION

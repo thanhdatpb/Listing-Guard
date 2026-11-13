@@ -34,6 +34,7 @@ public final class ConfiguredCsvAdapter implements ListingInputAdapter {
     private final Map<String, String> separators;
     private final List<String> required;
     private final FamilyColumns family;
+    private final String idColumn;
 
     public record FamilyColumns(String roleColumn, String parentValue, String childValue,
                                 String skuColumn, String parentSkuColumn) { }
@@ -64,6 +65,15 @@ public final class ConfiguredCsvAdapter implements ListingInputAdapter {
     public ConfiguredCsvAdapter(String id, String marketplace, Set<String> formats, char delimiter, Charset encoding,
                                 Map<String, String> fields, Map<String, List<String>> multiFields,
                                 Map<String, String> separators, List<String> required, FamilyColumns family) {
+        this(id, marketplace, formats, delimiter, encoding, fields, multiFields, separators, required, family, null);
+    }
+
+    /** {@code idColumn} names the header whose cell becomes {@link ListingRecord#id()}; null for none. */
+    public ConfiguredCsvAdapter(String id, String marketplace, Set<String> formats, char delimiter, Charset encoding,
+                                Map<String, String> fields, Map<String, List<String>> multiFields,
+                                Map<String, String> separators, List<String> required, FamilyColumns family,
+                                String idColumn) {
+        this.idColumn = idColumn;
         this.id = id;
         this.marketplace = marketplace;
         this.formats = Set.copyOf(formats);
@@ -82,11 +92,15 @@ public final class ConfiguredCsvAdapter implements ListingInputAdapter {
     @Override public String marketplace() { return marketplace; }
     @Override public Set<String> formats() { return formats; }
 
+    /** The column delimiter of the format, so a caller can read a header the way {@link #open} will. */
+    public char delimiter() { return delimiter; }
+
     @Override
     public Detection detect(List<String> header) {
         java.util.LinkedHashSet<String> wanted = new java.util.LinkedHashSet<>(required);
         wanted.addAll(fields.values());
         multiFields.values().forEach(wanted::addAll);
+        if (idColumn != null) wanted.add(idColumn);
         if (family != null) {
             wanted.add(family.roleColumn());
             wanted.add(family.skuColumn());
@@ -165,7 +179,8 @@ public final class ConfiguredCsvAdapter implements ListingInputAdapter {
                     if ("parent".equals(familyRole)) familyId = cell(cells, indexes.get(family.skuColumn()));
                     if ("child".equals(familyRole)) familyId = cell(cells, indexes.get(family.parentSkuColumn()));
                 }
-                return new ListingRecord(line, listing, errors, blankToNull(familyId), familyRole);
+                String recordId = idColumn == null ? null : blankToNull(cell(cells, indexes.get(idColumn)));
+                return new ListingRecord(line, listing, errors, blankToNull(familyId), familyRole, recordId);
             }
             @Override public void close() throws IOException { rows.close(); }
         };
