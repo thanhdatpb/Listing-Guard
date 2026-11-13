@@ -64,7 +64,8 @@ services:
       # Fix suggestions and the publish readiness score (ADR-014): off by default, so /checks keeps its current response.
       # The console editor shows them whatever this says.
       LISTING_GUARD_FIXES_ENABLED: ${LISTING_GUARD_FIXES_ENABLED:-false}
-      # Web console (ADR-014 B2): off by default. Enabling it requires HTTPS, a fixed base URL and SMTP.
+      # Web console (ADR-014 B2): off by default. Enabling it requires HTTPS and a fixed base URL, and SMTP unless the sign-in
+      # mode is CLOUDFLARE_ACCESS (ADR-027).
       LISTING_GUARD_CONSOLE_ENABLED: ${LISTING_GUARD_CONSOLE_ENABLED:-false}
       LISTING_GUARD_CONSOLE_BASE_URL: ${LISTING_GUARD_CONSOLE_BASE_URL:-}
       LISTING_GUARD_CONSOLE_COOKIE_SECURE: "true"
@@ -73,6 +74,18 @@ services:
       LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS: ${LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS:-5}
       # The language of a console page whose reader has not chosen one (ADR-028): en or vi.
       LISTING_GUARD_CONSOLE_DEFAULT_LOCALE: ${LISTING_GUARD_CONSOLE_DEFAULT_LOCALE:-en}
+      # Console sign-in (ADR-027): MAGIC_LINK (default), CLOUDFLARE_ACCESS or BOTH, and the Cloudflare Access settings. They must
+      # be listed here: a variable of .env that this file does not name never reaches the container. The defaults equal the
+      # application's, so a deployment that sets none of them is unchanged.
+      LISTING_GUARD_CONSOLE_AUTH_MODE: ${LISTING_GUARD_CONSOLE_AUTH_MODE:-MAGIC_LINK}
+      LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN: ${LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN:-}
+      LISTING_GUARD_CONSOLE_ACCESS_AUD: ${LISTING_GUARD_CONSOLE_ACCESS_AUD:-}
+      LISTING_GUARD_CONSOLE_ACCESS_CERTS_URL: ${LISTING_GUARD_CONSOLE_ACCESS_CERTS_URL:-}
+      LISTING_GUARD_CONSOLE_ACCESS_CERT_CACHE_TTL: ${LISTING_GUARD_CONSOLE_ACCESS_CERT_CACHE_TTL:-1h}
+      LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_DOMAINS: ${LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_DOMAINS:-}
+      LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS: ${LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS:-}
+      LISTING_GUARD_CONSOLE_ACCESS_AUTO_CREATE: ${LISTING_GUARD_CONSOLE_ACCESS_AUTO_CREATE:-false}
+      LISTING_GUARD_CONSOLE_ACCESS_DEFAULT_CLIENT_NAME: ${LISTING_GUARD_CONSOLE_ACCESS_DEFAULT_CLIENT_NAME:-}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
@@ -93,12 +106,14 @@ services:
   admin:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["admin"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: admin
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -116,12 +131,14 @@ services:
   trademark-import:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: trademark-import
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -139,12 +156,14 @@ services:
   uspto-convert:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    mem_limit: ${USPTO_CONVERT_MEM_LIMIT:-3g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: uspto-convert
+      JAVA_TOOL_OPTIONS: ${USPTO_CONVERT_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -238,12 +257,14 @@ services:
   batch-check:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: batch-check
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -266,12 +287,14 @@ services:
   health-report:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: health-report
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -287,12 +310,14 @@ services:
   policy-diff:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["policy-diff"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: policy-diff
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}

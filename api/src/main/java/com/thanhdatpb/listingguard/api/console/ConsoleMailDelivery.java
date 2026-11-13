@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("!dev")
 @ConditionalOnProperty(prefix = "listing-guard.console", name = "enabled", havingValue = "true")
+@org.springframework.context.annotation.Conditional(ConsoleMagicLinkModeCondition.class)
 public class ConsoleMailDelivery implements MagicLinkDelivery {
 
     private final JavaMailSender mailSender;

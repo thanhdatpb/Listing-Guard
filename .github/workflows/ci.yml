@@ -39,3 +39,24 @@ jobs:
       # found before a tag is pushed.
       - name: Java client SDK release jars
         run: ./mvnw -B -pl client -Prelease package -DskipTests
+
+  # `./mvnw verify` never builds the Docker image, so a module the api needs but the Dockerfile does not copy (as happened with
+  # listing-input-adapters) was found only when a release tag was pushed. Build the image the release workflow builds, for
+  # linux/amd64 only (the arm64 build needs QEMU and stays in the release workflow), and push nothing. It runs on every pull
+  # request and on main.
+  image:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build the release image (linux/amd64, not pushed)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false

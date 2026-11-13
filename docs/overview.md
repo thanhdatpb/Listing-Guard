@@ -94,7 +94,7 @@ Before you rely on it:
   been committed. The optional server-side policy analyzer has no real model call or endpoint yet.
 
 What is not built yet is listed in the [Roadmap](#roadmap). Changes between versions are in
-[docs/releases/v0.7.0.md](releases/v0.7.0.md).
+[docs/releases/v0.8.0.md](releases/v0.8.0.md).
 
 ## Architecture
 
@@ -356,7 +356,7 @@ Implemented capabilities are summarized in [Status](#status). The next confirmed
 - [MCP server](mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the seven tools, errors and limits.
 - [Deployment](deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
 - [Oracle ARM deployment](deploy-oracle.md): deploy the production API and PostgreSQL on an Oracle Cloud Ampere A1 VM behind Cloudflare Tunnel.
-- [Release notes](releases/v0.7.0.md): what changed in each version and what to do when upgrading.
+- [Release notes](releases/v0.8.0.md): what changed in each version and what to do when upgrading.
 - [ADR-001: Rule configuration](adr/ADR-001-rule-config.md)
 - [ADR-002: Ruleset versioning](adr/ADR-002-ruleset-versioning.md)
 - [ADR-003: Chunking strategy](adr/ADR-003-chunking-strategy.md)

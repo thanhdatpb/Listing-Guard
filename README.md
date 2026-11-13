@@ -16,6 +16,7 @@ Self-hosted pre-publish compliance API for Etsy and Amazon listings: determinist
 The API checks listings and returns findings with their source, field and evidence. Separate endpoints screen variation families, buyer personalization text and listing images.
 The API stores results in each client's scope; optional plans, quota and fix/readiness output are disabled by default.
 Trademark checks require an operator loaded catalog, and image checks are disabled by default with thresholds still unverified.
+The optional console keeps magic-link sign-in by default and can use verified Cloudflare Access identities without SMTP (ADR-027).
 Listing Guard suggests and reports. It never edits or publishes a listing and does no SEO.
 
 ## What it checks
@@ -34,10 +35,10 @@ Rule sources stay labeled as they are in the rulesets; no unverified limit is pr
 
 ## How a check flows
 
-![Seven numbered steps show a listing request moving from a client through Cloudflare Access and Tunnel to the API, cache, pack and PostgreSQL, then returning findings and evidence; the diagram also shows pre-publish and pre-production patterns and the trademark catalog pipeline.](docs/images/request-flow-and-data.svg)
+![Seven numbered steps show a listing request moving from a client through the Cloudflare edge and Tunnel to the API, cache, pack and PostgreSQL, then returning findings and evidence; the diagram also shows pre-publish and pre-production patterns and the trademark catalog pipeline.](docs/images/request-flow-and-data.svg)
 
 1. A client sends `POST /api/v1/checks` with `X-API-Key`.
-2. Cloudflare Access validates its service token, then the Cloudflare Tunnel forwards the request to the Oracle A1 Docker Compose deployment.
+2. Cloudflare terminates HTTPS and the Cloudflare Tunnel forwards the request to the Oracle A1 Docker Compose deployment (Cloudflare Access protects only `/console/*` and `/health`; `/api/v1/*` is protected by the API key and the rate limit).
 3. The API validates the client's API key and applies per-client rate limiting and optional plan/quota checks.
 4. The cache identity includes the client, marketplace, pack, input hash, ruleset version and `analysisVersion`.
 5. On a cache miss, the API runs the requested pack using its declared ruleset and analysis version.
@@ -84,7 +85,7 @@ The second request needs an operator configured catalog; without one it returns 
 
 ## Deploy
 
-See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production setup, Access, backups, upgrades and health checks. General production settings are in [deployment](docs/deployment.md).
+See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production setup, Access, backups, upgrades and health checks. General production settings are in [deployment](docs/deployment.md). Before the first deployment read [deploy readiness](docs/deploy-readiness.md): what is on or off by default, the environment variables, the resource budget, a security checklist, a smoke test and the manual steps in order. The release notes of the version to deploy are in [docs/releases](docs/releases/v0.8.0.md).
 
 ## Roadmap
 
@@ -110,8 +111,9 @@ See the [detailed status and project guide](docs/overview.md) for implemented be
 - [Integration guide](docs/integration-guide.md)
 - [Deployment](docs/deployment.md)
 - [Oracle A1 deployment](docs/deploy-oracle.md)
+- [Deploy readiness](docs/deploy-readiness.md)
 - [Architecture decisions](docs/adr/)
-- [Release notes](docs/releases/v0.7.0.md)
+- [Release notes](docs/releases/v0.8.0.md)
 
 ## License
 

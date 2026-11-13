@@ -10,10 +10,12 @@
 <main>
     <div th:replace="~{console/layout :: languageSwitch}"></div>
     <h1 th:text="#{login.heading}"></h1>
-    <p th:text="#{login.intro}"></p>
+    <p th:if="${accessLogin}" th:text="#{login.access.intro}"></p>
+    <p th:if="${accessAvailable}"><a href="/console/" th:text="#{login.access.continue}"></a></p>
+    <p th:unless="${accessLogin}" th:text="#{login.intro}"></p>
     <p th:if="${message}" th:text="${message}" role="status"></p>
     <p th:if="${error}" th:text="${error}" role="alert"></p>
-    <form method="post" th:action="@{/login}" th:object="${emailForm}">
+    <form th:unless="${accessLogin}" method="post" th:action="@{/login}" th:object="${emailForm}">
         <label for="email" th:text="#{login.email.label}"></label>
         <input id="email" type="email" th:field="*{email}" autocomplete="email" maxlength="254" required>
         <button type="submit" th:text="#{login.submit}"></button>

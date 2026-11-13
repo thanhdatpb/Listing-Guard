@@ -50,7 +50,12 @@ catalogs/raw/
 # deploy/oracle/uspto-sync.sh: its host lock and its run logs (ADR-009, PR A2d)
 .uspto-sync.lock
 .policy-diff.lock
+# deploy/oracle/tsdr-status.sh: its host lock (its run logs are under logs/)
+.tsdr-status.lock
 logs/
+
+# deploy/oracle/backup.sh writes database dumps here: they hold every client's stored results, so they are never committed
+backups/
 
 # Batch check (docs/batch-check.md): real listing exports and the reports made from them are never committed; the
 # mappings in batch/mappings/ are

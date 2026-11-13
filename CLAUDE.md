@@ -292,12 +292,18 @@ It never edits a listing, never publishes, and does no SEO.
   needs the `batch` pack, stops at once with `quota-exceeded` when no unit is left, and marks rows `QUOTA_EXCEEDED` when the
   quota runs out midway. `plan set <client> <plan>` (admin job) changes a plan at once. The packs `policy-analyzer` and
   `sheet-connector` are reserved and not enforced yet: ADR-011 PR 5 and phase 4b (GĐ4b) will call `PlanService.requirePack` for them.
-- **Console** (ADR-014 part B, V21): optional server-rendered Thymeleaf pages, off by default. Keep its session/CSRF
+- **Console** (ADR-014 part B, V21; login options ADR-027, V35): optional server-rendered Thymeleaf pages, off by default. Keep its session/CSRF
   Spring Security chain separate from the stateless API chain; API-key authentication remains in `ApiKeyFilter`.
+  `listing-guard.console.auth-mode` defaults to `MAGIC_LINK` and also supports `CLOUDFLARE_ACCESS` and `BOTH`.
   Magic-link GET only displays confirmation; CSRF-protected POST consumes the hashed, 15-minute token and rotates the
-  session id. Build links only from `listing-guard.console.base-url`, never request headers. Only `dev` may log links;
-  enabled production console requires SMTP and HTTPS. Login limiting is shared PostgreSQL state: 5 per normalized email
-  and 30 per remote IP per 15 minutes. The first successful login provisions an account and a FREE client.
+  session id. SMTP is required only when the selected mode enables magic links. Access mode verifies the RS256
+  `Cf-Access-Jwt-Assertion` signature against cached team certificates, checks issuer/AUD/time claims, then applies
+  the configured email/domain allowlist; the raw Access email header is never trusted. Optional first-login account
+  creation assigns allowed emails to the configured shared FREE client (V35 permits multiple accounts per client).
+  Both modes create the same rotated server-side session; Access logout redirects to `/cdn-cgi/access/logout`.
+  See ADR-027 and `docs/deploy-oracle.md`. Build links only from `listing-guard.console.base-url`, never request headers.
+  Only `dev` may log links. Login limiting for magic links is shared PostgreSQL state: 5 per normalized email and 30
+  per remote IP per 15 minutes.
   **Editor (B3)** (`api/.../console/editor/`, `templates/console/editor*.html`, `static/console/editor.{css,js}`): `GET|POST
   /console/check` and `POST /console/check/apply`. It always calls `CheckService.checkDetailed` (verified fixes and readiness)
   and `TrademarkCheckService`, whatever `listing-guard.fixes.enabled` says; `check()` and `get()` keep following the flag and
@@ -331,7 +337,7 @@ It never edits a listing, never publishes, and does no SEO.
   (`trademark.disclaimer.note`).
 - Current scope: Etsy and Amazon rule engines, the image checker (ADR-008: the core and the endpoint, off by default and without the bounded decode service), the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
+  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, policy ingest + retrieval, and the optional console (magic-link by default, or Cloudflare Access per ADR-027) with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12c.yaml`): simple input format (`title`, `brand`,
@@ -609,6 +615,22 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   around a block. A name from a listing becomes a path only when it is a plain file name matching the patterns. Archives are
   never extracted to disk. Tests use `FakeOdpServer` (JDK `HttpServer` on the loopback address) and synthetic zips, never the
   real ODP.
+- **Image build and release** (`docs/deploy-readiness.md`, `docs/releases/`): the `Dockerfile` copies each Maven module by name, so a
+  **new module that `api` depends on (directly or through another module) needs its `COPY` line in the same PR**; `./mvnw verify`
+  does not build the image, so check with `docker build .` (the missing `listing-input-adapters` line made every release build fail
+  until v0.8.0). Runtime folders of a deployment (`backups/`, `logs/`, `catalogs/raw/`, `policy-monitor/`, ...) stay in `.gitignore`
+  and `.dockerignore`. A new setting that a deployment must control is forwarded by `docker-compose.prod.yml`, listed (commented)
+  in `deploy/env.prod.example` and in the table of `docs/deploy-readiness.md`; a new one-shot job gets a `mem_limit`. **v0.8.0 is
+  prepared** (`docs/releases/v0.8.0.md`, `Released YYYY-MM-DD` still to fill; **no tag exists yet**; **v0.7.0 is never tagged**: its
+  notes are folded into v0.8.0 and `v0.7.0.md` only points there). CI has an `image` job that runs `docker build` (linux/amd64, not
+  pushed) on every pull request, so a `Dockerfile` that misses a module fails the PR. **Deployment decisions** (ADR-019, 2026-11-13):
+  personal Oracle account, Tokyo, Always Free, 2 OCPU / 12 GB, no reserved IP, public GHCR package, 1 USD budget alert, Cloudflare
+  Access only in front of `/console/*` (the maintainer's e-mail) and `/health`, and **none in front of `/api/v1/*`** (the API key and
+  the rate limit protect it, because the MCP server sends only `X-API-Key`): never write the runbook or the docs as if `/api/v1/*`
+  were behind Access. Open: limit console sign-ins by `CF-Connecting-IP` (trusted only from the tunnel connector) and optional Access
+  service-token settings in the MCP server (`docs/deploy-readiness.md` section 7). `cloudflared` is pinned in
+  `docker-compose.prod.cloudflared.yml` with its source in a comment; update it from the releases page, never to `latest`.
+  `docs/releases/unreleased.md` is a stub for the changes after it. After a tag the maintainer moves the ADR-022 baseline.
 - **TSDR status check** (ADR-009 "TSDR status check"): the job only proposes. It never writes a catalog table, activates a
   version, edits a finding or removes a mark, and `tsdr_status` is append-only (a trigger). The key comes only from
   `LISTING_GUARD_TSDR_API_KEY`, goes only in its header to the `base-url` host, and never into a log, a message, the database, a
