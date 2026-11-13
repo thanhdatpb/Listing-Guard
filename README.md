@@ -66,6 +66,7 @@ The seven tools are `check_listing`, `check_trademark`, `check_variations`, `scr
 - [MCP server](docs/mcp.md) for Claude Code, Claude Desktop and other MCP clients.
 - [Java client SDK](client/README.md) for Java backends.
 - [`batch-check`](docs/batch-check.md) for CSV or Amazon flat-file reports.
+- [Console bulk check](docs/bulk-check.md) to paste rows from a Google Sheet (or upload a CSV) and copy the results back.
 
 ## Quickstart with Docker
 

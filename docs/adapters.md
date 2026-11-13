@@ -28,6 +28,10 @@ including records whose quoted cell spans multiple lines. A malformed encoding o
 problem is returned with its field name so the caller can report it without losing other rows. Blank values are absent,
 and unknown source columns are ignored.
 
+A template may name `id_column`, the header whose cell becomes the record's `id` (a SKU or handle). The id only names the record in a
+report (the console bulk check shows it; see [bulk-check.md](bulk-check.md)); it is not a listing field. The built-in CSV templates
+set it. A blank cell, or a template with no `id_column`, gives no id.
+
 ### Minimal CSV template
 
 ```yaml

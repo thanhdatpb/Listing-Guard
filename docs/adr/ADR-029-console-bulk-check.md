@@ -87,9 +87,12 @@ in the table. Files read by an adapter carry the family key but no variation att
 `listing-guard.console.bulk.max-rows` (default 200 data rows) and `max-bytes` (default 1 MiB of text or file). A larger input is refused
 as a whole with a message that gives both numbers; nothing is checked, nothing is charged and nothing is cut (a cut table would shift
 the rows against the Sheet). The request body limit of the API (`listing-guard.api.max-body-bytes`, 256 KB) does not fit a paste of
-this size, so `BodyLimitFilter` takes a list of path allowances instead of one: `/console/bulk/prepare` and `/console/bulk/run`, `POST`
-only, up to `4 * max-bytes + 64 KiB` (a text sent in a form field grows when it is URL-encoded); the limits above are the real ones and
-are checked in the controller. Every other path keeps its limit.
+this size, so `BodyLimitFilter` takes a map of path allowances instead of one path (the image checks, ADR-008, and these two):
+`/console/bulk/prepare` and `/console/bulk/run`, `POST` with `multipart/form-data` only, up to `2 * max-bytes + 64 KiB`, and only while
+the console is on. Both pages post multipart on purpose: a text in a URL-encoded field grows several-fold, and Tomcat stops reading a
+URL-encoded body at `server.tomcat.max-http-form-post-size` (2 MB). The limits above are the real ones and are checked in the
+controller (`max-bytes` must stay below `spring.servlet.multipart.max-file-size`, which the container applies to every part). Every
+other path keeps its limit.
 
 ### Plans and quota
 

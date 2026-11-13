@@ -1,6 +1,6 @@
 ﻿# Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), listing input adapters (ADR-025), the policy change monitor (ADR-026), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, the TSDR status check, and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities`, `GET /api/v1/input-adapters` and the schema of the trademark check's findings (see the sections below). There are seven additive migrations: V28 (trademark), V29 and V30 (image checks), V31 and V32 (USPTO sync), V33 (policy snapshots), and V34 (TSDR status).
+Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), listing input adapters (ADR-025), the policy change monitor (ADR-026), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, the TSDR status check, the console bulk check (ADR-029), and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities`, `GET /api/v1/input-adapters` and the schema of the trademark check's findings (see the sections below). There are eight additive migrations: V28 (trademark), V29 and V30 (image checks), V31 and V32 (USPTO sync), V33 (policy snapshots), V34 (TSDR status), and V35 (the console bulk check's column mapping).
 
 ## What is new
 
@@ -44,6 +44,25 @@ ADR-022 compatibility report lines (`contract-tools/target/contract/compatibilit
 - `response-property-added` at `schema TrademarkCheckResult.productType`
 - `schema-renamed` at `POST /api/v1/trademark-checks request application/json $`: CheckRequest -> TrademarkCheckRequest
 - `schema-renamed` at `schema TrademarkCheckResult.findings[]`: FindingView -> TrademarkCheckFindingView
+
+### Console bulk check (ADR-029)
+
+The console gets a page, **Kiểm tra hàng loạt** (`/console/bulk`, Vietnamese, in the menu). A seller pastes rows copied from a Google
+Sheet or uploads a CSV/TSV, confirms what each column is (a guess from the column names, remembered per account by header text),
+and gets one status per row (`Đạt`, `Cảnh báo`, `Lỗi`, or why the row was not judged) in the input's order, with a status filter, a
+row detail like the *Check listing* page, a block of two columns to paste back into the Sheet, and a CSV. The checks are the ones of
+`/checks`, `/trademark-checks` and, for rows that share a parent SKU, `/variation-checks`, called through the same services, so plans,
+quota (one unit per new result), cache and retention are unchanged. A file of a format the input adapters know (Etsy export, Amazon
+flat file, experimental Shopify) is recognized from its header and checked without a mapping step. Guide: [bulk-check.md](../bulk-check.md).
+
+- **Nothing pasted or uploaded is stored.** The only new state is `console_bulk_mapping` (**V35**, additive): column labels, the
+  field each was given and list separators, per account and marketplace, deleted with the account; never a cell.
+- New settings `LISTING_GUARD_CONSOLE_BULK_MAX_ROWS` (200) and `LISTING_GUARD_CONSOLE_BULK_MAX_BYTES` (1MB). A larger input is
+  refused whole, never cut. The two `POST /console/bulk/*` paths may carry a `multipart/form-data` body over the 256 KB API body limit
+  (only while the console is on); `BodyLimitFilter` now takes a map of such paths.
+- The adapter module gains an optional `id_column` in a template and `ListingRecord.id` (additive; the three CSV built-ins set it).
+- No API endpoint, MCP tool, ruleset or `analysisVersion` changes: `docs/api/openapi.json` is unchanged, so the ADR-022 compatibility
+  report has no new line for it.
 
 ### TSDR status check (ADR-009)
 
