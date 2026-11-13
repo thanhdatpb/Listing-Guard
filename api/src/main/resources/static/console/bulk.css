@@ -1,0 +1,70 @@
+/* The bulk check page (ADR-029). Plain CSS; the tokens, buttons and verdict panels come from editor.css, the table basics from console.css. */
+
+select, input[type="file"] {
+  width: 100%;
+  max-width: 28rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+select:focus-visible, input[type="file"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+textarea.paste { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875rem; white-space: pre; overflow: auto; }
+fieldset.separators { margin: 1rem 0; padding: 0.5rem 0.75rem 0.75rem; border: 1px solid var(--line); border-radius: 8px; }
+fieldset.separators legend { font-weight: 600; padding: 0 0.4rem; }
+fieldset.separators .field { margin: 0.5rem 0; }
+
+/* the mapping step: one row per column of the table */
+table.mapping { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; }
+table.mapping th, table.mapping td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.mapping thead th { font-size: 0.875rem; color: var(--muted); font-weight: 600; }
+table.mapping td.what { overflow-wrap: anywhere; }
+table.mapping td.pick select { max-width: none; }
+.letter { display: inline-block; min-width: 2rem; padding: 0.1rem 0.4rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card); text-align: center; font-weight: 600; }
+.checkbox { display: flex; gap: 0.5rem; align-items: flex-start; margin: 1rem 0; }
+.checkbox input { margin-top: 0.3rem; }
+ul.problems { margin: 0.25rem 0 0; padding-left: 1.25rem; }
+
+/* the result */
+ul.counts { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; list-style: none; margin: 0.75rem 0; padding: 0; }
+ul.counts li { font-variant-numeric: tabular-nums; }
+.filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0; }
+.filters button { padding: 0.3rem 0.9rem; border-radius: 999px; }
+.filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.result-actions { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: center; margin: 0.75rem 0; }
+details.sheet-help { margin: 0.75rem 0; padding: 0.5rem 0.75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+details.sheet-help summary { cursor: pointer; font-weight: 600; }
+details.sheet-help textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8125rem; white-space: pre; margin-top: 0.5rem; }
+
+table.bulk-results { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; }
+table.bulk-results th, table.bulk-results td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+table.bulk-results thead th { font-size: 0.875rem; color: var(--muted); font-weight: 600; }
+table.bulk-results td.n, table.bulk-results th.n { text-align: right; font-variant-numeric: tabular-nums; }
+table.bulk-results td.main { min-width: 16rem; }
+table.bulk-results tr[hidden] { display: none; }
+table.bulk-results summary { cursor: pointer; }
+
+/* a status is told by its word and by its mark, never by color alone */
+.status { display: inline-block; padding: 0.1rem 0.6rem; border: 1px solid var(--line); border-left-width: 6px; border-radius: 6px; font-weight: 600; white-space: nowrap; }
+.status.ok { border-left-color: var(--ok); }
+.status.warning { border-left-color: var(--warning); }
+.status.error { border-left-color: var(--error); }
+.status.unreadable, .status.not-checked, .status.empty { border-left-color: var(--muted); color: var(--muted); }
+
+.row-detail { margin: 0.75rem 0 0.25rem; }
+.row-detail .verdicts { margin-bottom: 1rem; }
+.row-detail .verdict .big { font-size: 1.75rem; }
+.row-detail h4 { margin: 0.75rem 0 0.25rem; font-size: 0.95rem; }
+ul.items { list-style: none; margin: 0.25rem 0 0.75rem; padding: 0; }
+ul.items li.item { margin: 0 0 0.75rem; padding: 0 0 0 0.75rem; border-left: 4px solid var(--line); }
+ul.items li.item.error, ul.items li.item.high { border-left-color: var(--error); }
+ul.items li.item.warning, ul.items li.item.medium { border-left-color: var(--warning); }
+ul.items li.item.info, ul.items li.item.low { border-left-color: var(--info); }
+ul.items p { margin: 0.2rem 0; }
+.level { display: inline-block; margin-right: 0.4rem; padding: 0 0.45rem; border: 1px solid var(--line); border-radius: 4px; font-size: 0.8125rem; font-weight: 700; }
+
+@media (max-width: 40rem) {
+  table.bulk-results, table.mapping { display: block; overflow-x: auto; }
+}

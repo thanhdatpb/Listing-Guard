@@ -4,11 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thanhdatpb.listingguard.api.client.ApiKeyRepository;
 import com.thanhdatpb.listingguard.api.client.ClientProvisioning;
 import com.thanhdatpb.listingguard.api.console.ConsoleProperties;
+import com.thanhdatpb.listingguard.api.console.bulk.BulkProperties;
 import com.thanhdatpb.listingguard.api.image.ImageProperties;
 import com.thanhdatpb.listingguard.api.web.BodyLimitFilter;
 import com.thanhdatpb.listingguard.api.web.RequestIdFilter;
 import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -70,13 +73,20 @@ public class ApiSecurityConfig {
 
     @Bean
     public FilterRegistrationBean<BodyLimitFilter> bodyLimitFilter(ApiProperties properties, ImageProperties images,
+                                                                   ConsoleProperties console, BulkProperties bulk,
                                                                    ObjectMapper mapper) {
         // the image endpoint takes a multipart body of its own, larger limit, but only while image checks are enabled: when
-        // they are off a large upload gets the ordinary 413 and is never staged (ADR-008)
-        BodyLimitFilter filter = images.enabled()
-                ? new BodyLimitFilter(properties.maxBodyBytes(), mapper, "/api/v1/image-checks", images.maxRequestSize().toBytes())
-                : new BodyLimitFilter(properties.maxBodyBytes(), mapper);
-        return register(filter, Ordered.HIGHEST_PRECEDENCE + 10);
+        // they are off a large upload gets the ordinary 413 and is never staged (ADR-008). The two POSTs of the console's bulk
+        // check do the same, only while the console is on (ADR-029)
+        Map<String, Long> uploads = new LinkedHashMap<>();
+        if (images.enabled()) {
+            uploads.put("/api/v1/image-checks", images.maxRequestSize().toBytes());
+        }
+        if (console.enabled()) {
+            uploads.put("/console/bulk/prepare", bulk.requestLimitBytes());
+            uploads.put("/console/bulk/run", bulk.requestLimitBytes());
+        }
+        return register(new BodyLimitFilter(properties.maxBodyBytes(), mapper, uploads), Ordered.HIGHEST_PRECEDENCE + 10);
     }
 
     @Bean

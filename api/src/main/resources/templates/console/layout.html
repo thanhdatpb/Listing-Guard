@@ -15,11 +15,12 @@
     <span th:replace="~{console/layout :: demoText}"></span>
 </div>
 
-<!-- The bar of a signed-in page: where to go, and sign out. "active" is dashboard, check, report or keys. -->
+<!-- The bar of a signed-in page: where to go, and sign out. "active" is dashboard, check, bulk, report or keys. -->
 <header class="bar" th:fragment="nav(active)">
     <nav aria-label="Console">
         <a th:href="@{/console}" th:aria-current="${active == 'dashboard'} ? 'page'">Dashboard</a>
         <a th:href="@{/console/check}" th:aria-current="${active == 'check'} ? 'page'">Check listing</a>
+        <a th:href="@{/console/bulk}" th:aria-current="${active == 'bulk'} ? 'page'">Kiểm tra hàng loạt</a>
         <a th:href="@{/console/report}" th:aria-current="${active == 'report'} ? 'page'">Report</a>
         <a th:href="@{/console/api-keys}" th:aria-current="${active == 'keys'} ? 'page'">API keys</a>
     </nav>
