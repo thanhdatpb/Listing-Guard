@@ -34,10 +34,10 @@ Rule sources stay labeled as they are in the rulesets; no unverified limit is pr
 
 ## How a check flows
 
-![Seven numbered steps show a listing request moving from a client through Cloudflare Access and Tunnel to the API, cache, pack and PostgreSQL, then returning findings and evidence; the diagram also shows pre-publish and pre-production patterns and the trademark catalog pipeline.](docs/images/request-flow-and-data.svg)
+![Seven numbered steps show a listing request moving from a client through the Cloudflare edge and Tunnel to the API, cache, pack and PostgreSQL, then returning findings and evidence; the diagram also shows pre-publish and pre-production patterns and the trademark catalog pipeline.](docs/images/request-flow-and-data.svg)
 
 1. A client sends `POST /api/v1/checks` with `X-API-Key`.
-2. Cloudflare Access validates its service token, then the Cloudflare Tunnel forwards the request to the Oracle A1 Docker Compose deployment.
+2. Cloudflare terminates HTTPS and the Cloudflare Tunnel forwards the request to the Oracle A1 Docker Compose deployment (Cloudflare Access protects only `/console/*` and `/health`; `/api/v1/*` is protected by the API key and the rate limit).
 3. The API validates the client's API key and applies per-client rate limiting and optional plan/quota checks.
 4. The cache identity includes the client, marketplace, pack, input hash, ruleset version and `analysisVersion`.
 5. On a cache miss, the API runs the requested pack using its declared ruleset and analysis version.
@@ -110,9 +110,8 @@ See the [detailed status and project guide](docs/overview.md) for implemented be
 - [Deployment](docs/deployment.md)
 - [Oracle A1 deployment](docs/deploy-oracle.md)
 - [Deploy readiness](docs/deploy-readiness.md)
-- [Release notes v0.8.0](docs/releases/v0.8.0.md)
 - [Architecture decisions](docs/adr/)
-- [Release notes](docs/releases/v0.7.0.md)
+- [Release notes](docs/releases/v0.8.0.md)
 
 ## License
 
