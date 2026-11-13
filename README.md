@@ -66,6 +66,7 @@ The seven tools are `check_listing`, `check_trademark`, `check_variations`, `scr
 - [MCP server](docs/mcp.md) for Claude Code, Claude Desktop and other MCP clients.
 - [Java client SDK](client/README.md) for Java backends.
 - [`batch-check`](docs/batch-check.md) for CSV or Amazon flat-file reports.
+- The optional web console speaks English and Vietnamese (`LISTING_GUARD_CONSOLE_DEFAULT_LOCALE`, [ADR-028](docs/adr/ADR-028-console-localization.md)); the API does not change.
 
 ## Quickstart with Docker
 

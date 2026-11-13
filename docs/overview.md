@@ -64,6 +64,9 @@ Working end to end:
   report keep following that flag. An **API keys** page lists, creates and revokes the keys of the signed-in account (the
   secret is shown once; at most `listing-guard.console.max-active-keys`, default 5, active keys; no plan check and no
   migration), and while the trademark catalog is the fictional DEMO one every page carries a banner that says so.
+  Every page is in English or Vietnamese ([ADR-028](adr/ADR-028-console-localization.md)): the default is
+  `listing-guard.console.default-locale`, a reader switches with the links in the corner (a cookie), each finding gets one
+  sentence saying what its rule checks, and the API's responses do not change.
   Production requires HTTPS and SMTP; development can log links. Saved listings and history remain planned.
 - The optional MCP server ([ADR-017](adr/ADR-017-mcp-server.md), `mcp-server/`): a separate jar that lets an AI agent
   (Claude Code, Claude Desktop, your own agent) call the checks as seven read-and-check tools over the Model Context Protocol.

@@ -71,6 +71,8 @@ services:
       LISTING_GUARD_CONSOLE_MAIL_FROM: ${LISTING_GUARD_CONSOLE_MAIL_FROM:-}
       # The most active API keys one console account may hold.
       LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS: ${LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS:-5}
+      # The language of a console page whose reader has not chosen one (ADR-028): en or vi.
+      LISTING_GUARD_CONSOLE_DEFAULT_LOCALE: ${LISTING_GUARD_CONSOLE_DEFAULT_LOCALE:-en}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}

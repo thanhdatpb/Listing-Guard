@@ -1,8 +1,29 @@
 ﻿# Unreleased changes
 
-Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), listing input adapters (ADR-025), the policy change monitor (ADR-026), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, the TSDR status check, and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities`, `GET /api/v1/input-adapters` and the schema of the trademark check's findings (see the sections below). There are seven additive migrations: V28 (trademark), V29 and V30 (image checks), V31 and V32 (USPTO sync), V33 (policy snapshots), and V34 (TSDR status).
+Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), listing input adapters (ADR-025), the policy change monitor (ADR-026), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, the TSDR status check, the console in English and Vietnamese (ADR-028), and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities`, `GET /api/v1/input-adapters` and the schema of the trademark check's findings (see the sections below). There are seven additive migrations: V28 (trademark), V29 and V30 (image checks), V31 and V32 (USPTO sync), V33 (policy snapshots), and V34 (TSDR status).
 
 ## What is new
+
+### The console in English and Vietnamese (ADR-028)
+
+Every page of the optional web console and its sign-in e-mail now exist in English and Vietnamese, for the Vietnamese sellers
+who read the findings. **No API response, request, status, header or migration changes**; the OpenAPI document and the
+compatibility report are unchanged by it, and a deployment that does nothing shows the same English pages as before.
+
+- **Language.** `LISTING_GUARD_CONSOLE_DEFAULT_LOCALE` (`en` by default, `vi` for a Vietnamese deployment; any other value stops
+  the start-up) is the language of a page whose reader has not chosen one. A reader switches with the links in the corner of every
+  page; the choice is the cookie `lg_lang` (the code only, `HttpOnly`, `SameSite=Lax`). The browser's `Accept-Language` is not read,
+  and the API's own answers do not change language.
+- **Texts.** No sentence is written in a template or a script any more: they are keys of `messages.properties` and
+  `messages_vi.properties`. A test fails on a key missing from one file, on a key nothing uses, and on a sentence written in a page.
+- **Findings.** Rule ids, fields, evidence, versions and the message, suggestion and fix of each finding are shown exactly as the
+  API returns them. Under each finding the page adds one sentence saying what its rule checks, from `rules.properties` and
+  `rules_vi.properties` (an English sentence stands in for a missing Vietnamese one). A test fails on a rule of the registered
+  rulesets with no sentence, so a new rule must add its two sentences.
+- **Trademark disclaimer.** The ruleset's own wording (it is Vietnamese) is always printed unchanged. An English page puts an
+  English statement above it and labels the ruleset's text as the original.
+- **For the maintainer to review:** the Vietnamese sentences, the rule explanations and the English disclaimer statement were
+  written for this change and have not been reviewed by a native reader or a lawyer (ADR-028, Open questions).
 
 ### Listing input adapters (ADR-025)
 

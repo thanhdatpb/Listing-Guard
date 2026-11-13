@@ -318,6 +318,17 @@ It never edits a listing, never publishes, and does no SEO.
   operator keys too; the count and insert hold a row lock on the client. `ConsoleModelAdvice` sets `demoCatalog` when
   `listing-guard.trademark.catalog-version` starts with `demo-`: every console page (sign-in pages included, inline style) shows
   the banner and the editor's trademark panel repeats it.
+  **Localization (ADR-028, Proposed; implemented)**: every sentence the console prints is a key of `api/src/main/resources/messages.properties`
+  (English, the base) and `messages_vi.properties`, read through Spring's `MessageSource` (`#{...}` in a template, `ConsoleMessages` in
+  Java; `spring.messages.basename: messages,rules`, no fallback to the JVM's language). The language of a page: the `lang` link in the
+  corner (`?lang=en|vi`, a `GET`) sets the `lg_lang` cookie (code only, `HttpOnly`, `SameSite=Lax`), else the cookie, else
+  `listing-guard.console.default-locale` (`LISTING_GUARD_CONSOLE_DEFAULT_LOCALE`, `en`; anything but `en`/`vi` stops the start-up);
+  `Accept-Language` is not read and `ConsoleLocaleResolver` acts on `/console/**` and `/login/**` only, so the API's answers never change
+  language. Not stored on the account (no migration). **The API's response is untouched**: rule ids, fields, evidence, versions, enum
+  codes and each finding's message, suggestion and fix are printed as the API gave them; under each finding the page adds one sentence
+  from `rules.properties` / `rules_vi.properties` (key `rule.<ruleId>`; Vietnamese missing shows the English, none shows nothing). The
+  trademark disclaimer of the ruleset is always printed as it is; an English page puts an English statement above it
+  (`trademark.disclaimer.note`).
 - Current scope: Etsy and Amazon rule engines, the image checker (ADR-008: the core and the endpoint, off by default and without the bounded decode service), the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
   endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, policy ingest + retrieval, and the optional magic-link console with a plan/usage
@@ -416,6 +427,11 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     it with `check_trademark` `product_type`, the contract and integration tests, the `release-client` workflow, docs). Open questions
     the maintainer decides are at the end of the ADR (Maven Central, a version line of its own, more endpoints, retrying network errors
     and Cloudflare `5xx`, joining the ADR-022 compatibility check, Jackson 3). Not planned: a method that writes, a caller-supplied `HttpClient`.
+
+15. Console localization (ADR-028, Proposed): done as one PR (`feature/console-i18n-vi`: ADR, `messages*.properties`, `rules*.properties`,
+    `ConsoleLocaleResolver`, the language links, the tests, docs). Open questions the maintainer decides are at the end of the ADR
+    (storing the choice on the account, the default in the production compose file, a review of the Vietnamese sentences and of the
+    English disclaimer statement). Not planned: translating the API's problem details, `report.html` of the job or the MCP server.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
@@ -682,6 +698,20 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `ImageAnalysisFingerprint` decide findings and cache identity: changing one needs a new fingerprint component. Test rulesets with
   numbers live in `api/src/test/resources/image/` only. Do not enable the endpoint for an untrusted caller before the bounded decode
   service, the upload staging and the health effect exist.
+- **Console text and rule explanations** (ADR-028): **a template and a script hold no sentence** (`ConsoleTextInTemplatesTest` scans
+  them and fails on one). A new text for a console page is a key in `messages.properties` **and** `messages_vi.properties` in the same
+  change (a test holds that the two files have the same keys and placeholders, that every key in use exists and that every key is
+  used), printed with `th:text="#{key}"`, or from Java through `ConsoleMessages` (`LocaleContextHolder` carries the page's language, so
+  a method that builds a sentence needs no locale argument). A message holds no markup, an argument is text made before the lookup (no
+  locale-grouped numbers), a message with arguments doubles its apostrophes (`''`) and one without does not. JavaScript gets its
+  sentences from `data-i18n-*` attributes written by the template (keys that start with `js.`). **A new rule, or a new rule id in a
+  new ruleset version, adds `rule.<ruleId>` to `rules.properties` and `rules_vi.properties` in the same change**
+  (`RuleExplanationsTest` reads the rulesets `application.yml` registers and fails on a rule without a sentence; its exception list
+  must stay empty or justified, and it fails on an entry that no longer applies). A rule explanation says what the rule looks at: no
+  number (the ruleset owns every number), no verdict, nothing about a marketplace's policy beyond the ruleset's own notes. Never
+  translate or reword what the API returns (rule ids, fields, evidence, versions, `message`, `suggestion`, fix text), never change the
+  ruleset's trademark disclaimer to localize it, and never let `ConsoleLocaleResolver` act outside the console's paths. A new language
+  is a `messages_<code>`/`rules_<code>` pair and an entry of `ConsoleLocales.SUPPORTED`.
 - **Java client SDK** (ADR-023): `client` depends on the JDK and Jackson 2 only (a test reads its POM and imports: no Spring, no
   logging framework, no database, no other module, no Jackson type in a public signature) and issues only `GET` and `POST` to the
   `Operation` list; a new endpoint is a new `Operation`, a typed method in both forms, its own records and a stub test, and a new
