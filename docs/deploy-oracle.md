@@ -6,19 +6,22 @@ health checks. PostgreSQL and the tunnel have no published ports.
 
 New releases publish `linux/amd64` and `linux/arm64` images. Images tagged through `v0.5.0` are amd64-only; do not
 use one of those tags on the A1 VM. The `docs/deployment.md` runbook covers migration details and the general
-production compose setup.
+production compose setup. [docs/deploy-readiness.md](deploy-readiness.md) is the pre-deploy review: what is on or off by
+default, the environment variables, the resource budget, the security checklist, a smoke test and the manual steps in order.
 
 ## 1. Prepare accounts, DNS and access
 
-1. Create an Oracle Cloud account. For a company service, prefer registering it under a company-controlled identity
-   with shared recovery contacts rather than an individual's personal account.
-2. Select the home region carefully. Singapore is a nearby option for Vietnam; Oracle does not let you change the
-   home region after account creation. Check latency, data-location requirements and service availability first.
-3. Oracle Always Free A1 capacity is not guaranteed. Consider upgrading to Pay As You Go to reduce the risk of idle
-   free instances being reclaimed; this does not guarantee capacity, eliminate quotas or make the VM highly available.
-   Never assume a resource is available until the console confirms it.
+1. Create the Oracle Cloud account. **Decision (ADR-019, 2026-11-13): a personal account of the maintainer**, not a
+   company-controlled one. Billing and recovery contacts are then personal and nobody else can recover the account, so keep
+   the repository, the protected `.env` and recent off-host backups sufficient to rebuild the service elsewhere (step 6).
+2. Select the home region. **Decision: Tokyo.** Oracle does not let you change the home region after account creation; A1
+   capacity in Tokyo and the latency from your callers were not checked, so check both first.
+3. **Decision: Always Free.** Pay As You Go is optional (it can lower the risk that an idle free instance is reclaimed; it does
+   not guarantee capacity, eliminate quotas or make the VM highly available). **Create an Oracle budget alert of 1 USD before
+   you create the VM**: it warns about any spend, it does not stop one. Never assume a resource is available until the console
+   confirms it.
 4. Put the public DNS zone for your domain on Cloudflare. Pick the hostname to expose the API, for example
-   `listing-api.example.com`. Cloudflare Access is configured per path (console, API, health) in step 5.
+   `listing-api.example.com`. Cloudflare Access is configured in step 5 for `/console/*` and `/health` only.
 5. Create an SSH key pair and keep the private key in a protected password manager or workstation key store. Add the
    public key when creating the VM. Confirm key-based SSH works before running the bootstrap script.
 
@@ -30,7 +33,8 @@ In the Oracle Cloud Console, create a VM with:
 - Shape: `VM.Standard.A1.Flex`, **2 OCPUs and 12 GB memory** (or less if that is the quota available).
 - A boot volume sized for the database, Docker images and retained local backups; monitor actual usage and keep
   off-host backups regardless of boot-volume durability.
-- A reserved public IPv4 address if one is available and appropriate for the account.
+- A reserved public IPv4 address is **not required** (decision of 2026-11-13): the tunnel is outbound and only SSH uses the
+  VM's address, so an ephemeral address is enough; note it again if the instance is recreated.
 - A security list or network security group with **only SSH (TCP 22) inbound from the administrator's public IP**.
   Do not add inbound 80, 443, 8080, or PostgreSQL rules. Tunnel traffic is initiated outbound by cloudflared.
 
@@ -61,7 +65,7 @@ runtime directories, so copy the repository contents into that directory rather 
 sudo cp -R /path/to/Listing-Guard/. /opt/listing-guard/
 sudo chown -R deploy:deploy /opt/listing-guard
 sudo chown -R 10001:10001 /opt/listing-guard/catalogs/raw /opt/listing-guard/batch/out \
-  /opt/listing-guard/health-report/out /opt/listing-guard/backups
+  /opt/listing-guard/health-report/out /opt/listing-guard/policy-monitor /opt/listing-guard/backups
 ```
 
 The data folders need uid `10001` for the image's one-shot jobs. The `deploy` account is added to the matching data
@@ -108,7 +112,9 @@ interface.
 
 ## 4. Create an API client and start production
 
-Authenticate Docker to GHCR first if the package is private. Then create a client and its first API key with the
+The GHCR package is **public** (decision of 2026-11-13: after the first release is published, set the package's visibility to
+public in its GitHub settings), so the VM pulls without a login; authenticate Docker to GHCR first only if you make it private.
+Then create a client and its first API key with the
 one-shot admin job. Store the key in the caller's secret store; it is printed only once.
 
 ```bash
@@ -143,18 +149,21 @@ http://api:8080
 `api` resolves only on the private Compose network. cloudflared makes outbound tunnel connections; no host port is
 published and the OCI ingress rules remain SSH-only.
 
-Cloudflare Access is set up as **one self-hosted application per path on the same hostname, each with its own policy**.
-People and machines never share an application:
+**Decision (ADR-019, 2026-11-13): Cloudflare Access sits in front of `/console/*` and `/health` only. `/api/v1/*` has no Access
+application and is protected by the client's `X-API-Key` and the per-client rate limit.** The reason is the MCP server (ADR-017):
+it sends only `X-API-Key` and has no setting for the Access headers, so it could not call a path that Access protects. Access is
+set up as **one self-hosted application per path on the same hostname, each with its own policy**:
 
 | Path | Who | Policy action | Subsection |
 |---|---|---|---|
-| `/console/*` | People, by company e-mail | Allow | Console |
-| `/api/v1/*` | Backends in another network or cloud | Service Auth with a service token | Service token, Application for `/api/v1/*` |
+| `/console/*` | People: **for now only the maintainer's e-mail address**; add an address when someone else needs the console | Allow | Console |
 | `/health` | The uptime monitor | Bypass, or Service Auth with its own token | Health |
+| `/api/v1/*` | Backends and agents | **No Access application**: the API's own `X-API-Key` check and rate limit | Optional: Access in front of `/api/v1/*` |
 
-A request to `/api/v1/*` passes two independent checks: Access (the service token headers, checked by Cloudflare before
-the request reaches the tunnel), then the API (`X-API-Key`, ADR-005 and ADR-007). Both are required and neither
-replaces the other. How a backend sends the headers is in the
+A request to `/api/v1/*` therefore passes one check, the API's (`X-API-Key`, ADR-005 and ADR-007), after Cloudflare has
+terminated HTTPS. What that costs, and what is left open (a keyless request is answered `401` but is not rate limited by the
+application, so only Cloudflare's edge stops a flood of them), is in [deploy-readiness.md](deploy-readiness.md#7-open-items).
+How a backend that does sit behind Access sends its headers is in the
 [integration guide](integration-guide.md#calling-through-cloudflare-access).
 
 **How to read the Cloudflare statements below.** A statement that cites a Cloudflare page is what that page said when
@@ -165,7 +174,7 @@ on it, and settle it with the checks in "Check from outside". The pages are list
 ### Console (people)
 
 Create a Cloudflare Access self-hosted application for the same hostname and the path `/console/*`. Add an Allow
-policy restricted to the company's approved email addresses or identity group, and choose an identity provider such
+policy restricted to an explicit allow-list of e-mail addresses (**for now only the maintainer's**, decision of 2026-11-13; add an address, or an identity group, when someone else needs the console), and choose an identity provider such
 as email OTP or Google. In Access-only mode the application also verifies the signed identity assertion itself, so
 SMTP is not needed. Configure `LISTING_GUARD_CONSOLE_BASE_URL` to the exact HTTPS public origin and set the variables
 listed below. Do not expose `/console/*` around Access: the JWT assertion is forwarded by the Tunnel and is trusted
@@ -223,14 +232,36 @@ Verify using one identity in the allowlist and one outside it:
 If login mode is `MAGIC_LINK` or `BOTH`, configure `SPRING_MAIL_HOST`, `LISTING_GUARD_CONSOLE_MAIL_FROM` and the
 remaining `SPRING_MAIL_*` values as before. Access-only deployments may leave all SMTP settings empty.
 
-`/console/*` is its own application with its own human policy. It never takes a service token, and the `/api/v1/*`
-application never takes a human policy. The dashboard uses `/console/`; `/console` redirects there because Cloudflare's
+`/console/*` is its own application with its own human policy. It never takes a service token, and an `/api/v1/*`
+application (optional, below) never takes a human policy. The dashboard uses `/console/`; `/console` redirects there because Cloudflare's
 path rule `/console/*` does not cover the bare `/console` path. The app verifies the signed assertion on `/console/`.
 The magic-link pages at `/login` and `/login/verify` remain outside Access in `MAGIC_LINK` and `BOTH` modes; they
 retain their own CSRF and rate limits. `/logout` invalidates the app session and, when Access is enabled, redirects to
 Cloudflare's `/cdn-cgi/access/logout` endpoint.
 
-### Service token for a backend
+### Health (uptime monitor)
+
+`GET /health` needs no API key and answers only `200 {"status":"UP"}` or `503 {"status":"DOWN","reason":"database
+unavailable"}`. To keep it reachable for the uptime monitor, pick one:
+
+- **Bypass** (simplest): a separate self-hosted application with the path `health` and one policy, action **Bypass**,
+  Include selector **Everyone** (the policies page's Bypass example). The page says Bypass "disables Access enforcement
+  for specific traffic" and is "typically used to enable applications that require specific endpoints to be public",
+  that bypassed requests are not logged, that Bypass cannot use identity-based selectors, that it should be tested before
+  production and that Cloudflare "does not recommend using Bypass to grant direct permanent access to your internal
+  applications". Only `/health` is bypassed.
+- **Service Auth**: a service token as in the optional section below, with a token of its own named after the monitor. This needs a monitor
+  that can send the two custom headers, which is **chưa kiểm chứng (unverified)** for any particular monitoring product:
+  check its documentation.
+
+### Optional: Access in front of `/api/v1/*` (not used by this deployment)
+
+**Skip the next two subsections for this deployment** (the decision above keeps Access off `/api/v1/*`). They stay for an operator
+whose callers can all send the Access headers, for example Java backends using the SDK's `cloudflareAccess(...)`; the MCP server
+cannot. If you add the application, `/api/v1/*` passes two independent checks, Access (checked by Cloudflare before the request
+reaches the tunnel) and the API's `X-API-Key`; both are required and neither replaces the other.
+
+#### Service token for a backend
 
 Create one service token for each calling backend, so that one can be rotated or revoked without touching the others
 (our recommendation, not a Cloudflare requirement):
@@ -250,7 +281,7 @@ a grace period of one hour to 30 days, or you can revoke it immediately. Rotate 
 new secret, confirm it works, then let the grace period end. To stop a caller, disable or delete its token. What a client
 receives once its token has expired is **chưa kiểm chứng (unverified)**: the page does not say.
 
-### Application for `/api/v1/*`
+#### Application for `/api/v1/*`
 
 1. **Zero Trust > Access controls > Applications > Create new application > Self-hosted and private > Add public
    hostname.** Domain: the API hostname. Path: `api/v1/*`. The application-paths page says `*` is a wildcard, that
@@ -280,66 +311,45 @@ receives once its token has expired is **chưa kiểm chứng (unverified)**: th
    **chưa kiểm chứng (unverified)**. Write down which setting your account has: it decides whether a bad caller sees a
    redirect, a 401 or a 403.
 
-### Health (uptime monitor)
-
-`GET /health` needs no API key and answers only `200 {"status":"UP"}` or `503 {"status":"DOWN","reason":"database
-unavailable"}`. To keep it reachable for the uptime monitor, pick one:
-
-- **Bypass** (simplest): a separate self-hosted application with the path `health` and one policy, action **Bypass**,
-  Include selector **Everyone** (the policies page's Bypass example). The page says Bypass "disables Access enforcement
-  for specific traffic" and is "typically used to enable applications that require specific endpoints to be public",
-  that bypassed requests are not logged, that Bypass cannot use identity-based selectors, that it should be tested before
-  production and that Cloudflare "does not recommend using Bypass to grant direct permanent access to your internal
-  applications". Only `/health` is bypassed.
-- **Service Auth**: the same as for the API path, with a token of its own named after the monitor. This needs a monitor
-  that can send the two custom headers, which is **chưa kiểm chứng (unverified)** for any particular monitoring product:
-  check its documentation.
-
 ### Paths no application covers
 
-The three applications above do not cover `/v3/api-docs` (needs an API key; Swagger UI is off by default),
-`GET /policies/search` (a debug view: `404` unless enabled, and it needs a key), or `/api/v1` with nothing after it (no
-such route). The pages read do not say what Access does with a request whose path matches no application on a hostname
-that has applications (**chưa kiểm chứng (unverified)**, see the checks below); their one related note says that where no Access
-application is in place "the published application will be available to anyone on the Internet". Do not assume: request
-each of these paths from outside. These routes still need an `X-API-Key`, but if they should be closed at Cloudflare too,
-add an application for them.
+The two applications above do not cover `/api/v1/*` (on purpose: the API key and the rate limit protect it), `/v3/api-docs`
+(needs an API key; Swagger UI is off by default), `GET /policies/search` (a debug view: `404` unless enabled, and it needs a key),
+`/login`, `/login/verify`, `/logout` and `/console` (see Console). The pages read do not say what Access does with a request whose
+path matches no application on a hostname that has applications (**chưa kiểm chứng (unverified)**, see the checks below); their
+one related note says that where no Access application is in place "the published application will be available to anyone on the
+Internet". So those paths are reachable by anyone and are protected only by the application: every `/api/v1/*` route and
+`/v3/api-docs` answer `401` without a valid `X-API-Key`, and the console routes answer `401` when the console is off.
 
 ### Check from outside
 
-Run these from a machine that is not the VM, with the three secrets loaded from your secret store into the environment
-(do not type their values on the command line: they land in shell history and process lists):
+Run these from a machine that is not the VM, with the key loaded from your secret store into the environment (do not type its
+value on the command line: it lands in shell history and the process list):
 
 ```bash
 export LISTING_GUARD_BASE_URL=https://listing-api.example.com   # your public hostname
 
-# 1. Both layers valid: GET /api/v1/usage reads only your own client and costs no quota unit
+# 1. A valid key reaches the API: GET /api/v1/usage reads only your own client and costs no quota unit
 curl -sS -o /dev/null -w '%{http_code} %{content_type}\n' --connect-timeout 5 --max-time 10 \
-  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-  -H "X-API-Key: $LISTING_GUARD_API_KEY" \
-  "$LISTING_GUARD_BASE_URL/api/v1/usage"
-
-# 2. Passes Access, wrong or missing API key: the API itself refuses
-curl -sS -w '\n%{http_code} %{content_type}\n' --connect-timeout 5 --max-time 10 \
-  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-  "$LISTING_GUARD_BASE_URL/api/v1/usage"
-
-# 3. No Access headers, valid API key: Access must refuse before the API sees the request
-curl -sS -i --connect-timeout 5 --max-time 10 \
   -H "X-API-Key: $LISTING_GUARD_API_KEY" "$LISTING_GUARD_BASE_URL/api/v1/usage"
+
+# 2. No key or a wrong key: the API itself refuses
+curl -sS -w '\n%{http_code} %{content_type}\n' --connect-timeout 5 --max-time 10 \
+  "$LISTING_GUARD_BASE_URL/api/v1/usage"
+
+# 3. The console and the health check sit behind Access
+curl -sS -i --connect-timeout 5 --max-time 10 "$LISTING_GUARD_BASE_URL/console/" | head -5
+curl -sS -i --connect-timeout 5 --max-time 10 "$LISTING_GUARD_BASE_URL/health" | head -5
 ```
 
 | Check | Expected | Who answered |
 |---|---|---|
 | 1 | `200 application/json` | The API |
-| 2 | `401 application/problem+json` with `"code":"unauthorized"` and a `requestId` | The API: the request passed Access |
-| 3 | Not `200`, and not `application/problem+json` with a `requestId` | Access. The status (`302`, `401` or `403`) depends on the settings above: record what you see |
-| Check 1 with a wrong Client Secret | Same as check 3 | Access |
-| `GET /health` | `200 {"status":"UP"}` | The API, through Bypass or the monitor's token |
-| `GET /console/` with no identity | The Access sign-in page, never the console | Access |
-| `GET /v3/api-docs` and `/policies/search` without Access headers | Record the answer | **chưa kiểm chứng (unverified)**, see "Paths no application covers" |
+| 2 | `401 application/problem+json` with `"code":"unauthorized"` and a `requestId` | The API |
+| `GET /console/` with no identity | The Access sign-in page (or a redirect to it), never the console | Access |
+| `GET /console/` with the maintainer's identity | The console sign-in or dashboard (when the console is enabled) | Access, then the API |
+| `GET /health` | `200 {"status":"UP"}` if you chose Bypass; with Service Auth, send the monitor's token headers | The API, through Bypass or the monitor's token |
+| `GET /v3/api-docs` and `/policies/search` without a key | `401` (the API) | Record what you see: **chưa kiểm chứng (unverified)** if Access answers instead |
 
 Verify locally that only `127.0.0.1:<API_PORT>` is published:
 
@@ -398,6 +408,24 @@ curl --fail http://127.0.0.1:<API_PORT>/health
 The Compose files selected by `COMPOSE_FILE` remain in effect, including the Tunnel and optional Preview network.
 Flyway applies migrations automatically; read the release notes and the migration guidance in
 [`deployment.md`](deployment.md) before an upgrade with migration changes.
+
+### Update cloudflared
+
+`docker-compose.prod.cloudflared.yml` pins the connector's tag (never `latest`). The tag in the file is **`2026.11.0`**, the latest
+stable (not pre-release) release of `cloudflare/cloudflared` on 2026-11-13: `gh api repos/cloudflare/cloudflared/releases/latest`
+(<https://github.com/cloudflare/cloudflared/releases>, published 2026-11-12) names it, and `docker manifest inspect
+cloudflare/cloudflared:2026.11.0` lists `linux/amd64` and `linux/arm64`, so the A1 VM pulls the right one. It was a day old when
+chosen; if it misbehaves, `2026.10.7` (2026-10-30) was the stable release before it. Check the releases page and update the tag
+before each deployment made from the file, and from time to time afterwards (the connector is not covered by the API's
+`LISTING_GUARD_VERSION`):
+
+```bash
+# edit the image tag in docker-compose.prod.cloudflared.yml, then
+docker compose --profile prod pull cloudflared
+docker compose --profile prod up -d --no-deps cloudflared
+docker compose --profile prod logs --tail=50 cloudflared      # connections registered, no errors
+curl -fsS https://<your hostname>/health
+```
 
 ## 7. Capacity, monitoring and moving to another host
 
@@ -591,7 +619,9 @@ files; it does not download pages, call a model or change rulesets. Raw files ar
 updating the database snapshot:
 
 ```bash
-install -d -m 750 policies/raw/etsy policies/raw/amazon policy-monitor
+# policies/raw is read by the container (uid 10001, read-only mount), so it must be readable by others (755); policy-monitor
+# is written by it and is created writable by the bootstrap (or: sudo chown 10001:10001 policy-monitor)
+install -d -m 755 policies/raw/etsy policies/raw/amazon
 # Copy maintainer-reviewed files into policies/raw/<marketplace>/, then edit policies/manifest.yaml.
 ./deploy/oracle/policy-diff.sh --dry-run
 ls -td policy-monitor/out/* | head -1
