@@ -5,6 +5,15 @@ The pre-deploy review of the first production deployment on one Oracle Cloud Alw
 v0.8.0 on 2026-11-13. It adds no feature. It says what is on and what is not, which variables decide it, whether the VM is big
 enough, what to check before the address is public, how to smoke-test the deployment, and which steps only you can do, in order.
 
+## Decisions of the maintainer
+
+Made on 2026-11-13 and recorded in [ADR-019](adr/ADR-019-oracle-a1-cloudflare-tunnel.md); this page follows them: a **personal** Oracle account, region **Tokyo**, **Always Free** (Pay As You Go is optional), a **1 USD** budget alert,
+a VM of **2 OCPUs and 12 GB**, a reserved public IP **not required**, the **GHCR package public**, and Cloudflare Access only in
+front of **`/console/*`** (for now the maintainer's e-mail address alone) **and `/health`**. **`/api/v1/*` has no Access
+application: the client's API key and the per-client rate limit protect it**, because the MCP server sends only `X-API-Key` and
+could not call a path that Access protects. The price of that choice is in [section 7](#7-open-items): a request without a valid
+key is answered `401` but is not rate limited by the application.
+
 ## What was checked, and what was not
 
 Checked in this review, on the code of this branch:
@@ -25,6 +34,11 @@ Checked in this review, on the code of this branch:
 - **Jobs run under the new memory caps**: `admin`, `health-report` and `policy-diff` (which then stopped, as it should, for want
   of saved policy files).
 - `./mvnw -B verify` (all modules, with PostgreSQL in Testcontainers) passes.
+- **CI now builds the image** (an `image` job of `ci.yml`: `docker build`, `linux/amd64`, nothing pushed, on every pull request
+  and on `main`), so this class of error is caught before a release.
+- **The tunnel connector tag.** `cloudflared` is pinned to `2026.11.0`: the latest stable (not pre-release) release of
+  `cloudflare/cloudflared` on 2026-11-13 (GitHub Releases, published 2026-11-12), and `docker manifest inspect` lists
+  `linux/amd64` and `linux/arm64` for it. It is a day old; the previous stable release is `2026.10.7`.
 
 **Not checked, and no claim is made:** the API on **ARM64 hardware** (the `linux/arm64` image is built by the release workflow with
 QEMU and scanned only as amd64; v0.7.0's notes say the same); anything on **Oracle or Cloudflare** (Access policies, the tunnel, the
@@ -40,7 +54,8 @@ its numbers are invented or unverified; *not usable yet* = it cannot give a usef
 
 ### HTTP endpoints of the API
 
-Everything but `/health` needs `X-API-Key` (ADR-007). Behind Cloudflare, `/api/v1/*` also needs the Access service token.
+Everything but `/health` needs `X-API-Key` (ADR-007). `/api/v1/*` is **not** behind Cloudflare Access in this deployment: the key
+and the per-client rate limit are its only protection ([the decision](#decisions-of-the-maintainer)).
 
 | Endpoint | Default | Controlled by | Depends on | Value |
 |---|---|---|---|---|
@@ -71,7 +86,7 @@ mail sender is replaced), not with a real SMTP server or a browser.
 
 | Page | What it does |
 |---|---|
-| `GET /login`, `POST /login`, `GET /login/verify`, `POST /login/verify`, `/logout` | magic-link sign-in (5 per e-mail and 30 per remote IP per 15 minutes; see [the remote IP issue](#7-what-is-left-and-bigger-items)) |
+| `GET /login`, `POST /login`, `GET /login/verify`, `POST /login/verify`, `/logout` | magic-link sign-in (5 per e-mail and 30 per remote IP per 15 minutes; see [the remote IP issue](#7-open-items)) |
 | `GET /console` | dashboard |
 | `GET /console/check`, `POST /console/check`, `POST /console/check/apply` | the Check listing editor (verified fixes, readiness, trademark panel; costs quota like the API) |
 | `GET /console/api-keys`, `POST /console/api-keys`, `GET\|POST /console/api-keys/{id}/revoke` | list, create and revoke the account's keys (`LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS`, 5) |
@@ -100,11 +115,11 @@ Run with `docker compose -f docker-compose.prod.yml --profile prod --profile <pr
 
 | Client | State | Notes |
 |---|---|---|
-| Cloudflare Tunnel (`cloudflared`) | optional override file, needs `TUNNEL_TOKEN` | image tag `2025.10.0` is pinned; **check it is still a supported release** before go-live |
-| Java SDK `listing-guard-client` | published to GitHub Packages by the release workflow on a `v*.*.*` tag | reading needs a token with `read:packages`; it can send the Access service-token headers |
-| MCP server (`mcp-server`, 7 tools) | a jar you build or attach to the release; STDIO by default | **sends only `X-API-Key`**: it cannot call a hostname that Access protects on `/api/v1/*`; run it where it reaches the API without Access |
+| Cloudflare Tunnel (`cloudflared`) | optional override file, needs `TUNNEL_TOKEN` | image tag **`2026.11.0`** is pinned (latest stable on 2026-11-13); check the releases page before each deployment ([deploy-oracle.md](deploy-oracle.md#update-cloudflared)) |
+| Java SDK `listing-guard-client` | published to GitHub Packages by the release workflow on a `v*.*.*` tag | reading needs a token with `read:packages`; it can send Access service-token headers, which this deployment does not need |
+| MCP server (`mcp-server`, 7 tools) | a jar you build or attach to the release; STDIO by default | **sends only `X-API-Key`**, which is why `/api/v1/*` has no Access application: it reaches the API with the key alone |
 | Official agent skill (`skills/listing-guard`) | in the repository | needs the MCP server |
-| Chrome extension | another repository | **not reviewed here**; how it gets past Access on `/api/v1/*` is not documented in this repository |
+| Chrome extension | another repository | **not reviewed here**; with no Access on `/api/v1/*` it needs only an API key (how the extension keeps that key is its own matter) |
 
 ## 2. Environment variables
 
@@ -154,7 +169,7 @@ Fixed in this branch:
 - `backups/` (database dumps with every client's stored results) and `.tsdr-status.lock` were not in `.gitignore`.
   `.dockerignore` now keeps the runtime folders out of the build context.
 
-Left as they are (choices or bigger items, [section 7](#7-what-is-left-and-bigger-items)): the development Compose file names two
+Left as they are (choices or bigger items, [section 7](#7-open-items)): the development Compose file names two
 variables differently (`PLANS_ENABLED`, `FIXES_ENABLED`); `LISTING_GUARD_IMAGE_ENABLED`, the rate limit, the retention periods
 and `springdoc.api-docs.enabled` are not forwarded by the production Compose file, so they cannot be changed from `.env` (the image
 checks are meant to stay off; the others keep their defaults).
@@ -209,7 +224,7 @@ Tick each one on the real host. "Here" says what this review saw; the rest is yo
 |---|---|---|
 | 1 | **Swagger off.** `LISTING_GUARD_SWAGGER_UI` is `"false"` in the production Compose file and the API refuses to start with `true` under `prod`. | Here: `/swagger-ui.html` and `/v3/api-docs` answer `401` without a key. |
 | 2 | **No development key.** `LISTING_GUARD_DEV_API_KEY` is not forwarded and the API refuses it under `prod`. | Code and tests. |
-| 3 | **Cloudflare Access.** `/console/*` Allow for company e-mails only; `/api/v1/*` Service Auth with a service token per caller; `/health` Bypass (or its own token); 401 response and strict service tokens set as in [deploy-oracle.md §5](deploy-oracle.md#5-configure-cloudflare-tunnel-and-access). Run the checks "from outside" and write down what Access answers. | **Yours.** Several Cloudflare behaviours are marked *chưa kiểm chứng* in the runbook. |
+| 3 | **Cloudflare Access** in front of `/console/*` (Allow, **the maintainer's e-mail only for now**) and `/health` (Bypass, or Service Auth with the monitor's own token). **None for `/api/v1/*`** (decision above). Run the checks "from outside" of [deploy-oracle.md §5](deploy-oracle.md#check-from-outside) and write down what Access answers. | **Yours.** Several Cloudflare behaviours are marked *chưa kiểm chứng* in the runbook. |
 | 4 | **Ports.** Only `127.0.0.1:<API_PORT>` is published; PostgreSQL and `cloudflared` publish nothing; OCI ingress is SSH from your IP only. | Here: `127.0.0.1:18080->8080/tcp`, PostgreSQL `5432/tcp` unpublished. The OCI side is yours. |
 | 5 | **Rate limit.** On: 60 requests a minute and a burst of 20, per client, in memory in the one API instance. | Here: 20 quick calls passed, then `429`. Not changeable from `.env`. |
 | 6 | **API keys and the admin.** Keys are stored as SHA-256 only and shown once; revoking one takes effect within `auth-cache-ttl` (30 s). **There is no admin API key**: the admin is the one-shot job, so whoever can run `docker` on the host is the admin. Keep SSH key-only, `deploy` the only user, and the `docker` group small. Never run the admin job detached (`-d`): the key is printed to the terminal only. | Code; the bootstrap sets key-only SSH and fail2ban. |
@@ -218,21 +233,23 @@ Tick each one on the real host. "Here" says what this review saw; the rest is yo
 | 9 | **Backups restore.** Daily and weekly dumps to R2 with lifecycle rules (7 and 28 days), and **a restore tried**. | Here: the scripts' dump and restore worked on a throwaway database (34 migrations, data intact). **Yours:** the same on the A1 or a scratch host, from an R2 download (the scripts take a local file; download it first), with the time it takes. |
 | 10 | **Console** (only if enabled). HTTPS base URL, SMTP, Secure cookie, Access in front of `/console/*`. | Here: the API refuses to start misconfigured. A real sign-in is yours to try. |
 | 11 | **The `tools` jobs are not exposed.** They have no port; they run only with `docker compose run`. | Compose file. |
-| 12 | **Image and host updates.** Unattended upgrades and fail2ban from the bootstrap; Trivy scans the amd64 image at release (CRITICAL, fixed only); the base images `eclipse-temurin:25-jre` and `pgvector/pgvector:pg16` float and `cloudflared` is pinned: update the tags on a schedule. | The arm64 image is not scanned. |
+| 12 | **Image and host updates.** Unattended upgrades and fail2ban from the bootstrap; Trivy scans the amd64 image at release (CRITICAL, fixed only); the base images `eclipse-temurin:25-jre` and `pgvector/pgvector:pg16` float and `cloudflared` is pinned (`2026.11.0`): update the tags on a schedule. | The arm64 image is not scanned. |
 | 13 | **Retention.** Trademark, variation, personalization and image results are kept 30 days; buyer text is never stored. The health report's JSON is the only long-term record of counts. | Code and tests. |
 | 14 | **No data of a single company** is in the repository, and the DEMO catalog is never served. | Convention; `capabilities` shows `demo`. |
+| 15 | **`/api/v1/*` is public and protected by the API key and the rate limit alone.** The key is `lg_` plus 43 random characters, stored as SHA-256; the limit is per client and applies **after** the key check, so a request with no valid key is answered `401` and is not limited by the application (the API does not limit by IP). Cloudflare's edge is the only thing that stops a flood of keyless requests. | Here: a keyless and a wrong-key call answer `401 application/problem+json`. **Yours:** consider a Cloudflare rate-limiting rule for `/api/v1/*` ([section 7](#7-open-items)); whether your plan allows one was not checked. |
 
 ## 5. Smoke test after deploy
 
-Set the values from your secret store (do not type secrets on the command line: they land in shell history). **On the VM**, with the
-loopback port; **from outside**, through Cloudflare, add the two Access headers. All of the requests below were run against the
-production Compose file in this review; the answers are what it gave.
+Set the key from your secret store (do not type it on the command line: it lands in shell history). Run the block **on the VM**,
+with the loopback port, and again **from outside** with the public hostname: `/api/v1/*` has no Access application, so the same
+requests work through Cloudflare with the API key alone. All of the requests below were run against the production Compose file
+in this review (on the loopback port); the answers are what it gave.
 
 ```bash
 cd /opt/listing-guard
 export BASE=http://127.0.0.1:<API_PORT>          # from outside: https://<your hostname>
 export LISTING_GUARD_API_KEY=...                  # a key made with the admin job
-H="X-API-Key: $LISTING_GUARD_API_KEY"             # from outside also: -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"
+H="X-API-Key: $LISTING_GUARD_API_KEY"
 
 docker compose --profile prod ps                                   # api and postgres healthy; only 127.0.0.1 published
 curl -fsS $BASE/health                                             # 200 {"status":"UP"}
@@ -254,51 +271,56 @@ curl -sS -o /dev/null -w '%{http_code}\n' $BASE/swagger-ui.html    # 401; /v3/ap
 The variation and personalization requests are in [input-schema.md](input-schema.md#variation-checks): the Amazon family there
 answers `200 COMPLETE`, and a personalization screening answers `200` with `INCOMPLETE` while no catalog is served.
 
-**From outside only** (the checks of [deploy-oracle.md §5](deploy-oracle.md#check-from-outside)): a valid service token and key
-gives `200`; a valid token with a wrong key gives `401 application/problem+json` from the API; no token gives an Access
-answer (record its status); `GET /console/` with no identity gives the Access sign-in page.
+**From outside only** (the checks of [deploy-oracle.md §5](deploy-oracle.md#check-from-outside)): a valid key gives `200`; no
+key or a wrong one gives `401 application/problem+json` with a `requestId`, from the API; `GET /console/` with no identity gives
+the Access sign-in page and never the console; `GET /health` gives `200 {"status":"UP"}` through the Bypass (or with the
+monitor's token). Also confirm `X-Listing-Guard-Version` is the release you deployed.
 
-**Console, only if enabled:** open `https://<hostname>/console` (Access sign-in first), enter an allowed e-mail, open the link in
-the mail, press **Sign in**, then open **Check listing** and **API keys**, create and revoke a key, and read **Report**.
+**Console, only if enabled:** open `https://<hostname>/console` (the Access sign-in first, with the maintainer's e-mail), enter
+the same e-mail on the console's own sign-in, open the link in the mail, press **Sign in**, then open **Check listing** and
+**API keys**, create and revoke a key, and read **Report**.
 
 **After a restart or an upgrade:** `docker compose --profile prod logs --tail=100 api` shows `Started`, no `ERROR`; the migration
 count in `flyway_schema_history` is 34 for v0.8.0.
 
 ## 6. Release v0.8.0 and the manual steps, in order
 
-Release notes: [releases/v0.8.0.md](releases/v0.8.0.md). **No tag has been created.** Order matters because the image must exist
-before the VM can pull it.
+Release notes: [releases/v0.8.0.md](releases/v0.8.0.md). **No tag has been created**, and none is planned for v0.7.0: its notes are
+folded into v0.8.0 (decision of 2026-11-13). Order matters because the image must exist before the VM can pull it.
 
 **GitHub (before any server)**
 
 1. Merge this pull request (it holds the `Dockerfile` fix: **no tag may be pushed from a commit without it**).
-2. Decide about v0.7.0. Its notes are written and it has no tag. Either tag `v0.7.0` first and then `v0.8.0` (each pushes an
-   image after `./mvnw verify` and a Trivy scan), or skip it and fold `releases/v0.7.0.md` into `v0.8.0.md`. Fill the
-   `Released YYYY-MM-DD` line of the notes you tag.
+2. Fill the `Released YYYY-MM-DD` line of `docs/releases/v0.8.0.md` and tag **`v0.8.0` only**.
 3. Push the tag, wait for the `Release image` and `release-client` workflows (the `linux/amd64` and `linux/arm64` manifests, the
-   SDK), then publish the draft GitHub Release that `publish-contract` creates. Attach `listing-guard-mcp-<version>.jar` by hand
+   SDK), then publish the draft GitHub Release that `publish-contract` creates. Attach `listing-guard-mcp-0.8.0.jar` by hand
    (`./mvnw -B -pl mcp-server -am package`).
-4. Make the GHCR package public, or have a token with `read:packages` ready for the VM.
-5. After each tag, move the API baseline in a pull request (copy `docs/api/openapi.json` and `input-schema.json` of the tag into
-   `docs/api/baseline/`, delete the old files, set `baseline:` in `docs/api/breaking-changes.yaml` to the new version with no
+4. **Make the GHCR package public** (decision): the package exists only after the first publish, so open its settings on GitHub
+   afterwards and set the visibility. Prove it from a machine that is not logged in to GHCR:
+   `docker pull ghcr.io/thanhdatpb/listing-guard:0.8.0`.
+5. After the tag, move the API baseline in a pull request (copy `docs/api/openapi.json` and `input-schema.json` of the tag into
+   `docs/api/baseline/`, delete the old files, set `baseline:` in `docs/api/breaking-changes.yaml` to `v0.8.0` with no
    exceptions; ADR-022).
 
 **Oracle**
 
-6. Create the account under company control, home region Singapore, upgrade to Pay As You Go, **set a budget alert** (threshold
-   is an open question of ADR-019).
-7. Create the VM: Ubuntu 24.04 ARM64, `VM.Standard.A1.Flex`, 2 OCPUs and 12 GB, boot volume about 100 GB, a reserved public IP,
-   a security list with **SSH (22) from your IP only**. If it reports "Out of capacity", retry later; open nothing else.
+6. Create the **personal** Oracle account, home region **Tokyo**, plan **Always Free**, and **create a budget alert of 1 USD**
+   before the VM. Keep the recovery codes and the account e-mail somewhere you can reach if your laptop is gone: nobody else can
+   recover a personal account. A1 capacity in Tokyo was not checked.
+7. Create the VM: Ubuntu 24.04 ARM64, `VM.Standard.A1.Flex`, **2 OCPUs and 12 GB**, boot volume about 100 GB, **no reserved IP
+   needed**, a security list with **SSH (22) from your IP only** (if your IP changes you edit the rule in the OCI console). If it
+   reports "Out of capacity", retry later; open nothing else.
 8. Log in, get the repository onto the VM, run `sudo ./deploy/oracle/bootstrap.sh`, then **prove the `deploy` account logs in
    by key before you close the first session**.
 9. Copy the repository into `/opt/listing-guard` and `chown` as in [deploy-oracle.md §3](deploy-oracle.md#3-bootstrap-the-host-and-prepare-the-release-files).
-10. Create `.env` from `deploy/env.prod.example` (`chmod 600`): the required variables, `LISTING_GUARD_VERSION`, `COMPOSE_FILE`
-    with the Cloudflare override.
+10. Create `.env` from `deploy/env.prod.example` (`chmod 600`): the required variables, `LISTING_GUARD_VERSION=0.8.0`,
+    `COMPOSE_FILE=docker-compose.prod.yml:docker-compose.prod.cloudflared.yml`.
 
 **Cloudflare**
 
 11. Put the DNS zone on Cloudflare. Create a remotely-managed tunnel, put its token in `.env` as `TUNNEL_TOKEN`, and route the
-    public hostname to `http://api:8080`. Check that the pinned `cloudflared` tag is still supported and change it if not.
+    public hostname to `http://api:8080`. The compose file pins `cloudflared` `2026.11.0`; look at the releases page once more
+    before you start it ([deploy-oracle.md](deploy-oracle.md#update-cloudflared)).
 
 **Oracle again**
 
@@ -308,54 +330,75 @@ before the VM can pull it.
 
 **Cloudflare again**
 
-14. Create the three Access applications (`/console/*`, `/api/v1/*`, `/health`), one service token per calling backend (with an
-    expiry alert), switch on "401 Response for Service Auth policies", note your account's strict-service-token setting, and run
-    the checks from outside. Decide whether `/login`, `/login/verify`, `/logout` and `/console` also need an application.
+14. Create the Access applications **for `/console/*` (Allow, only your e-mail) and for `/health` (Bypass, or Service Auth with
+    the monitor's token). Create none for `/api/v1/*`.** Decide whether `/login`, `/login/verify`, `/logout` and `/console` also
+    need an application (they are not under `/console/*`), and run the checks from outside. Optionally add a Cloudflare
+    rate-limiting rule for `/api/v1/*` ([section 7](#7-open-items), item 3).
 
 **Backups and schedule**
 
 15. Create the R2 bucket and an API token, add lifecycle rules (7 days on `daily/`, 28 on `weekly/`), install the AWS CLI on the
     VM, fill the `BACKUP_S3_*` variables, run `deploy/oracle/backup.sh` by hand and see the object in R2.
-16. **Rehearse a restore** from that dump on a scratch host or database, with `deploy/oracle/restore.sh`, and note the time.
+16. **Rehearse a restore** from that dump on a scratch host or database, with `deploy/oracle/restore.sh`, and note the time. With a
+    personal account this is the recovery path if the VM or the account is lost.
 17. Install the schedule: `crontab deploy/oracle/crontab.example` (as `deploy`), after reading the times.
 
 **Verify and watch**
 
 18. Run the [smoke test](#5-smoke-test-after-deploy) on the VM and from outside; send a few minutes of realistic load and read
     `docker stats`.
-19. Add an uptime monitor on `/health` (through the Bypass application or a token it can send), an Oracle budget alert and a
-    Cloudflare service-token expiry alert.
+19. Add an uptime monitor on `/health` (through the Bypass application or a token it can send) and check that the 1 USD Oracle
+    budget alert exists.
 
 **Later, when you decide**
 
-20. The console (SMTP provider, HTTPS base URL, Access on `/console/*`), a real trademark catalog (USPTO data and its terms, the
-    converter verified against a real file), the TSDR key and the Roadmap items of the README.
+20. The console (SMTP provider, HTTPS base URL, the Access application on `/console/*`), a real trademark catalog (USPTO data and
+    its terms, the converter verified against a real file), the TSDR key and the Roadmap items of the README.
 
-## 7. What is left, and bigger items
+## 7. Open items
 
-Not changed here because each is a behaviour change, a decision or a larger piece of work:
+Not changed here because each is a behaviour change, a decision or a larger piece of work. Items 1 and 2 are the two pieces of
+work left open by the decision to keep Access off `/api/v1/*`.
 
-1. **The console login limit is shared behind the tunnel.** The "30 per remote IP" limit uses `request.getRemoteAddr()`, which
-   behind Cloudflare Tunnel is the `cloudflared` container, so every user shares one bucket of 30 sign-in requests per 15 minutes
-   (and an access log would show that address). Trusting `CF-Connecting-IP` safely needs a design (only from `cloudflared`).
-2. **The MCP server cannot send the Access service-token headers** (the SDK can). Add the two settings, or keep Access off
-   `/api/v1/*` for the hosts that run it.
-3. **The `linux/arm64` image was never run on ARM64 hardware**, and the arm64 image is not scanned. Run the smoke test on the A1
-   before relying on it, or add an arm64 runner to the release workflow.
-4. **Settings that cannot be changed from `.env`** (not forwarded by `docker-compose.prod.yml`): the rate limit, the retention
+1. **Limit console sign-ins by `CF-Connecting-IP`.** The "30 per remote IP per 15 minutes" limit takes
+   `request.getRemoteAddr()` (`ConsoleLoginController`), the address of the TCP peer, which behind Cloudflare Tunnel is the
+   `cloudflared` container. Every user therefore shares one bucket of 30 sign-in requests per 15 minutes (the limit of 5 per
+   e-mail is unaffected). The real client address is in the `CF-Connecting-IP` header. To use it safely the API must trust that
+   header **only when the peer is the tunnel connector** (a configured list of trusted proxy addresses or the Compose network);
+   otherwise anyone who can reach the port, including a container on the optional shared network, could choose the bucket it
+   falls into. It needs a setting (off by default, so nothing changes), tests with a forged header, and a change to
+   `docs/deployment.md`, which today says forwarded-IP headers are not trusted. Until then a burst of sign-in requests from one
+   person can lock the others out of the console for up to 15 minutes. With the console off or used by one person this does not
+   matter.
+2. **Optional Access service-token headers in the MCP server.** The MCP server sends only `X-API-Key`; the Java client SDK it
+   uses already has `cloudflareAccess(clientId, clientSecret)`. Add two optional settings (names to be decided, for example
+   `LISTING_GUARD_MCP_ACCESS_CLIENT_ID` and `LISTING_GUARD_MCP_ACCESS_CLIENT_SECRET`, both or neither, never logged or echoed)
+   that pass the headers to the SDK, with an ADR-017 amendment, `docs/mcp.md` and tests against the stub API. With them an
+   operator could later put a Service Auth application in front of `/api/v1/*` and still use the MCP server. It is optional: with
+   the settings absent nothing changes.
+3. **A keyless request is not rate limited by the application.** The limiter runs after the key check and counts per client, so a
+   request with no valid key is answered `401` and no limit applies to it. A request with no `X-API-Key` header costs nothing;
+   a wrong key costs the lookup of its hash, and the same wrong key is remembered for 30 s (`auth-cache-ttl`), but a flood of
+   different wrong keys was not tested. Without Access on `/api/v1/*`, only Cloudflare's edge stands between the internet and
+   that work. Options, none built: a Cloudflare
+   rate-limiting rule for `/api/v1/*` (whether the free plan allows one was not checked), or an IP-based limit in the
+   application, which needs the trusted `CF-Connecting-IP` of item 1.
+4. **The `linux/arm64` image was never run on ARM64 hardware**, and the arm64 image is not scanned. Run the smoke test on the A1
+   before relying on it, or add an arm64 runner to the release workflow. A1 capacity in Tokyo was not checked either.
+5. **Settings that cannot be changed from `.env`** (not forwarded by `docker-compose.prod.yml`): the rate limit, the retention
    periods, `springdoc.api-docs.enabled`, `LISTING_GUARD_IMAGE_ENABLED`. Forward the ones you need; keep the image checks off until
    ADR-008's bounded decoder and upload staging exist.
-5. **Load, memory and disk are unmeasured** (above); the API's `ExitOnOutOfMemoryError` and heap share are proposals.
-6. **The sample crontab can overlap the TSDR line with a long sync**; set the times after the first real sync.
-7. **No catalog is verified**: trademark checks are not usable for real until the converter is checked against a real USPTO file,
+6. **Load, memory and disk are unmeasured** (above); the API's `ExitOnOutOfMemoryError` and heap share are proposals.
+7. **The sample crontab can overlap the TSDR line with a long sync**; set the times after the first real sync.
+8. **No catalog is verified**: trademark checks are not usable for real until the converter is checked against a real USPTO file,
    a catalog is imported and its terms are checked; the sync's ODP download and the TSDR calls need keys and a first real run
    (ADR-009).
-8. **`/v3/api-docs` stays on behind a key**; the start-up warns about it. Disable it with a forwarded setting if you prefer.
-9. **Base images float** (`eclipse-temurin:25-jre`, `pgvector/pgvector:pg16`); the build and the tests run on Java 21 while the
-   image runs Java 25 (unchanged since v0.7.0). Pin by digest or align the versions when you decide.
-10. **The Chrome extension** (another repository) was not reviewed: how it calls an API behind Access is open.
-11. **CI never builds the Docker image** (`./mvnw verify` does not), which is how the missing `COPY` of `listing-input-adapters` went
-    unnoticed; only a tag push builds it. Add a `docker build .` step to `ci.yml` (a few minutes a run) or build the image in a
-    pull request that touches the `Dockerfile` or adds a module.
-12. **ADR-019 is still `Proposed`** and its two open questions (the allow-list's e-mail addresses, the budget threshold) are
-    yours.
+9. **`/v3/api-docs` stays on behind a key**; the start-up warns about it. Disable it with a forwarded setting if you prefer.
+10. **Base images float** (`eclipse-temurin:25-jre`, `pgvector/pgvector:pg16`); the build and the tests run on Java 21 while the
+    image runs Java 25 (unchanged since the move to Spring Boot 4.1). Pin by digest or align the versions when you decide.
+11. **The Chrome extension** (another repository) was not reviewed. With no Access on `/api/v1/*` it needs only an API key, which
+    a browser extension must store somewhere the extension can read: how it does that is its own design.
+12. **A personal Oracle account has one owner.** If the account, the VM and the laptop are all lost, the repository, a copy of
+    `.env` kept off the VM and the R2 backups are the only way back. Keep the `.env` copy and the R2 credentials in a password
+    manager you can open without the laptop.
+13. **ADR-019 is still `Proposed`.** Its questions are answered (the decisions of 2026-11-13); change its status when you accept it.
