@@ -23,14 +23,15 @@ Checked in this review, on the code of this branch:
   stopped with a `ProjectBuildingException` before it compiled anything. **A release tag pushed from `main` as it was would not
   have produced an image.** Fixed here (one `COPY` line); the image then built (693 MB) and started.
 - **A smoke test against the production Compose file.** The image was run with `docker-compose.prod.yml` (profile `prod`, so
-  `SPRING_PROFILES_ACTIVE=prod`) on a local Docker, with a throwaway `.env` outside the repository: start-up and the 34
+  `SPRING_PROFILES_ACTIVE=prod`) on a local Docker, with a throwaway `.env` outside the repository: start-up and the 35
   migrations (about 13 s), the admin job, every request of [Smoke test](#5-smoke-test-after-deploy), the log, the published
   ports, memory at rest and the JVM flags.
 - **A backup and restore rehearsal with the real scripts** (`deploy/oracle/backup.sh`, `restore.sh --yes`) on that throwaway
-  database: the dump was written, the restore ran, the API came back and the clients, the stored check and all 34 migrations were
-  intact.
+  database: the dump was written, the restore ran, the API came back and the clients, the stored check and all migrations were
+  intact (done before `main` added V35, so on 34 migrations; the smoke test above was repeated on 35).
 - **The console refuses to start misconfigured**: with `LISTING_GUARD_CONSOLE_ENABLED=true` and nothing else the API stops with
   `listing-guard.console.base-url must be an absolute http(s) URL ...`.
+- **The Access sign-in settings reach the container** (after merging ADR-027 from `main`): with only `LISTING_GUARD_CONSOLE_ENABLED=true`,  `..._BASE_URL`, `..._AUTH_MODE=CLOUDFLARE_ACCESS`, `..._ACCESS_TEAM_DOMAIN`, `..._ACCESS_AUD` and `..._ACCESS_ALLOWED_EMAILS` in the  `.env` and **no SMTP setting** the API started and `GET /login` offered the Cloudflare Access sign-in; `GET /console/` with no  assertion, with an unsigned `Cf-Access-Authenticated-User-Email` header, and with a garbage `Cf-Access-Jwt-Assertion` was redirected  to `/login?access=denied`; and the default `MAGIC_LINK` mode with the console enabled and no SMTP still refused to start. A real  Cloudflare team and a signed assertion were not tried here.
 - **Jobs run under the new memory caps**: `admin`, `health-report` and `policy-diff` (which then stopped, as it should, for want
   of saved policy files).
 - `./mvnw -B verify` (all modules, with PostgreSQL in Testcontainers) passes.
@@ -41,7 +42,7 @@ Checked in this review, on the code of this branch:
   `linux/amd64` and `linux/arm64` for it. It is a day old; the previous stable release is `2026.10.7`.
 
 **Not checked, and no claim is made:** the API on **ARM64 hardware** (the `linux/arm64` image is built by the release workflow with
-QEMU and scanned only as amd64; v0.7.0's notes say the same); anything on **Oracle or Cloudflare** (Access policies, the tunnel, the
+QEMU and scanned only as amd64; the v0.8.0 notes, which absorb v0.7.0's, say the same); anything on **Oracle or Cloudflare** (Access policies, the tunnel, the
 service token behaviours that Cloudflare's pages do not state); a **real SMTP server or a browser** on the console; a **load test**;
 **R2**; the real **USPTO** data, ODP and TSDR; the Chrome extension, which is another repository. The memory and disk figures below
 are from an idle, empty database on amd64 and are **not** a sizing result.
@@ -78,11 +79,18 @@ and the per-client rate limit are its only protection ([the decision](#decisions
 ### Console pages (the optional Thymeleaf console, ADR-014)
 
 All of them are **off** (`LISTING_GUARD_CONSOLE_ENABLED=false`): the routes do not exist, and `/console` or `/login` answer the
-API's `401` "X-API-Key header is missing". Enabling needs `LISTING_GUARD_CONSOLE_BASE_URL` (a fixed `https` origin),
-`LISTING_GUARD_CONSOLE_MAIL_FROM`, `SPRING_MAIL_HOST` (and credentials for an authenticating provider); the API refuses to start
-without them. Cloudflare Access protects `/console/*` only: `/login`, `/login/verify`, `/logout` and `/console` itself are not under
-that path (see [deploy-oracle.md](deploy-oracle.md#console-people)). **Value: real, but verified only by integration tests** (their
-mail sender is replaced), not with a real SMTP server or a browser.
+API's `401` "X-API-Key header is missing". Enabling needs `LISTING_GUARD_CONSOLE_BASE_URL` (a fixed `https` origin) and one of two
+sign-in modes (`LISTING_GUARD_CONSOLE_AUTH_MODE`, ADR-027): **`MAGIC_LINK`** (the default) needs `LISTING_GUARD_CONSOLE_MAIL_FROM` and
+`SPRING_MAIL_HOST` (and credentials for an authenticating provider); **`CLOUDFLARE_ACCESS`** needs no SMTP but the team domain, the
+Access application's AUD tag and an e-mail or domain allow-list (`LISTING_GUARD_CONSOLE_ACCESS_*`); `BOTH` needs both. The API
+refuses to start without what the chosen mode needs. For a console used by the maintainer alone, `CLOUDFLARE_ACCESS` with
+`LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS` set to the same address as the Access policy is the smaller setup (no mail provider);
+the decision does not choose a mode, so the default stays `MAGIC_LINK`. Cloudflare Access protects `/console/*` only: `/login`,
+`/login/verify`, `/logout` and `/console` (which redirects to `/console/`) are not under that path (see
+[deploy-oracle.md](deploy-oracle.md#console-people)); in `CLOUDFLARE_ACCESS` mode the magic-link pages are not offered.
+**Value: real, but verified only by integration tests** (the mail sender is replaced and the Access assertions are signed with
+generated keys), not with a real SMTP server, a real Cloudflare team or a browser. This review checked only that the settings of
+the Access mode reach the container ([section 2](#2-environment-variables)).
 
 | Page | What it does |
 |---|---|
@@ -144,7 +152,7 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 | Backups (read by the scripts from `.env`, not by Compose) | `BACKUP_RETENTION_COUNT` 14; with R2: `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`, `BACKUP_S3_REGION`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` (secrets), `BACKUP_S3_PREFIX`, `BACKUP_S3_SESSION_TOKEN`; the Sunday cron line sets `BACKUP_S3_TIER=weekly` itself |
 | Trademark | `TRADEMARK_CATALOG_VERSION` (empty), `TRADEMARK_FOLLOW_ACTIVATION` false (the two exclude each other), `USPTO_SYNC_LICENSE` (required before `uspto-sync` runs), `USPTO_SYNC_KEEP_VERSIONS` 3, `USPTO_SYNC_DOWNLOAD_ENABLED` false, `LISTING_GUARD_USPTO_ODP_API_KEY` (secret), `USPTO_MAX_DISTINCT_SERIALS`, `USPTO_FILTERS`, `USPTO_STRICT`, `USPTO_ALLOW_OTHER_VERSION`, `USPTO_SYNC_WARN_FREE_GB` 30, `USPTO_SYNC_MIN_FREE_GB` 15, `USPTO_SYNC_LOG_RETENTION` 30 |
 | TSDR | `TSDR_DOWNLOAD_ENABLED` false, `LISTING_GUARD_TSDR_API_KEY` (secret), `TSDR_MAX_MARKS` 100, `TSDR_UNMATCHED_PER_RUN` 0, `TSDR_RECHECK_INTERVAL` 30d, `TSDR_FINDING_STATUS_ENABLED` false, `TSDR_STATUS_LOG_RETENTION` 30 |
-| Console | `LISTING_GUARD_CONSOLE_ENABLED` false, `LISTING_GUARD_CONSOLE_BASE_URL`, `LISTING_GUARD_CONSOLE_MAIL_FROM`, `LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS` 5, `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT` 587, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (secret), `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` true, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` true. The cookie is always Secure (`LISTING_GUARD_CONSOLE_COOKIE_SECURE` is fixed to `"true"`) |
+| Console | `LISTING_GUARD_CONSOLE_ENABLED` false, `LISTING_GUARD_CONSOLE_BASE_URL`, `LISTING_GUARD_CONSOLE_AUTH_MODE` MAGIC_LINK (or CLOUDFLARE_ACCESS, BOTH), `LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN`, `..._ACCESS_AUD`, `..._ACCESS_CERTS_URL`, `..._ACCESS_CERT_CACHE_TTL` 1h, `..._ACCESS_ALLOWED_DOMAINS`, `..._ACCESS_ALLOWED_EMAILS`, `..._ACCESS_AUTO_CREATE` false, `..._ACCESS_DEFAULT_CLIENT_NAME` (the Access settings only for CLOUDFLARE_ACCESS or BOTH), `LISTING_GUARD_CONSOLE_MAIL_FROM`, `LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS` 5, `SPRING_MAIL_HOST` (the mail settings only for MAGIC_LINK or BOTH), `SPRING_MAIL_PORT` 587, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (secret), `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` true, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` true. The cookie is always Secure (`LISTING_GUARD_CONSOLE_COOKIE_SECURE` is fixed to `"true"`) |
 | Features | `LISTING_GUARD_PLANS_ENABLED` false, `LISTING_GUARD_FIXES_ENABLED` false |
 | Embeddings | `LISTING_GUARD_EMBEDDING_PROVIDER` none, `LISTING_GUARD_EMBEDDING_API_KEY` (secret; with provider `api` the API does not start while it is empty) |
 | Policy monitor | `POLICY_MONITOR_STALE_DAYS` 90, `POLICY_MONITOR_KEEP_REPORTS` 12 |
@@ -166,6 +174,7 @@ Fixed in this branch:
 - The runbook's `chown` list left out `policy-monitor`, and its `install -d -m 750 policies/raw/...` made the saved policy files
   unreadable by the container (uid 10001 is neither the owner nor in the group). The bootstrap now creates `policy-monitor`
   writable by uid 10001 and the runbook uses mode 755 for `policies/raw`.
+- The nine console settings of ADR-027 (`LISTING_GUARD_CONSOLE_AUTH_MODE`, `..._ACCESS_*`) were in `env.prod.example` (added on `main`) but not in `docker-compose.prod.yml`, so a value in `.env` never reached the container and the Access sign-in could not be switched on. The compose file now forwards them with the application's own defaults.
 - `backups/` (database dumps with every client's stored results) and `.tsdr-status.lock` were not in `.gitignore`.
   `.dockerignore` now keeps the runtime folders out of the build context.
 
@@ -230,7 +239,7 @@ Tick each one on the real host. "Here" says what this review saw; the rest is yo
 | 6 | **API keys and the admin.** Keys are stored as SHA-256 only and shown once; revoking one takes effect within `auth-cache-ttl` (30 s). **There is no admin API key**: the admin is the one-shot job, so whoever can run `docker` on the host is the admin. Keep SSH key-only, `deploy` the only user, and the `docker` group small. Never run the admin job detached (`-d`): the key is printed to the terminal only. | Code; the bootstrap sets key-only SSH and fail2ban. |
 | 7 | **Logs hold no listing text and no key.** The Tomcat access log is off and its pattern never prints the query string; Docker logs rotate at 10 MB × 3. | Here: after a key, a check and failed calls, the API log contained neither the key, the database password nor the listing text. A grep of the code found no log call that prints a listing field. The admin job's one-time key is on its terminal only. |
 | 8 | **Secrets.** `.env` is `chmod 600` and in `.gitignore`; `backups/` is now in `.gitignore` too. | Fixed here. |
-| 9 | **Backups restore.** Daily and weekly dumps to R2 with lifecycle rules (7 and 28 days), and **a restore tried**. | Here: the scripts' dump and restore worked on a throwaway database (34 migrations, data intact). **Yours:** the same on the A1 or a scratch host, from an R2 download (the scripts take a local file; download it first), with the time it takes. |
+| 9 | **Backups restore.** Daily and weekly dumps to R2 with lifecycle rules (7 and 28 days), and **a restore tried**. | Here: the scripts' dump and restore worked on a throwaway database (34 migrations at the time, data intact). **Yours:** the same on the A1 or a scratch host, from an R2 download (the scripts take a local file; download it first), with the time it takes. |
 | 10 | **Console** (only if enabled). HTTPS base URL, SMTP, Secure cookie, Access in front of `/console/*`. | Here: the API refuses to start misconfigured. A real sign-in is yours to try. |
 | 11 | **The `tools` jobs are not exposed.** They have no port; they run only with `docker compose run`. | Compose file. |
 | 12 | **Image and host updates.** Unattended upgrades and fail2ban from the bootstrap; Trivy scans the amd64 image at release (CRITICAL, fixed only); the base images `eclipse-temurin:25-jre` and `pgvector/pgvector:pg16` float and `cloudflared` is pinned (`2026.11.0`): update the tags on a schedule. | The arm64 image is not scanned. |
@@ -281,7 +290,7 @@ the same e-mail on the console's own sign-in, open the link in the mail, press *
 **API keys**, create and revoke a key, and read **Report**.
 
 **After a restart or an upgrade:** `docker compose --profile prod logs --tail=100 api` shows `Started`, no `ERROR`; the migration
-count in `flyway_schema_history` is 34 for v0.8.0.
+count in `flyway_schema_history` is 35 for v0.8.0.
 
 ## 6. Release v0.8.0 and the manual steps, in order
 
