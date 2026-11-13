@@ -32,6 +32,11 @@ listing-guard:
     rate-window: 15m
     # The most active API keys one console account may hold (the "API keys" page). Keys made by the admin job count too.
     max-active-keys: ${LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS:5}
+    # The bulk check page (ADR-029): the most data rows and bytes of one paste or file. A larger input is refused as a whole, never cut.
+    # max-bytes must stay below spring.servlet.multipart.max-file-size.
+    bulk:
+      max-rows: ${LISTING_GUARD_CONSOLE_BULK_MAX_ROWS:200}
+      max-bytes: ${LISTING_GUARD_CONSOLE_BULK_MAX_BYTES:1MB}
   rate-limit:
     enabled: true
     requests-per-minute: 60

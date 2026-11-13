@@ -27,11 +27,11 @@ public record BulkProperties(@DefaultValue("200") int maxRows, @DefaultValue("1M
 
     /**
      * The most a request to {@code /console/bulk/prepare} or {@code /console/bulk/run} may declare: both pages post
-     * {@code multipart/form-data} (a text in a URL-encoded field can grow six-fold, and Tomcat refuses to read a URL-encoded body over
-     * {@code server.tomcat.max-http-form-post-size}, 2 MB, without an error), so the text and a file travel as they are. The request
-     * holds the text or one file, and the {@code run} request the text again; the limits above are the real ones and are checked by the
-     * controller. Tomcat also applies its 2 MB form size to a text part: a {@code max-bytes} above that needs
-     * {@code server.tomcat.max-http-form-post-size} raised too.
+     * {@code multipart/form-data} (a text in a URL-encoded field can grow several-fold, and Tomcat stops reading a URL-encoded body at
+     * {@code server.tomcat.max-http-form-post-size}, 2 MB), so the text and a file travel as they are. The request holds the text or
+     * one file, and the {@code run} request the text again; the limits above are the real ones and are checked by the controller.
+     * {@code max-bytes} must also stay below {@code spring.servlet.multipart.max-file-size} (10 MB by default), which the container
+     * applies to every part.
      */
     public long requestLimitBytes() {
         return maxBytes.toBytes() * 2 + FORM_OVERHEAD_BYTES;
