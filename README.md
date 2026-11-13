@@ -83,7 +83,7 @@ The second request needs an operator configured catalog; without one it returns 
 
 ## Deploy
 
-See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production setup, Access, backups, upgrades and health checks. General production settings are in [deployment](docs/deployment.md).
+See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production setup, Access, backups, upgrades and health checks. General production settings are in [deployment](docs/deployment.md). Before the first deployment read [deploy readiness](docs/deploy-readiness.md): what is on or off by default, the environment variables, the resource budget, a security checklist, a smoke test and the manual steps in order. The release notes of the version to deploy are in [docs/releases](docs/releases/v0.8.0.md).
 
 ## Roadmap
 
@@ -109,6 +109,8 @@ See the [detailed status and project guide](docs/overview.md) for implemented be
 - [Integration guide](docs/integration-guide.md)
 - [Deployment](docs/deployment.md)
 - [Oracle A1 deployment](docs/deploy-oracle.md)
+- [Deploy readiness](docs/deploy-readiness.md)
+- [Release notes v0.8.0](docs/releases/v0.8.0.md)
 - [Architecture decisions](docs/adr/)
 - [Release notes](docs/releases/v0.7.0.md)
 
