@@ -56,10 +56,12 @@ public class ConsoleApiKeysController {
 
     private final ClientProvisioning provisioning;
     private final ConsoleProperties properties;
+    private final ConsoleMessages messages;
 
-    public ConsoleApiKeysController(ClientProvisioning provisioning, ConsoleProperties properties) {
+    public ConsoleApiKeysController(ClientProvisioning provisioning, ConsoleProperties properties, ConsoleMessages messages) {
         this.provisioning = provisioning;
         this.properties = properties;
+        this.messages = messages;
     }
 
     @GetMapping("/console/api-keys")
@@ -92,7 +94,7 @@ public class ConsoleApiKeysController {
         } catch (KeyLimitReachedException ex) {
             response.setStatus(HttpStatus.CONFLICT.value());
             populate(model, user, label);
-            model.addAttribute("error", "You already have " + ex.limit() + " active keys, the most allowed. Revoke one to create another.");
+            model.addAttribute("error", messages.get("keys.error.limit", ex.limit()));
         }
         return LIST_VIEW;
     }
@@ -116,9 +118,8 @@ public class ConsoleApiKeysController {
     public String revoke(@PathVariable String keyId, @AuthenticationPrincipal ConsoleUser user, RedirectAttributes redirect) {
         try {
             RevokeOutcome outcome = provisioning.revokeKey(user.clientId(), keyId);
-            redirect.addFlashAttribute("notice", outcome == RevokeOutcome.REVOKED
-                    ? "Key " + keyId + " is revoked. Applications that use it are refused from now on."
-                    : "Key " + keyId + " was already revoked.");
+            redirect.addFlashAttribute("notice", messages.get(outcome == RevokeOutcome.REVOKED
+                    ? "keys.notice.revoked" : "keys.notice.alreadyrevoked", keyId));
         } catch (KeyNotFoundException ex) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
@@ -136,12 +137,12 @@ public class ConsoleApiKeysController {
         model.addAttribute("label", label);
     }
 
-    private static String problemWith(String label) {
+    private String problemWith(String label) {
         if (label.length() > ClientProvisioning.MAX_LABEL_LENGTH) {
-            return "The label is longer than " + ClientProvisioning.MAX_LABEL_LENGTH + " characters.";
+            return messages.get("keys.error.labeltoolong", ClientProvisioning.MAX_LABEL_LENGTH);
         }
         if (CONTROL.matcher(label).find()) {
-            return "The label cannot hold control characters.";
+            return messages.get("keys.error.labelcontrol");
         }
         return null;
     }

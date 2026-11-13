@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.editor;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -15,6 +16,8 @@ import java.util.regex.Pattern;
  * typed since the check, and a proposal for the old text must not overwrite the new. A tag is found by its value (the finding's
  * index counts the cleaned list, without blank lines, and is tried first); when the index no longer fits, the tag is used only
  * if exactly one line holds that value.
+ *
+ * <p>The sentence for the seller is in the language of the page (ADR-028), so the applier is given the console's messages.
  */
 final class EditorFixApplier {
 
@@ -23,43 +26,43 @@ final class EditorFixApplier {
     }
 
     private static final Pattern TAG_FIELD = Pattern.compile("tags\\[(\\d+)]");
-    private static final String CHECK_AGAIN = " Nothing was checked: press Check to see the result for the changed listing.";
 
     private EditorFixApplier() {
     }
 
-    static Outcome apply(EditorForm form, String field, String value, String action, String proposedValue) {
+    static Outcome apply(ConsoleMessages messages, EditorForm form, String field, String value, String action,
+                         String proposedValue) {
         if (field == null || value == null || action == null) {
-            return refused(form, "That suggestion is no longer available. Press Check again.");
+            return refused(form, messages.get("editor.apply.unavailable"));
         }
         boolean replace = "REPLACE".equals(action);
         boolean remove = "REMOVE".equals(action);
         if (!replace && !remove) {
-            return refused(form, "That suggestion is no longer available. Press Check again.");
+            return refused(form, messages.get("editor.apply.unavailable"));
         }
         if (replace && (proposedValue == null || proposedValue.isBlank() || proposedValue.contains("\n")
                 || proposedValue.contains("\r"))) {
-            return refused(form, "That suggestion has no value that can be put in the field.");
+            return refused(form, messages.get("editor.apply.novalue"));
         }
         if (field.equals("title") && replace) {
-            return title(form, value, proposedValue);
+            return title(messages, form, value, proposedValue);
         }
         Matcher tag = TAG_FIELD.matcher(field);
         if (tag.matches()) {
-            return tag(form, Integer.parseInt(tag.group(1)), value, replace ? proposedValue : null);
+            return tag(messages, form, Integer.parseInt(tag.group(1)), value, replace ? proposedValue : null);
         }
-        return refused(form, "This suggestion cannot be applied to " + field + " here.");
+        return refused(form, messages.get("editor.apply.unsupported", field));
     }
 
-    private static Outcome title(EditorForm form, String value, String proposed) {
+    private static Outcome title(ConsoleMessages messages, EditorForm form, String value, String proposed) {
         if (!form.title().trim().equals(value)) {
-            return changedSinceTheCheck(form);
+            return changedSinceTheCheck(messages, form);
         }
-        return new Outcome(form.withTitle(proposed), true, "Replaced the title with the suggested value." + CHECK_AGAIN);
+        return new Outcome(form.withTitle(proposed), true, messages.get("editor.apply.title") + " " + checkAgain(messages));
     }
 
     /** {@code replacement} is null to remove the tag. */
-    private static Outcome tag(EditorForm form, int cleanedIndex, String value, String replacement) {
+    private static Outcome tag(ConsoleMessages messages, EditorForm form, int cleanedIndex, String value, String replacement) {
         List<String> lines = new ArrayList<>(EditorListingMapper.lines(form.tags()));
         List<Integer> cleaned = new ArrayList<>();
         for (int i = 0; i < lines.size(); i++) {
@@ -77,20 +80,24 @@ final class EditorFixApplier {
             }
         }
         if (line == null) {
-            return changedSinceTheCheck(form);
+            return changedSinceTheCheck(messages, form);
         }
         if (replacement == null) {
             lines.remove((int) line);
             return new Outcome(form.withTags(String.join("\n", lines)), true,
-                    "Removed the tag \"" + value + "\"." + CHECK_AGAIN);
+                    messages.get("editor.apply.tag.removed", value) + " " + checkAgain(messages));
         }
         lines.set(line, replacement);
         return new Outcome(form.withTags(String.join("\n", lines)), true,
-                "Replaced the tag \"" + value + "\" with \"" + replacement + "\"." + CHECK_AGAIN);
+                messages.get("editor.apply.tag.replaced", value, replacement) + " " + checkAgain(messages));
     }
 
-    private static Outcome changedSinceTheCheck(EditorForm form) {
-        return refused(form, "The field changed since the check, so the suggestion was not applied. Press Check again.");
+    private static String checkAgain(ConsoleMessages messages) {
+        return messages.get("editor.apply.checkagain");
+    }
+
+    private static Outcome changedSinceTheCheck(ConsoleMessages messages, EditorForm form) {
+        return refused(form, messages.get("editor.apply.changed"));
     }
 
     private static Outcome refused(EditorForm form, String message) {

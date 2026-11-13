@@ -20,7 +20,10 @@ import java.util.Map;
  */
 public final class EditorListingMapper {
 
-    /** The listing JSON, or the messages of the fields that could not be read (keyed by form field name). */
+    /**
+     * The listing JSON, or the fields that could not be read (keyed by form field name). The value is the <b>key</b> of the
+     * message that says why, not its text: the controller looks it up in the language of the page (ADR-028).
+     */
     public record Mapped(ObjectNode listing, Map<String, String> errors) {
         public boolean valid() {
             return errors.isEmpty();
@@ -82,7 +85,7 @@ public final class EditorListingMapper {
             new BigDecimal(value);
             listing.put("price", value);
         } catch (NumberFormatException e) {
-            errors.put("price", "Enter the price as a number with a decimal point, for example 19.99.");
+            errors.put("price", "editor.error.price");
         }
     }
 
@@ -94,7 +97,7 @@ public final class EditorListingMapper {
         try {
             listing.put("quantity", Long.parseLong(value));
         } catch (NumberFormatException e) {
-            errors.put("quantity", "Enter the quantity as a whole number, for example 5.");
+            errors.put("quantity", "editor.error.quantity");
         }
     }
 }

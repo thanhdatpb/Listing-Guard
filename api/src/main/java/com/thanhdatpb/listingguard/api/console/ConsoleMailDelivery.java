@@ -13,20 +13,25 @@ public class ConsoleMailDelivery implements MagicLinkDelivery {
 
     private final JavaMailSender mailSender;
     private final ConsoleProperties properties;
+    private final ConsoleMessages messages;
 
-    public ConsoleMailDelivery(JavaMailSender mailSender, ConsoleProperties properties) {
+    public ConsoleMailDelivery(JavaMailSender mailSender, ConsoleProperties properties, ConsoleMessages messages) {
         this.mailSender = mailSender;
         this.properties = properties;
+        this.messages = messages;
     }
 
+    /**
+     * Called while the sign-in request is being handled, so the e-mail is in the language of the page on which the link was
+     * asked for (ADR-028).
+     */
     @Override
     public void send(String email, String link) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(properties.mailFrom());
         message.setTo(email);
-        message.setSubject("Your Listing Guard sign-in link");
-        message.setText("Use this link to sign in to Listing Guard. It expires in 15 minutes:\n\n" + link
-                + "\n\nIf you did not request this link, you can ignore this email.");
+        message.setSubject(messages.get("mail.subject"));
+        message.setText(messages.get("mail.body.before") + "\n\n" + link + "\n\n" + messages.get("mail.body.after"));
         mailSender.send(message);
     }
 }
