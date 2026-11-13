@@ -91,12 +91,14 @@ services:
   admin:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["admin"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: admin
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -114,12 +116,14 @@ services:
   trademark-import:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: trademark-import
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -137,12 +141,14 @@ services:
   uspto-convert:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    mem_limit: ${USPTO_CONVERT_MEM_LIMIT:-3g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: uspto-convert
+      JAVA_TOOL_OPTIONS: ${USPTO_CONVERT_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -236,12 +242,14 @@ services:
   batch-check:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: batch-check
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -264,12 +272,14 @@ services:
   health-report:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["tools"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: health-report
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -285,12 +295,14 @@ services:
   policy-diff:
     image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
     profiles: ["policy-diff"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
     logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: policy-diff
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}

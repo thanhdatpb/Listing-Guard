@@ -6,7 +6,8 @@ health checks. PostgreSQL and the tunnel have no published ports.
 
 New releases publish `linux/amd64` and `linux/arm64` images. Images tagged through `v0.5.0` are amd64-only; do not
 use one of those tags on the A1 VM. The `docs/deployment.md` runbook covers migration details and the general
-production compose setup.
+production compose setup. [docs/deploy-readiness.md](deploy-readiness.md) is the pre-deploy review: what is on or off by
+default, the environment variables, the resource budget, the security checklist, a smoke test and the manual steps in order.
 
 ## 1. Prepare accounts, DNS and access
 
@@ -61,7 +62,7 @@ runtime directories, so copy the repository contents into that directory rather 
 sudo cp -R /path/to/Listing-Guard/. /opt/listing-guard/
 sudo chown -R deploy:deploy /opt/listing-guard
 sudo chown -R 10001:10001 /opt/listing-guard/catalogs/raw /opt/listing-guard/batch/out \
-  /opt/listing-guard/health-report/out /opt/listing-guard/backups
+  /opt/listing-guard/health-report/out /opt/listing-guard/policy-monitor /opt/listing-guard/backups
 ```
 
 The data folders need uid `10001` for the image's one-shot jobs. The `deploy` account is added to the matching data
@@ -537,7 +538,9 @@ files; it does not download pages, call a model or change rulesets. Raw files ar
 updating the database snapshot:
 
 ```bash
-install -d -m 750 policies/raw/etsy policies/raw/amazon policy-monitor
+# policies/raw is read by the container (uid 10001, read-only mount), so it must be readable by others (755); policy-monitor
+# is written by it and is created writable by the bootstrap (or: sudo chown 10001:10001 policy-monitor)
+install -d -m 755 policies/raw/etsy policies/raw/amazon
 # Copy maintainer-reviewed files into policies/raw/<marketplace>/, then edit policies/manifest.yaml.
 ./deploy/oracle/policy-diff.sh --dry-run
 ls -td policy-monitor/out/* | head -1
