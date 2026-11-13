@@ -8,3 +8,12 @@
 *.md
 docs
 eval
+# runtime data of a deployment checkout: never part of the image, and a catalog or a dump can be gigabytes of build context
+backups
+logs
+catalogs/raw
+policies/raw
+policy-monitor
+health-report/out
+batch/input
+batch/out
