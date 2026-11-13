@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.security;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleLocales;
 import com.thanhdatpb.listingguard.api.console.ConsoleProperties;
 import java.net.URI;
 import java.util.Arrays;
@@ -60,6 +61,9 @@ public final class ConsoleStartupSafetyCheck {
         }
         if (properties.maxActiveKeys() < 1) {
             throw new IllegalStateException("listing-guard.console.max-active-keys must be at least 1.");
+        }
+        if (!ConsoleLocales.isSupported(properties.defaultLocale())) {
+            throw new IllegalStateException("listing-guard.console.default-locale must be one of " + ConsoleLocales.codes() + ".");
         }
         if (dev) {
             log.warn("Console development mail delivery logs magic links. Do not use the 'dev' profile in production.");

@@ -13,5 +13,7 @@ public record ConsoleProperties(
         @DefaultValue("5") int emailLimit,
         @DefaultValue("30") int ipLimit,
         @DefaultValue("15m") Duration rateWindow,
-        @DefaultValue("5") int maxActiveKeys) {
+        @DefaultValue("5") int maxActiveKeys,
+        // The language of a console page whose reader has not chosen one (ADR-028): a code of ConsoleLocales.SUPPORTED.
+        @DefaultValue("en") String defaultLocale) {
 }
