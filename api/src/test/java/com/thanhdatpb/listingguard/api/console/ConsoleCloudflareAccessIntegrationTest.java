@@ -58,4 +58,23 @@ class ConsoleCloudflareAccessIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM account WHERE email IN (?,?)", Integer.class,
                 "outsider@outside.test", "staff@example.test")).isZero();
     }
+
+    @Test
+    void theAccessSignInPageIsInTheLanguageOfThePage() throws Exception {
+        String english = mvc.perform(get("/login")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String vietnamese = mvc.perform(get("/login").cookie(new jakarta.servlet.http.Cookie(ConsoleLocaleResolver.COOKIE, "vi")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String deniedEnglish = mvc.perform(get("/login").param("access", "denied")).andExpect(status().isForbidden()).andReturn()
+                .getResponse().getContentAsString();
+        String deniedVietnamese = mvc.perform(get("/login").param("access", "denied")
+                        .cookie(new jakarta.servlet.http.Cookie(ConsoleLocaleResolver.COOKIE, "vi")))
+                .andExpect(status().isForbidden()).andReturn().getResponse().getContentAsString();
+
+        assertThat(english).contains("Continue with Cloudflare Access").contains("Sign in through your organization")
+                .doesNotContain("??");
+        assertThat(vietnamese).contains("Tiếp tục với Cloudflare Access").contains("Hãy đăng nhập qua ứng dụng Cloudflare Access")
+                .doesNotContain("Continue with").doesNotContain("??");
+        assertThat(deniedEnglish).contains("Your Cloudflare Access identity is not allowed to use this console.");
+        assertThat(deniedVietnamese).contains("Danh tính Cloudflare Access của bạn không được phép dùng console này.");
+    }
 }

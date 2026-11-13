@@ -137,7 +137,7 @@ class ConsoleReportIntegrationTest {
 
         String html = page(userOf(c));
 
-        assertThat(section(html, "overview")).contains("2026-11-02").contains("2026-11-08").contains("<span>7</span> days")
+        assertThat(section(html, "overview")).contains("2026-11-02").contains("2026-11-08").contains("7 days")
                 .contains("2026-11-09T03:00:00Z");
         assertThat(html).contains("name=\"from\"").contains("value=\"2026-11-02\"").contains("value=\"2026-11-08\"");
         assertThat(section(html, "by-week")).contains("2026-W45");

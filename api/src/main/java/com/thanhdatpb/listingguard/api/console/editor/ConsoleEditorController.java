@@ -1,9 +1,11 @@
 package com.thanhdatpb.listingguard.api.console.editor;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetLimitsService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -35,11 +37,14 @@ public class ConsoleEditorController {
     private final PlanService plans;
     private final RulesetLimitsService rulesetLimits;
     private final EditorCheckService checks;
+    private final ConsoleMessages messages;
 
-    public ConsoleEditorController(PlanService plans, RulesetLimitsService rulesetLimits, EditorCheckService checks) {
+    public ConsoleEditorController(PlanService plans, RulesetLimitsService rulesetLimits, EditorCheckService checks,
+                                   ConsoleMessages messages) {
         this.plans = plans;
         this.rulesetLimits = rulesetLimits;
         this.checks = checks;
+        this.messages = messages;
     }
 
     @GetMapping("/console/check")
@@ -60,7 +65,7 @@ public class ConsoleEditorController {
         EditorMarketplace selected = marketplace(form.marketplace());
         EditorListingMapper.Mapped mapped = EditorListingMapper.map(selected, form);
         if (!mapped.valid()) {
-            populate(model, user, selected, form, mapped.errors());
+            populate(model, user, selected, form, texts(mapped.errors()));
             return VIEW;
         }
         EditorResult result = checks.check(user.clientId(), selected, mapped.listing());
@@ -83,10 +88,11 @@ public class ConsoleEditorController {
         EditorFixApplier.Outcome outcome;
         if (FIX_ID.matcher(fixId).matches()) {
             String prefix = "fix." + fixId + ".";
-            outcome = EditorFixApplier.apply(form, request.getParameter(prefix + "field"), request.getParameter(prefix + "value"),
-                    request.getParameter(prefix + "action"), request.getParameter(prefix + "proposed"));
+            outcome = EditorFixApplier.apply(messages, form, request.getParameter(prefix + "field"),
+                    request.getParameter(prefix + "value"), request.getParameter(prefix + "action"),
+                    request.getParameter(prefix + "proposed"));
         } else {
-            outcome = EditorFixApplier.apply(form, null, null, null, null);
+            outcome = EditorFixApplier.apply(messages, form, null, null, null, null);
         }
         populate(model, user, selected, outcome.form(), Map.of());
         model.addAttribute("notice", outcome.message());
@@ -107,6 +113,13 @@ public class ConsoleEditorController {
         model.addAttribute("fieldErrors", errors);
         // collapsed by default; open when a field could not be read, or when it already holds what the seller typed
         model.addAttribute("otherOpen", !errors.isEmpty() || form.hasOtherFields());
+    }
+
+    /** The refusals of the form as the page prints them: {@link EditorListingMapper} gives the key of each message. */
+    private Map<String, String> texts(Map<String, String> keys) {
+        Map<String, String> texts = new LinkedHashMap<>();
+        keys.forEach((field, key) -> texts.put(field, messages.get(key)));
+        return texts;
     }
 
     static EditorMarketplace marketplace(String code) {

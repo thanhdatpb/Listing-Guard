@@ -28,16 +28,16 @@ public class ConsoleLoginController {
 
     public record EmailForm(@NotBlank @Email @Size(max = 254) String email) { }
 
-    private static final String REQUEST_MESSAGE =
-            "If an account can be created or signed in for that address, a sign-in link will be sent.";
     private final org.springframework.beans.factory.ObjectProvider<MagicLinkService> magicLinks;
     private final ConsoleProperties properties;
+    private final ConsoleMessages messages;
     private final HttpSessionSecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
 
     public ConsoleLoginController(org.springframework.beans.factory.ObjectProvider<MagicLinkService> magicLinks,
-                                  ConsoleProperties properties) {
+                                  ConsoleProperties properties, ConsoleMessages messages) {
         this.magicLinks = magicLinks;
         this.properties = properties;
+        this.messages = messages;
     }
 
     @GetMapping("/login")
@@ -46,17 +46,17 @@ public class ConsoleLoginController {
         boolean denied = "denied".equals(access);
         if (denied) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            model.addAttribute("error", "Your Cloudflare Access identity is not allowed to use this console. Contact the console administrator.");
+            model.addAttribute("error", messages.get("login.error.accessdenied"));
         }
         if (properties.cloudflareAccessEnabled() && !properties.magicLinkEnabled()) {
-            if (logout != null && !denied) model.addAttribute("message", "You have been signed out of the console and Cloudflare Access.");
+            if (logout != null && !denied) model.addAttribute("message", messages.get("login.message.signedout.access"));
             model.addAttribute("accessLogin", true);
             model.addAttribute("accessAvailable", true);
             return "console/login";
         }
         model.addAttribute("accessAvailable", properties.cloudflareAccessEnabled());
         model.addAttribute("emailForm", new EmailForm(""));
-        if (logout != null && !denied) model.addAttribute("message", "You have been signed out.");
+        if (logout != null && !denied) model.addAttribute("message", messages.get("login.message.signedout"));
         return "console/login";
     }
 
@@ -65,11 +65,11 @@ public class ConsoleLoginController {
                               HttpServletRequest request, Model model) {
         if (!properties.magicLinkEnabled()) return "redirect:/login";
         if (binding.hasErrors()) {
-            model.addAttribute("error", "Enter a valid email address.");
+            model.addAttribute("error", messages.get("login.error.email"));
             return "console/login";
         }
         magicLinks.getObject().requestSignIn(form.email(), request.getRemoteAddr());
-        model.addAttribute("message", REQUEST_MESSAGE);
+        model.addAttribute("message", messages.get("login.message.requested"));
         model.addAttribute("emailForm", new EmailForm(""));
         return "console/login";
     }
@@ -89,7 +89,7 @@ public class ConsoleLoginController {
     public String verify(@RequestParam(required = false) String token, HttpServletRequest request,
                          HttpServletResponse response, Model model) {
         MagicLinkService service = magicLinks.getIfAvailable();
-        java.util.Optional<ConsoleUser> user = service == null ? java.util.Optional.empty() : service.consume(token);
+        Optional<ConsoleUser> user = service == null ? Optional.empty() : service.consume(token);
         if (user.isEmpty()) {
             model.addAttribute("valid", false);
             return "console/verify";

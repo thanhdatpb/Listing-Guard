@@ -1,22 +1,23 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Confirm sign in - Listing Guard</title>
+    <title th:text="#{verify.title}"></title>
 </head>
 <body>
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <main>
-    <h1>Confirm sign in</h1>
+    <div th:replace="~{console/layout :: languageSwitch}"></div>
+    <h1 th:text="#{verify.heading}"></h1>
     <div th:if="${valid}">
-        <p>This link is valid. Select the button below to sign in.</p>
+        <p th:text="#{verify.valid}"></p>
         <form method="post" th:action="@{/login/verify}">
             <input type="hidden" name="token" th:value="${token}">
-            <button type="submit">Sign in</button>
+            <button type="submit" th:text="#{verify.submit}"></button>
         </form>
     </div>
-    <p th:unless="${valid}" role="alert">This sign-in link has expired or has already been used.</p>
+    <p th:unless="${valid}" role="alert" th:text="#{verify.invalid}"></p>
 </main>
 </body>
 </html>

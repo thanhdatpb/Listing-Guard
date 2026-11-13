@@ -1,23 +1,24 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sign in - Listing Guard</title>
+    <title th:text="#{login.title}"></title>
 </head>
 <body>
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <main>
-    <h1>Sign in to Listing Guard</h1>
-    <p th:if="${accessLogin}">Sign in through your organization’s Cloudflare Access application to continue.</p>
-    <p th:if="${accessAvailable}"><a href="/console/">Continue with Cloudflare Access</a></p>
-    <p th:unless="${accessLogin}">Enter your email and we will send you a sign-in link.</p>
+    <div th:replace="~{console/layout :: languageSwitch}"></div>
+    <h1 th:text="#{login.heading}"></h1>
+    <p th:if="${accessLogin}" th:text="#{login.access.intro}"></p>
+    <p th:if="${accessAvailable}"><a href="/console/" th:text="#{login.access.continue}"></a></p>
+    <p th:unless="${accessLogin}" th:text="#{login.intro}"></p>
     <p th:if="${message}" th:text="${message}" role="status"></p>
     <p th:if="${error}" th:text="${error}" role="alert"></p>
     <form th:unless="${accessLogin}" method="post" th:action="@{/login}" th:object="${emailForm}">
-        <label for="email">Email address</label>
+        <label for="email" th:text="#{login.email.label}"></label>
         <input id="email" type="email" th:field="*{email}" autocomplete="email" maxlength="254" required>
-        <button type="submit">Send sign-in link</button>
+        <button type="submit" th:text="#{login.submit}"></button>
     </form>
 </main>
 </body>

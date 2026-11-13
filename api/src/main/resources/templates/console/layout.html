@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <body>
 <!-- Parts every console page shares. This file is never served on its own; the pages include the fragments below.
-     The banner styles itself inline on purpose: the sign-in pages are public and cannot load the console style sheets,
-     which sit behind the sign-in, and the banner must look the same on every page. Fixed colors with enough contrast on
-     their own, so the light and dark schemes of the other pages do not change it. -->
+     The banner styles itself inline on purpose: the sign-in pages are public and cannot load the console style sheets, which
+     sit behind the sign-in, and the banner must look the same on every page. Fixed colors with enough contrast on their own, so
+     the light and dark schemes of the other pages do not change it.
+     No text is written in a template (ADR-028): every sentence is a key of messages.properties and messages_vi.properties. -->
 
 <!-- The notice of a demonstration catalog, one text for the banner and for the trademark panel of the editor. -->
-<span th:fragment="demoText">Demo catalog: fictional marks only. Real trademark checking is not active.</span>
+<span th:fragment="demoText" th:text="#{demo.banner}"></span>
 
 <!-- Shown on every console page while the configured trademark catalog version starts with "demo-" (ConsoleModelAdvice). -->
 <div th:fragment="demoBanner" th:if="${demoCatalog}" id="demo-banner" role="note"
@@ -15,16 +16,26 @@
     <span th:replace="~{console/layout :: demoText}"></span>
 </div>
 
-<!-- The bar of a signed-in page: where to go, and sign out. "active" is dashboard, check, report or keys. -->
+<!-- The links that change the language of the page (ConsoleLanguageAdvice): each language is named in itself, on purpose. -->
+<!-- Not a nav element: a fragment selector "nav" would match it, and nav(active) below must find the bar. -->
+<div class="lang" role="group" th:fragment="languageSwitch" th:aria-label="#{lang.aria}">
+    <th:block th:each="option, it : ${languageOptions}">
+        <a th:href="${option.href}" th:text="${option.name}" th:lang="${option.code}" th:hreflang="${option.code}"
+           th:aria-current="${option.current} ? 'true'"></a><span th:unless="${it.last}"> | </span>
+    </th:block>
+</div>
+
+<!-- The bar of a signed-in page: where to go, the language, and sign out. "active" is dashboard, check, report or keys. -->
 <header class="bar" th:fragment="nav(active)">
-    <nav aria-label="Console">
-        <a th:href="@{/console}" th:aria-current="${active == 'dashboard'} ? 'page'">Dashboard</a>
-        <a th:href="@{/console/check}" th:aria-current="${active == 'check'} ? 'page'">Check listing</a>
-        <a th:href="@{/console/report}" th:aria-current="${active == 'report'} ? 'page'">Report</a>
-        <a th:href="@{/console/api-keys}" th:aria-current="${active == 'keys'} ? 'page'">API keys</a>
+    <nav th:aria-label="#{nav.aria}">
+        <a th:href="@{/console}" th:text="#{nav.dashboard}" th:aria-current="${active == 'dashboard'} ? 'page'"></a>
+        <a th:href="@{/console/check}" th:text="#{nav.check}" th:aria-current="${active == 'check'} ? 'page'"></a>
+        <a th:href="@{/console/report}" th:text="#{nav.report}" th:aria-current="${active == 'report'} ? 'page'"></a>
+        <a th:href="@{/console/api-keys}" th:text="#{nav.keys}" th:aria-current="${active == 'keys'} ? 'page'"></a>
     </nav>
+    <div th:replace="~{console/layout :: languageSwitch}"></div>
     <form method="post" th:action="@{/logout}">
-        <button type="submit" class="link">Sign out</button>
+        <button type="submit" class="link" th:text="#{nav.signout}"></button>
     </form>
 </header>
 </body>

@@ -33,6 +33,9 @@ listing-guard:
     rate-window: 15m
     # The most active API keys one console account may hold (the "API keys" page). Keys made by the admin job count too.
     max-active-keys: ${LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS:5}
+    # The language of a page whose reader has not chosen one (ADR-028): en or vi. A reader changes it with the links in the corner
+    # of every page, which set a cookie. The Vietnamese deployment sets vi.
+    default-locale: ${LISTING_GUARD_CONSOLE_DEFAULT_LOCALE:en}
     access-team-domain: ${LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN:}
     access-aud: ${LISTING_GUARD_CONSOLE_ACCESS_AUD:}
     access-certs-url: ${LISTING_GUARD_CONSOLE_ACCESS_CERTS_URL:}
@@ -247,6 +250,11 @@ spring:
       # The default transactional advisory lock keeps a transaction open on Flyway's own connection, and
       # CREATE/DROP INDEX CONCURRENTLY (V9, V11, V13) waits for every open transaction: the migration would hang.
       transactional-lock: false
+  messages:
+    # The console's texts (ADR-028): messages*.properties for the pages, rules*.properties for the explanation of each rule id.
+    basename: messages,rules
+    # A key missing from a Vietnamese file falls to the English base, never to the language of the server's JVM.
+    fallback-to-system-locale: false
   mvc:
     problemdetails:
       enabled: true

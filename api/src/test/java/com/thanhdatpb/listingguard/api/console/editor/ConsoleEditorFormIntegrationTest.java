@@ -158,10 +158,8 @@ class ConsoleEditorFormIntegrationTest {
         String freeHtml = page(free, "ETSY");
         String sellerHtml = page(seller, "ETSY");
 
-        assertThat(freeHtml).contains("Cost: up to <span>1</span>").contains("unit</span>")
-                .contains("Remaining this month: <span>" + freeQuota + "</span> of")
-                .contains("<time>2026-12-01</time>").doesNotContain("trademark 1");
-        assertThat(sellerHtml).contains("Cost: up to <span>2</span>").contains("units</span>")
-                .contains("listing rules 1 + trademark 1");
+        assertThat(freeHtml).contains("Cost: up to 1 unit<").contains("Remaining this month: " + freeQuota + " of")
+                .contains("resets on 2026-12-01 (UTC)").doesNotContain("trademark 1");
+        assertThat(sellerHtml).contains("Cost: up to 2 units<").contains("listing rules 1 + trademark 1");
     }
 }

@@ -26,8 +26,22 @@
     return isNaN(parsed) ? null : parsed;
   }
 
+  // The sentences come from the page (data-i18n-* on the form, written from the messages of the page's language), so this file
+  // holds none. A sentence is a pattern with {0}, {1}; without the attribute only the numbers are shown.
+  function sentence(name, values) {
+    var form = document.getElementById('editor-form');
+    var pattern = form ? form.getAttribute('data-i18n-' + name) : null;
+    if (!pattern) {
+      return values.join(' / ');
+    }
+    return pattern.replace(/\{(\d+)\}/g, function (match, index) {
+      var value = values[Number(index)];
+      return value === undefined ? match : String(value);
+    });
+  }
+
   function show(counter, text, over) {
-    counter.textContent = text + (over ? ' - over the limit' : '');
+    counter.textContent = over ? sentence('over', [text]) : text;
     counter.classList.toggle('over', over);
   }
 
@@ -37,18 +51,18 @@
     if (mode === 'chars' || mode === 'bytes') {
       var limit = number(counter.getAttribute('data-limit'));
       var used = mode === 'bytes' ? utf8Bytes(value.trim()) : codePoints(value.trim());
-      var unit = mode === 'bytes' ? 'bytes' : 'characters';
-      show(counter, used + (limit === null ? '' : ' / ' + limit) + ' ' + unit, limit !== null && used > limit);
+      var text = limit === null ? sentence(mode + '-nolimit', [used]) : sentence(mode, [used, limit]);
+      show(counter, text, limit !== null && used > limit);
     } else if (mode === 'list') {
       var limitCount = number(counter.getAttribute('data-limit-count'));
       var limitEach = number(counter.getAttribute('data-limit-each'));
       var items = entries(value);
       var longest = items.reduce(function (max, item) { return Math.max(max, codePoints(item)); }, 0);
-      var text = items.length + (limitCount === null ? '' : ' / ' + limitCount) + ' entries';
+      var summary = limitCount === null ? sentence('entries-nolimit', [items.length]) : sentence('entries', [items.length, limitCount]);
       if (limitEach !== null) {
-        text += '; longest ' + longest + ' / ' + limitEach + ' characters';
+        summary += '; ' + sentence('longest', [longest, limitEach]);
       }
-      show(counter, text, (limitCount !== null && items.length > limitCount) || (limitEach !== null && longest > limitEach));
+      show(counter, summary, (limitCount !== null && items.length > limitCount) || (limitEach !== null && longest > limitEach));
     }
   }
 

@@ -206,6 +206,26 @@ example for an application that calls the API. It needs no migration and no plan
   enough are revoked.
 - The page serves `/console/console.css` and `/console/keys.js` behind the console sign-in.
 
+### Console language (ADR-028)
+
+Every console page and the sign-in e-mail exist in English and Vietnamese. The language of a page is chosen in this order: the
+`lang` link in the corner of the page (`?lang=en`, `?lang=vi`), then the `lg_lang` cookie that link sets, then the default below.
+The browser's `Accept-Language` is not used. The cookie holds the code only (`HttpOnly`, `SameSite=Lax`, `Secure` as
+`LISTING_GUARD_CONSOLE_COOKIE_SECURE` says, one year). Only the console is affected: the API's answers, its problem details, the
+batch and health-report files and the MCP server do not change language.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `LISTING_GUARD_CONSOLE_DEFAULT_LOCALE` | `en` | The language of a page whose reader has not chosen one: `en` or `vi`. Any other value, empty included, stops the API from starting. Set `vi` for Vietnamese sellers. |
+
+- What stays as the API gave it, in both languages: rule ids, fields, evidence, versions, codes such as `ERROR` or `HIGH`, and the
+  message, suggestion and fix of each finding. Under each finding the page adds one sentence saying what its rule checks
+  (`rules.properties`, `rules_vi.properties`); a rule with no Vietnamese sentence shows the English one.
+- The trademark disclaimer is printed as the ruleset writes it. On an English page, an English statement stands above it and the
+  ruleset's text is labelled as the original.
+- The texts are in `messages.properties` and `messages_vi.properties` inside the API jar; to change a sentence, change the file
+  and rebuild. A language is added with one more pair of files and one entry in `ConsoleLocales.SUPPORTED`.
+
 ### DEMO catalog banner
 
 While `listing-guard.trademark.catalog-version` starts with `demo-` (the DEMO catalog of `catalogs/demo/`), every console page

@@ -1,16 +1,17 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <body>
 <!-- Parts of the report page (ADR-018) that repeat for each pack. This file is never served on its own; console/report includes
-     the fragments below. Every value goes through th:text. -->
+     the fragments below. Every value goes through th:text; every sentence is a message (ADR-028). The severity and the rule id are
+     codes of the API and are printed as they are. -->
 
 <!-- Findings per severity: a list of SeverityCountView. -->
 <table class="report" th:fragment="severities(list)">
     <thead>
     <tr>
-        <th scope="col">Severity</th>
-        <th scope="col" class="n">Findings</th>
-        <th scope="col" class="n">Results affected</th>
+        <th scope="col" th:text="#{report.col.severity}"></th>
+        <th scope="col" class="n" th:text="#{report.col.findings}"></th>
+        <th scope="col" class="n" th:text="#{report.col.affected}"></th>
     </tr>
     </thead>
     <tbody>
@@ -22,23 +23,23 @@
     </tbody>
 </table>
 
-<!-- A ranking of rules: a RuleRankingView. -->
+<!-- A ranking of rules: a RuleRankingView. Under each rule id, what the rule checks (ADR-028), when a sentence exists. -->
 <div th:fragment="rules(ranking)">
-    <p th:if="${ranking.items.isEmpty()}">No findings.</p>
+    <p th:if="${ranking.items.isEmpty()}" th:text="#{report.rules.none}"></p>
     <th:block th:unless="${ranking.items.isEmpty()}">
         <div class="report-scroll">
             <table class="report">
                 <thead>
                 <tr>
-                    <th scope="col">Rule</th>
-                    <th scope="col">Severity</th>
-                    <th scope="col" class="n">Findings</th>
-                    <th scope="col" class="n">Results affected</th>
+                    <th scope="col" th:text="#{report.col.rule}"></th>
+                    <th scope="col" th:text="#{report.col.severity}"></th>
+                    <th scope="col" class="n" th:text="#{report.col.findings}"></th>
+                    <th scope="col" class="n" th:text="#{report.col.affected}"></th>
                 </tr>
                 </thead>
                 <tbody>
-                <tr th:each="item : ${ranking.items}">
-                    <td th:text="${item.ruleId}"></td>
+                <tr th:each="item : ${ranking.items}" th:with="explanation=${@consoleMessages.ruleExplanation(item.ruleId)}">
+                    <td><span th:text="${item.ruleId}"></span><span class="muted small explain" th:if="${explanation != null}"><br><span th:text="${explanation}"></span></span></td>
                     <td th:text="${item.severity}"></td>
                     <td class="n" th:text="${item.findings}"></td>
                     <td class="n" th:text="${item.checksAffected}"></td>
@@ -46,10 +47,8 @@
                 </tbody>
             </table>
         </div>
-        <p class="muted small">
-            <span th:text="${ranking.items.size()}"></span> of <span th:text="${ranking.distinctRules}"></span> different rules (and
-            severities), most findings first.
-        </p>
+        <p class="muted small"
+           th:text="#{report.rules.footer(${#strings.toString(ranking.items.size())}, ${#strings.toString(ranking.distinctRules)})}"></p>
     </th:block>
 </div>
 </body>

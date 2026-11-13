@@ -22,16 +22,36 @@ public record ConsoleProperties(
         @DefaultValue("") String accessAllowedDomains,
         @DefaultValue("") String accessAllowedEmails,
         @DefaultValue("false") boolean accessAutoCreate,
-        @DefaultValue("") String accessDefaultClientName) {
+        @DefaultValue("") String accessDefaultClientName,
+        // The language of a console page whose reader has not chosen one (ADR-028): a code of ConsoleLocales.SUPPORTED.
+        @DefaultValue("en") String defaultLocale) {
 
     @org.springframework.boot.context.properties.bind.ConstructorBinding
     public ConsoleProperties { }
 
+    /** The settings that existed before the Cloudflare Access sign-in and the language (ADR-027, ADR-028), all at their defaults. */
     public ConsoleProperties(boolean enabled, String baseUrl, boolean cookieSecure, String mailFrom,
                              int emailLimit, int ipLimit, Duration rateWindow, int maxActiveKeys) {
+        this(enabled, baseUrl, cookieSecure, mailFrom, emailLimit, ipLimit, rateWindow, maxActiveKeys, "en");
+    }
+
+    /** The same, with the language of a page whose reader has not chosen one. */
+    public ConsoleProperties(boolean enabled, String baseUrl, boolean cookieSecure, String mailFrom,
+                             int emailLimit, int ipLimit, Duration rateWindow, int maxActiveKeys, String defaultLocale) {
         this(enabled, baseUrl, cookieSecure, mailFrom, emailLimit, ipLimit, rateWindow, maxActiveKeys,
                 ConsoleAuthMode.MAGIC_LINK, "", "", "",
-                Duration.ofHours(1), "", "", false, "");
+                Duration.ofHours(1), "", "", false, "", defaultLocale);
+    }
+
+    /** Every setting of ADR-027 with the default language. */
+    public ConsoleProperties(boolean enabled, String baseUrl, boolean cookieSecure, String mailFrom,
+                             int emailLimit, int ipLimit, Duration rateWindow, int maxActiveKeys, ConsoleAuthMode authMode,
+                             String accessTeamDomain, String accessAud, String accessCertsUrl, Duration accessCertCacheTtl,
+                             String accessAllowedDomains, String accessAllowedEmails, boolean accessAutoCreate,
+                             String accessDefaultClientName) {
+        this(enabled, baseUrl, cookieSecure, mailFrom, emailLimit, ipLimit, rateWindow, maxActiveKeys, authMode,
+                accessTeamDomain, accessAud, accessCertsUrl, accessCertCacheTtl, accessAllowedDomains, accessAllowedEmails,
+                accessAutoCreate, accessDefaultClientName, "en");
     }
 
     public boolean magicLinkEnabled() { return authMode.usesMagicLink(); }

@@ -3,12 +3,16 @@ package com.thanhdatpb.listingguard.api.console;
 import com.thanhdatpb.listingguard.api.check.MarketplaceNotYetSupportedException;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.check.UnknownMarketplaceException;
+import com.thanhdatpb.listingguard.api.report.HealthReport;
 import com.thanhdatpb.listingguard.api.report.HealthReportService;
 import com.thanhdatpb.listingguard.api.report.InvalidReportPeriodException;
 import com.thanhdatpb.listingguard.api.report.ReportPeriodTooLongException;
 import com.thanhdatpb.listingguard.api.report.ReportQuery;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkRulesets;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -40,11 +44,14 @@ public class ConsoleReportController {
     private final HealthReportService service;
     private final NormalizerRegistry normalizers;
     private final TrademarkRulesets trademarkRulesets;
+    private final ConsoleMessages messages;
 
-    public ConsoleReportController(HealthReportService service, NormalizerRegistry normalizers, TrademarkRulesets trademarkRulesets) {
+    public ConsoleReportController(HealthReportService service, NormalizerRegistry normalizers, TrademarkRulesets trademarkRulesets,
+                                   ConsoleMessages messages) {
         this.service = service;
         this.normalizers = normalizers;
         this.trademarkRulesets = trademarkRulesets;
+        this.messages = messages;
     }
 
     @GetMapping("/console/report")
@@ -65,16 +72,58 @@ public class ConsoleReportController {
             model.addAttribute("from", query.from().toString());
             model.addAttribute("to", query.to().toString());
             model.addAttribute("marketplaceSelected", query.marketplace() == null ? "" : query.marketplace());
-            model.addAttribute("report", service.summary(user.clientId(), query));
+            HealthReport report = service.summary(user.clientId(), query);
+            model.addAttribute("report", report);
+            model.addAttribute("coverageText", coverageText(report.coverageNote(), query.from()));
         } catch (InvalidReportPeriodException | ReportPeriodTooLongException | UnknownMarketplaceException
                  | MarketplaceNotYetSupportedException e) {
             response.setStatus(HttpStatus.BAD_REQUEST.value());
             model.addAttribute("from", echo(from));
             model.addAttribute("to", echo(to));
             model.addAttribute("marketplaceSelected", "");
-            model.addAttribute("error", e.getMessage());
+            model.addAttribute("error", problem(e));
         }
         return VIEW;
+    }
+
+    /**
+     * What the refusal says, in the language of the page. The API's own sentence (the exception's message) is English and part of
+     * its contract; the console writes its own from what is wrong, and never repeats what the caller sent.
+     */
+    private String problem(RuntimeException e) {
+        if (e instanceof InvalidReportPeriodException period) {
+            return switch (period.reason()) {
+                case FROM_AFTER_TO -> messages.get("report.error.fromafterto");
+                case REQUIRED -> messages.get("report.error.required", period.parameter());
+                case NOT_A_DATE -> messages.get("report.error.notadate", period.parameter());
+                case NOT_A_CALENDAR_DATE -> messages.get("report.error.notarealdate", period.parameter());
+                case OTHER -> messages.get("report.error.period");
+            };
+        }
+        if (e instanceof ReportPeriodTooLongException tooLong) {
+            return messages.get("report.error.toolong", tooLong.requestedDays(), tooLong.maxDays());
+        }
+        String supported = String.join(", ", normalizers.supported());
+        return messages.get(e instanceof MarketplaceNotYetSupportedException
+                ? "report.error.marketplace.planned" : "report.error.marketplace.unknown", supported);
+    }
+
+    /**
+     * The coverage note of the report in the language of the page, built from the same figures as the API's English sentence
+     * ({@code ReportCoverage}): a pack is incomplete when the period starts before the first day it still has every result of.
+     */
+    private String coverageText(HealthReport.CoverageView coverage, LocalDate periodStart) {
+        List<String> kept = new ArrayList<>();
+        List<String> gaps = new ArrayList<>();
+        for (HealthReport.RetentionView pack : coverage.retention()) {
+            kept.add(messages.get("report.coverage.kept", pack.pack(), pack.period()));
+            if (periodStart.isBefore(pack.coveredFrom())) {
+                gaps.add(messages.get("report.coverage.gap", pack.pack(), pack.period(), pack.coveredFrom()));
+            }
+        }
+        return gaps.isEmpty()
+                ? messages.get("report.coverage.complete", String.join(", ", kept))
+                : messages.get("report.coverage.incomplete", String.join(", ", gaps));
     }
 
     private static boolean blank(String text) {

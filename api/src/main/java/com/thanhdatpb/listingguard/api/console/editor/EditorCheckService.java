@@ -5,6 +5,7 @@ import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.CheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
 import com.thanhdatpb.listingguard.api.plan.QuotaExceededException;
@@ -33,6 +34,9 @@ import org.springframework.stereotype.Service;
  * only the check it concerns, and the page says so in that check's panel; the other result is still shown. Both are the
  * services the API uses, so cache identity, retention and quota counting are those of the API and nothing is stored beyond
  * what the API stores (never the listing text).
+ *
+ * <p>The sentences of the panels are the console's own and come from its messages, in the language of the page (ADR-028). What
+ * a finding says (message, suggestion, fix) is the API's text and passes through unchanged.
  */
 @Service
 @ConditionalOnProperty(prefix = "listing-guard.console", name = "enabled", havingValue = "true")
@@ -41,23 +45,21 @@ public class EditorCheckService {
     private static final List<Severity> SEVERITY_ORDER = List.of(Severity.ERROR, Severity.WARNING, Severity.INFO);
     private static final List<RiskLevel> RISK_ORDER = List.of(RiskLevel.HIGH, RiskLevel.MEDIUM, RiskLevel.LOW);
 
-    private static final String LISTING_RULES_ONLY =
-            "The score counts the listing rules only. It is not a trademark verdict and not a promise that the marketplace "
-                    + "will accept the listing.";
-
     private final CheckService checks;
     private final TrademarkCheckService trademarks;
     private final TrademarkRulesets trademarkRulesets;
     private final NormalizerRegistry normalizers;
     private final JdbcTemplate jdbc;
+    private final ConsoleMessages messages;
 
     public EditorCheckService(CheckService checks, TrademarkCheckService trademarks, TrademarkRulesets trademarkRulesets,
-                              NormalizerRegistry normalizers, JdbcTemplate jdbc) {
+                              NormalizerRegistry normalizers, JdbcTemplate jdbc, ConsoleMessages messages) {
         this.checks = checks;
         this.trademarks = trademarks;
         this.trademarkRulesets = trademarkRulesets;
         this.normalizers = normalizers;
         this.jdbc = jdbc;
+        this.messages = messages;
     }
 
     public EditorResult check(UUID clientId, EditorMarketplace marketplace, ObjectNode listingJson) {
@@ -77,41 +79,44 @@ public class EditorCheckService {
         try {
             result = checks.checkDetailed(clientId, request);
         } catch (QuotaExceededException e) {
-            return notRun("Your monthly quota is used up (" + e.used() + " of " + e.quota() + " units). It resets on "
-                    + EditorCost.resetDate(e.resetAt()) + " (UTC); a listing you already checked is still answered.");
+            return notRun(messages.get("editor.rules.quota", e.used(), e.quota(), EditorCost.resetDate(e.resetAt())));
         } catch (PlanNotAllowedException e) {
-            return notRun("Your plan (" + e.plan() + ") does not include the listing rules.");
+            return notRun(messages.get("editor.rules.plan", e.plan()));
         }
         boolean required = result.findings().stream().anyMatch(finding -> "required_fields".equals(finding.ruleId()));
         return new Rules(readiness(result), ruleGroups(result), true, required);
     }
 
-    private static Rules notRun(String reason) {
-        return new Rules(new EditorResult.Readiness(EditorResult.ReadinessKind.NOT_RUN, null, "Not scored", "Not scored",
+    private Rules notRun(String reason) {
+        String notScored = messages.get("editor.readiness.notscored");
+        return new Rules(new EditorResult.Readiness(EditorResult.ReadinessKind.NOT_RUN, null, notScored, notScored,
                 reason, null), List.of(), false, false);
     }
 
-    private static EditorResult.Readiness readiness(CheckResult result) {
+    private EditorResult.Readiness readiness(CheckResult result) {
         CheckResult.ReadinessView view = result.readiness();
+        String notScored = messages.get("editor.readiness.notscored");
+        String only = messages.get("editor.readiness.only");
         if (view == null) {
-            return new EditorResult.Readiness(EditorResult.ReadinessKind.INCOMPLETE, null, "Not scored", "Not scored",
-                    "No readiness was computed for this result, so no score is shown. " + LISTING_RULES_ONLY, null);
+            return new EditorResult.Readiness(EditorResult.ReadinessKind.INCOMPLETE, null, notScored, notScored,
+                    messages.get("editor.readiness.none") + " " + only, null);
         }
         if ("INCOMPLETE".equals(view.status()) || view.score() == null) {
-            return new EditorResult.Readiness(EditorResult.ReadinessKind.INCOMPLETE, null, "Not scored", "Not scored",
-                    "A rule could not run, so there is no score. The findings below are the ones that were established. "
-                            + LISTING_RULES_ONLY, view.version());
+            return new EditorResult.Readiness(EditorResult.ReadinessKind.INCOMPLETE, null, notScored, notScored,
+                    messages.get("editor.readiness.incomplete") + " " + only, view.version());
         }
         String big = String.valueOf(view.score());
         if (view.ready()) {
-            return new EditorResult.Readiness(EditorResult.ReadinessKind.READY, view.score(), big, "Ready",
-                    "None of the listing rules found an error. " + LISTING_RULES_ONLY, view.version());
+            return new EditorResult.Readiness(EditorResult.ReadinessKind.READY, view.score(), big,
+                    messages.get("editor.readiness.ready.headline"),
+                    messages.get("editor.readiness.ready.detail") + " " + only, view.version());
         }
-        return new EditorResult.Readiness(EditorResult.ReadinessKind.NOT_READY, view.score(), big, "Not ready",
-                "The listing rules found at least one error. Fix it and check again. " + LISTING_RULES_ONLY, view.version());
+        return new EditorResult.Readiness(EditorResult.ReadinessKind.NOT_READY, view.score(), big,
+                messages.get("editor.readiness.notready.headline"),
+                messages.get("editor.readiness.notready.detail") + " " + only, view.version());
     }
 
-    private static List<EditorResult.Group<EditorResult.RuleItem>> ruleGroups(CheckResult result) {
+    private List<EditorResult.Group<EditorResult.RuleItem>> ruleGroups(CheckResult result) {
         List<EditorResult.Group<EditorResult.RuleItem>> groups = new ArrayList<>();
         int nextFixId = 0;
         for (Severity severity : SEVERITY_ORDER) {
@@ -128,12 +133,12 @@ public class EditorCheckService {
         return groups;
     }
 
-    private static String label(Severity severity) {
-        return switch (severity) {
-            case ERROR -> "Errors";
-            case WARNING -> "Warnings";
-            case INFO -> "Information";
-        };
+    private String label(Severity severity) {
+        return messages.get(switch (severity) {
+            case ERROR -> "editor.severity.error";
+            case WARNING -> "editor.severity.warning";
+            case INFO -> "editor.severity.info";
+        });
     }
 
     private static EditorResult.RuleItem ruleItem(CheckResult.FindingView finding, Integer fixId) {
@@ -149,16 +154,17 @@ public class EditorCheckService {
             TrademarkCheckResult result = trademarks.check(clientId, request);
             return fromResult(result, listing);
         } catch (TrademarkUnavailableException e) {
-            return panel(EditorResult.TrademarkKind.UNAVAILABLE, "Unavailable", "Trademark check unavailable",
-                    "No trademark catalog is loaded on this server, so the listing was not compared with any mark. "
-                            + "The listing rules ran as usual.", null, disclaimer);
+            return panel(EditorResult.TrademarkKind.UNAVAILABLE, messages.get("editor.trademark.unavailable.big"),
+                    messages.get("editor.trademark.unavailable.headline"), messages.get("editor.trademark.unavailable.detail"),
+                    null, disclaimer);
         } catch (PlanNotAllowedException e) {
-            return panel(EditorResult.TrademarkKind.NOT_IN_PLAN, "Not checked", "Trademark not checked",
-                    "Your plan (" + e.plan() + ") does not include the trademark check.", upgradeHint(e.pack()), disclaimer);
+            return panel(EditorResult.TrademarkKind.NOT_IN_PLAN, messages.get("editor.trademark.notchecked.big"),
+                    messages.get("editor.trademark.notchecked.headline"), messages.get("editor.trademark.plan", e.plan()),
+                    upgradeHint(e.pack()), disclaimer);
         } catch (QuotaExceededException e) {
-            return panel(EditorResult.TrademarkKind.QUOTA_EXCEEDED, "Not checked", "Trademark not checked",
-                    "Your monthly quota is used up (" + e.used() + " of " + e.quota() + " units). It resets on "
-                            + EditorCost.resetDate(e.resetAt()) + " (UTC); a listing you already checked is still answered.",
+            return panel(EditorResult.TrademarkKind.QUOTA_EXCEEDED, messages.get("editor.trademark.notchecked.big"),
+                    messages.get("editor.trademark.notchecked.headline"),
+                    messages.get("editor.rules.quota", e.used(), e.quota(), EditorCost.resetDate(e.resetAt())),
                     null, disclaimer);
         }
     }
@@ -168,17 +174,19 @@ public class EditorCheckService {
         String disclaimer = result.disclaimer();
         if (result.completeness() == Completeness.COMPLETE) {
             String level = result.riskLevel().name();
-            return new EditorResult.Trademark(EditorResult.TrademarkKind.RESULT, level, level, "Risk level: " + level,
+            return new EditorResult.Trademark(EditorResult.TrademarkKind.RESULT, level, level,
+                    messages.get("editor.trademark.risk", level),
                     result.findings().isEmpty()
-                            ? "No possible reference was found in the catalog the text was compared with."
-                            : "These are possible references to registered marks, for you to review.",
+                            ? messages.get("editor.trademark.none")
+                            : messages.get("editor.trademark.review"),
                     null, disclaimer, groups);
         }
-        String known = result.riskLevel() == RiskLevel.UNKNOWN ? "Unknown" : result.riskLevel().name();
+        String known = result.riskLevel() == RiskLevel.UNKNOWN ? messages.get("editor.trademark.unknown")
+                : result.riskLevel().name();
         return new EditorResult.Trademark(EditorResult.TrademarkKind.INCOMPLETE,
-                result.riskLevel() == RiskLevel.UNKNOWN ? null : result.riskLevel().name(), known, "Trademark check incomplete",
-                "A rule could not run, so the risk cannot be fully determined. The findings shown are the ones that were "
-                        + "established; never read this as a low risk.", null, disclaimer, groups);
+                result.riskLevel() == RiskLevel.UNKNOWN ? null : result.riskLevel().name(), known,
+                messages.get("editor.trademark.incomplete.headline"), messages.get("editor.trademark.incomplete.detail"),
+                null, disclaimer, groups);
     }
 
     private List<EditorResult.Group<EditorResult.TrademarkItem>> trademarkGroups(TrademarkCheckResult result, Listing listing) {
@@ -187,8 +195,8 @@ public class EditorCheckService {
             List<EditorResult.TrademarkItem> items = result.findings().stream().filter(finding -> finding.risk() == risk)
                     .map(finding -> trademarkItem(finding, listing)).toList();
             if (!items.isEmpty()) {
-                groups.add(new EditorResult.Group<>(risk.name().charAt(0) + risk.name().substring(1).toLowerCase(Locale.ROOT)
-                        + " risk", risk.name().toLowerCase(Locale.ROOT), items));
+                groups.add(new EditorResult.Group<>(messages.get("editor.trademark.group." + risk.name().toLowerCase(Locale.ROOT)),
+                        risk.name().toLowerCase(Locale.ROOT), items));
             }
         }
         return groups;
@@ -211,9 +219,8 @@ public class EditorCheckService {
         List<String> plans = jdbc.queryForList("SELECT plan_code FROM plan_pack WHERE pack_id = ? ORDER BY plan_code",
                 String.class, pack.id());
         if (plans.isEmpty()) {
-            return "No plan includes this check. Ask the operator of this deployment.";
+            return messages.get("editor.upgrade.none");
         }
-        return "Plans that include it: " + String.join(", ", plans) + ". Ask the operator of this deployment to move you "
-                + "to one of them.";
+        return messages.get("editor.upgrade.plans", String.join(", ", plans));
     }
 }
