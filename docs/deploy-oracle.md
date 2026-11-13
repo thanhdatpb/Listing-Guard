@@ -174,16 +174,70 @@ on it, and settle it with the checks in "Check from outside". The pages are list
 ### Console (people)
 
 Create a Cloudflare Access self-hosted application for the same hostname and the path `/console/*`. Add an Allow
-policy restricted to an explicit allow-list of e-mail addresses: **for now only the maintainer's** (decision of 2026-11-13;
-add an address, or an identity group, when someone else needs the console). Test both a permitted and an unpermitted identity. The console itself must also be enabled and configured with SMTP and the exact HTTPS public
-origin in `LISTING_GUARD_CONSOLE_BASE_URL`; Cloudflare Access is an additional gate, not a replacement for console
-login.
+policy restricted to an explicit allow-list of e-mail addresses (**for now only the maintainer's**, decision of 2026-11-13; add an address, or an identity group, when someone else needs the console), and choose an identity provider such
+as email OTP or Google. In Access-only mode the application also verifies the signed identity assertion itself, so
+SMTP is not needed. Configure `LISTING_GUARD_CONSOLE_BASE_URL` to the exact HTTPS public origin and set the variables
+listed below. Do not expose `/console/*` around Access: the JWT assertion is forwarded by the Tunnel and is trusted
+only after signature verification by the API.
+
+#### Cloudflare Access sign-in (ADR-027)
+
+In Zero Trust, open **Access > Applications > Add an application > Self-hosted**. Set the public hostname and path
+`/console/*`, add an Allow policy for the approved people or email domain, and enable the desired login methods (email
+OTP and/or Google). Save the application and copy its **AUD tag** from the application's details page. Keep the Access
+policy and the application's audience in place; Listing Guard independently checks both the assertion signature and
+the AUD claim. The team issuer is `https://<team-name>.cloudflareaccess.com`; the default certificate endpoint is
+`<team issuer>/cdn-cgi/access/certs`.
+
+For Access-only login, put these values in the protected server `.env` (see `deploy/env.prod.example`):
+
+```dotenv
+LISTING_GUARD_CONSOLE_ENABLED=true
+LISTING_GUARD_CONSOLE_BASE_URL=https://listing-api.example.com
+LISTING_GUARD_CONSOLE_AUTH_MODE=CLOUDFLARE_ACCESS
+LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN=https://your-team.cloudflareaccess.com
+LISTING_GUARD_CONSOLE_ACCESS_AUD=PASTE_THE_AUD_TAG
+LISTING_GUARD_CONSOLE_ACCESS_CERT_CACHE_TTL=1h
+LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_DOMAINS=example.com
+LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS=admin@example.net
+LISTING_GUARD_CONSOLE_ACCESS_AUTO_CREATE=false
+```
+
+`LISTING_GUARD_CONSOLE_ACCESS_CERTS_URL` may override the certificate URL; normally leave it unset. The assertion
+cache refreshes after the configured TTL and immediately when a token has an unknown `kid`. Set one or both allowlist
+variables (comma-separated, exact email or exact domain). With auto-creation enabled, also set
+`LISTING_GUARD_CONSOLE_ACCESS_DEFAULT_CLIENT_NAME`; new accounts share that configured FREE client. Existing accounts
+keep their current client. `CLOUDFLARE_ACCESS` does not require SMTP. `MAGIC_LINK` remains the default and retains its
+current behavior; it requires SMTP only when selected. `BOTH` enables both methods and therefore requires SMTP.
+
+After changing `.env`, recreate the API:
+
+```bash
+docker compose --profile prod up -d --no-deps api
+docker compose --profile prod logs --tail=100 api
+```
+
+Verify using one identity in the allowlist and one outside it:
+
+1. Open `https://listing-api.example.com/console/` in a private browser window and sign in with the allowed identity
+   through Access. The dashboard should show that identity; with auto-creation on, it should use the configured default
+   client.
+2. Sign out and repeat with an identity outside the app policy. Cloudflare should deny it before it reaches the API.
+   For an identity that passes the Cloudflare policy but is outside Listing Guard's own allowlist, the API shows a 403
+   explanation. This checks both policy layers.
+3. For a direct app-level check, run `curl -i https://listing-api.example.com/console/` without Access cookies; expect
+   Cloudflare's sign-in/deny response, not the console. Never send a fabricated `Cf-Access-Authenticated-User-Email`
+   header as a test of identity: the application does not trust it.
+
+If login mode is `MAGIC_LINK` or `BOTH`, configure `SPRING_MAIL_HOST`, `LISTING_GUARD_CONSOLE_MAIL_FROM` and the
+remaining `SPRING_MAIL_*` values as before. Access-only deployments may leave all SMTP settings empty.
 
 `/console/*` is its own application with its own human policy. It never takes a service token, and an `/api/v1/*`
-application (optional, below) never takes a human policy. The console's sign-in pages are served at `/login`, `/login/verify` and
-`/logout`, and the dashboard also answers at `/console`; none of these is under `/console/*` (Cloudflare's
-application-paths page says that `example.com/alpha/*` does not cover `example.com/alpha`). Decide explicitly whether to
-add them to an Access application; the console's own sign-in (magic link, CSRF, login limits) applies either way.
+application (optional, below) never takes a human policy. The dashboard uses `/console/`; `/console` redirects there because Cloudflare's
+path rule `/console/*` does not cover the bare `/console` path. The app verifies the signed assertion on `/console/`.
+The magic-link pages at `/login` and `/login/verify` remain outside Access in `MAGIC_LINK` and `BOTH` modes; they
+retain their own CSRF and rate limits. `/logout` invalidates the app session and, when Access is enabled, redirects to
+Cloudflare's `/cdn-cgi/access/logout` endpoint.
 
 ### Health (uptime monitor)
 
