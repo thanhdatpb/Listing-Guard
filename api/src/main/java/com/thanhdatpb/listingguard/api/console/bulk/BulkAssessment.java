@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Detail;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Item;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Kind;
@@ -9,11 +10,12 @@ import java.util.List;
 
 /**
  * Reduces the three checks of one row to what the table shows (ADR-029): a status, a count, the main finding and the line that is
- * pasted back into the Sheet. It decides nothing about a listing that a rule did not decide: it only orders and counts.
+ * pasted back into the Sheet. It decides nothing about a listing that a rule did not decide: it only orders and counts. Its sentences
+ * are messages (ADR-028), in the language of the page.
  *
- * <p>A row is {@code Lỗi} when a listing rule (or a variation rule) found an ERROR; {@code Cảnh báo} for a WARNING, a trademark risk of
+ * <p>A row is {@code ERROR} when a listing rule (or a variation rule) found an ERROR; {@code WARNING} for a WARNING, a trademark risk of
  * MEDIUM or HIGH, or any part that is INCOMPLETE (a result that could not be completed is never read as clean); otherwise
- * {@code Đạt}, which means no listing rule found an error or warning and says nothing about the marketplace or about a trademark
+ * {@code OK}, which means no listing rule found an error or warning and says nothing about the marketplace or about a trademark
  * that was not checked (the summary says so).
  */
 final class BulkAssessment {
@@ -27,13 +29,13 @@ final class BulkAssessment {
     private BulkAssessment() {
     }
 
-    static Assessed of(Detail detail) {
+    static Assessed of(ConsoleMessages messages, Detail detail) {
         if (detail.problem() != null) {
-            return new Assessed(Status.UNREADABLE, 0, null, summary("Không đọc được: " + detail.problem()));
+            return new Assessed(Status.UNREADABLE, 0, null, summary(messages.get("bulk.summary.unreadable", detail.problem())));
         }
         BulkResult.Rules rules = detail.rules();
         if (!rules.ran()) {
-            return new Assessed(Status.NOT_CHECKED, 0, null, summary("Chưa kiểm tra: " + rules.note()));
+            return new Assessed(Status.NOT_CHECKED, 0, null, summary(messages.get("bulk.summary.notchecked", rules.note())));
         }
         BulkResult.Trademark trademark = detail.trademark();
         BulkResult.Variation variation = detail.variation();
@@ -72,23 +74,23 @@ final class BulkAssessment {
 
         StringBuilder text = new StringBuilder();
         if (findings == 0) {
-            text.append("Không có phát hiện.");
+            text.append(messages.get("bulk.summary.none"));
         } else {
-            text.append(findings).append(" phát hiện. ").append(main.message());
+            text.append(messages.get("bulk.summary.some", findings, main.message()));
         }
         List<String> notes = new ArrayList<>();
         if (trademark.kind() == Kind.NOT_RUN) {
-            notes.add("Chưa kiểm tra nhãn hiệu: " + trademark.note());
+            notes.add(messages.get("bulk.summary.trademark.notrun", trademark.note()));
         } else if (trademark.kind() == Kind.INCOMPLETE) {
-            notes.add("Kiểm tra nhãn hiệu chưa đầy đủ");
+            notes.add(messages.get("bulk.summary.trademark.incomplete"));
         }
         if ("INCOMPLETE".equals(rules.readiness())) {
-            notes.add("Một quy tắc không chạy được");
+            notes.add(messages.get("bulk.summary.rules.incomplete"));
         }
         if (variation.kind() == Kind.NOT_RUN) {
-            notes.add("Chưa kiểm tra biến thể: " + variation.note());
+            notes.add(messages.get("bulk.summary.variation.notrun", variation.note()));
         } else if (variation.kind() == Kind.INCOMPLETE) {
-            notes.add("Kiểm tra biến thể chưa đầy đủ");
+            notes.add(messages.get("bulk.summary.variation.incomplete"));
         }
         for (String note : notes) {
             text.append(" [").append(note).append(']');

@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.console.bulk;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkTargets.Target;
 import com.thanhdatpb.listingguard.api.console.editor.EditorMarketplace;
 import com.thanhdatpb.listingguard.input.StandardListingAdapter;
@@ -42,7 +43,8 @@ final class BulkListingMapper {
     private BulkListingMapper() {
     }
 
-    static Mapped map(EditorMarketplace marketplace, ColumnMapping mapping, List<String> labels, List<String> cells) {
+    static Mapped map(ConsoleMessages messages, EditorMarketplace marketplace, ColumnMapping mapping, List<String> labels,
+                      List<String> cells) {
         if (cells.stream().allMatch(String::isBlank)) {
             return new Mapped(null, null, null, Map.of(), JSON.objectNode(), null, true);
         }
@@ -86,8 +88,7 @@ final class BulkListingMapper {
                     if (PLAIN_DECIMAL.matcher(value).matches()) {
                         listing.put(key, new BigDecimal(value));
                     } else {
-                        problems.add("Giá (cột “" + labels.get(i) + "”) = “" + clip(value) + "” không phải số thập phân "
-                                + "thường: dùng dấu chấm, không có ký hiệu tiền tệ hay dấu phân cách hàng nghìn");
+                        problems.add(messages.get("bulk.row.price", labels.get(i), clip(value)));
                     }
                 }
                 case INTEGER -> {
@@ -98,15 +99,14 @@ final class BulkListingMapper {
                     if (WHOLE_NUMBER.matcher(value).matches()) {
                         listing.put(key, Long.parseLong(value));
                     } else {
-                        problems.add("Số lượng (cột “" + labels.get(i) + "”) = “" + clip(value)
-                                + "” không phải số nguyên");
+                        problems.add(messages.get("bulk.row.quantity", labels.get(i), clip(value)));
                     }
                 }
             }
         }
         lists.forEach((key, columns) -> putList(listing, marketplace, mapping, key, columns));
         ObjectNode standard = StandardListingAdapter.toStandardInput(marketplace.code(), listing);
-        String error = problems.isEmpty() ? null : "Dữ liệu sai: " + String.join("; ", problems) + ".";
+        String error = problems.isEmpty() ? null : messages.get("bulk.row.problem", String.join("; ", problems));
         return new Mapped(sku, parentSku, theme, attributes, standard, error, false);
     }
 

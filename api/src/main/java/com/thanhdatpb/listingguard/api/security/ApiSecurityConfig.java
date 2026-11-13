@@ -107,7 +107,8 @@ public class ApiSecurityConfig {
     @Bean
     @Order(1)
     @ConditionalOnProperty(prefix = "listing-guard.console", name = "enabled", havingValue = "true")
-    public SecurityFilterChain consoleSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain consoleSecurityFilterChain(HttpSecurity http, ConsoleProperties console,
+                                                            com.thanhdatpb.listingguard.api.console.CloudflareAccessLoginService accessLogin) throws Exception {
         http.securityMatcher("/login", "/login/**", "/console", "/console/**", "/logout")
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/login", "/login/**").permitAll()
@@ -116,13 +117,16 @@ public class ApiSecurityConfig {
                 .sessionManagement(session -> session.sessionFixation(fixation -> fixation.changeSessionId()))
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(
                         (request, response, authException) -> response.sendRedirect("/login")))
-                .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .logoutSuccessUrl("/login?logout")
+                .logout(logout -> logout.logoutUrl("/logout")
+                        .logoutSuccessUrl(console.cloudflareAccessEnabled() ? "/cdn-cgi/access/logout" : "/login?logout")
                         .invalidateHttpSession(true)
                         .deleteCookies("LISTINGGUARDSESSION"))
                 .headers(headers -> headers.referrerPolicy(referrer -> referrer
                         .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)));
+        if (console.cloudflareAccessEnabled()) {
+            http.addFilterBefore(new com.thanhdatpb.listingguard.api.console.CloudflareAccessAuthenticationFilter(accessLogin, console),
+                    org.springframework.security.web.authentication.AnonymousAuthenticationFilter.class);
+        }
         return http.build();
     }
 

@@ -52,7 +52,8 @@ public record ReportQuery(LocalDate from, LocalDate to, String marketplace) {
         LocalDate first = date(from, "from");
         LocalDate last = date(to, "to");
         if (last.isBefore(first)) {
-            throw new InvalidReportPeriodException("from must not be after to.");
+            throw new InvalidReportPeriodException("from must not be after to.", InvalidReportPeriodException.Reason.FROM_AFTER_TO,
+                    null);
         }
         long days = ChronoUnit.DAYS.between(first, last) + 1;
         if (days > maxDays) {
@@ -63,16 +64,19 @@ public record ReportQuery(LocalDate from, LocalDate to, String marketplace) {
 
     private static LocalDate date(String text, String name) {
         if (text == null || text.isBlank()) {
-            throw new InvalidReportPeriodException(name + " is required: a date written as YYYY-MM-DD.");
+            throw new InvalidReportPeriodException(name + " is required: a date written as YYYY-MM-DD.",
+                    InvalidReportPeriodException.Reason.REQUIRED, name);
         }
         String trimmed = text.trim();
         if (!DATE.matcher(trimmed).matches()) {
-            throw new InvalidReportPeriodException(name + " is not a date written as YYYY-MM-DD.");
+            throw new InvalidReportPeriodException(name + " is not a date written as YYYY-MM-DD.",
+                    InvalidReportPeriodException.Reason.NOT_A_DATE, name);
         }
         try {
             return LocalDate.parse(trimmed);
         } catch (DateTimeParseException e) {
-            throw new InvalidReportPeriodException(name + " is not a real calendar date written as YYYY-MM-DD.");
+            throw new InvalidReportPeriodException(name + " is not a real calendar date written as YYYY-MM-DD.",
+                    InvalidReportPeriodException.Reason.NOT_A_CALENDAR_DATE, name);
         }
     }
 }

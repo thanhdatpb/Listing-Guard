@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Detail;
@@ -11,13 +12,15 @@ import org.junit.jupiter.api.Test;
 
 /** What the table says about a row, from what the three checks found (ADR-029). Synthetic findings only. */
 class BulkAssessmentTest {
+    private static final ConsoleMessages MESSAGES = BulkTestMessages.vi();
+
 
     private static Item item(String level, String message) {
-        return new Item(level, BulkText.severityLabel(level), "rule_" + level, "title", message, "do something", null, null, null);
+        return new Item(level, BulkText.level(MESSAGES, level), "rule_" + level, "title", message, "do something", null, null, null, null);
     }
 
     private static BulkResult.Rules rules(String readiness, Item... items) {
-        return new BulkResult.Rules(true, null, readiness, "INCOMPLETE".equals(readiness) ? null : 90, List.of(items));
+        return new BulkResult.Rules(true, null, readiness, null, "INCOMPLETE".equals(readiness) ? null : 90, List.of(items));
     }
 
     private static BulkResult.Trademark tm(Kind kind, String level, Item... items) {
@@ -40,7 +43,7 @@ class BulkAssessmentTest {
 
     @Test
     void aRowWithNothingFoundIsOkAndSaysSo() {
-        BulkAssessment.Assessed assessed = BulkAssessment.of(detail(rules("READY"), tm(Kind.RESULT, null), NO_FAMILY));
+        BulkAssessment.Assessed assessed = BulkAssessment.of(MESSAGES, detail(rules("READY"), tm(Kind.RESULT, null), NO_FAMILY));
 
         assertThat(assessed.status()).isEqualTo(Status.OK);
         assertThat(assessed.findings()).isZero();
@@ -50,7 +53,7 @@ class BulkAssessmentTest {
 
     @Test
     void anErrorOfTheRulesMakesTheRowAnErrorAndIsItsMainFinding() {
-        BulkAssessment.Assessed assessed = BulkAssessment.of(detail(
+        BulkAssessment.Assessed assessed = BulkAssessment.of(MESSAGES, detail(
                 rules("NOT_READY", item("warning", "a warning"), item("error", "an error")),
                 tm(Kind.RESULT, "HIGH", item("high", "a mark")), NO_FAMILY));
 
@@ -70,7 +73,7 @@ class BulkAssessmentTest {
         assertThat(BulkAssessment.rank("trademark", "medium")).isLessThan(BulkAssessment.rank("rules", "info"));
         assertThat(BulkAssessment.rank("rules", "info")).isLessThan(BulkAssessment.rank("trademark", "low"));
 
-        BulkAssessment.Assessed assessed = BulkAssessment.of(detail(rules("READY", item("warning", "rule warning")),
+        BulkAssessment.Assessed assessed = BulkAssessment.of(MESSAGES, detail(rules("READY", item("warning", "rule warning")),
                 tm(Kind.RESULT, "HIGH", item("high", "mark risk")), variation(Kind.RESULT, item("warning", "family warning"))));
         assertThat(assessed.status()).isEqualTo(Status.WARNING);
         assertThat(assessed.main().message()).isEqualTo("mark risk");
@@ -78,20 +81,20 @@ class BulkAssessmentTest {
 
     @Test
     void aWarningOfTheRulesOrOfAFamilyMakesAWarning() {
-        assertThat(BulkAssessment.of(detail(rules("READY", item("warning", "w")), tm(Kind.RESULT, null), NO_FAMILY)).status())
+        assertThat(BulkAssessment.of(MESSAGES, detail(rules("READY", item("warning", "w")), tm(Kind.RESULT, null), NO_FAMILY)).status())
                 .isEqualTo(Status.WARNING);
-        assertThat(BulkAssessment.of(detail(rules("READY"), tm(Kind.RESULT, null), variation(Kind.RESULT, item("warning", "w"))))
+        assertThat(BulkAssessment.of(MESSAGES, detail(rules("READY"), tm(Kind.RESULT, null), variation(Kind.RESULT, item("warning", "w"))))
                 .status()).isEqualTo(Status.WARNING);
     }
 
     @Test
     void aTrademarkRiskOfMediumOrHighIsAWarningAndALowOneOnlyCounts() {
-        assertThat(BulkAssessment.of(detail(rules("READY"), tm(Kind.RESULT, "MEDIUM", item("medium", "m")), NO_FAMILY)).status())
+        assertThat(BulkAssessment.of(MESSAGES, detail(rules("READY"), tm(Kind.RESULT, "MEDIUM", item("medium", "m")), NO_FAMILY)).status())
                 .isEqualTo(Status.WARNING);
-        assertThat(BulkAssessment.of(detail(rules("READY"), tm(Kind.RESULT, "HIGH", item("high", "h")), NO_FAMILY)).status())
+        assertThat(BulkAssessment.of(MESSAGES, detail(rules("READY"), tm(Kind.RESULT, "HIGH", item("high", "h")), NO_FAMILY)).status())
                 .isEqualTo(Status.WARNING);
 
-        BulkAssessment.Assessed low = BulkAssessment.of(detail(rules("READY"), tm(Kind.RESULT, "LOW", item("low", "l")), NO_FAMILY));
+        BulkAssessment.Assessed low = BulkAssessment.of(MESSAGES, detail(rules("READY"), tm(Kind.RESULT, "LOW", item("low", "l")), NO_FAMILY));
         assertThat(low.status()).isEqualTo(Status.OK);
         assertThat(low.findings()).isEqualTo(1);
         assertThat(low.main().message()).isEqualTo("l");
@@ -99,43 +102,43 @@ class BulkAssessmentTest {
 
     @Test
     void anIncompleteResultIsNeverReadAsClean() {
-        assertThat(BulkAssessment.of(detail(rules("READY"), tm(Kind.INCOMPLETE, null), NO_FAMILY)).status())
+        assertThat(BulkAssessment.of(MESSAGES, detail(rules("READY"), tm(Kind.INCOMPLETE, null), NO_FAMILY)).status())
                 .as("trademark incomplete").isEqualTo(Status.WARNING);
-        assertThat(BulkAssessment.of(detail(rules("INCOMPLETE"), tm(Kind.RESULT, null), NO_FAMILY)).status())
+        assertThat(BulkAssessment.of(MESSAGES, detail(rules("INCOMPLETE"), tm(Kind.RESULT, null), NO_FAMILY)).status())
                 .as("a rule could not run").isEqualTo(Status.WARNING);
-        assertThat(BulkAssessment.of(detail(rules("READY"), tm(Kind.RESULT, null), variation(Kind.INCOMPLETE))).status())
+        assertThat(BulkAssessment.of(MESSAGES, detail(rules("READY"), tm(Kind.RESULT, null), variation(Kind.INCOMPLETE))).status())
                 .as("variation incomplete").isEqualTo(Status.WARNING);
     }
 
     @Test
     void whatDidNotRunIsSaidInTheSummaryAndNeverTurnsIntoAFailure() {
-        BulkAssessment.Assessed noTrademark = BulkAssessment.of(detail(rules("READY"), tmNotRun("hết quota"), NO_FAMILY));
+        BulkAssessment.Assessed noTrademark = BulkAssessment.of(MESSAGES, detail(rules("READY"), tmNotRun("hết quota"), NO_FAMILY));
         assertThat(noTrademark.status()).isEqualTo(Status.OK);
         assertThat(noTrademark.summary()).contains("[Chưa kiểm tra nhãn hiệu: hết quota]");
 
-        BulkAssessment.Assessed noVariation = BulkAssessment.of(detail(rules("READY"), tm(Kind.RESULT, null), variation(Kind.NOT_RUN)));
+        BulkAssessment.Assessed noVariation = BulkAssessment.of(MESSAGES, detail(rules("READY"), tm(Kind.RESULT, null), variation(Kind.NOT_RUN)));
         assertThat(noVariation.summary()).contains("[Chưa kiểm tra biến thể: gói không gồm]");
     }
 
     @Test
     void aRowWhoseRulesDidNotRunIsNotCheckedAndAnUnreadableRowSaysWhy() {
-        BulkAssessment.Assessed quota = BulkAssessment.of(detail(BulkResult.Rules.notRun("hết quota tháng"), tmNotRun("x"), NO_FAMILY));
+        BulkAssessment.Assessed quota = BulkAssessment.of(MESSAGES, detail(BulkResult.Rules.notRun("hết quota tháng"), tmNotRun("x"), NO_FAMILY));
         assertThat(quota.status()).isEqualTo(Status.NOT_CHECKED);
         assertThat(quota.summary()).isEqualTo("Chưa kiểm tra: hết quota tháng");
 
-        BulkAssessment.Assessed unread = BulkAssessment.of(Detail.unread("Dữ liệu sai: giá"));
+        BulkAssessment.Assessed unread = BulkAssessment.of(MESSAGES, Detail.unread("Dữ liệu sai: giá"));
         assertThat(unread.status()).isEqualTo(Status.UNREADABLE);
         assertThat(unread.summary()).isEqualTo("Không đọc được: Dữ liệu sai: giá");
     }
 
     @Test
     void theSummaryIsOneLineAndCutAtACodePoint() {
-        BulkAssessment.Assessed multiline = BulkAssessment.of(detail(
+        BulkAssessment.Assessed multiline = BulkAssessment.of(MESSAGES, detail(
                 rules("NOT_READY", item("error", "first line\nsecond\tline  with   gaps")), tm(Kind.RESULT, null), NO_FAMILY));
         assertThat(multiline.summary()).doesNotContain("\n").doesNotContain("\t").contains("first line second line with gaps");
 
         String longMessage = "x".repeat(300);
-        BulkAssessment.Assessed cut = BulkAssessment.of(detail(rules("NOT_READY", item("error", longMessage)),
+        BulkAssessment.Assessed cut = BulkAssessment.of(MESSAGES, detail(rules("NOT_READY", item("error", longMessage)),
                 tm(Kind.RESULT, null), NO_FAMILY));
         assertThat(cut.summary().codePointCount(0, cut.summary().length())).isEqualTo(BulkAssessment.SUMMARY_MAX_CHARS);
         assertThat(cut.summary()).endsWith("…");

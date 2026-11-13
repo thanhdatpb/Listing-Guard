@@ -20,7 +20,7 @@ public class ConsoleAccount {
     @Column(nullable = false, unique = true, length = 254)
     private String email;
 
-    @Column(name = "client_id", nullable = false, unique = true)
+    @Column(name = "client_id", nullable = false)
     private UUID clientId;
 
     @Column(name = "created_at", nullable = false)

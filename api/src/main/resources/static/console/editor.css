@@ -55,6 +55,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 }
 .bar nav { display: flex; gap: 1.25rem; }
 .bar a[aria-current="page"] { color: var(--fg); font-weight: 600; text-decoration: none; }
+/* The language links (ADR-028): the current language is plain text, the other is a link. */
+.lang { display: flex; gap: 0.4rem; }
+.lang a[aria-current="true"] { color: var(--fg); font-weight: 600; text-decoration: none; }
 
 .layout {
   display: grid;

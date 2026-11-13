@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -12,6 +13,8 @@ import org.junit.jupiter.api.Test;
 
 /** One row of cells into the standard listing JSON (ADR-029). Synthetic values only. */
 class BulkListingMapperTest {
+    private static final ConsoleMessages MESSAGES = BulkTestMessages.vi();
+
 
     private static final EditorMarketplace ETSY = EditorMarketplace.ETSY;
     private static final EditorMarketplace AMAZON = EditorMarketplace.AMAZON;
@@ -21,7 +24,7 @@ class BulkListingMapperTest {
         for (int i = 0; i < targets.size(); i++) {
             labels.add("Cột " + BulkTable.letters(i));
         }
-        return BulkListingMapper.map(ETSY, new ColumnMapping(targets, separators), labels, List.of(cells));
+        return BulkListingMapper.map(MESSAGES, ETSY, new ColumnMapping(targets, separators), labels, List.of(cells));
     }
 
     private static List<String> texts(JsonNode array) {
@@ -103,7 +106,7 @@ class BulkListingMapperTest {
                 Map.of());
         List<String> labels = List.of("SKU", "Title", "Parent", "Theme", "Màu", "Size");
 
-        BulkListingMapper.Mapped mapped = BulkListingMapper.map(AMAZON, mapping, labels,
+        BulkListingMapper.Mapped mapped = BulkListingMapper.map(MESSAGES, AMAZON, mapping, labels,
                 List.of(" TEE-RED-S ", "Tee", " TEE-P", "Color-Size", "Red", " S "));
 
         assertThat(mapped.sku()).isEqualTo("TEE-RED-S");
@@ -116,14 +119,14 @@ class BulkListingMapperTest {
     @Test
     void amazonBulletsAcrossColumnsAndSearchTermsAsTextOrList() {
         ColumnMapping five = new ColumnMapping(List.of("bullet_points", "bullet_points", "bullet_points", "search_terms"), Map.of());
-        BulkListingMapper.Mapped mapped = BulkListingMapper.map(AMAZON, five, List.of("B1", "B2", "B3", "Terms"),
+        BulkListingMapper.Mapped mapped = BulkListingMapper.map(MESSAGES, AMAZON, five, List.of("B1", "B2", "B3", "Terms"),
                 List.of("one", "two", "", "red blue"));
 
         assertThat(texts(mapped.listing().get("bullet_points"))).containsExactly("one", "two", "");
         assertThat(mapped.listing().get("search_terms").isTextual()).as("one column is text").isTrue();
 
         ColumnMapping manyTerms = new ColumnMapping(List.of("search_terms", "search_terms"), Map.of());
-        BulkListingMapper.Mapped list = BulkListingMapper.map(AMAZON, manyTerms, List.of("T1", "T2"), List.of("red", "blue"));
+        BulkListingMapper.Mapped list = BulkListingMapper.map(MESSAGES, AMAZON, manyTerms, List.of("T1", "T2"), List.of("red", "blue"));
         assertThat(texts(list.listing().get("search_terms"))).containsExactly("red", "blue");
     }
 
@@ -131,7 +134,7 @@ class BulkListingMapperTest {
     void aSingleColumnOfAmazonBulletsIsCutAtNewLinesByDefault() {
         ColumnMapping one = new ColumnMapping(List.of("bullet_points"), Map.of());
 
-        BulkListingMapper.Mapped mapped = BulkListingMapper.map(AMAZON, one, List.of("Bullets"), List.of("light\nstrong\r\nwarm"));
+        BulkListingMapper.Mapped mapped = BulkListingMapper.map(MESSAGES, AMAZON, one, List.of("Bullets"), List.of("light\nstrong\r\nwarm"));
 
         assertThat(texts(mapped.listing().get("bullet_points"))).containsExactly("light", "strong", "warm");
     }

@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Row;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Status;
 import java.nio.charset.StandardCharsets;
@@ -9,7 +10,7 @@ import java.util.StringJoiner;
 
 /**
  * The two things a seller takes away from a bulk run (ADR-029): the block that is pasted back into the Sheet and the CSV file. Both are
- * built from the rows in their input order.
+ * built from the rows in their input order, in the language of the page (ADR-028).
  *
  * <p>The block has two columns, status and summary, tab-separated, one line per input row. No cell holds a tab or a line break, so a
  * Sheet puts each in one cell; a blank input row is a blank line, so the answer never shifts against the rows it belongs to; a table
@@ -19,40 +20,37 @@ import java.util.StringJoiner;
  */
 final class BulkExport {
 
-    static final String STATUS_HEADER = "Trạng thái";
-    static final String SUMMARY_HEADER = "Tóm tắt";
-
-    private static final String[] CSV_HEADER = {"Dòng", "SKU", STATUS_HEADER, "Số phát hiện", SUMMARY_HEADER};
-
     private BulkExport() {
     }
 
-    static String sheetBlock(List<Row> rows, boolean header) {
+    static String sheetBlock(ConsoleMessages messages, List<Row> rows, boolean header) {
         StringJoiner lines = new StringJoiner("\n");
         if (header) {
-            lines.add(STATUS_HEADER + "\t" + SUMMARY_HEADER);
+            lines.add(oneLine(messages.get("bulk.export.status")) + "\t" + oneLine(messages.get("bulk.export.summary")));
         }
         for (Row row : rows) {
             boolean blank = row.status() == Status.EMPTY;
-            lines.add((blank ? "" : defuse(row.status().label())) + "\t" + (blank ? "" : defuse(oneLine(row.summary()))));
+            lines.add((blank ? "" : defuse(oneLine(row.statusLabel()))) + "\t" + (blank ? "" : defuse(oneLine(row.summary()))));
         }
         return lines.toString();
     }
 
     /** UTF-8 with a byte order mark, so a spreadsheet reads the Vietnamese text; {@code \r\n} between lines. */
-    static String csv(List<Row> rows) {
+    static String csv(ConsoleMessages messages, List<Row> rows) {
         StringBuilder out = new StringBuilder("﻿");
         StringJoiner head = new StringJoiner(",");
-        for (String name : CSV_HEADER) {
-            head.add(cell(name));
-        }
+        head.add(cell(messages.get("bulk.export.line")));
+        head.add(cell(messages.get("bulk.export.sku")));
+        head.add(cell(messages.get("bulk.export.status")));
+        head.add(cell(messages.get("bulk.export.findings")));
+        head.add(cell(messages.get("bulk.export.summary")));
         out.append(head).append("\r\n");
         for (Row row : rows) {
             boolean blank = row.status() == Status.EMPTY;
             StringJoiner line = new StringJoiner(",");
             line.add(String.valueOf(row.line()));
             line.add(cell(row.sku()));
-            line.add(cell(row.status().label()));
+            line.add(cell(row.statusLabel()));
             line.add(String.valueOf(row.findings()));
             line.add(cell(blank ? "" : oneLine(row.summary())));
             out.append(line).append("\r\n");

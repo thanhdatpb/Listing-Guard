@@ -46,7 +46,8 @@ limit, and the plan and monthly quota (see "Plans and monthly quota"). Another c
 
 Some deployments put the API behind Cloudflare Access, for example a small host that is reachable only through a
 Cloudflare Tunnel (see [`deploy-oracle.md`](deploy-oracle.md)). Ask the operator whether yours does; a deployment you
-reach directly needs none of this. If it does, a request to `/api/v1/*` passes two independent checks, in this order:
+reach directly needs none of this, and neither does the reference Oracle deployment, which keeps Access off `/api/v1/*` and
+protects it with the API key and the rate limit alone (ADR-019; the MCP server could not call it otherwise). If it does, a request to `/api/v1/*` passes two independent checks, in this order:
 Cloudflare Access, then the API. Send three headers on every request:
 
 | Header | Value | Checked by |

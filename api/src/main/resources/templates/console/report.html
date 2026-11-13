@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Report - Listing Guard</title>
+    <title th:text="#{report.title}"></title>
     <link rel="stylesheet" th:href="@{/console/editor.css}">
     <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
@@ -11,57 +11,53 @@
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('report')}"></header>
 <main class="page wide">
-    <h1>Listing health report</h1>
+    <h1 th:text="#{report.heading}"></h1>
     <p class="muted">
-        Signed in as <span th:text="${email}"></span>. Counts of the results this account has stored: which rules fail most, the
-        trademark risk levels, and the same numbers per week. It only counts; it shows no listing text.
+        <span th:text="#{common.signedin(${email})}"></span> <span th:text="#{report.intro}"></span>
     </p>
 
     <form class="report-form" id="report-form" method="get" th:action="@{/console/report}">
         <div class="field">
-            <label for="from">From</label>
+            <label for="from" th:text="#{report.form.from}"></label>
             <input type="date" id="from" name="from" th:value="${from}">
         </div>
         <div class="field">
-            <label for="to">To (included)</label>
+            <label for="to" th:text="#{report.form.to}"></label>
             <input type="date" id="to" name="to" th:value="${to}">
         </div>
         <div class="field">
-            <label for="marketplace">Marketplace</label>
+            <label for="marketplace" th:text="#{report.form.marketplace}"></label>
             <select id="marketplace" name="marketplace">
-                <option value="">All</option>
+                <option value="" th:text="#{report.form.all}"></option>
                 <option th:each="code : ${marketplaces}" th:value="${code}" th:text="${code}" th:selected="${code == marketplaceSelected}"></option>
             </select>
         </div>
-        <button type="submit" class="primary">Show report</button>
+        <button type="submit" class="primary" th:text="#{report.form.submit}"></button>
     </form>
-    <p class="muted small">UTC days, both ends included, at most <span th:text="${maxDays}"></span> days.</p>
+    <p class="muted small" th:text="#{report.note.days(${#strings.toString(maxDays)})}"></p>
 
     <div class="notice refused" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
 
     <th:block th:if="${report != null}">
-        <section id="coverage" aria-label="Coverage">
-            <div class="notice applied" role="note" th:if="${report.coverageNote.complete}"><p th:text="${report.coverageNote.text}"></p></div>
-            <div class="notice refused" role="note" th:unless="${report.coverageNote.complete}"><p th:text="${report.coverageNote.text}"></p></div>
+        <section id="coverage" th:aria-label="#{report.coverage.aria}">
+            <div class="notice applied" role="note" th:if="${report.coverageNote.complete}"><p th:text="${coverageText}"></p></div>
+            <div class="notice refused" role="note" th:unless="${report.coverageNote.complete}"><p th:text="${coverageText}"></p></div>
         </section>
 
         <section id="overview" aria-labelledby="overview-heading">
-            <h2 id="overview-heading">Stored results</h2>
+            <h2 id="overview-heading" th:text="#{report.overview.heading}"></h2>
             <p class="muted">
-                <time th:text="${report.period.from}"></time> to <time th:text="${report.period.to}"></time>
-                (<span th:text="${report.period.days}"></span> days)<span th:if="${report.marketplace != null}"> · marketplace
-                <b th:text="${report.marketplace}"></b></span>. Generated <time th:text="${report.generatedAt}"></time>.
+                <time th:text="${report.period.from}"></time> <span th:text="#{report.overview.to}"></span> <time th:text="${report.period.to}"></time>
+                (<span th:text="#{report.overview.days(${#strings.toString(report.period.days)})}"></span>)<span th:if="${report.marketplace != null}"> · <span th:text="#{report.overview.marketplace}"></span>
+                <b th:text="${report.marketplace}"></b></span>. <span th:text="#{report.overview.generated}"></span> <time th:text="${report.generatedAt}"></time>.
             </p>
-            <p class="muted small">
-                A result is a stored one, not a request: an answer from the cache creates none, so a listing checked again with the same
-                analysis is counted once.
-            </p>
+            <p class="muted small" th:text="#{report.overview.note}"></p>
             <table class="report">
                 <thead>
                 <tr>
-                    <th scope="col">Pack</th>
-                    <th scope="col" class="n">Results</th>
-                    <th scope="col">Status</th>
+                    <th scope="col" th:text="#{report.col.pack}"></th>
+                    <th scope="col" class="n" th:text="#{report.col.results}"></th>
+                    <th scope="col" th:text="#{report.col.status}"></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -91,37 +87,34 @@
 
         <section id="listing-rules" aria-labelledby="listing-rules-heading">
             <h2 id="listing-rules-heading">listing-rules</h2>
-            <h3>Findings by severity</h3>
+            <h3 th:text="#{report.severity.heading}"></h3>
             <div th:replace="~{console/report-fragments :: severities(${report.packs.listingRules.findings})}"></div>
-            <h3>Publish readiness stored with the results</h3>
+            <h3 th:text="#{report.readiness.heading}"></h3>
             <table class="report" id="readiness">
                 <tbody>
-                <tr><td>Results with a readiness</td><td class="n" th:text="${report.packs.listingRules.readiness.checksWithReadiness}"></td></tr>
-                <tr><td>With a score</td><td class="n" th:text="${report.packs.listingRules.readiness.scoredChecks}"></td></tr>
-                <tr><td>Incomplete (no score, counted as not ready)</td><td class="n" th:text="${report.packs.listingRules.readiness.incompleteChecks}"></td></tr>
-                <tr><td>Ready</td><td class="n" th:text="${report.packs.listingRules.readiness.readyChecks}"></td></tr>
-                <tr><td>Ready rate</td><td class="n" th:text="${report.packs.listingRules.readiness.readyRate != null ? #numbers.formatDecimal(report.packs.listingRules.readiness.readyRate * 100, 1, 'NONE', 1, 'POINT') + '%' : '-'}"></td></tr>
-                <tr><td>Mean score (scored results only)</td><td class="n" th:text="${report.packs.listingRules.readiness.averageScore != null ? #numbers.formatDecimal(report.packs.listingRules.readiness.averageScore, 1, 'NONE', 1, 'POINT') : '-'}"></td></tr>
-                <tr><td>Results with no readiness stored (skipped, not zero)</td><td class="n" th:text="${report.packs.listingRules.readiness.checksWithoutReadiness}"></td></tr>
-                <tr><td>Readiness versions</td><td class="n"><span th:each="version, it : ${report.packs.listingRules.readiness.versions}"><span th:text="${version}"></span><span th:unless="${it.last}">, </span></span><span th:if="${report.packs.listingRules.readiness.versions.isEmpty()}">-</span></td></tr>
+                <tr><td th:text="#{report.readiness.withreadiness}"></td><td class="n" th:text="${report.packs.listingRules.readiness.checksWithReadiness}"></td></tr>
+                <tr><td th:text="#{report.readiness.scored}"></td><td class="n" th:text="${report.packs.listingRules.readiness.scoredChecks}"></td></tr>
+                <tr><td th:text="#{report.readiness.incomplete}"></td><td class="n" th:text="${report.packs.listingRules.readiness.incompleteChecks}"></td></tr>
+                <tr><td th:text="#{report.readiness.ready}"></td><td class="n" th:text="${report.packs.listingRules.readiness.readyChecks}"></td></tr>
+                <tr><td th:text="#{report.readiness.readyrate}"></td><td class="n" th:text="${report.packs.listingRules.readiness.readyRate != null ? #numbers.formatDecimal(report.packs.listingRules.readiness.readyRate * 100, 1, 'NONE', 1, 'POINT') + '%' : '-'}"></td></tr>
+                <tr><td th:text="#{report.readiness.mean}"></td><td class="n" th:text="${report.packs.listingRules.readiness.averageScore != null ? #numbers.formatDecimal(report.packs.listingRules.readiness.averageScore, 1, 'NONE', 1, 'POINT') : '-'}"></td></tr>
+                <tr><td th:text="#{report.readiness.without}"></td><td class="n" th:text="${report.packs.listingRules.readiness.checksWithoutReadiness}"></td></tr>
+                <tr><td th:text="#{report.readiness.versions}"></td><td class="n"><span th:each="version, it : ${report.packs.listingRules.readiness.versions}"><span th:text="${version}"></span><span th:unless="${it.last}">, </span></span><span th:if="${report.packs.listingRules.readiness.versions.isEmpty()}">-</span></td></tr>
                 </tbody>
             </table>
-            <p class="muted small">
-                The score counts listing-rules only, never trademark. It is stored when fix suggestions are on or when the result comes
-                from the Check listing page.
-            </p>
-            <h3>Rules with the most findings</h3>
+            <p class="muted small" th:text="#{report.readiness.note}"></p>
+            <h3 th:text="#{report.rules.heading}"></h3>
             <div th:replace="~{console/report-fragments :: rules(${report.packs.listingRules.topRules})}"></div>
         </section>
 
         <section id="trademark-risk" aria-labelledby="trademark-risk-heading">
             <h2 id="trademark-risk-heading">trademark-risk</h2>
-            <h3>Results by risk level</h3>
+            <h3 th:text="#{report.trademark.levels.heading}"></h3>
             <table class="report" id="risk-levels">
                 <thead>
                 <tr>
-                    <th scope="col">Risk level</th>
-                    <th scope="col" class="n">Results</th>
+                    <th scope="col" th:text="#{report.col.risklevel}"></th>
+                    <th scope="col" class="n" th:text="#{report.col.results}"></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -131,17 +124,17 @@
                 </tr>
                 </tbody>
             </table>
-            <p class="muted small">UNKNOWN means the risk could not be determined. It is not the same as LOW and is never counted as it.</p>
-            <h3>Catalog marks matched most often</h3>
-            <p th:if="${report.packs.trademarkRisk.topMarks.items.isEmpty()}">No marks were matched.</p>
+            <p class="muted small" th:text="#{report.trademark.unknown.note}"></p>
+            <h3 th:text="#{report.trademark.marks.heading}"></h3>
+            <p th:if="${report.packs.trademarkRisk.topMarks.items.isEmpty()}" th:text="#{report.trademark.marks.none}"></p>
             <div class="report-scroll" th:unless="${report.packs.trademarkRisk.topMarks.items.isEmpty()}">
                 <table class="report" id="top-marks">
                     <thead>
                     <tr>
-                        <th scope="col">Mark (from the catalog)</th>
-                        <th scope="col" class="n">Findings</th>
-                        <th scope="col" class="n">Results affected</th>
-                        <th scope="col">Highest risk</th>
+                        <th scope="col" th:text="#{report.col.mark}"></th>
+                        <th scope="col" class="n" th:text="#{report.col.findings}"></th>
+                        <th scope="col" class="n" th:text="#{report.col.affected}"></th>
+                        <th scope="col" th:text="#{report.col.highest}"></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -154,13 +147,19 @@
                     </tbody>
                 </table>
             </div>
-            <p class="muted small" th:text="${trademarkDisclaimer}"></p>
+            <th:block th:with="note=${@consoleMessages.disclaimerNote(trademarkDisclaimer)}">
+                <p class="muted small" id="trademark-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
+                <p class="muted small" id="trademark-disclaimer">
+                    <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
+                    <span th:text="${trademarkDisclaimer}"></span>
+                </p>
+            </th:block>
         </section>
 
         <section id="variation-checks" aria-labelledby="variation-checks-heading">
             <h2 id="variation-checks-heading">variation-checks</h2>
             <div th:replace="~{console/report-fragments :: severities(${report.packs.variationChecks.findings})}"></div>
-            <h3>Rules with the most findings</h3>
+            <h3 th:text="#{report.rules.heading}"></h3>
             <div th:replace="~{console/report-fragments :: rules(${report.packs.variationChecks.topRules})}"></div>
         </section>
 
@@ -169,50 +168,50 @@
             <table class="report">
                 <tbody>
                 <tr>
-                    <td>Trademark scan</td>
+                    <td th:text="#{report.pers.scan}"></td>
                     <td><span th:each="entry, it : ${report.packs.personalizationScreening.trademarkStatus}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
                 </tr>
                 <tr>
-                    <td>Trademark risk level</td>
+                    <td th:text="#{report.pers.risk}"></td>
                     <td><span th:each="entry, it : ${report.packs.personalizationScreening.trademarkRiskLevels}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
                 </tr>
                 </tbody>
             </table>
-            <p class="muted small">No mark is listed here: a mark that matched what a buyer typed says something about that text.</p>
-            <h3>Character-rule findings by severity</h3>
+            <p class="muted small" th:text="#{report.pers.nomarks}"></p>
+            <h3 th:text="#{report.pers.findings}"></h3>
             <div th:replace="~{console/report-fragments :: severities(${report.packs.personalizationScreening.findings})}"></div>
-            <h3>Character rules with the most findings</h3>
+            <h3 th:text="#{report.pers.rules}"></h3>
             <div th:replace="~{console/report-fragments :: rules(${report.packs.personalizationScreening.topRules})}"></div>
         </section>
 
         <section id="by-week" aria-labelledby="by-week-heading">
-            <h2 id="by-week-heading">By ISO week</h2>
+            <h2 id="by-week-heading" th:text="#{report.week.heading}"></h2>
             <div class="report-scroll">
                 <table class="report">
                     <thead>
                     <tr>
-                        <th scope="col">Week</th>
-                        <th scope="col">Days</th>
-                        <th scope="col">Partial</th>
-                        <th scope="col" class="n">Rule results</th>
+                        <th scope="col" th:text="#{report.week.col.week}"></th>
+                        <th scope="col" th:text="#{report.week.col.days}"></th>
+                        <th scope="col" th:text="#{report.week.col.partial}"></th>
+                        <th scope="col" class="n" th:text="#{report.week.col.ruleresults}"></th>
                         <th scope="col" class="n">ERROR</th>
                         <th scope="col" class="n">WARNING</th>
-                        <th scope="col" class="n">Ready</th>
-                        <th scope="col" class="n">Mean score</th>
-                        <th scope="col" class="n">Trademark results</th>
+                        <th scope="col" class="n" th:text="#{report.week.col.ready}"></th>
+                        <th scope="col" class="n" th:text="#{report.week.col.mean}"></th>
+                        <th scope="col" class="n" th:text="#{report.week.col.trademark}"></th>
                         <th scope="col" class="n">HIGH</th>
                         <th scope="col" class="n">MEDIUM</th>
                         <th scope="col" class="n">LOW</th>
                         <th scope="col" class="n">UNKNOWN</th>
-                        <th scope="col" class="n">Variation results</th>
-                        <th scope="col" class="n">Screenings</th>
+                        <th scope="col" class="n" th:text="#{report.week.col.variation}"></th>
+                        <th scope="col" class="n" th:text="#{report.week.col.screenings}"></th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="w : ${report.byWeek}">
                         <td th:text="${w.isoWeek}"></td>
-                        <td><time th:text="${w.from}"></time> to <time th:text="${w.to}"></time></td>
-                        <td th:text="${w.partial} ? 'yes' : 'no'"></td>
+                        <td><time th:text="${w.from}"></time> <span th:text="#{report.overview.to}"></span> <time th:text="${w.to}"></time></td>
+                        <td th:text="${w.partial} ? #{report.week.yes} : #{report.week.no}"></td>
                         <td class="n" th:text="${w.listingRules.checks}"></td>
                         <td class="n" th:text="${w.listingRules.findings[0].findings}"></td>
                         <td class="n" th:text="${w.listingRules.findings[1].findings}"></td>
@@ -229,17 +228,17 @@
                     </tbody>
                 </table>
             </div>
-            <p class="muted small">A partial week reaches beyond the period, so it has fewer results: compare rates and scores, not counts.</p>
+            <p class="muted small" th:text="#{report.week.note}"></p>
         </section>
 
         <section id="versions" aria-labelledby="versions-heading">
-            <h2 id="versions-heading">Versions running now</h2>
+            <h2 id="versions-heading" th:text="#{report.versions.heading}"></h2>
             <table class="report">
                 <thead>
                 <tr>
-                    <th scope="col">Pack</th>
-                    <th scope="col">Marketplace</th>
-                    <th scope="col">Ruleset</th>
+                    <th scope="col" th:text="#{report.col.pack}"></th>
+                    <th scope="col" th:text="#{report.col.marketplace}"></th>
+                    <th scope="col" th:text="#{report.col.ruleset}"></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -251,8 +250,8 @@
                 </tbody>
             </table>
             <p class="muted small">
-                Trademark catalog: <span th:text="${report.versions.trademarkCatalog.state}"></span><span th:if="${report.versions.trademarkCatalog.version != null}"> (<span th:text="${report.versions.trademarkCatalog.version}"></span>)</span>.
-                Results of the period may have been made with older versions.
+                <span th:text="#{report.versions.catalog}"></span> <span th:text="${report.versions.trademarkCatalog.state}"></span><span th:if="${report.versions.trademarkCatalog.version != null}"> (<span th:text="${report.versions.trademarkCatalog.version}"></span>)</span>.
+                <span th:text="#{report.versions.older}"></span>
             </p>
         </section>
     </th:block>

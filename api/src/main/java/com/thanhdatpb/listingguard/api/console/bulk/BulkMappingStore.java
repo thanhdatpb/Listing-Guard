@@ -15,7 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * The column mapping an account used last, per marketplace (ADR-029, V35). It holds what a seller chose, never what a Sheet contains:
+ * The column mapping an account used last, per marketplace (ADR-029, V36). It holds what a seller chose, never what a Sheet contains:
  * the label of each mapped column (its header text), the target that column was given and the separator of each list target. A
  * label is at most {@value #LABEL_MAX_CHARS} characters and a mapping at most {@value #MAX_COLUMNS} columns; anything more is left
  * out when it is saved and ignored when it is read, so a row cannot grow without bound and a damaged one cannot break a page.

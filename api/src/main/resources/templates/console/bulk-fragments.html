@@ -1,55 +1,65 @@
 <!DOCTYPE html>
-<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <body>
 <!-- Parts of the bulk check page (ADR-029). This file is never served on its own; bulk.html includes the fragments below.
      Every value is printed with th:text, so a listing's text is never markup. The detail of a row shows what the editor shows:
      the readiness and the trademark panel side by side with the disclaimer, then the findings. A suggested fix is shown and
-     never applied. -->
+     never applied. No text is written here (ADR-028): every sentence is a message. -->
 
 <div class="row-detail" th:fragment="rowDetail(row, disclaimer)">
-    <p class="muted" th:if="${row.detail.problem != null}" th:text="'Không đọc được: ' + ${row.detail.problem}"></p>
+    <p class="muted" th:if="${row.detail.problem != null}" th:text="#{bulk.detail.unreadable(${row.detail.problem})}"></p>
     <th:block th:if="${row.detail.problem == null}">
         <div class="verdicts">
             <section class="verdict"
                      th:classappend="${!row.detail.rules.ran} ? 'not-run' : (${row.detail.rules.readiness == 'READY'} ? 'ready' : (${row.detail.rules.readiness == 'NOT_READY'} ? 'not-ready' : 'incomplete'))">
-                <h4>Sẵn sàng đăng (quy tắc listing)</h4>
+                <h4 th:text="#{bulk.detail.readiness}"></h4>
                 <p class="big" th:if="${row.detail.rules.score != null}" th:text="${row.detail.rules.score}"></p>
-                <p class="headline" th:if="${row.detail.rules.ran}" th:text="${row.detail.rules.readinessLabel()}"></p>
-                <p class="headline" th:unless="${row.detail.rules.ran}" th:text="'Chưa kiểm tra: ' + ${row.detail.rules.note}"></p>
-                <p class="muted small">Điểm chỉ tính theo quy tắc listing, không phải kết luận về nhãn hiệu và không đảm bảo sàn chấp nhận listing.</p>
+                <p class="headline" th:if="${row.detail.rules.ran}" th:text="${row.detail.rules.readinessLabel}"></p>
+                <p class="headline" th:unless="${row.detail.rules.ran}" th:text="#{bulk.detail.notchecked(${row.detail.rules.note})}"></p>
+                <p class="muted small" th:text="#{bulk.detail.readiness.note}"></p>
             </section>
             <section class="verdict"
                      th:classappend="${row.detail.trademark.kind.name() == 'RESULT'} ? 'result' : (${row.detail.trademark.kind.name() == 'INCOMPLETE'} ? 'incomplete' : 'unavailable')">
-                <h4>Rủi ro nhãn hiệu</h4>
+                <h4 th:text="#{bulk.detail.trademark}"></h4>
                 <p class="big" th:text="${row.detail.trademark.level != null} ? ${row.detail.trademark.level} : '&mdash;'"></p>
-                <p class="headline" th:if="${row.detail.trademark.kind.name() == 'RESULT' and row.detail.trademark.items.isEmpty()}">Không thấy tham chiếu nào trong danh mục đã so sánh</p>
+                <p class="headline" th:if="${row.detail.trademark.kind.name() == 'RESULT' and row.detail.trademark.items.isEmpty()}"
+                   th:text="#{bulk.detail.trademark.none}"></p>
                 <p class="headline" th:if="${row.detail.trademark.kind.name() == 'RESULT' and !row.detail.trademark.items.isEmpty()}"
-                   th:text="'Có ' + ${row.detail.trademark.items.size()} + ' phát hiện, để bạn xem lại'"></p>
-                <p class="headline" th:if="${row.detail.trademark.kind.name() == 'INCOMPLETE'}">Chưa đầy đủ: không đọc là rủi ro thấp</p>
-                <p class="headline" th:if="${row.detail.trademark.kind.name() == 'NOT_RUN'}" th:text="'Chưa kiểm tra: ' + ${row.detail.trademark.note}"></p>
-                <p class="muted small disclaimer" th:text="${disclaimer}"></p>
+                   th:text="#{bulk.detail.trademark.some(${'' + row.detail.trademark.items.size()})}"></p>
+                <p class="headline" th:if="${row.detail.trademark.kind.name() == 'INCOMPLETE'}" th:text="#{bulk.detail.trademark.incomplete}"></p>
+                <p class="headline" th:if="${row.detail.trademark.kind.name() == 'NOT_RUN'}"
+                   th:text="#{bulk.detail.notchecked(${row.detail.trademark.note})}"></p>
+                <th:block th:with="note=${@consoleMessages.disclaimerNote(disclaimer)}">
+                    <p class="muted small disclaimer" th:if="${note != null}" th:text="${note}"></p>
+                    <p class="muted small disclaimer">
+                        <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
+                        <span th:text="${disclaimer}"></span>
+                    </p>
+                </th:block>
             </section>
         </div>
 
         <th:block th:if="${row.detail.rules.ran}">
-            <h4>Quy tắc listing (<span th:text="${row.detail.rules.items.size()}"></span>)</h4>
-            <p class="muted small" th:if="${row.detail.rules.items.isEmpty()}">Quy tắc listing không tìm thấy gì để báo.</p>
+            <h4 th:text="#{bulk.detail.rules(${'' + row.detail.rules.items.size()})}"></h4>
+            <p class="muted small" th:if="${row.detail.rules.items.isEmpty()}" th:text="#{bulk.detail.rules.none}"></p>
             <th:block th:if="${!row.detail.rules.items.isEmpty()}">
                 <th:block th:replace="~{console/bulk-fragments :: items(${row.detail.rules.items})}"></th:block>
             </th:block>
         </th:block>
 
         <th:block th:if="${!row.detail.trademark.items.isEmpty()}">
-            <h4>Nhãn hiệu (<span th:text="${row.detail.trademark.items.size()}"></span>)</h4>
+            <h4 th:text="#{bulk.detail.trademark.findings(${'' + row.detail.trademark.items.size()})}"></h4>
             <th:block th:replace="~{console/bulk-fragments :: items(${row.detail.trademark.items})}"></th:block>
         </th:block>
 
         <th:block th:if="${row.detail.variation.kind.name() != 'NONE'}">
-            <h4>Biến thể</h4>
+            <h4 th:text="#{bulk.detail.variation}"></h4>
             <p class="muted small" th:if="${row.detail.variation.kind.name() == 'NOT_RUN'}"
-               th:text="'Chưa kiểm tra biến thể: ' + ${row.detail.variation.note}"></p>
-            <p class="muted small" th:if="${row.detail.variation.kind.name() == 'INCOMPLETE'}">Kiểm tra biến thể chưa đầy đủ: một quy tắc không chạy được, nên không đọc là sạch.</p>
-            <p class="muted small" th:if="${row.detail.variation.kind.name() == 'RESULT' and row.detail.variation.items.isEmpty()}">Không có phát hiện về biến thể ở dòng này.</p>
+               th:text="#{bulk.detail.notchecked(${row.detail.variation.note})}"></p>
+            <p class="muted small" th:if="${row.detail.variation.kind.name() == 'INCOMPLETE'}"
+               th:text="#{bulk.detail.variation.incomplete}"></p>
+            <p class="muted small" th:if="${row.detail.variation.kind.name() == 'RESULT' and row.detail.variation.items.isEmpty()}"
+               th:text="#{bulk.detail.variation.none}"></p>
             <th:block th:if="${!row.detail.variation.items.isEmpty()}">
                 <th:block th:replace="~{console/bulk-fragments :: items(${row.detail.variation.items})}"></th:block>
             </th:block>
@@ -60,12 +70,13 @@
 <ul class="items" th:fragment="items(list)">
     <li class="item" th:each="f : ${list}" th:classappend="${f.level}">
         <p class="msg"><span class="level" th:text="${f.levelLabel}"></span><span th:text="${f.message}"></span></p>
-        <p class="meta small muted"><code th:text="${f.ruleId}"></code><th:block th:if="${f.field != null}"> tại <code th:text="${f.field}"></code></th:block><th:block th:if="${f.detail != null}"> &middot; <span th:text="${f.detail}"></span></th:block></p>
+        <p class="meta small muted"><code th:text="${f.ruleId}"></code><th:block th:if="${f.field != null}"> <span th:text="#{bulk.item.at}"></span> <code th:text="${f.field}"></code></th:block><th:block th:if="${f.detail != null}"> &middot; <span th:text="${f.detail}"></span></th:block></p>
+        <p class="small muted" th:if="${f.explanation != null}" th:text="${f.explanation}"></p>
         <p class="small" th:if="${f.suggestion != null}" th:text="${f.suggestion}"></p>
         <div class="fix" th:if="${f.fix != null}">
-            <p class="small"><strong>Gợi ý sửa (chưa được áp dụng):</strong> <span th:text="${f.fix}"></span></p>
-            <p class="small" th:if="${f.fixValue != null}">Giá trị đề xuất: <code th:text="${f.fixValue}"></code></p>
-            <p class="small" th:if="${f.fixValue == null}">Đề xuất: bỏ giá trị này.</p>
+            <p class="small"><strong th:text="#{bulk.item.fix}"></strong> <span th:text="${f.fix}"></span></p>
+            <p class="small" th:if="${f.fixValue != null}"><span th:text="#{bulk.item.fix.value}"></span> <code th:text="${f.fixValue}"></code></p>
+            <p class="small" th:if="${f.fixValue == null}" th:text="#{bulk.item.fix.remove}"></p>
         </div>
     </li>
 </ul>

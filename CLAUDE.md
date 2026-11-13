@@ -294,12 +294,18 @@ It never edits a listing, never publishes, and does no SEO.
   needs the `batch` pack, stops at once with `quota-exceeded` when no unit is left, and marks rows `QUOTA_EXCEEDED` when the
   quota runs out midway. `plan set <client> <plan>` (admin job) changes a plan at once. The packs `policy-analyzer` and
   `sheet-connector` are reserved and not enforced yet: ADR-011 PR 5 and phase 4b (GĐ4b) will call `PlanService.requirePack` for them.
-- **Console** (ADR-014 part B, V21): optional server-rendered Thymeleaf pages, off by default. Keep its session/CSRF
+- **Console** (ADR-014 part B, V21; login options ADR-027, V35): optional server-rendered Thymeleaf pages, off by default. Keep its session/CSRF
   Spring Security chain separate from the stateless API chain; API-key authentication remains in `ApiKeyFilter`.
+  `listing-guard.console.auth-mode` defaults to `MAGIC_LINK` and also supports `CLOUDFLARE_ACCESS` and `BOTH`.
   Magic-link GET only displays confirmation; CSRF-protected POST consumes the hashed, 15-minute token and rotates the
-  session id. Build links only from `listing-guard.console.base-url`, never request headers. Only `dev` may log links;
-  enabled production console requires SMTP and HTTPS. Login limiting is shared PostgreSQL state: 5 per normalized email
-  and 30 per remote IP per 15 minutes. The first successful login provisions an account and a FREE client.
+  session id. SMTP is required only when the selected mode enables magic links. Access mode verifies the RS256
+  `Cf-Access-Jwt-Assertion` signature against cached team certificates, checks issuer/AUD/time claims, then applies
+  the configured email/domain allowlist; the raw Access email header is never trusted. Optional first-login account
+  creation assigns allowed emails to the configured shared FREE client (V35 permits multiple accounts per client).
+  Both modes create the same rotated server-side session; Access logout redirects to `/cdn-cgi/access/logout`.
+  See ADR-027 and `docs/deploy-oracle.md`. Build links only from `listing-guard.console.base-url`, never request headers.
+  Only `dev` may log links. Login limiting for magic links is shared PostgreSQL state: 5 per normalized email and 30
+  per remote IP per 15 minutes.
   **Editor (B3)** (`api/.../console/editor/`, `templates/console/editor*.html`, `static/console/editor.{css,js}`): `GET|POST
   /console/check` and `POST /console/check/apply`. It always calls `CheckService.checkDetailed` (verified fixes and readiness)
   and `TrademarkCheckService`, whatever `listing-guard.fixes.enabled` says; `check()` and `get()` keep following the flag and
@@ -320,28 +326,40 @@ It never edits a listing, never publishes, and does no SEO.
   operator keys too; the count and insert hold a row lock on the client. `ConsoleModelAdvice` sets `demoCatalog` when
   `listing-guard.trademark.catalog-version` starts with `demo-`: every console page (sign-in pages included, inline style) shows
   the banner and the editor's trademark panel repeats it.
-  **Bulk check (ADR-029, V35)** (`api/.../console/bulk/`, `templates/console/bulk*.html`, `static/console/bulk.{css,js}`, Vietnamese,
-  menu "Kiểm tra hàng loạt"): `GET /console/bulk`, `POST /console/bulk/prepare` and `POST /console/bulk/run` (multipart). A seller pastes
-  rows copied from a Google Sheet (tab "Dán từ Sheet") or uploads a CSV/TSV (tab "Tải file"), confirms what each column is, and gets
+  **Bulk check (ADR-029, V36)** (`api/.../console/bulk/`, `templates/console/bulk*.html`, `static/console/bulk.{css,js}`, English and
+  Vietnamese like the rest of the console: every sentence is a message key, ADR-028; `BulkText` and the pure classes take
+  `ConsoleMessages`): `GET /console/bulk`, `POST /console/bulk/prepare` and `POST /console/bulk/run` (multipart). A seller pastes
+  rows copied from a Google Sheet (tab "Paste from Sheet") or uploads a CSV/TSV (tab "Upload a file"), confirms what each column is, and gets
   one status per row in the input's order, a filter, a row detail like the editor's, a block of two columns (status, summary) to paste
   back into the Sheet and a CSV. `BulkCheckService` calls `CheckService.checkDetailed`, `TrademarkCheckService.check` and, for rows
   that share a parent SKU, `VariationCheckService.check` once per family: plans (the `listing-rules` pack and a unit left before the
   first row; the `batch` pack is not required), quota (one unit per new result), cache and retention are those services', and no
   analysis is new. **The pasted text, the file and the result table are never stored**: the text goes back to the browser in a hidden
   field between the two steps (no session attribute, no temporary file) and every page is `no-store`; the only new state is
-  `console_bulk_mapping` (V35: column labels, targets and list separators per account and marketplace, never a cell). `DelimitedText`
+  `console_bulk_mapping` (V36: column labels, targets and list separators per account and marketplace, never a cell). `DelimitedText`
   keeps a blank row in place (the pasted-back block must line up with the Sheet) and refuses a quote that never closes; a column is
   guessed from a list of names (`BulkTargets`) and one that matches nothing is skipped; a price or quantity is never guessed at (a
   decimal comma is an unreadable row, not 19.99). Limits `listing-guard.console.bulk.max-rows` (200) and `max-bytes` (1MB): a larger
   input is refused whole, never cut; `BodyLimitFilter` takes a map of multipart upload paths (the image checks and these two POSTs,
   the latter only while the console is on). A file one built-in input adapter recognizes is read with it and checks no variation
-  family (the adapters do not read variation attributes). `Đạt` only means no rule found an error or warning; an INCOMPLETE part is
-  `Cảnh báo`; a part that did not run (no catalog, plan, quota) is said in the row and never becomes a silent `Đạt`; the trademark
+  family (the adapters do not read variation attributes). The status OK (`Đạt`) only means no rule found an error or warning; an INCOMPLETE
+  part is Warning (`Cảnh báo`); a part that did not run (no catalog, plan, quota) is said in the row and never becomes a silent `Đạt`; the trademark
   disclaimer is on the page and in each row's detail; a cell that starts like a formula gets a leading apostrophe in the pasted block
   and the CSV. No API endpoint, MCP tool or `openapi.json` change.
+  **Localization (ADR-028, Proposed; implemented)**: every sentence the console prints is a key of `api/src/main/resources/messages.properties`
+  (English, the base) and `messages_vi.properties`, read through Spring's `MessageSource` (`#{...}` in a template, `ConsoleMessages` in
+  Java; `spring.messages.basename: messages,rules`, no fallback to the JVM's language). The language of a page: the `lang` link in the
+  corner (`?lang=en|vi`, a `GET`) sets the `lg_lang` cookie (code only, `HttpOnly`, `SameSite=Lax`), else the cookie, else
+  `listing-guard.console.default-locale` (`LISTING_GUARD_CONSOLE_DEFAULT_LOCALE`, `en`; anything but `en`/`vi` stops the start-up);
+  `Accept-Language` is not read and `ConsoleLocaleResolver` acts on `/console/**` and `/login/**` only, so the API's answers never change
+  language. Not stored on the account (no migration). **The API's response is untouched**: rule ids, fields, evidence, versions, enum
+  codes and each finding's message, suggestion and fix are printed as the API gave them; under each finding the page adds one sentence
+  from `rules.properties` / `rules_vi.properties` (key `rule.<ruleId>`; Vietnamese missing shows the English, none shows nothing). The
+  trademark disclaimer of the ruleset is always printed as it is; an English page puts an English statement above it
+  (`trademark.disclaimer.note`).
 - Current scope: Etsy and Amazon rule engines, the image checker (ADR-008: the core and the endpoint, off by default and without the bounded decode service), the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, the console bulk check (ADR-029), policy ingest + retrieval, and the optional magic-link console with a plan/usage
+  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, the console bulk check (ADR-029), policy ingest + retrieval, and the optional console (magic-link by default, or Cloudflare Access per ADR-027) with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12c.yaml`): simple input format (`title`, `brand`,
@@ -438,8 +456,12 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     the maintainer decides are at the end of the ADR (Maven Central, a version line of its own, more endpoints, retrying network errors
     and Cloudflare `5xx`, joining the ADR-022 compatibility check, Jackson 3). Not planned: a method that writes, a caller-supplied `HttpClient`.
 
-15. Console bulk check (ADR-029, Proposed): done as one PR (`feature/console-bulk-check`: ADR, the adapters' `id_column`, `console/bulk`,
-    V35, tests, `docs/bulk-check.md`). Open questions the maintainer decides are at the end of the ADR (the `batch` pack, a larger input
+15. Console localization (ADR-028, Proposed): done as one PR (`feature/console-i18n-vi`: ADR, `messages*.properties`, `rules*.properties`,
+    `ConsoleLocaleResolver`, the language links, the tests, docs). Open questions the maintainer decides are at the end of the ADR
+    (storing the choice on the account, the default in the production compose file, a review of the Vietnamese sentences and of the
+    English disclaimer statement). Not planned: translating the API's problem details, `report.html` of the job or the MCP server.
+16. Console bulk check (ADR-029, Proposed): done as one PR (`feature/console-bulk-check`: ADR, the adapters' `id_column`, `console/bulk`,
+    V36, tests, `docs/bulk-check.md`). Open questions the maintainer decides are at the end of the ADR (the `batch` pack, a larger input
     that needs a background run, variation attributes for adapter files, a mapping shared by the members of a client, a decimal
     comma). Not planned: storing a pasted table or its result, applying a fix, writing to a Sheet or a marketplace, a console page for
     images, personalization or the health report in bulk.
@@ -620,6 +642,22 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   around a block. A name from a listing becomes a path only when it is a plain file name matching the patterns. Archives are
   never extracted to disk. Tests use `FakeOdpServer` (JDK `HttpServer` on the loopback address) and synthetic zips, never the
   real ODP.
+- **Image build and release** (`docs/deploy-readiness.md`, `docs/releases/`): the `Dockerfile` copies each Maven module by name, so a
+  **new module that `api` depends on (directly or through another module) needs its `COPY` line in the same PR**; `./mvnw verify`
+  does not build the image, so check with `docker build .` (the missing `listing-input-adapters` line made every release build fail
+  until v0.8.0). Runtime folders of a deployment (`backups/`, `logs/`, `catalogs/raw/`, `policy-monitor/`, ...) stay in `.gitignore`
+  and `.dockerignore`. A new setting that a deployment must control is forwarded by `docker-compose.prod.yml`, listed (commented)
+  in `deploy/env.prod.example` and in the table of `docs/deploy-readiness.md`; a new one-shot job gets a `mem_limit`. **v0.8.0 is
+  prepared** (`docs/releases/v0.8.0.md`, `Released YYYY-MM-DD` still to fill; **no tag exists yet**; **v0.7.0 is never tagged**: its
+  notes are folded into v0.8.0 and `v0.7.0.md` only points there). CI has an `image` job that runs `docker build` (linux/amd64, not
+  pushed) on every pull request, so a `Dockerfile` that misses a module fails the PR. **Deployment decisions** (ADR-019, 2026-11-13):
+  personal Oracle account, Tokyo, Always Free, 2 OCPU / 12 GB, no reserved IP, public GHCR package, 1 USD budget alert, Cloudflare
+  Access only in front of `/console/*` (the maintainer's e-mail) and `/health`, and **none in front of `/api/v1/*`** (the API key and
+  the rate limit protect it, because the MCP server sends only `X-API-Key`): never write the runbook or the docs as if `/api/v1/*`
+  were behind Access. Open: limit console sign-ins by `CF-Connecting-IP` (trusted only from the tunnel connector) and optional Access
+  service-token settings in the MCP server (`docs/deploy-readiness.md` section 7). `cloudflared` is pinned in
+  `docker-compose.prod.cloudflared.yml` with its source in a comment; update it from the releases page, never to `latest`.
+  `docs/releases/unreleased.md` is a stub for the changes after it. After a tag the maintainer moves the ADR-022 baseline.
 - **TSDR status check** (ADR-009 "TSDR status check"): the job only proposes. It never writes a catalog table, activates a
   version, edits a finding or removes a mark, and `tsdr_status` is append-only (a trigger). The key comes only from
   `LISTING_GUARD_TSDR_API_KEY`, goes only in its header to the `base-url` host, and never into a log, a message, the database, a
@@ -709,6 +747,20 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `ImageAnalysisFingerprint` decide findings and cache identity: changing one needs a new fingerprint component. Test rulesets with
   numbers live in `api/src/test/resources/image/` only. Do not enable the endpoint for an untrusted caller before the bounded decode
   service, the upload staging and the health effect exist.
+- **Console text and rule explanations** (ADR-028): **a template and a script hold no sentence** (`ConsoleTextInTemplatesTest` scans
+  them and fails on one). A new text for a console page is a key in `messages.properties` **and** `messages_vi.properties` in the same
+  change (a test holds that the two files have the same keys and placeholders, that every key in use exists and that every key is
+  used), printed with `th:text="#{key}"`, or from Java through `ConsoleMessages` (`LocaleContextHolder` carries the page's language, so
+  a method that builds a sentence needs no locale argument). A message holds no markup, an argument is text made before the lookup (no
+  locale-grouped numbers), a message with arguments doubles its apostrophes (`''`) and one without does not. JavaScript gets its
+  sentences from `data-i18n-*` attributes written by the template (keys that start with `js.`). **A new rule, or a new rule id in a
+  new ruleset version, adds `rule.<ruleId>` to `rules.properties` and `rules_vi.properties` in the same change**
+  (`RuleExplanationsTest` reads the rulesets `application.yml` registers and fails on a rule without a sentence; its exception list
+  must stay empty or justified, and it fails on an entry that no longer applies). A rule explanation says what the rule looks at: no
+  number (the ruleset owns every number), no verdict, nothing about a marketplace's policy beyond the ruleset's own notes. Never
+  translate or reword what the API returns (rule ids, fields, evidence, versions, `message`, `suggestion`, fix text), never change the
+  ruleset's trademark disclaimer to localize it, and never let `ConsoleLocaleResolver` act outside the console's paths. A new language
+  is a `messages_<code>`/`rules_<code>` pair and an entry of `ConsoleLocales.SUPPORTED`.
 - **Java client SDK** (ADR-023): `client` depends on the JDK and Jackson 2 only (a test reads its POM and imports: no Spring, no
   logging framework, no database, no other module, no Jackson type in a public signature) and issues only `GET` and `POST` to the
   `Operation` list; a new endpoint is a new `Operation`, a typed method in both forms, its own records and a stub test, and a new
@@ -726,8 +778,9 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   a meaning the seller did not confirm (the guess is a default, `BulkTargets` holds no marketplace limit), a price or quantity is never
   guessed at, a blank row keeps its place so the pasted-back block lines up with the Sheet, an input over the limit is refused whole and
   never cut, and a row that did not get a part of the check says so (no silent `Đạt`; `Đạt` is never a marketplace's or a trademark
-  verdict). Every printed value goes through `th:text`, a cell that starts like a formula gets a leading apostrophe, and a fix is shown
-  and never applied. A new multipart POST path outside the console needs its entry in `bodyLimitFilter` (`ApiSecurityConfig`) and an ADR.
+  verdict). Every printed value goes through `th:text` and every sentence is a message of both bundles (ADR-028: a new text is a key
+  in `messages.properties` and `messages_vi.properties`, never a literal in the template, the script or a class), a cell that starts like
+  a formula gets a leading apostrophe, and a fix is shown and never applied. A new multipart POST path outside the console needs its entry in `bodyLimitFilter` (`ApiSecurityConfig`) and an ADR.
 - **MCP server** (ADR-017, ADR-023): `mcp-server` stays a client of the REST API and depends on exactly one module, `client` (a test
   reads its POM and its imports: no database, no Spring, no `core`, no `api`); it calls the API only through `ApiGateway` (an SDK raw
   call with `RetryPolicy.none()`). A new tool means a new `Endpoint` entry, a `ToolSpec` with a schema that

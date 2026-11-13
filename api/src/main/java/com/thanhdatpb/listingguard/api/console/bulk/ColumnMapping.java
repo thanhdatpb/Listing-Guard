@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkTargets.Target;
 import com.thanhdatpb.listingguard.api.console.editor.EditorMarketplace;
 import java.util.ArrayList;
@@ -32,7 +33,7 @@ record ColumnMapping(List<String> targets, Map<String, String> separators) {
      * Why this mapping cannot be run, in Vietnamese; empty when it can. A target that takes one column given to several, and a
      * mapping that reads no listing field at all, are refused rather than guessed at.
      */
-    List<String> problems(EditorMarketplace marketplace, List<String> labels) {
+    List<String> problems(ConsoleMessages messages, EditorMarketplace marketplace, List<String> labels) {
         List<String> problems = new ArrayList<>();
         boolean anyListingField = false;
         for (Target target : BulkTargets.of(marketplace)) {
@@ -43,15 +44,14 @@ record ColumnMapping(List<String> targets, Map<String, String> separators) {
                 }
             }
             if (!target.multiple() && columns.size() > 1) {
-                problems.add("Mục “" + target.label() + "” chỉ nhận một cột nhưng đang được gán cho " + columns.size()
-                        + " cột (" + String.join(", ", columns) + "). Chọn một cột, các cột còn lại để “Bỏ qua”.");
+                problems.add(messages.get("bulk.problem.single", target.label(messages), columns.size(), String.join(", ", columns)));
             }
             if (target.listingField() && !columns.isEmpty()) {
                 anyListingField = true;
             }
         }
         if (!anyListingField) {
-            problems.add("Chưa chọn cột nào cho tiêu đề, mô tả hay các trường khác của listing. Chọn ít nhất một cột.");
+            problems.add(messages.get("bulk.problem.nolistingfield"));
         }
         return problems;
     }
@@ -61,7 +61,7 @@ record ColumnMapping(List<String> targets, Map<String, String> separators) {
      * target. An unknown target or separator is a refused request, never a default: it can only come from a form that was edited by
      * hand.
      */
-    static ColumnMapping fromParams(EditorMarketplace marketplace, int columns, Map<String, String> params) {
+    static ColumnMapping fromParams(ConsoleMessages messages, EditorMarketplace marketplace, int columns, Map<String, String> params) {
         List<String> targets = new ArrayList<>();
         for (int i = 0; i < columns; i++) {
             String value = params.get("col." + i);
@@ -70,7 +70,7 @@ record ColumnMapping(List<String> targets, Map<String, String> separators) {
             } else if (BulkTargets.find(marketplace, value.trim()).isPresent()) {
                 targets.add(value.trim());
             } else {
-                throw new BulkTable.Refused(400, "Giá trị không hợp lệ cho cột " + BulkTable.letters(i) + ". Mở lại trang và chọn lại.");
+                throw new BulkTable.Refused(400, messages.get("bulk.error.badcolumn", BulkTable.letters(i)));
             }
         }
         Map<String, String> separators = new LinkedHashMap<>();
@@ -83,7 +83,7 @@ record ColumnMapping(List<String> targets, Map<String, String> separators) {
                 continue;
             }
             if (BulkTargets.separator(value.trim()).isEmpty()) {
-                throw new BulkTable.Refused(400, "Dấu tách không hợp lệ cho “" + target.label() + "”. Mở lại trang và chọn lại.");
+                throw new BulkTable.Refused(400, messages.get("bulk.error.badseparator", target.label(messages)));
             }
             separators.put(target.key(), value.trim());
         }

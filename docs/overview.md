@@ -64,6 +64,9 @@ Working end to end:
   report keep following that flag. An **API keys** page lists, creates and revokes the keys of the signed-in account (the
   secret is shown once; at most `listing-guard.console.max-active-keys`, default 5, active keys; no plan check and no
   migration), and while the trademark catalog is the fictional DEMO one every page carries a banner that says so.
+  Every page is in English or Vietnamese ([ADR-028](adr/ADR-028-console-localization.md)): the default is
+  `listing-guard.console.default-locale`, a reader switches with the links in the corner (a cookie), each finding gets one
+  sentence saying what its rule checks, and the API's responses do not change.
   Production requires HTTPS and SMTP; development can log links. Saved listings and history remain planned.
 - The optional MCP server ([ADR-017](adr/ADR-017-mcp-server.md), `mcp-server/`): a separate jar that lets an AI agent
   (Claude Code, Claude Desktop, your own agent) call the checks as seven read-and-check tools over the Model Context Protocol.
@@ -91,7 +94,7 @@ Before you rely on it:
   been committed. The optional server-side policy analyzer has no real model call or endpoint yet.
 
 What is not built yet is listed in the [Roadmap](#roadmap). Changes between versions are in
-[docs/releases/v0.7.0.md](releases/v0.7.0.md).
+[docs/releases/v0.8.0.md](releases/v0.8.0.md).
 
 ## Architecture
 
@@ -353,7 +356,7 @@ Implemented capabilities are summarized in [Status](#status). The next confirmed
 - [MCP server](mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the seven tools, errors and limits.
 - [Deployment](deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
 - [Oracle ARM deployment](deploy-oracle.md): deploy the production API and PostgreSQL on an Oracle Cloud Ampere A1 VM behind Cloudflare Tunnel.
-- [Release notes](releases/v0.7.0.md): what changed in each version and what to do when upgrading.
+- [Release notes](releases/v0.8.0.md): what changed in each version and what to do when upgrading.
 - [ADR-001: Rule configuration](adr/ADR-001-rule-config.md)
 - [ADR-002: Ruleset versioning](adr/ADR-002-ruleset-versioning.md)
 - [ADR-003: Chunking strategy](adr/ADR-003-chunking-strategy.md)

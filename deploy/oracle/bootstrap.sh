@@ -111,7 +111,7 @@ fi
 
 step "Prepare the Listing Guard deployment and persistent-data folders"
 install -d -m 0755 -o deploy -g deploy /opt/listing-guard
-for directory in catalogs/raw batch/out health-report/out backups; do
+for directory in catalogs/raw batch/out health-report/out policy-monitor backups; do
   install -d -m 2770 -o 10001 -g "$data_group" "/opt/listing-guard/$directory"
 done
 

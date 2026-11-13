@@ -14,6 +14,7 @@ import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.check.CheckStatus;
 import com.thanhdatpb.listingguard.api.check.FindingSource;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
+import com.thanhdatpb.listingguard.api.console.ConsoleMessagesTestSupport;
 import com.thanhdatpb.listingguard.api.listing.EtsyNormalizer;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
@@ -33,9 +34,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -67,7 +71,13 @@ class EditorCheckServiceTest {
         when(rulesets.ruleset()).thenReturn(ruleset);
         NormalizerRegistry normalizers = mock(NormalizerRegistry.class);
         when(normalizers.get(anyString())).thenReturn(new EtsyNormalizer());
-        service = new EditorCheckService(checks, trademarks, rulesets, normalizers, jdbc);
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
+        service = new EditorCheckService(checks, trademarks, rulesets, normalizers, jdbc, ConsoleMessagesTestSupport.messages());
+    }
+
+    @AfterEach
+    void resetLocale() {
+        LocaleContextHolder.resetLocaleContext();
     }
 
     private static CheckResult.FindingView finding(String ruleId, Severity severity, String field, String value,

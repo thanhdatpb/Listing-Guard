@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Row;
@@ -11,9 +12,11 @@ import org.junit.jupiter.api.Test;
 
 /** The block pasted back into a Sheet and the CSV file (ADR-029). Synthetic rows only. */
 class BulkExportTest {
+    private static final ConsoleMessages MESSAGES = BulkTestMessages.vi();
+
 
     private static Row row(int index, int line, String sku, Status status, int findings, String summary) {
-        return new Row(index, line, sku, status, findings, null, summary, null);
+        return new Row(index, line, sku, status, status.label(MESSAGES), findings, null, summary, null);
     }
 
     private static final List<Row> ROWS = List.of(
@@ -25,7 +28,7 @@ class BulkExportTest {
 
     @Test
     void theBlockHasOneLineForEveryRowInOrderAndABlankRowIsABlankLine() {
-        String[] lines = BulkExport.sheetBlock(ROWS, false).split("\n", -1);
+        String[] lines = BulkExport.sheetBlock(MESSAGES, ROWS, false).split("\n", -1);
 
         assertThat(lines).hasSize(ROWS.size());
         assertThat(lines[0]).isEqualTo("Đạt\tKhông có phát hiện.");
@@ -37,7 +40,7 @@ class BulkExportTest {
 
     @Test
     void aTableThatHadAHeaderGetsAHeaderLineSoTheBlockPastesBesideTheHeaderRow() {
-        String[] lines = BulkExport.sheetBlock(ROWS, true).split("\n", -1);
+        String[] lines = BulkExport.sheetBlock(MESSAGES, ROWS, true).split("\n", -1);
 
         assertThat(lines).hasSize(ROWS.size() + 1);
         assertThat(lines[0]).isEqualTo("Trạng thái\tTóm tắt");
@@ -48,7 +51,7 @@ class BulkExportTest {
     void everyLineOfTheBlockHasExactlyTwoCellsEvenWhenATextHasATabOrALineBreak() {
         List<Row> rows = List.of(row(1, 2, "S-1", Status.WARNING, 1, BulkAssessment.summary("a\tb\nc")));
 
-        String block = BulkExport.sheetBlock(rows, false);
+        String block = BulkExport.sheetBlock(MESSAGES, rows, false);
 
         assertThat(block.split("\n", -1)).hasSize(1);
         assertThat(block.split("\t", -1)).hasSize(2);
@@ -64,15 +67,15 @@ class BulkExportTest {
         assertThat(BulkExport.defuse(null)).isEmpty();
 
         List<Row> rows = List.of(row(1, 2, "=HYPERLINK(\"x\")", Status.WARNING, 1, "=cmd|' /C calc'!A0"));
-        assertThat(BulkExport.sheetBlock(rows, false)).endsWith("\t'=cmd|' /C calc'!A0");
-        assertThat(BulkExport.csv(rows)).contains("'=HYPERLINK").contains("'=cmd");
+        assertThat(BulkExport.sheetBlock(MESSAGES, rows, false)).endsWith("\t'=cmd|' /C calc'!A0");
+        assertThat(BulkExport.csv(MESSAGES, rows)).contains("'=HYPERLINK").contains("'=cmd");
     }
 
     @Test
     void theCsvIsUtf8WithAByteOrderMarkAndQuotesWhatNeedsIt() {
         List<Row> rows = List.of(row(1, 2, "S,1", Status.WARNING, 1, "Một \"phát hiện\", hai"));
 
-        String csv = BulkExport.csv(rows);
+        String csv = BulkExport.csv(MESSAGES, rows);
 
         assertThat(csv).startsWith("﻿Dòng,SKU,Trạng thái,Số phát hiện,Tóm tắt\r\n");
         assertThat(csv).endsWith("2,\"S,1\",Cảnh báo,1,\"Một \"\"phát hiện\"\", hai\"\r\n");
@@ -80,7 +83,7 @@ class BulkExportTest {
 
     @Test
     void aBlankRowIsInTheCsvToo() {
-        String csv = BulkExport.csv(ROWS);
+        String csv = BulkExport.csv(MESSAGES, ROWS);
 
         assertThat(csv.split("\r\n")).hasSize(ROWS.size() + 1);
         assertThat(csv).contains("\r\n3,,Dòng trống,0,\r\n");
@@ -88,7 +91,7 @@ class BulkExportTest {
 
     @Test
     void theDownloadLinkCarriesTheSameCsvWithoutTheServerKeepingIt() {
-        String csv = BulkExport.csv(ROWS);
+        String csv = BulkExport.csv(MESSAGES, ROWS);
 
         String href = BulkExport.csvHref(csv);
 

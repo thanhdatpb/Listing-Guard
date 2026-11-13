@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -16,6 +17,8 @@ import org.junit.jupiter.api.Test;
 
 /** What a column can be, the guess from a header, the remembered mapping and the checks before a run (ADR-029). */
 class ColumnMappingTest {
+    private static final ConsoleMessages MESSAGES = BulkTestMessages.vi();
+
 
     private static final EditorMarketplace ETSY = EditorMarketplace.ETSY;
     private static final EditorMarketplace AMAZON = EditorMarketplace.AMAZON;
@@ -141,7 +144,7 @@ class ColumnMappingTest {
     void aTargetGivenToTwoColumnsIsRefusedWithBothNames() {
         ColumnMapping mapping = new ColumnMapping(List.of("title", "title", "tags", "tags"), Map.of());
 
-        List<String> problems = mapping.problems(ETSY, List.of("Tên", "Tiêu đề", "Tag 1", "Tag 2"));
+        List<String> problems = mapping.problems(MESSAGES, ETSY, List.of("Tên", "Tiêu đề", "Tag 1", "Tag 2"));
 
         assertThat(problems).hasSize(1);
         assertThat(problems.get(0)).contains("Tiêu đề").contains("2 cột").contains("Tên, Tiêu đề");
@@ -151,22 +154,22 @@ class ColumnMappingTest {
     void aMappingThatReadsNoListingFieldIsRefused() {
         ColumnMapping onlySku = new ColumnMapping(List.of("sku", ""), Map.of());
 
-        assertThat(onlySku.problems(ETSY, List.of("SKU", "x"))).singleElement().asString().contains("ít nhất một cột");
-        assertThat(new ColumnMapping(List.of("title"), Map.of()).problems(ETSY, List.of("Tên"))).isEmpty();
+        assertThat(onlySku.problems(MESSAGES, ETSY, List.of("SKU", "x"))).singleElement().asString().contains("ít nhất một cột");
+        assertThat(new ColumnMapping(List.of("title"), Map.of()).problems(MESSAGES, ETSY, List.of("Tên"))).isEmpty();
     }
 
     @Test
     void aSubmittedFormIsReadByColumnPositionAndAnUnknownValueIsRefused() {
-        ColumnMapping mapping = ColumnMapping.fromParams(ETSY, 3,
+        ColumnMapping mapping = ColumnMapping.fromParams(MESSAGES, ETSY, 3,
                 Map.of("col.0", "sku", "col.1", "title", "sep.tags", "newline", "sep.materials", "pipe"));
 
         assertThat(mapping.targets()).containsExactly("sku", "title", "");
         assertThat(mapping.separatorOf(BulkTargets.find(ETSY, "tags").orElseThrow())).isEqualTo("newline");
         assertThat(mapping.separatorOf(BulkTargets.find(ETSY, "materials").orElseThrow())).isEqualTo("pipe");
 
-        assertThatThrownBy(() -> ColumnMapping.fromParams(ETSY, 1, Map.of("col.0", "brand")))
+        assertThatThrownBy(() -> ColumnMapping.fromParams(MESSAGES, ETSY, 1, Map.of("col.0", "brand")))
                 .isInstanceOfSatisfying(BulkTable.Refused.class, e -> assertThat(e.status).isEqualTo(400));
-        assertThatThrownBy(() -> ColumnMapping.fromParams(ETSY, 1, Map.of("col.0", "title", "sep.tags", "tilde")))
+        assertThatThrownBy(() -> ColumnMapping.fromParams(MESSAGES, ETSY, 1, Map.of("col.0", "title", "sep.tags", "tilde")))
                 .isInstanceOf(BulkTable.Refused.class);
     }
 }

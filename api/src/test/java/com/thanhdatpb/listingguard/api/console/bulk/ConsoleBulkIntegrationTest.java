@@ -21,6 +21,7 @@ import com.thanhdatpb.listingguard.api.client.ClientProvisioning;
 import com.thanhdatpb.listingguard.api.client.ClientRepository;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccount;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRepository;
+import com.thanhdatpb.listingguard.api.console.ConsoleLocaleResolver;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkPages.ResultRow;
 import com.thanhdatpb.listingguard.api.plan.PlanCode;
@@ -30,6 +31,7 @@ import com.thanhdatpb.listingguard.api.plan.PlanTestSupport.MutableClock;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkReadyTestConfig;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkRulesets;
 import com.thanhdatpb.listingguard.api.web.BodyLimitFilter;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpSession;
 import java.util.Collections;
 import java.util.List;
@@ -63,6 +65,7 @@ import org.springframework.test.web.servlet.MvcResult;
         "listing-guard.console.enabled=true",
         "listing-guard.console.base-url=https://console.example.test",
         "listing-guard.console.mail-from=noreply@example.test",
+        "listing-guard.console.default-locale=vi",
         "spring.mail.host=mail.example.test",
         "listing-guard.plans.enabled=true"
 })
@@ -158,7 +161,7 @@ class ConsoleBulkIntegrationTest {
 
         assertThat(selectedTargets(mapping)).containsExactly("sku", "title", "description", "tags", "tags", "price", "quantity",
                 "category", "who_made", "when_made", "");
-        assertThat(mapping).contains("1</strong> dòng dữ liệu").contains("Dòng đầu được đọc là tiêu đề")
+        assertThat(mapping).contains("Có 1 dòng dữ liệu và 11 cột.").contains("Dòng đầu được đọc là tiêu đề")
                 .doesNotContain("Đã áp dụng cách chọn cột");
     }
 
@@ -322,7 +325,7 @@ class ConsoleBulkIntegrationTest {
                 + "Cup " + unique() + "\tplain\tQ-2\n";
 
         String mapping = prepare(seller, "ETSY", text, null);
-        assertThat(mapping).contains("2</strong> dòng dữ liệu");
+        assertThat(mapping).contains("Có 2 dòng dữ liệu và 3 cột.");
         String result = run(seller, mapping);
 
         List<ResultRow> rows = resultRows(result);
@@ -501,6 +504,60 @@ class ConsoleBulkIntegrationTest {
         mvc.perform(get("/console/bulk")).andExpect(status().is3xxRedirection());
         mvc.perform(multipart("/console/bulk/prepare").with(csrf()).param("source", "paste").param("marketplace", "ETSY")
                 .param("text", "x")).andExpect(status().is3xxRedirection());
+    }
+
+    @Test
+    void everyStageSpeaksTheLanguageOfThePageAndShowsNoMissingMessage() throws Exception {
+        ConsoleUser seller = user(PlanCode.SELLER);
+        String text = table(goodRow("S-1", "Zorvex ceramic mug " + unique()));
+        String disclaimer = trademarkRulesets.ruleset().disclaimer();
+
+        for (String language : List.of("en", "vi")) {
+            Cookie cookie = new Cookie(ConsoleLocaleResolver.COOKIE, language);
+            String form = mvc.perform(get("/console/bulk").with(signedIn(seller)).cookie(cookie)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            String mapping = mvc.perform(prepareRequest(seller, "ETSY", text, null).cookie(cookie)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            String result = mvc.perform(runRequest(seller, mapping, Map.of(), Map.of(), false).cookie(cookie))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+            for (String page : List.of(form, mapping, result)) {
+                assertThat(page).as(language).contains("<html lang=\"" + language + "\"").doesNotContain("??")
+                        .doesNotContain("#{").doesNotContain("${");
+            }
+            assertThat(result).as(language + " keeps the ruleset's own disclaimer").contains(disclaimer);
+            if (language.equals("en")) {
+                assertThat(form).contains("Paste from Sheet").doesNotContain("Dán từ Sheet");
+                assertThat(mapping).contains("What is each column?").contains("data rows and 11 columns.");
+                assertThat(result).contains("Results (Etsy)").contains("id=\"result-disclaimer-note\"")
+                        .contains("Original text of the ruleset:").doesNotContain("Kết quả (");
+                assertThat(sheetLines(result).get(0)).isEqualTo("Status\tSummary");
+                assertThat(resultRows(result).get(0).status()).isEqualTo("Warning");
+            } else {
+                assertThat(form).contains("Dán từ Sheet").doesNotContain("Paste from Sheet");
+                assertThat(mapping).contains("Mỗi cột là gì?");
+                assertThat(result).contains("Kết quả (Etsy)").doesNotContain("id=\"result-disclaimer-note\"");
+                assertThat(sheetLines(result).get(0)).isEqualTo("Trạng thái\tTóm tắt");
+                assertThat(resultRows(result).get(0).status()).isEqualTo("Cảnh báo");
+            }
+        }
+    }
+
+    @Test
+    void aFindingShowsWhatItsRuleChecksInTheLanguageOfThePage() throws Exception {
+        ConsoleUser seller = user(PlanCode.FREE);
+        String text = table(String.join("\t", "S-1", "Long tag mug " + unique(), "A synthetic mug.", "a very very long tag name",
+                "a very very long tag name", "19.99", "5", "Home", "i_did", "made_to_order", ""));
+
+        for (String language : List.of("en", "vi")) {
+            Cookie cookie = new Cookie(ConsoleLocaleResolver.COOKIE, language);
+            String mapping = mvc.perform(prepareRequest(seller, "ETSY", text, null).cookie(cookie)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            String result = mvc.perform(runRequest(seller, mapping, Map.of(), Map.of(), false).cookie(cookie))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+            assertThat(result).as(language).contains("tag_length").containsPattern("class=\"small muted\">[^<]+</p>");
+        }
     }
 
     @Test

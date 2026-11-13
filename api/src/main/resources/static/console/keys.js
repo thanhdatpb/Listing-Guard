@@ -23,19 +23,24 @@
     source.select();
   });
 
+  // The sentences are written by the page, in its language (data-i18n-* on the button), so this file holds none.
+  function text(name) {
+    return button.getAttribute('data-i18n-' + name) || '';
+  }
+
   if (!(navigator.clipboard && window.isSecureContext)) {
-    say('Select the key above and copy it.');
+    say(text('select'));
     return;
   }
 
   button.hidden = false;
   button.addEventListener('click', function () {
     navigator.clipboard.writeText(source.value).then(function () {
-      say('Copied.');
+      say(text('copied'));
     }, function () {
       source.focus();
       source.select();
-      say('Could not copy. Select the key above and copy it.');
+      say(text('failed'));
     });
   });
 })();

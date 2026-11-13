@@ -37,6 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
         "listing-guard.console.enabled=true",
         "listing-guard.console.base-url=https://console.example.test",
         "listing-guard.console.mail-from=noreply@example.test",
+        "listing-guard.console.default-locale=vi",
         "spring.mail.host=mail.example.test",
         "listing-guard.console.bulk.max-rows=3",
         "listing-guard.console.bulk.max-bytes=1KB"

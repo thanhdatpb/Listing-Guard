@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.editor.EditorMarketplace;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -64,18 +65,17 @@ final class BulkTable {
      *                   is in the list
      * @throws Refused when the text cannot be read, holds no data row, or holds more than {@code maxRows}
      */
-    static Prepared prepare(String text, char delimiter, HeaderMode mode, EditorMarketplace marketplace, Set<String> remembered,
-                            int maxRows) {
+    static Prepared prepare(ConsoleMessages messages, String text, char delimiter, HeaderMode mode, EditorMarketplace marketplace,
+                            Set<String> remembered, int maxRows) {
         DelimitedText.Table table;
         try {
             table = DelimitedText.parse(text, delimiter);
         } catch (DelimitedText.FormatException e) {
-            throw new Refused(400, "Dữ liệu không đọc được: dấu nháy kép mở ở dòng " + e.line
-                    + " không được đóng. Kiểm tra ô đó trong Sheet rồi chép lại.");
+            throw new Refused(400, messages.get("bulk.error.quote", e.line));
         }
         List<DelimitedText.Row> all = table.rows();
         if (all.isEmpty()) {
-            throw new Refused(400, "Chưa có dữ liệu. Dán các dòng đã chép từ Google Sheet, hoặc chọn một file.");
+            throw new Refused(400, messages.get("bulk.error.nodata"));
         }
         int columns = all.stream().mapToInt(row -> row.cells().size()).max().orElse(1);
         boolean header = switch (mode) {
@@ -85,13 +85,13 @@ final class BulkTable {
         };
         List<DelimitedText.Row> rows = header ? all.subList(1, all.size()) : all;
         if (rows.isEmpty()) {
-            throw new Refused(400, "Chỉ có dòng tiêu đề, chưa có dòng dữ liệu nào.");
+            throw new Refused(400, messages.get("bulk.error.headeronly"));
         }
         if (rows.size() > maxRows) {
-            throw new Refused(400, "Có " + rows.size() + " dòng dữ liệu, vượt giới hạn " + maxRows
-                    + " dòng của một lần kiểm tra. Chia bảng thành nhiều lần dán (mỗi lần tối đa " + maxRows + " dòng).");
+            throw new Refused(400, messages.get("bulk.error.toomany", rows.size(), maxRows));
         }
-        return new Prepared(delimiter, header, labels(header ? all.get(0).cells() : List.of(), columns), List.copyOf(rows));
+        return new Prepared(delimiter, header, labels(messages, header ? all.get(0).cells() : List.of(), columns),
+                List.copyOf(rows));
     }
 
     private static boolean looksLikeHeader(DelimitedText.Row first, EditorMarketplace marketplace, Set<String> remembered) {
@@ -107,12 +107,12 @@ final class BulkTable {
         return false;
     }
 
-    private static List<String> labels(List<String> headerCells, int columns) {
+    private static List<String> labels(ConsoleMessages messages, List<String> headerCells, int columns) {
         List<String> labels = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (int i = 0; i < columns; i++) {
             String raw = i < headerCells.size() ? headerCells.get(i).trim() : "";
-            String base = raw.isEmpty() ? "Cột " + letters(i) : clip(raw);
+            String base = raw.isEmpty() ? messages.get("bulk.column.default", letters(i)) : clip(raw);
             String label = base;
             int repeat = 2;
             while (!seen.add(label)) {

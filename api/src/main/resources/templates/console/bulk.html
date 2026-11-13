@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Kiểm tra hàng loạt - Listing Guard</title>
+    <title th:text="#{bulk.title}"></title>
     <link rel="stylesheet" th:href="@{/console/editor.css}">
     <link rel="stylesheet" th:href="@{/console/console.css}">
     <link rel="stylesheet" th:href="@{/console/bulk.css}">
@@ -12,52 +12,49 @@
 <body>
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('bulk')}"></header>
-<main class="page wide">
-    <h1>Kiểm tra hàng loạt</h1>
+<main class="page wide" id="bulk-page">
+    <h1 th:text="#{bulk.heading}"></h1>
     <p class="muted">
-        Đăng nhập là <span th:text="${email}"></span>. Listing Guard chỉ kiểm tra và gợi ý: không sửa, không đăng listing và không ghi
-        gì lên sàn hay vào Sheet của bạn. Nội dung bạn dán hoặc file bạn tải lên không được lưu.
+        <span th:text="#{common.signedin(${email})}"></span>
+        <span th:text="#{bulk.intro}"></span>
     </p>
 
     <div class="notice refused" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
 
-    <!-- Bước 1: dán hoặc tải file -->
+    <!-- Step 1: paste or upload -->
     <th:block th:if="${stage == 'form'}">
-        <nav class="tabs" aria-label="Cách nhập dữ liệu">
-            <a th:href="@{/console/bulk(tab='paste',marketplace=${marketplace.code})}" id="tab-paste"
-               th:classappend="${tab.key == 'paste'} ? 'active'" th:aria-current="${tab.key == 'paste'} ? 'page'">Dán từ Sheet</a>
-            <a th:href="@{/console/bulk(tab='file',marketplace=${marketplace.code})}" id="tab-file"
-               th:classappend="${tab.key == 'file'} ? 'active'" th:aria-current="${tab.key == 'file'} ? 'page'">Tải file</a>
+        <nav class="tabs" th:aria-label="#{bulk.tabs.aria}">
+            <a th:href="@{/console/bulk(tab='paste',marketplace=${marketplace.code})}" id="tab-paste" th:text="#{bulk.tab.paste}"
+               th:classappend="${tab.key == 'paste'} ? 'active'" th:aria-current="${tab.key == 'paste'} ? 'page'"></a>
+            <a th:href="@{/console/bulk(tab='file',marketplace=${marketplace.code})}" id="tab-file" th:text="#{bulk.tab.file}"
+               th:classappend="${tab.key == 'file'} ? 'active'" th:aria-current="${tab.key == 'file'} ? 'page'"></a>
         </nav>
 
         <form id="paste-form" method="post" enctype="multipart/form-data" th:action="@{/console/bulk/prepare}"
               th:if="${tab.key == 'paste'}">
             <input type="hidden" name="source" value="paste">
             <div class="field">
-                <label for="paste-marketplace">Sàn</label>
+                <label for="paste-marketplace" th:text="#{bulk.marketplace}"></label>
                 <select id="paste-marketplace" name="marketplace">
                     <option th:each="m : ${marketplaces}" th:value="${m.code}" th:text="${m.label}" th:selected="${m == marketplace}"></option>
                 </select>
             </div>
             <div class="field">
-                <label for="text">Dán nội dung đã chép từ Google Sheet</label>
+                <label for="text" th:text="#{bulk.paste.label}"></label>
                 <textarea id="text" name="text" class="paste" rows="12" spellcheck="false" aria-describedby="text-hint"
                           th:text="${pasted}"></textarea>
-                <p class="hint" id="text-hint">
-                    Chọn vùng ô trong Sheet (có thể kèm dòng tiêu đề), sao chép rồi dán vào đây. Ô có xuống dòng hoặc dấu tab vẫn đọc đúng.
-                    Tối đa <span th:text="${maxRows}"></span> dòng và <span th:text="${maxBytesText}"></span> mỗi lần.
-                </p>
+                <p class="hint" id="text-hint" th:text="${pasteHint}"></p>
             </div>
             <div class="field">
-                <label for="paste-header">Dòng đầu là tiêu đề?</label>
+                <label for="paste-header" th:text="#{bulk.header.label}"></label>
                 <select id="paste-header" name="header">
-                    <option value="auto" selected>Tự nhận biết</option>
-                    <option value="yes">Có</option>
-                    <option value="no">Không</option>
+                    <option value="auto" selected th:text="#{bulk.header.auto}"></option>
+                    <option value="yes" th:text="#{bulk.header.yes}"></option>
+                    <option value="no" th:text="#{bulk.header.no}"></option>
                 </select>
             </div>
             <div class="actions">
-                <button type="submit" class="primary">Tiếp tục: chọn cột</button>
+                <button type="submit" class="primary" th:text="#{bulk.paste.submit}"></button>
             </div>
         </form>
 
@@ -65,45 +62,37 @@
               th:if="${tab.key == 'file'}">
             <input type="hidden" name="source" value="file">
             <div class="field">
-                <label for="file-marketplace">Sàn</label>
+                <label for="file-marketplace" th:text="#{bulk.marketplace}"></label>
                 <select id="file-marketplace" name="marketplace">
                     <option th:each="m : ${marketplaces}" th:value="${m.code}" th:text="${m.label}" th:selected="${m == marketplace}"></option>
                 </select>
             </div>
             <div class="field">
-                <label for="file">File CSV, TSV hoặc file xuất từ sàn</label>
+                <label for="file" th:text="#{bulk.file.label}"></label>
                 <input type="file" id="file" name="file" required aria-describedby="file-hint"
                        accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
-                <p class="hint" id="file-hint">
-                    File .csv, .tsv hoặc .txt, mã hóa UTF-8, dòng đầu là tiêu đề. File xuất từ Etsy, file Amazon (flat file) và file sản phẩm
-                    Shopify được nhận dạng từ tiêu đề và kiểm tra ngay; file khác sẽ sang bước chọn cột như khi dán.
-                    Tối đa <span th:text="${maxRows}"></span> dòng và <span th:text="${maxBytesText}"></span> mỗi lần.
-                </p>
+                <p class="hint" id="file-hint" th:text="${fileHint}"></p>
             </div>
             <div class="field">
-                <label for="file-header">Dòng đầu là tiêu đề? <span class="muted">(chỉ dùng cho file không nhận dạng được)</span></label>
+                <label for="file-header" th:text="#{bulk.file.header.label}"></label>
                 <select id="file-header" name="header">
-                    <option value="auto" selected>Tự nhận biết</option>
-                    <option value="yes">Có</option>
-                    <option value="no">Không</option>
+                    <option value="auto" selected th:text="#{bulk.header.auto}"></option>
+                    <option value="yes" th:text="#{bulk.header.yes}"></option>
+                    <option value="no" th:text="#{bulk.header.no}"></option>
                 </select>
             </div>
             <div class="actions">
-                <button type="submit" class="primary">Tải lên và tiếp tục</button>
+                <button type="submit" class="primary" th:text="#{bulk.file.submit}"></button>
             </div>
         </form>
     </th:block>
 
-    <!-- Bước 2: chọn cột -->
+    <!-- Step 2: what is each column -->
     <th:block th:if="${stage == 'mapping'}">
-        <h2 id="mapping-heading">Mỗi cột là gì?</h2>
-        <p>
-            Có <strong th:text="${mapping.rows}"></strong> dòng dữ liệu và <strong th:text="${mapping.columns.size()}"></strong> cột.
-            <span th:text="${mapping.header} ? 'Dòng đầu được đọc là tiêu đề.' : 'Không có dòng tiêu đề: các cột được gọi theo chữ cái như trong Sheet.'"></span>
-            Trang đã đoán sẵn từ tên cột; sửa nếu chưa đúng. Cột nào để &ldquo;Bỏ qua&rdquo; sẽ không được kiểm tra.
-        </p>
+        <h2 id="mapping-heading" th:text="#{bulk.mapping.heading}"></h2>
+        <p id="mapping-intro" th:text="${mapping.intro}"></p>
         <div class="notice applied" id="remembered-note" role="status" th:if="${mapping.remembered}">
-            <p>Đã áp dụng cách chọn cột bạn dùng lần trước cho các cột có cùng tên tiêu đề.</p>
+            <p th:text="#{bulk.mapping.remembered}"></p>
         </div>
         <div class="notice refused" id="mapping-problems" role="alert" th:if="${!mapping.problems.isEmpty()}">
             <ul class="problems"><li th:each="problem : ${mapping.problems}" th:text="${problem}"></li></ul>
@@ -120,9 +109,9 @@
             <table class="mapping" aria-labelledby="mapping-heading">
                 <thead>
                 <tr>
-                    <th scope="col">Cột</th>
-                    <th scope="col">Tiêu đề và vài ô mẫu</th>
-                    <th scope="col">Cột này là</th>
+                    <th scope="col" th:text="#{bulk.mapping.col.letter}"></th>
+                    <th scope="col" th:text="#{bulk.mapping.col.what}"></th>
+                    <th scope="col" th:text="#{bulk.mapping.col.is}"></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -132,12 +121,12 @@
                         <strong th:text="${c.label}"></strong>
                         <br th:if="${!c.samples.isEmpty()}">
                         <span class="muted small" th:each="sample, state : ${c.samples}"
-                              th:text="${state.last} ? ${sample} : ${sample} + ' &middot; '"></span>
+                              th:text="${state.last} ? ${sample} : ${sample} + ' · '"></span>
                     </td>
                     <td class="pick">
-                        <label class="visually-hidden" th:for="'col-' + ${c.index}" th:text="'Cột ' + ${c.letter} + ' là'"></label>
+                        <label class="visually-hidden" th:for="'col-' + ${c.index}" th:text="#{bulk.mapping.col.label(${c.letter})}"></label>
                         <select th:id="'col-' + ${c.index}" th:name="'col.' + ${c.index}">
-                            <option value="" th:selected="${c.selected == ''}">&mdash; Bỏ qua &mdash;</option>
+                            <option value="" th:selected="${c.selected == ''}" th:text="#{bulk.mapping.skip}"></option>
                             <option th:each="t : ${targets}" th:value="${t.key}" th:text="${t.label}"
                                     th:selected="${t.key == c.selected}"></option>
                         </select>
@@ -147,13 +136,10 @@
             </table>
 
             <fieldset class="separators" th:if="${!mapping.separators.isEmpty()}">
-                <legend>Khi một cột chứa nhiều giá trị</legend>
-                <p class="muted small">
-                    Nếu bạn gán <em>một</em> cột cho mục có nhiều giá trị, cột đó được tách thành từng giá trị theo dấu bên dưới. Nếu gán
-                    <em>nhiều</em> cột (ví dụ Tag 1, Tag 2, Tag 3), mỗi cột là một giá trị và dấu tách không dùng.
-                </p>
+                <legend th:text="#{bulk.separators.legend}"></legend>
+                <p class="muted small" th:text="#{bulk.separators.help}"></p>
                 <div class="field" th:each="s : ${mapping.separators}">
-                    <label th:for="'sep-' + ${s.key}" th:text="${s.label} + ' trong một cột được tách bằng'"></label>
+                    <label th:for="'sep-' + ${s.key}" th:text="${s.label}"></label>
                     <select th:id="'sep-' + ${s.key}" th:name="'sep.' + ${s.key}">
                         <option th:each="o : ${separatorOptions}" th:value="${o.key}" th:text="${o.label}"
                                 th:selected="${o.key == s.selected}"></option>
@@ -163,63 +149,61 @@
 
             <div class="checkbox">
                 <input type="checkbox" id="remember" name="remember" value="on" th:checked="${mapping.remember}">
-                <label for="remember">Nhớ cách chọn cột này cho lần sau (chỉ lưu tên cột và mục đã chọn, không lưu nội dung)</label>
+                <label for="remember" th:text="#{bulk.remember}"></label>
             </div>
 
-            <p class="cost" id="cost">
-                <th:block th:if="${mapping.costNote != null}" th:text="${mapping.costNote}"></th:block>
-                <th:block th:if="${mapping.costNote == null}">Gói và quota chưa được bật trên máy chủ này, nên không tính quota.</th:block>
-            </p>
+            <p class="cost" id="cost" th:text="${mapping.costNote != null} ? ${mapping.costNote} : #{bulk.cost.none}"></p>
             <div class="actions">
-                <button type="submit" class="primary" id="run-button">Kiểm tra</button>
-                <a class="button" th:href="@{/console/bulk(marketplace=${marketplace.code})}">Làm lại từ đầu</a>
+                <button type="submit" class="primary" id="run-button" th:text="#{bulk.run}"></button>
+                <a class="button" th:href="@{/console/bulk(marketplace=${marketplace.code})}" th:text="#{bulk.restart}"></a>
             </div>
         </form>
     </th:block>
 
-    <!-- Kết quả -->
+    <!-- The result -->
     <th:block th:if="${stage == 'result'}">
         <section id="result" aria-labelledby="result-heading">
-            <h2 id="result-heading">Kết quả (<span th:text="${marketplace.label}"></span>)</h2>
-            <p class="muted small" id="result-disclaimer">
-                &ldquo;Đạt&rdquo; nghĩa là không quy tắc listing nào tìm thấy lỗi hay cảnh báo; không phải lời xác nhận của sàn, và không nói gì về
-                nhãn hiệu nếu dòng đó ghi &ldquo;Chưa kiểm tra nhãn hiệu&rdquo;. Kết quả nhãn hiệu chỉ là cảnh báo tham khảo.
-                <span th:text="${result.disclaimer}"></span>
-            </p>
+            <h2 id="result-heading" th:text="#{bulk.result.heading(${marketplace.label})}"></h2>
+            <p class="muted small" id="result-note" th:text="#{bulk.result.note}"></p>
+            <th:block th:with="note=${@consoleMessages.disclaimerNote(result.disclaimer)}">
+                <p class="muted small disclaimer" id="result-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
+                <p class="muted small disclaimer" id="result-disclaimer">
+                    <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
+                    <span th:text="${result.disclaimer}"></span>
+                </p>
+            </th:block>
 
             <div class="notice" th:each="note : ${result.notes}"><p th:text="${note}"></p></div>
 
             <ul class="counts" id="counts">
-                <li><strong th:text="${result.counts.total}"></strong> dòng</li>
-                <li>Lỗi <strong th:text="${result.counts.error}"></strong></li>
-                <li>Cảnh báo <strong th:text="${result.counts.warning}"></strong></li>
-                <li>Đạt <strong th:text="${result.counts.ok}"></strong></li>
-                <li>Chưa kiểm tra hoặc bỏ qua <strong th:text="${result.counts.others}"></strong></li>
+                <li th:text="#{bulk.counts.total(${'' + result.counts.total})}"></li>
+                <li th:text="#{bulk.counts.error(${'' + result.counts.error})}"></li>
+                <li th:text="#{bulk.counts.warning(${'' + result.counts.warning})}"></li>
+                <li th:text="#{bulk.counts.ok(${'' + result.counts.ok})}"></li>
+                <li th:text="#{bulk.counts.others(${'' + result.counts.others})}"></li>
             </ul>
 
-            <div class="filters" id="status-filters" role="group" aria-label="Lọc theo trạng thái" hidden>
-                <button type="button" data-filter="ALL" aria-pressed="true">Tất cả</button>
-                <button type="button" data-filter="ERROR" aria-pressed="false">Lỗi</button>
-                <button type="button" data-filter="WARNING" aria-pressed="false">Cảnh báo</button>
-                <button type="button" data-filter="OK" aria-pressed="false">Đạt</button>
-                <button type="button" data-filter="OTHER" aria-pressed="false">Khác</button>
+            <div class="filters" id="status-filters" role="group" th:aria-label="#{bulk.filter.aria}" hidden>
+                <button type="button" data-filter="ALL" aria-pressed="true" th:text="#{bulk.filter.all}"></button>
+                <button type="button" data-filter="ERROR" aria-pressed="false" th:text="#{bulk.filter.error}"></button>
+                <button type="button" data-filter="WARNING" aria-pressed="false" th:text="#{bulk.filter.warning}"></button>
+                <button type="button" data-filter="OK" aria-pressed="false" th:text="#{bulk.filter.ok}"></button>
+                <button type="button" data-filter="OTHER" aria-pressed="false" th:text="#{bulk.filter.other}"></button>
             </div>
 
             <div class="result-actions">
-                <button type="button" id="copy-sheet" data-copy-from="sheet-block" class="primary" hidden>Sao chép cột kết quả</button>
-                <a class="button" id="download-csv" th:href="${result.csvHref}" download="ket-qua-listing-guard.csv">Tải CSV kết quả</a>
-                <a class="button" th:href="@{/console/bulk(marketplace=${marketplace.code})}">Kiểm tra bảng khác</a>
+                <button type="button" id="copy-sheet" data-copy-from="sheet-block" class="primary" hidden th:text="#{bulk.copy}"
+                        th:attr="data-i18n-copied=#{js.bulk.copied},data-i18n-failed=#{js.bulk.failed}"></button>
+                <a class="button" id="download-csv" th:href="${result.csvHref}" download="listing-guard-bulk-results.csv"
+                   th:text="#{bulk.csv}"></a>
+                <a class="button" th:href="@{/console/bulk(marketplace=${marketplace.code})}" th:text="#{bulk.another}"></a>
             </div>
             <p class="copy-status" id="copy-status" role="status" aria-live="polite"></p>
 
             <details class="sheet-help" id="sheet-help">
-                <summary>Cột kết quả để dán vào Sheet</summary>
-                <p class="muted small">
-                    Hai cột (Trạng thái, Tóm tắt), mỗi dòng của bảng một dòng, đúng thứ tự bạn đã dán<span th:if="${result.header}">; dòng đầu
-                    là tiêu đề của hai cột</span>. Dán vào ô đầu tiên của hai cột trống ngay cạnh bảng gốc, cùng hàng với
-                    <span th:text="${result.header} ? 'dòng tiêu đề' : 'dòng đầu tiên'"></span>.
-                </p>
-                <label class="visually-hidden" for="sheet-block">Cột kết quả</label>
+                <summary th:text="#{bulk.sheet.summary}"></summary>
+                <p class="muted small" th:text="${result.header} ? #{bulk.sheet.withheader} : #{bulk.sheet.noheader}"></p>
+                <label class="visually-hidden" for="sheet-block" th:text="#{bulk.sheet.label}"></label>
                 <textarea id="sheet-block" readonly rows="6" spellcheck="false" th:text="${result.sheetBlock}"></textarea>
             </details>
 
@@ -227,25 +211,25 @@
                 <table class="bulk-results" id="bulk-results" aria-labelledby="result-heading">
                     <thead>
                     <tr>
-                        <th scope="col" class="n">Dòng</th>
-                        <th scope="col">SKU</th>
-                        <th scope="col">Trạng thái</th>
-                        <th scope="col" class="n">Phát hiện</th>
-                        <th scope="col">Phát hiện chính (bấm để xem chi tiết)</th>
+                        <th scope="col" class="n" th:text="#{bulk.table.line}"></th>
+                        <th scope="col" th:text="#{bulk.table.sku}"></th>
+                        <th scope="col" th:text="#{bulk.table.status}"></th>
+                        <th scope="col" class="n" th:text="#{bulk.table.findings}"></th>
+                        <th scope="col" th:text="#{bulk.table.main}"></th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="row : ${result.rows}" th:attr="data-group=${row.status.group()}" th:classappend="'row-' + ${row.status.css()}">
                         <td class="n" th:text="${row.line}"></td>
                         <td class="sku"><span th:if="${row.sku != null}" th:text="${row.sku}"></span><span class="muted" th:if="${row.sku == null}">&mdash;</span></td>
-                        <td><span class="status" th:classappend="${row.status.css()}" th:text="${row.status.label()}"></span></td>
+                        <td><span class="status" th:classappend="${row.status.css()}" th:text="${row.statusLabel}"></span></td>
                         <td class="n" th:text="${row.findings}"></td>
                         <td class="main">
                             <details th:if="${row.status.name() != 'EMPTY'}">
                                 <summary th:text="${row.main != null} ? ${row.main.message} : ${row.summary}"></summary>
                                 <div th:replace="~{console/bulk-fragments :: rowDetail(${row}, ${result.disclaimer})}"></div>
                             </details>
-                            <span class="muted" th:if="${row.status.name() == 'EMPTY'}">Dòng trống, bỏ qua.</span>
+                            <span class="muted" th:if="${row.status.name() == 'EMPTY'}" th:text="#{bulk.row.empty}"></span>
                         </td>
                     </tr>
                     </tbody>

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Check listing - Listing Guard</title>
+    <title th:text="#{editor.title}"></title>
     <link rel="stylesheet" th:href="@{/console/editor.css}">
     <script th:src="@{/console/editor.js}" defer></script>
 </head>
@@ -12,144 +12,138 @@
 <header th:replace="~{console/layout :: nav('check')}"></header>
 <main class="layout">
     <section class="editor" aria-labelledby="editor-heading">
-        <h1 id="editor-heading">Check listing</h1>
+        <h1 id="editor-heading" th:text="#{editor.heading}"></h1>
         <p class="muted">
-            Signed in as <span th:text="${email}"></span>. Listing Guard checks and suggests. It never edits or publishes
-            your listing, and it does not store what you type.
+            <span th:text="#{common.signedin(${email})}"></span> <span th:text="#{editor.intro}"></span>
         </p>
 
-        <nav class="tabs" aria-label="Marketplace">
+        <nav class="tabs" th:aria-label="#{editor.marketplace.aria}">
             <a th:each="m : ${marketplaces}" th:href="@{/console/check(marketplace=${m.code})}" th:text="${m.label}"
                th:aria-current="${m == marketplace} ? 'page'"
                th:classappend="${m == marketplace} ? 'active'"></a>
         </nav>
-        <p class="muted small">Choosing another marketplace starts an empty form.</p>
+        <p class="muted small" th:text="#{editor.marketplace.note}"></p>
 
-        <form id="editor-form" method="post" th:action="@{/console/check}" th:object="${form}" novalidate>
+        <!-- The sentences of the live counters (editor.js) are written here: the script holds no text (ADR-028). They are patterns
+             with {0}, {1}; the script fills in the numbers. -->
+        <form id="editor-form" method="post" th:action="@{/console/check}" th:object="${form}" novalidate
+              th:attr="data-i18n-chars=#{js.counter.chars},data-i18n-chars-nolimit=#{js.counter.chars.nolimit},data-i18n-bytes=#{js.counter.bytes},data-i18n-bytes-nolimit=#{js.counter.bytes.nolimit},data-i18n-entries=#{js.counter.entries},data-i18n-entries-nolimit=#{js.counter.entries.nolimit},data-i18n-longest=#{js.counter.longest},data-i18n-over=#{js.counter.over}">
             <input type="hidden" th:field="*{marketplace}">
 
             <div class="field">
-                <label for="title">Title</label>
+                <label for="title" th:text="#{editor.title.label}"></label>
                 <input type="text" th:field="*{title}" autocomplete="off">
                 <p class="counter" data-counter-for="title" data-mode="chars"
                    th:if="${limits.titleMax != null}" th:attr="data-limit=${limits.titleMax}"
-                   th:text="'Limit: ' + ${limits.titleMax} + ' characters'"></p>
+                   th:text="#{editor.counter.limit.chars(${#strings.toString(limits.titleMax)})}"></p>
             </div>
 
             <div class="field" th:if="${marketplace.etsy}">
-                <label for="tags">Tags <span class="muted">(one per line)</span></label>
+                <label for="tags"><span th:text="#{editor.tags.label}"></span> <span class="muted" th:text="#{editor.oneperline}"></span></label>
                 <textarea th:field="*{tags}" rows="6"></textarea>
                 <p class="counter" data-counter-for="tags" data-mode="list"
                    th:if="${limits.tagCountMax != null or limits.tagLengthMax != null}"
                    th:attr="data-limit-count=${limits.tagCountMax},data-limit-each=${limits.tagLengthMax}"
-                   th:text="${(limits.tagCountMax != null ? 'Up to ' + limits.tagCountMax + ' tags' : 'Tags') + (limits.tagLengthMax != null ? ', ' + limits.tagLengthMax + ' characters each' : '')}"></p>
+                   th:text="(${limits.tagCountMax != null} ? #{editor.tags.counter.count(${#strings.toString(limits.tagCountMax)})} : #{editor.tags.counter.plain}) + (${limits.tagLengthMax != null} ? #{editor.counter.each(${#strings.toString(limits.tagLengthMax)})} : '')"></p>
             </div>
 
             <div class="field" th:if="${marketplace.amazon}">
-                <label for="bulletPoints">Bullet points <span class="muted">(one per line)</span></label>
+                <label for="bulletPoints"><span th:text="#{editor.bullets.label}"></span> <span class="muted" th:text="#{editor.oneperline}"></span></label>
                 <textarea th:field="*{bulletPoints}" rows="6"></textarea>
                 <p class="counter" data-counter-for="bulletPoints" data-mode="list"
                    th:if="${limits.bulletCountMax != null or limits.bulletLengthMax != null}"
                    th:attr="data-limit-count=${limits.bulletCountMax},data-limit-each=${limits.bulletLengthMax}"
-                   th:text="${(limits.bulletCountMax != null ? 'Up to ' + limits.bulletCountMax + ' bullet points' : 'Bullet points') + (limits.bulletLengthMax != null ? ', ' + limits.bulletLengthMax + ' characters each' : '')}"></p>
+                   th:text="(${limits.bulletCountMax != null} ? #{editor.bullets.counter.count(${#strings.toString(limits.bulletCountMax)})} : #{editor.bullets.counter.plain}) + (${limits.bulletLengthMax != null} ? #{editor.counter.each(${#strings.toString(limits.bulletLengthMax)})} : '')"></p>
             </div>
 
             <div class="field">
-                <label for="description">Description</label>
+                <label for="description" th:text="#{editor.description.label}"></label>
                 <textarea th:field="*{description}" rows="8"></textarea>
             </div>
 
             <details id="other-fields" class="other" th:open="${otherOpen}">
-                <summary>Other listing fields</summary>
-                <p class="muted small">
-                    Some rules need these fields; a rule reports a field you leave empty as missing.
-                </p>
+                <summary th:text="#{editor.other.summary}"></summary>
+                <p class="muted small" th:text="#{editor.other.intro}"></p>
 
                 <div class="field" th:if="${marketplace.amazon}">
-                    <label for="brand">Brand</label>
+                    <label for="brand" th:text="#{editor.brand.label}"></label>
                     <input type="text" th:field="*{brand}" autocomplete="off">
                 </div>
 
                 <div class="field" th:if="${marketplace.amazon}">
-                    <label for="searchTerms">Search terms</label>
+                    <label for="searchTerms" th:text="#{editor.searchterms.label}"></label>
                     <textarea th:field="*{searchTerms}" rows="2"></textarea>
                     <p class="counter" data-counter-for="searchTerms" data-mode="bytes"
                        th:if="${limits.searchTermsMaxBytes != null}" th:attr="data-limit=${limits.searchTermsMaxBytes}"
-                       th:text="'Limit: ' + ${limits.searchTermsMaxBytes} + ' bytes'"></p>
+                       th:text="#{editor.counter.limit.bytes(${#strings.toString(limits.searchTermsMaxBytes)})}"></p>
                 </div>
 
                 <div class="field" th:if="${marketplace.amazon}">
-                    <label for="productType">Product type</label>
+                    <label for="productType" th:text="#{editor.producttype.label}"></label>
                     <input type="text" th:field="*{productType}" autocomplete="off" aria-describedby="productType-hint">
-                    <p class="hint" id="productType-hint">For example LUGGAGE. It is matched to the ruleset ignoring case.</p>
+                    <p class="hint" id="productType-hint" th:text="#{editor.producttype.hint}"></p>
                 </div>
 
                 <div class="field" th:if="${marketplace.etsy}">
-                    <label for="category">Category</label>
+                    <label for="category" th:text="#{editor.category.label}"></label>
                     <input type="text" th:field="*{category}" autocomplete="off">
                 </div>
 
                 <div class="field">
-                    <label for="price">Price</label>
+                    <label for="price" th:text="#{editor.price.label}"></label>
                     <input type="text" th:field="*{price}" inputmode="decimal" autocomplete="off"
                            aria-describedby="price-hint"
                            th:attrappend="aria-invalid=${fieldErrors.containsKey('price')} ? 'true'">
-                    <p class="hint" id="price-hint">A number with a decimal point, for example 19.99.</p>
+                    <p class="hint" id="price-hint" th:text="#{editor.price.hint}"></p>
                     <p class="error" role="alert" th:if="${fieldErrors.containsKey('price')}" th:text="${fieldErrors['price']}"></p>
                 </div>
 
                 <div class="field">
-                    <label for="quantity">Quantity</label>
+                    <label for="quantity" th:text="#{editor.quantity.label}"></label>
                     <input type="text" th:field="*{quantity}" inputmode="numeric" autocomplete="off"
                            aria-describedby="quantity-hint"
                            th:attrappend="aria-invalid=${fieldErrors.containsKey('quantity')} ? 'true'">
-                    <p class="hint" id="quantity-hint">A whole number, for example 5.</p>
+                    <p class="hint" id="quantity-hint" th:text="#{editor.quantity.hint}"></p>
                     <p class="error" role="alert" th:if="${fieldErrors.containsKey('quantity')}" th:text="${fieldErrors['quantity']}"></p>
                 </div>
 
                 <div class="field" th:if="${marketplace.etsy}">
-                    <label for="whoMade">Who made it</label>
+                    <label for="whoMade" th:text="#{editor.whomade.label}"></label>
                     <input type="text" th:field="*{whoMade}" autocomplete="off" aria-describedby="whoMade-hint">
                     <p class="hint" id="whoMade-hint">
-                        Free text: the code Etsy uses for this field, for example <code>i_did</code>. Listing Guard does not
-                        keep a list of codes.
+                        <span th:text="#{editor.whomade.hint.before}"></span> <code>i_did</code><span th:text="#{editor.codes.hint.after}"></span>
                     </p>
                 </div>
 
                 <div class="field" th:if="${marketplace.etsy}">
-                    <label for="whenMade">When it was made</label>
+                    <label for="whenMade" th:text="#{editor.whenmade.label}"></label>
                     <input type="text" th:field="*{whenMade}" autocomplete="off" aria-describedby="whenMade-hint">
                     <p class="hint" id="whenMade-hint">
-                        Free text: the code Etsy uses for this field, for example <code>made_to_order</code>. Listing Guard
-                        does not keep a list of codes.
+                        <span th:text="#{editor.whenmade.hint.before}"></span> <code>made_to_order</code><span th:text="#{editor.codes.hint.after}"></span>
                     </p>
                 </div>
             </details>
 
             <div class="actions">
-                <button type="submit" class="primary" id="check-button">Check</button>
+                <button type="submit" class="primary" id="check-button" th:text="#{editor.check}"></button>
                 <p class="cost" id="cost">
                     <th:block th:if="${cost.enforced}">
-                        <strong>Cost: up to <span th:text="${cost.units}"></span>
-                            <span th:text="${cost.units == 1 ? 'unit' : 'units'}"></span></strong>
-                        of your monthly quota (listing rules 1<th:block th:if="${cost.trademarkIncluded}"> + trademark 1</th:block>).
-                        A listing you already checked is free.
-                        <th:block th:if="${cost.monthlyQuota != null}">
-                            Remaining this month: <span th:text="${cost.remaining}"></span> of
-                            <span th:text="${cost.monthlyQuota}"></span>; resets on
-                            <time th:text="${cost.resetDate}"></time> (UTC).
-                        </th:block>
-                        <th:block th:if="${cost.monthlyQuota == null}">Your quota is unlimited.</th:block>
+                        <strong th:text="${cost.units == 1} ? #{editor.cost.headline.one(${#strings.toString(cost.units)})} : #{editor.cost.headline.other(${#strings.toString(cost.units)})}"></strong>
+                        <span th:text="${cost.trademarkIncluded} ? #{editor.cost.breakdown.both} : #{editor.cost.breakdown.rules}"></span>
+                        <span th:text="#{editor.cost.free}"></span>
+                        <span th:if="${cost.monthlyQuota != null}"
+                              th:text="#{editor.cost.remaining(${#strings.toString(cost.remaining)}, ${#strings.toString(cost.monthlyQuota)}, ${cost.resetDate})}"></span>
+                        <span th:if="${cost.monthlyQuota == null}" th:text="#{editor.cost.unlimited}"></span>
                     </th:block>
                     <th:block th:unless="${cost.enforced}">
-                        Plan limits are not enforced in this deployment, so nothing is counted.
+                        <span th:text="#{editor.cost.notenforced}"></span>
                     </th:block>
                 </p>
             </div>
         </form>
     </section>
 
-    <aside class="results" id="results" aria-live="polite" aria-label="Results">
+    <aside class="results" id="results" aria-live="polite" th:aria-label="#{editor.results.aria}">
         <div class="notice" id="notice" th:if="${notice != null}" th:classappend="${noticeApplied} ? 'applied' : 'refused'"
              th:attr="role=${noticeApplied} ? 'status' : 'alert'">
             <p th:text="${notice}"></p>
@@ -158,41 +152,50 @@
             <div class="verdicts">
                 <section class="verdict" id="readiness-panel" aria-labelledby="readiness-heading"
                          th:classappend="${result.readiness.kind.css()}">
-                    <h2 id="readiness-heading">Publish readiness</h2>
+                    <h2 id="readiness-heading" th:text="#{editor.readiness.heading}"></h2>
                     <p class="big" th:text="${result.readiness.big}"></p>
                     <p class="headline" th:text="${result.readiness.headline}"></p>
                     <p class="muted small" th:text="${result.readiness.detail}"></p>
                 </section>
                 <section class="verdict" id="trademark-panel" aria-labelledby="trademark-heading"
                          th:classappend="${result.trademark.kind.css()}">
-                    <h2 id="trademark-heading">Trademark risk</h2>
+                    <h2 id="trademark-heading" th:text="#{editor.trademark.heading}"></h2>
                     <p class="big" th:text="${result.trademark.big}"></p>
                     <p class="headline" th:text="${result.trademark.headline}"></p>
                     <p class="muted small" th:text="${result.trademark.detail}"></p>
                     <p class="hint-upgrade small" th:if="${result.trademark.hint != null}" th:text="${result.trademark.hint}"></p>
                     <p class="demo-note small" id="trademark-demo-note" th:if="${demoCatalog}"><span th:replace="~{console/layout :: demoText}"></span></p>
-                    <p class="muted small disclaimer" th:text="${result.trademark.disclaimer}"></p>
+                    <!-- The wording of the ruleset is always printed as it is (it is the legal text). A statement of the page's own language
+                         goes above it when that language has one that differs (ADR-028). -->
+                    <th:block th:with="note=${@consoleMessages.disclaimerNote(result.trademark.disclaimer)}">
+                        <p class="muted small disclaimer" id="trademark-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
+                        <p class="muted small disclaimer" id="trademark-disclaimer">
+                            <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
+                            <span th:text="${result.trademark.disclaimer}"></span>
+                        </p>
+                    </th:block>
                 </section>
             </div>
 
             <section class="findings" id="rule-findings" th:if="${result.rulesRan}" aria-labelledby="findings-heading">
-                <h2 id="findings-heading">Findings</h2>
-                <p th:if="${result.ruleGroups.isEmpty()}">The listing rules found nothing to report.</p>
+                <h2 id="findings-heading" th:text="#{editor.findings.heading}"></h2>
+                <p th:if="${result.ruleGroups.isEmpty()}" th:text="#{editor.findings.none}"></p>
                 <div class="group" th:each="group : ${result.ruleGroups}" th:classappend="${group.css}">
                     <h3><span th:text="${group.label}"></span> (<span th:text="${group.items.size()}"></span>)</h3>
                     <ul>
-                        <li th:each="f : ${group.items}">
+                        <li th:each="f : ${group.items}" th:with="explanation=${@consoleMessages.ruleExplanation(f.ruleId)}">
                             <p class="msg" th:text="${f.message}"></p>
                             <p class="meta small muted"><code th:text="${f.ruleId}"></code>
-                                <th:block th:if="${f.field != null}"> on <code th:text="${f.field}"></code></th:block></p>
-                            <p class="evidence small" th:if="${f.evidence != null}">Evidence:
+                                <th:block th:if="${f.field != null}"> <span th:text="#{editor.finding.on}"></span> <code th:text="${f.field}"></code></th:block></p>
+                            <p class="explain small muted" th:if="${explanation != null}"><span th:text="#{editor.finding.explains}"></span> <span th:text="${explanation}"></span></p>
+                            <p class="evidence small" th:if="${f.evidence != null}"><span th:text="#{editor.finding.evidence}"></span>
                                 <th:block th:replace="~{console/editor-fragments :: evidence(${f.evidence})}"></th:block></p>
                             <p class="small" th:if="${f.suggestion != null}" th:text="${f.suggestion}"></p>
                             <div class="fix" th:if="${f.fix != null}">
-                                <p class="small"><strong>Suggested fix:</strong> <span th:text="${f.fix.description}"></span></p>
-                                <p class="small" th:if="${f.fix.proposedValue != null}">Proposed value:
+                                <p class="small"><strong th:text="#{editor.fix.label}"></strong> <span th:text="${f.fix.description}"></span></p>
+                                <p class="small" th:if="${f.fix.proposedValue != null}"><span th:text="#{editor.fix.proposed}"></span>
                                     <code th:text="${f.fix.proposedValue}"></code></p>
-                                <p class="small" th:if="${f.fix.proposedValue == null}">Proposed: remove this value.</p>
+                                <p class="small" th:if="${f.fix.proposedValue == null}" th:text="#{editor.fix.remove}"></p>
                                 <!-- The button and its hidden values belong to the editor form (form attribute), so the page sends
                                      what is typed in the fields now. Pressing it only fills the field; it never checks again. -->
                                 <input type="hidden" form="editor-form" th:name="'fix.' + ${f.fixId} + '.field'" th:value="${f.field}">
@@ -202,7 +205,7 @@
                                        th:value="${f.fix.proposedValue}" th:if="${f.fix.proposedValue != null}">
                                 <button type="submit" form="editor-form" name="apply" class="apply"
                                         th:value="${f.fixId}" th:formaction="@{/console/check/apply}"
-                                        th:attr="aria-label='Apply suggestion to ' + ${f.field}">Apply suggestion</button>
+                                        th:aria-label="#{editor.fix.apply.aria(${f.field})}" th:text="#{editor.fix.apply}"></button>
                             </div>
                         </li>
                     </ul>
@@ -211,15 +214,16 @@
 
             <section class="findings" id="trademark-findings" th:if="${!result.trademark.groups.isEmpty()}"
                      aria-labelledby="trademark-findings-heading">
-                <h2 id="trademark-findings-heading">Trademark findings</h2>
+                <h2 id="trademark-findings-heading" th:text="#{editor.trademark.findings.heading}"></h2>
                 <div class="group" th:each="group : ${result.trademark.groups}" th:classappend="${group.css}">
                     <h3><span th:text="${group.label}"></span> (<span th:text="${group.items.size()}"></span>)</h3>
                     <ul>
-                        <li th:each="f : ${group.items}">
+                        <li th:each="f : ${group.items}" th:with="explanation=${@consoleMessages.ruleExplanation(f.ruleId)}">
                             <p class="msg" th:text="${f.message}"></p>
-                            <p class="meta small muted"><code th:text="${f.ruleId}"></code> on <code th:text="${f.field}"></code>
-                                <th:block th:if="${f.mark != null}"> matching <code th:text="${f.mark}"></code></th:block></p>
-                            <p class="evidence small" th:if="${f.evidence != null}">Evidence:
+                            <p class="meta small muted"><code th:text="${f.ruleId}"></code> <span th:text="#{editor.finding.on}"></span> <code th:text="${f.field}"></code>
+                                <th:block th:if="${f.mark != null}"> <span th:text="#{editor.trademark.matching}"></span> <code th:text="${f.mark}"></code></th:block></p>
+                            <p class="explain small muted" th:if="${explanation != null}"><span th:text="#{editor.finding.explains}"></span> <span th:text="${explanation}"></span></p>
+                            <p class="evidence small" th:if="${f.evidence != null}"><span th:text="#{editor.finding.evidence}"></span>
                                 <th:block th:replace="~{console/editor-fragments :: evidence(${f.evidence})}"></th:block></p>
                             <p class="small" th:if="${f.suggestion != null}" th:text="${f.suggestion}"></p>
                         </li>
@@ -229,34 +233,31 @@
         </th:block>
 
         <section class="preview" id="preview" aria-labelledby="preview-heading">
-            <h2 id="preview-heading">Preview <span class="badge">Simulation</span></h2>
-            <p class="muted small">
-                A rough picture of the text as it stands in the form after the last check or suggestion. It is not a real page
-                and it copies no marketplace's design, so real pages cut titles differently and change over time.
-            </p>
+            <h2 id="preview-heading"><span th:text="#{editor.preview.heading}"></span> <span class="badge" th:text="#{editor.preview.badge}"></span></h2>
+            <p class="muted small" th:text="#{editor.preview.intro}"></p>
             <div class="sim-grid">
                 <div>
-                    <h3>As a search result</h3>
+                    <h3 th:text="#{editor.preview.search}"></h3>
                     <figure class="sim-card" th:classappend="${marketplace.amazon} ? 'row' : 'tile'">
                         <div class="sim-photo" aria-hidden="true"></div>
                         <figcaption>
                             <p class="sim-title" th:classappend="${!preview.hasTitle()} ? 'placeholder'"
-                               th:text="${preview.hasTitle()} ? ${preview.title()} : 'Your title appears here'"></p>
+                               th:text="${preview.hasTitle()} ? ${preview.title()} : #{editor.preview.placeholder}"></p>
                             <p class="sim-brand" th:if="${marketplace.amazon and !preview.brand().isEmpty()}"
                                th:text="${preview.brand()}"></p>
-                            <p class="sim-price" th:text="${preview.price().isEmpty()} ? 'Price not set' : ${preview.price()}"></p>
+                            <p class="sim-price" th:text="${preview.price().isEmpty()} ? #{editor.preview.noprice} : ${preview.price()}"></p>
                         </figcaption>
                     </figure>
-                    <p class="small muted">The title is cut by the style sheet after two lines. Real pages cut differently.</p>
+                    <p class="small muted" th:text="#{editor.preview.cutnote}"></p>
                 </div>
                 <div>
-                    <h3>As a product page</h3>
+                    <h3 th:text="#{editor.preview.page}"></h3>
                     <div class="sim-page">
                         <article>
-                            <h4 class="sim-page-title" th:classappend="${!preview.hasTitle()} ? 'placeholder'"><span th:if="${!preview.hasTitle()}">Your title appears here</span><span th:text="${preview.titleWithin()}"></span><mark class="beyond" th:if="${preview.overTheLimit()}" th:text="${preview.titleBeyond()}"></mark></h4>
+                            <h4 class="sim-page-title" th:classappend="${!preview.hasTitle()} ? 'placeholder'"><span th:if="${!preview.hasTitle()}" th:text="#{editor.preview.placeholder}"></span><span th:text="${preview.titleWithin()}"></span><mark class="beyond" th:if="${preview.overTheLimit()}" th:text="${preview.titleBeyond()}"></mark></h4>
                             <p class="sim-brand" th:if="${marketplace.amazon and !preview.brand().isEmpty()}"
-                               th:text="'Brand: ' + ${preview.brand()}"></p>
-                            <p class="sim-price" th:text="${preview.price().isEmpty()} ? 'Price not set' : ${preview.price()}"></p>
+                               th:text="#{editor.preview.brand(${preview.brand()})}"></p>
+                            <p class="sim-price" th:text="${preview.price().isEmpty()} ? #{editor.preview.noprice} : ${preview.price()}"></p>
                             <ul class="sim-bullets" th:if="${marketplace.amazon and !preview.bullets().isEmpty()}">
                                 <li th:each="bullet : ${preview.bullets()}" th:text="${bullet}"></li>
                             </ul>
@@ -265,7 +266,7 @@
                         </article>
                     </div>
                     <p class="small muted" th:if="${preview.overTheLimit()}"
-                       th:text="'The highlighted part is beyond the title limit of ' + ${limits.titleMax} + ' characters in the ruleset.'"></p>
+                       th:text="#{editor.preview.beyond(${#strings.toString(limits.titleMax)})}"></p>
                 </div>
             </div>
         </section>

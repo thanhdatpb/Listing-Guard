@@ -208,10 +208,11 @@ example for an application that calls the API. It needs no migration and no plan
 
 ### Bulk check page (ADR-029)
 
-A signed-in user can open **Kiểm tra hàng loạt** (`/console/bulk`) to paste rows copied from a Google Sheet, or upload a CSV or TSV,
+A signed-in user can open **Bulk check** (*Kiểm tra hàng loạt*, `/console/bulk`; English or Vietnamese like the rest of the console)
+to paste rows copied from a Google Sheet, or upload a CSV or TSV,
 and get one status per row to read on the page, copy back into the Sheet or download as CSV. The guide for sellers is
 [bulk-check.md](bulk-check.md). The page calls the same services as the API and `batch-check`, so plans, quota and retention are
-theirs. One additive migration, **V35**, creates `console_bulk_mapping`: the column mapping an account used (the header text of each
+theirs. One additive migration, **V36**, creates `console_bulk_mapping`: the column mapping an account used (the header text of each
 mapped column, the field it was given and the separator of each list field), never a cell of a Sheet. It is deleted with its
 account.
 
@@ -231,8 +232,28 @@ account.
   (`client_max_body_size`, Cloudflare's plan limit), keep it above that number.
 - With plans on, a run needs the `listing-rules` pack and a unit left; it costs one unit per new result, like the API (a listing
   checked before is free). The `batch` pack is not required.
-- Rolling back the migration (before the page was used): `DROP TABLE console_bulk_mapping;` and delete the row of V35 from
+- Rolling back the migration (before the page was used): `DROP TABLE console_bulk_mapping;` and delete the row of V36 from
   `flyway_schema_history`.
+
+### Console language (ADR-028)
+
+Every console page and the sign-in e-mail exist in English and Vietnamese. The language of a page is chosen in this order: the
+`lang` link in the corner of the page (`?lang=en`, `?lang=vi`), then the `lg_lang` cookie that link sets, then the default below.
+The browser's `Accept-Language` is not used. The cookie holds the code only (`HttpOnly`, `SameSite=Lax`, `Secure` as
+`LISTING_GUARD_CONSOLE_COOKIE_SECURE` says, one year). Only the console is affected: the API's answers, its problem details, the
+batch and health-report files and the MCP server do not change language.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `LISTING_GUARD_CONSOLE_DEFAULT_LOCALE` | `en` | The language of a page whose reader has not chosen one: `en` or `vi`. Any other value, empty included, stops the API from starting. Set `vi` for Vietnamese sellers. |
+
+- What stays as the API gave it, in both languages: rule ids, fields, evidence, versions, codes such as `ERROR` or `HIGH`, and the
+  message, suggestion and fix of each finding. Under each finding the page adds one sentence saying what its rule checks
+  (`rules.properties`, `rules_vi.properties`); a rule with no Vietnamese sentence shows the English one.
+- The trademark disclaimer is printed as the ruleset writes it. On an English page, an English statement stands above it and the
+  ruleset's text is labelled as the original.
+- The texts are in `messages.properties` and `messages_vi.properties` inside the API jar; to change a sentence, change the file
+  and rebuild. A language is added with one more pair of files and one entry in `ConsoleLocales.SUPPORTED`.
 
 ### DEMO catalog banner
 

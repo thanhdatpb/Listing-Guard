@@ -1,50 +1,56 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.editor.EditorCost;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
 import com.thanhdatpb.listingguard.api.plan.QuotaExceededException;
 
 /**
- * The Vietnamese sentences of the bulk check that more than one class needs (ADR-029). The page's own words are in
- * {@code templates/console/bulk.html}; the messages of a finding are the rules' own and are never reworded here.
+ * The sentences of the bulk check that more than one class needs (ADR-029), read from the console's messages (ADR-028) in the
+ * language of the page. The messages of a finding are the rules' own and are never reworded here.
  */
 final class BulkText {
-
-    static final String TRADEMARK_NOT_LOADED = "chưa nạp danh mục nhãn hiệu trên máy chủ này";
-    static final String CHECK_FAILED = "kiểm tra gặp lỗi (xem nhật ký của máy chủ)";
 
     private BulkText() {
     }
 
+    static String trademarkNotLoaded(ConsoleMessages messages) {
+        return messages.get("bulk.reason.trademark.notloaded");
+    }
+
+    static String checkFailed(ConsoleMessages messages) {
+        return messages.get("bulk.reason.failed");
+    }
+
     /** Why a check did not run for lack of quota, with the day the quota comes back. */
-    static String quota(QuotaExceededException e) {
-        return "hết quota tháng (đã dùng " + e.used() + " trên " + e.quota() + " đơn vị), quota đặt lại ngày "
-                + EditorCost.resetDate(e.resetAt()) + " (UTC)";
+    static String quota(ConsoleMessages messages, QuotaExceededException e) {
+        return messages.get("bulk.reason.quota", e.used(), e.quota(), EditorCost.resetDate(e.resetAt()));
     }
 
     /** Why a check did not run because the plan does not include it. */
-    static String plan(PlanNotAllowedException e) {
-        return "gói " + e.plan() + " không gồm " + packName(e.pack());
+    static String plan(ConsoleMessages messages, PlanNotAllowedException e) {
+        return messages.get("bulk.reason.plan", e.plan(), packName(messages, e.pack()));
     }
 
-    static String packName(Pack pack) {
+    static String packName(ConsoleMessages messages, Pack pack) {
         return switch (pack) {
-            case LISTING_RULES -> "kiểm tra quy tắc listing";
-            case TRADEMARK_RISK -> "kiểm tra nhãn hiệu";
-            case VARIATION_CHECKS -> "kiểm tra biến thể";
-            default -> "chức năng này";
+            case LISTING_RULES -> messages.get("bulk.pack.listingrules");
+            case TRADEMARK_RISK -> messages.get("bulk.pack.trademarkrisk");
+            case VARIATION_CHECKS -> messages.get("bulk.pack.variationchecks");
+            default -> messages.get("bulk.pack.other");
         };
     }
 
-    static String severityLabel(String level) {
+    /** The label of a severity or a trademark risk level ({@code error}, {@code warning}, {@code info}, {@code high}...). */
+    static String level(ConsoleMessages messages, String level) {
         return switch (level) {
-            case "error" -> "Lỗi";
-            case "warning" -> "Cảnh báo";
-            case "info" -> "Thông tin";
-            case "high" -> "Rủi ro cao";
-            case "medium" -> "Rủi ro trung bình";
-            case "low" -> "Rủi ro thấp";
+            case "error" -> messages.get("bulk.level.error");
+            case "warning" -> messages.get("bulk.level.warning");
+            case "info" -> messages.get("bulk.level.info");
+            case "high" -> messages.get("bulk.level.high");
+            case "medium" -> messages.get("bulk.level.medium");
+            case "low" -> messages.get("bulk.level.low");
             default -> level;
         };
     }

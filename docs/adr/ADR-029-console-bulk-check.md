@@ -20,7 +20,9 @@ trademark panel and disclaimer. What is missing is the page that turns a table i
 
 Add `GET /console/bulk` and two `POST`s (`/console/bulk/prepare`, `/console/bulk/run`) to the console, in the session and CSRF chain
 of the other console pages (a visitor who is not signed in goes to `/login`; with the console off there is no route). The page is in
-Vietnamese and is in the menu as "Kiểm tra hàng loạt". It checks and suggests only: nothing is published, no fix is applied, and
+English and Vietnamese like the rest of the console ([ADR-028](ADR-028-console-localization.md)): no sentence is written in the
+template, the script or a class, every one is a key of `messages.properties` and `messages_vi.properties`, in the language of the
+page. The menu entry is "Bulk check" or "Kiểm tra hàng loạt". It checks and suggests only: nothing is published, no fix is applied, and
 nothing is written to a marketplace or to the seller's Sheet. The seller pastes the answer back by hand.
 
 ### Two tabs, one table
@@ -51,7 +53,7 @@ column mapped, is refused with a message and the form comes back as it was.
 
 The guess is a default, never a decision: **the mapping that was used is remembered per account and marketplace and applied first the
 next time** (by column header text, so a Sheet with reordered columns still maps; a column the stored mapping does not know falls back to
-the guess). Only column labels, targets and separators are stored (V35, `console_bulk_mapping`, at most 100 columns of at most 120
+the guess). Only column labels, targets and separators are stored (V36, `console_bulk_mapping`, at most 100 columns of at most 120
 characters each, deleted with the account); never a cell value. The seller can untick "remember" for a run.
 
 ### What is read
@@ -145,9 +147,10 @@ an adapter can name its rows; every existing constructor and template keeps work
 - The mapping guess is a convenience that can be wrong; the page shows what it chose and the run uses only what the seller confirmed.
 - Results cannot be reopened later from the console (nothing lists them); the API's `GET /api/v1/checks/{id}` still answers for the
   retained checks. Saved listings and history stay "not designed" in ADR-014.
-- The page is Vietnamese while the rest of the console is English at the time of writing. ADR-028 (console i18n) is not in this
-  repository yet; the texts here are literals in the template and in one Java class (`BulkText`), so moving them to message bundles
-  is mechanical.
+- Every text is a message (ADR-028), so a status, a note, a sentence of the block pasted into the Sheet and the headers of the CSV follow
+  the language of the page; the status words in this ADR (`Đạt`, `Cảnh báo`, `Lỗi`) are the Vietnamese ones. The English sentences and
+  the Vietnamese ones are for the maintainer to review. A remembered mapping is keyed by the header text of the Sheet, which is the
+  seller's own words in any language; the label of a column that has no header ("Column A", "Cột A") follows the language.
 - A paste is limited to what fits one request (200 rows by default). A bigger file stays a job for `batch-check`.
 
 ## Open questions

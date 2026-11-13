@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccount;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRepository;
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.console.editor.EditorCost;
 import com.thanhdatpb.listingguard.api.console.editor.EditorMarketplace;
@@ -98,10 +99,10 @@ public class ConsoleBulkController {
 
     /**
      * @param dataField the text to send back, with the line break that an HTML textarea drops at its start put in front of it
-     * @param rows      how many data rows the table has
+     * @param intro     how many rows and columns the table has and how the header was read, in the language of the page
      * @param costNote  what the run can cost, or null when plans are off
      */
-    public record MappingPage(String dataField, String delimiter, boolean header, int rows, List<ColumnView> columns,
+    public record MappingPage(String dataField, String delimiter, boolean header, String intro, List<ColumnView> columns,
                               List<SeparatorView> separators, List<String> problems, boolean remember, String costNote,
                               boolean remembered) {
     }
@@ -112,9 +113,12 @@ public class ConsoleBulkController {
     private final ConsoleAccountRepository accounts;
     private final PlanService plans;
     private final ObjectMapper mapper;
+    private final ConsoleMessages messages;
 
     public ConsoleBulkController(BulkProperties limits, BulkCheckService service, BulkMappingStore mappingStore,
-                                 ConsoleAccountRepository accounts, PlanService plans, ObjectMapper mapper) {
+                                 ConsoleAccountRepository accounts, PlanService plans, ObjectMapper mapper,
+                                 ConsoleMessages messages) {
+        this.messages = messages;
         this.limits = limits;
         this.service = service;
         this.mappingStore = mappingStore;
@@ -153,12 +157,12 @@ public class ConsoleBulkController {
                 return prepareFile(user, marketplace, file, mode, model);
             }
             String pasted = text == null ? "" : text;
-            requireWithinBytes(pasted.getBytes(StandardCharsets.UTF_8).length, "Nội dung dán");
+            requireWithinBytes(pasted.getBytes(StandardCharsets.UTF_8).length, messages.get("bulk.error.what.paste"));
             if (pasted.isBlank()) {
-                throw new BulkTable.Refused(400, "Chưa có dữ liệu. Dán các dòng đã chép từ Google Sheet vào ô bên dưới.");
+                throw new BulkTable.Refused(400, messages.get("bulk.error.nodata"));
             }
-            BulkTable.Prepared table = BulkTable.prepare(pasted, '\t', mode, marketplace, rememberedLabels(user, marketplace),
-                    limits.maxRows());
+            BulkTable.Prepared table = BulkTable.prepare(messages, pasted, '\t', mode, marketplace,
+                    rememberedLabels(user, marketplace), limits.maxRows());
             return mappingStep(user, marketplace, table, pasted, null, model);
         } catch (BulkTable.Refused e) {
             return refuse(user, marketplace, tab, e, text, model, response);
@@ -177,20 +181,20 @@ public class ConsoleBulkController {
         EditorMarketplace marketplace = marketplace(params.getOrDefault("marketplace", ""));
         String data = params.getOrDefault("data", "");
         try {
-            requireWithinBytes(data.getBytes(StandardCharsets.UTF_8).length, "Nội dung");
+            requireWithinBytes(data.getBytes(StandardCharsets.UTF_8).length, messages.get("bulk.error.what.content"));
             BulkTable.HeaderMode mode = "yes".equals(params.get("header")) ? BulkTable.HeaderMode.YES : BulkTable.HeaderMode.NO;
             char delimiter = delimiter(params.get("delimiter"));
-            BulkTable.Prepared table = BulkTable.prepare(data, delimiter, mode, marketplace, Set.of(), limits.maxRows());
-            ColumnMapping mapping = ColumnMapping.fromParams(marketplace, table.columns(), params);
+            BulkTable.Prepared table = BulkTable.prepare(messages, data, delimiter, mode, marketplace, Set.of(), limits.maxRows());
+            ColumnMapping mapping = ColumnMapping.fromParams(messages, marketplace, table.columns(), params);
             boolean remember = params.containsKey("remember");
-            List<String> problems = mapping.problems(marketplace, table.labels());
+            List<String> problems = mapping.problems(messages, marketplace, table.labels());
             if (!problems.isEmpty()) {
                 response.setStatus(HttpStatus.BAD_REQUEST.value());
                 return mappingStep(user, marketplace, table, data, new Remembered(mapping, problems, remember), model);
             }
             List<BulkCheckService.Input> inputs = new ArrayList<>();
             for (DelimitedText.Row row : table.rows()) {
-                BulkListingMapper.Mapped mapped = BulkListingMapper.map(marketplace, mapping, table.labels(), row.cells());
+                BulkListingMapper.Mapped mapped = BulkListingMapper.map(messages, marketplace, mapping, table.labels(), row.cells());
                 if (mapped.blank()) {
                     inputs.add(BulkCheckService.Input.empty(row.line()));
                 } else if (mapped.error() != null) {
@@ -208,13 +212,11 @@ public class ConsoleBulkController {
         } catch (BulkTable.Refused e) {
             return refuse(user, marketplace, Tab.PASTE, e, null, model, response);
         } catch (PlanNotAllowedException e) {
-            return refuse(user, marketplace, Tab.PASTE, new BulkTable.Refused(403, "Gói của bạn (" + e.plan() + ") không gồm "
-                    + BulkText.packName(e.pack()) + ". Nhờ người quản trị máy chủ chuyển bạn sang gói có chức năng này."), null, model,
-                    response);
+            return refuse(user, marketplace, Tab.PASTE, new BulkTable.Refused(403, messages.get("bulk.error.plan", e.plan(),
+                    BulkText.packName(messages, e.pack()))), null, model, response);
         } catch (QuotaExceededException e) {
-            return refuse(user, marketplace, Tab.PASTE, new BulkTable.Refused(429, "Quota tháng đã hết: " + BulkText.quota(e)
-                    + ". Chưa kiểm tra dòng nào. Kết quả đã lưu của listing đã kiểm tra trước đó vẫn trả lời được khi bạn kiểm tra "
-                    + "lại từng listing."), null, model, response);
+            return refuse(user, marketplace, Tab.PASTE, new BulkTable.Refused(429, messages.get("bulk.error.quota",
+                    BulkText.quota(messages, e))), null, model, response);
         }
     }
 
@@ -223,30 +225,30 @@ public class ConsoleBulkController {
     private String prepareFile(ConsoleUser user, EditorMarketplace marketplace, MultipartFile file, BulkTable.HeaderMode mode,
                                Model model) {
         if (file == null || file.isEmpty()) {
-            throw new BulkTable.Refused(400, "Chưa chọn file. Chọn một file .csv, .tsv hoặc .txt.");
+            throw new BulkTable.Refused(400, messages.get("bulk.error.nofile"));
         }
         String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
         if (!(name.endsWith(".csv") || name.endsWith(".tsv") || name.endsWith(".txt"))) {
-            throw new BulkTable.Refused(400, "Chỉ nhận file .csv, .tsv hoặc .txt.");
+            throw new BulkTable.Refused(400, messages.get("bulk.error.extension"));
         }
-        requireWithinBytes(file.getSize(), "File");
+        requireWithinBytes(file.getSize(), messages.get("bulk.error.what.file"));
         byte[] bytes;
         try {
             bytes = file.getBytes();
         } catch (IOException e) {
-            throw new BulkTable.Refused(400, "Không đọc được file. Thử tải lại.");
+            throw new BulkTable.Refused(400, messages.get("bulk.error.readfile"));
         }
         String text = decode(bytes);
         Optional<ConfiguredCsvAdapter> adapter = adapterFor(text);
         if (adapter.isEmpty()) {
             char delimiter = DelimitedText.detectDelimiter(text);
-            BulkTable.Prepared table = BulkTable.prepare(text, delimiter, mode, marketplace, rememberedLabels(user, marketplace),
-                    limits.maxRows());
+            BulkTable.Prepared table = BulkTable.prepare(messages, text, delimiter, mode, marketplace,
+                    rememberedLabels(user, marketplace), limits.maxRows());
             return mappingStep(user, marketplace, table, text, null, model);
         }
         if (!adapter.get().marketplace().equals(marketplace.code())) {
-            throw new BulkTable.Refused(400, "File này có dạng “" + adapter.get().id() + "” của " + adapter.get().marketplace()
-                    + ", nhưng bạn đã chọn " + marketplace.label() + ". Chọn đúng sàn rồi tải lại.");
+            throw new BulkTable.Refused(400, messages.get("bulk.error.adapter.marketplace", adapter.get().id(),
+                    adapter.get().marketplace(), marketplace.label()));
         }
         return runWithAdapter(user, marketplace, adapter.get(), bytes, model);
     }
@@ -262,7 +264,8 @@ public class ConsoleBulkController {
                 families |= record.familyRole() != null;
                 int line = (int) record.line();
                 if (!record.errors().isEmpty()) {
-                    inputs.add(BulkCheckService.Input.unreadable(line, record.id(), "Dữ liệu sai: " + fieldErrors(record.errors()) + "."));
+                    inputs.add(BulkCheckService.Input.unreadable(line, record.id(),
+                            messages.get("bulk.row.problem", fieldErrors(record.errors()))));
                     continue;
                 }
                 JsonNode tree = mapper.valueToTree(record.listing());
@@ -273,21 +276,20 @@ public class ConsoleBulkController {
             throw new BulkTable.Refused(400, adapterFailure(e));
         }
         if (inputs.isEmpty()) {
-            throw new BulkTable.Refused(400, "Chỉ có dòng tiêu đề, chưa có dòng dữ liệu nào.");
+            throw new BulkTable.Refused(400, messages.get("bulk.error.headeronly"));
         }
         try {
             BulkResult result = service.run(user.clientId(), marketplace, inputs, true);
             List<String> notes = new ArrayList<>();
-            notes.add("File được nhận dạng là “" + adapter.id() + "”: các cột đã được đọc theo định dạng đó, bạn không cần chọn cột.");
+            notes.add(messages.get("bulk.note.adapter", adapter.id()));
             if (families) {
-                notes.add("File có dòng cha/con, nhưng định dạng này chưa đọc thuộc tính biến thể nên chưa kiểm tra biến thể. Dán bảng "
-                        + "có cột SKU cha và thuộc tính để kiểm tra biến thể.");
+                notes.add(messages.get("bulk.note.adapter.families"));
             }
             return result(user, marketplace, result, notes, model);
         } catch (PlanNotAllowedException e) {
-            throw new BulkTable.Refused(403, "Gói của bạn (" + e.plan() + ") không gồm " + BulkText.packName(e.pack()) + ".");
+            throw new BulkTable.Refused(403, messages.get("bulk.error.plan", e.plan(), BulkText.packName(messages, e.pack())));
         } catch (QuotaExceededException e) {
-            throw new BulkTable.Refused(429, "Quota tháng đã hết: " + BulkText.quota(e) + ". Chưa kiểm tra dòng nào.");
+            throw new BulkTable.Refused(429, messages.get("bulk.error.quota", BulkText.quota(messages, e)));
         }
     }
 
@@ -332,37 +334,36 @@ public class ConsoleBulkController {
         return text;
     }
 
-    private static String decode(byte[] bytes) {
+    private String decode(byte[] bytes) {
         try {
             return StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
         } catch (CharacterCodingException e) {
-            throw new BulkTable.Refused(400, "File không phải UTF-8. Lưu lại thành CSV UTF-8 (Google Sheets: Tệp, Tải xuống, "
-                    + "Giá trị phân tách bằng dấu phẩy) rồi tải lên.");
+            throw new BulkTable.Refused(400, messages.get("bulk.error.notutf8"));
         }
     }
 
-    private static String fieldErrors(List<ListingInputAdapter.FieldError> errors) {
-        List<String> messages = new ArrayList<>();
+    private String fieldErrors(List<ListingInputAdapter.FieldError> errors) {
+        List<String> texts = new ArrayList<>();
         for (ListingInputAdapter.FieldError error : errors) {
-            messages.add(switch (error.code()) {
-                case "invalid-number" -> error.field() + " không phải số thập phân thường (dùng dấu chấm, không có ký hiệu tiền tệ)";
-                case "missing-column" -> "dòng thiếu ô cho cột của " + error.field();
-                default -> error.field() + ": " + error.code();
+            texts.add(switch (error.code()) {
+                case "invalid-number" -> messages.get("bulk.field.invalidnumber", error.field());
+                case "missing-column" -> messages.get("bulk.field.missingcolumn", error.field());
+                default -> messages.get("bulk.field.other", error.field(), error.code());
             });
         }
-        return String.join("; ", messages);
+        return String.join("; ", texts);
     }
 
     private String adapterFailure(Exception e) {
         String message = e.getMessage() == null ? "" : e.getMessage();
         if (message.contains("row limit")) {
-            return "File có nhiều hơn " + limits.maxRows() + " dòng dữ liệu, vượt giới hạn của một lần kiểm tra. Chia file thành nhiều phần.";
+            return messages.get("bulk.error.adapter.rows", limits.maxRows());
         }
         if (message.contains("byte limit")) {
-            return "File vượt giới hạn " + bytesText(limits.maxBytes().toBytes()) + ".";
+            return messages.get("bulk.error.adapter.bytes", bytesText(limits.maxBytes().toBytes()));
         }
-        return "File không đọc được: không phải CSV hợp lệ (dấu nháy không đóng, hoặc dòng thiếu cột). Kiểm tra file rồi tải lại.";
+        return messages.get("bulk.error.adapter.csv");
     }
 
     // ---- the pages
@@ -382,15 +383,20 @@ public class ConsoleBulkController {
         List<SeparatorView> separators = new ArrayList<>();
         for (BulkTargets.Target target : BulkTargets.of(marketplace)) {
             if (target.separable()) {
-                separators.add(new SeparatorView(target.key(), target.label(), mapping.separatorOf(target)));
+                separators.add(new SeparatorView(target.key(), messages.get("bulk.separators.for", target.label(messages)),
+                        mapping.separatorOf(target)));
             }
         }
         long judgeable = table.rows().stream().filter(row -> !row.blank()).count();
         base(model, user, marketplace, Tab.PASTE);
         model.addAttribute("stage", "mapping");
-        model.addAttribute("targets", BulkTargets.of(marketplace).stream().map(t -> new TargetOption(t.key(), t.label())).toList());
-        model.addAttribute("separatorOptions", BulkTargets.SEPARATORS.stream().map(s -> new SeparatorOption(s.key(), s.label())).toList());
-        model.addAttribute("mapping", new MappingPage("\n" + text, delimiterName(table.delimiter()), table.header(), table.rows().size(),
+        model.addAttribute("targets", BulkTargets.of(marketplace).stream().map(t -> new TargetOption(t.key(), t.label(messages))).toList());
+        model.addAttribute("separatorOptions",
+                BulkTargets.SEPARATORS.stream().map(s -> new SeparatorOption(s.key(), s.label(messages))).toList());
+        String intro = messages.get("bulk.mapping.counts", table.rows().size(), table.columns()) + " "
+                + messages.get(table.header() ? "bulk.mapping.header.yes" : "bulk.mapping.header.no") + " "
+                + messages.get("bulk.mapping.guess");
+        model.addAttribute("mapping", new MappingPage("\n" + text, delimiterName(table.delimiter()), table.header(), intro,
                 columns, separators, again == null ? List.of() : again.problems(), again == null || again.remember(),
                 costNote(user, judgeable), stored.isPresent()));
         return VIEW;
@@ -424,8 +430,9 @@ public class ConsoleBulkController {
         model.addAttribute("marketplaces", EditorMarketplace.values());
         model.addAttribute("tab", tab);
         model.addAttribute("stage", "form");
-        model.addAttribute("maxRows", limits.maxRows());
-        model.addAttribute("maxBytesText", bytesText(limits.maxBytes().toBytes()));
+        String bytes = bytesText(limits.maxBytes().toBytes());
+        model.addAttribute("pasteHint", messages.get("bulk.paste.hint", limits.maxRows(), bytes));
+        model.addAttribute("fileHint", messages.get("bulk.file.hint", limits.maxRows(), bytes));
     }
 
     private static void noStore(HttpServletResponse response) {
@@ -438,8 +445,7 @@ public class ConsoleBulkController {
 
     private void requireWithinBytes(long size, String what) {
         if (size > limits.maxBytes().toBytes()) {
-            throw new BulkTable.Refused(413, what + " lớn hơn giới hạn " + bytesText(limits.maxBytes().toBytes())
-                    + " của một lần kiểm tra. Chia nhỏ rồi thử lại.");
+            throw new BulkTable.Refused(413, messages.get("bulk.error.toolarge", what, bytesText(limits.maxBytes().toBytes())));
         }
     }
 
@@ -464,14 +470,12 @@ public class ConsoleBulkController {
         if (!cost.enforced()) {
             return null;
         }
-        String note = "Tối đa " + (rows * cost.units()) + " đơn vị quota cho " + rows + " dòng (mỗi dòng: quy tắc listing 1"
-                + (cost.trademarkIncluded() ? " + nhãn hiệu 1" : "") + "; mỗi nhóm biến thể thêm 1). Listing đã kiểm tra trước đó "
-                + "không tốn thêm.";
+        String note = cost.trademarkIncluded() ? messages.get("bulk.cost.note.both", rows * cost.units(), rows)
+                : messages.get("bulk.cost.note.rules", rows * cost.units(), rows);
         if (cost.monthlyQuota() != null) {
-            note += " Còn lại tháng này: " + cost.remaining() + "/" + cost.monthlyQuota() + ", đặt lại ngày " + cost.resetDate()
-                    + " (UTC).";
+            note += " " + messages.get("bulk.cost.remaining", cost.remaining(), cost.monthlyQuota(), cost.resetDate());
         } else {
-            note += " Quota của bạn không giới hạn.";
+            note += " " + messages.get("bulk.cost.unlimited");
         }
         return note;
     }

@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -10,11 +11,13 @@ import org.junit.jupiter.api.Test;
 
 /** A pasted table with and without a header row, odd columns and the row limit (ADR-029). Synthetic text only. */
 class BulkTableTest {
+    private static final ConsoleMessages MESSAGES = BulkTestMessages.vi();
+
 
     private static final int MAX_ROWS = 200;
 
     private static BulkTable.Prepared prepare(String text, HeaderMode mode) {
-        return BulkTable.prepare(text, '\t', mode, EditorMarketplace.ETSY, Set.of(), MAX_ROWS);
+        return BulkTable.prepare(MESSAGES, text, '\t', mode, EditorMarketplace.ETSY, Set.of(), MAX_ROWS);
     }
 
     @Test
@@ -61,7 +64,7 @@ class BulkTableTest {
         String text = "Tên hàng\nMug\n";
 
         assertThat(prepare(text, HeaderMode.AUTO).header()).isFalse();
-        assertThat(BulkTable.prepare(text, '\t', HeaderMode.AUTO, EditorMarketplace.ETSY, Set.of("Tên hàng"), MAX_ROWS).header())
+        assertThat(BulkTable.prepare(MESSAGES, text, '\t', HeaderMode.AUTO, EditorMarketplace.ETSY, Set.of("Tên hàng"), MAX_ROWS).header())
                 .isTrue();
     }
 
@@ -88,13 +91,13 @@ class BulkTableTest {
             text.append("Mug ").append(i).append('\n');
         }
 
-        assertThatThrownBy(() -> BulkTable.prepare(text.toString(), '\t', HeaderMode.YES, EditorMarketplace.ETSY, Set.of(), 4))
+        assertThatThrownBy(() -> BulkTable.prepare(MESSAGES, text.toString(), '\t', HeaderMode.YES, EditorMarketplace.ETSY, Set.of(), 4))
                 .isInstanceOfSatisfying(BulkTable.Refused.class, e -> {
                     assertThat(e.status).isEqualTo(400);
                     assertThat(e.getMessage()).contains("5 dòng").contains("giới hạn 4");
                 });
         // the header row is not a data row: exactly the limit passes
-        assertThat(BulkTable.prepare(text.toString(), '\t', HeaderMode.YES, EditorMarketplace.ETSY, Set.of(), 5).rows()).hasSize(5);
+        assertThat(BulkTable.prepare(MESSAGES, text.toString(), '\t', HeaderMode.YES, EditorMarketplace.ETSY, Set.of(), 5).rows()).hasSize(5);
     }
 
     @Test

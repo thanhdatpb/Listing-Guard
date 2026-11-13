@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.CheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
+import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Detail;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Item;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Kind;
@@ -94,15 +95,18 @@ public class BulkCheckService {
     private final TrademarkCatalogRuntime trademarkCatalog;
     private final TrademarkRulesets trademarkRulesets;
     private final PlanService plans;
+    private final ConsoleMessages messages;
 
     public BulkCheckService(CheckService checks, TrademarkCheckService trademarks, VariationCheckService variations,
-                            TrademarkCatalogRuntime trademarkCatalog, TrademarkRulesets trademarkRulesets, PlanService plans) {
+                            TrademarkCatalogRuntime trademarkCatalog, TrademarkRulesets trademarkRulesets, PlanService plans,
+                            ConsoleMessages messages) {
         this.checks = checks;
         this.trademarks = trademarks;
         this.variations = variations;
         this.trademarkCatalog = trademarkCatalog;
         this.trademarkRulesets = trademarkRulesets;
         this.plans = plans;
+        this.messages = messages;
     }
 
     /** Where a row stands while the checks run; turned into a {@link Row} at the end. */
@@ -184,28 +188,27 @@ public class BulkCheckService {
         }
         List<String> notes = new ArrayList<>();
         if (trademarkNote != null) {
-            notes.add("Chưa kiểm tra nhãn hiệu cho mọi dòng: " + trademarkNote + ". Kết quả chỉ nói về quy tắc listing.");
+            notes.add(messages.get("bulk.note.trademark.all", trademarkNote));
         }
         if (variationNote != null) {
-            notes.add("Chưa kiểm tra biến thể: " + variationNote + ".");
+            notes.add(messages.get("bulk.note.variation.all", variationNote));
         }
         if (state.quotaNote != null) {
-            notes.add("Quota hết giữa chừng: " + state.quotaNote + ". Dòng đã có kết quả lưu vẫn được trả lời; dòng còn lại ở trạng thái "
-                    + "“Chưa kiểm tra”. Chạy lại sau khi quota đặt lại: kết quả đã lưu được dùng lại, không tốn thêm.");
+            notes.add(messages.get("bulk.note.quota", state.quotaNote));
         }
-        return BulkResult.of(marketplace.code(), header, rows, notes, trademarkRulesets.ruleset().disclaimer());
+        return BulkResult.of(messages, marketplace.code(), header, rows, notes, trademarkRulesets.ruleset().disclaimer());
     }
 
     private Row row(int index, Acc acc) {
         Input input = acc.input;
         if (input.preset() == Status.EMPTY) {
-            return new Row(index, input.line(), null, Status.EMPTY, 0, null, "", Detail.empty());
+            return new Row(index, input.line(), null, Status.EMPTY, Status.EMPTY.label(messages), 0, null, "", Detail.empty());
         }
         Detail detail = input.preset() == Status.UNREADABLE ? Detail.unread(input.problem())
                 : new Detail(acc.rules, acc.trademark, variation(acc), null);
-        BulkAssessment.Assessed assessed = BulkAssessment.of(detail);
-        return new Row(index, input.line(), input.sku(), assessed.status(), assessed.findings(), assessed.main(), assessed.summary(),
-                detail);
+        BulkAssessment.Assessed assessed = BulkAssessment.of(messages, detail);
+        return new Row(index, input.line(), input.sku(), assessed.status(), assessed.status().label(messages), assessed.findings(),
+                assessed.main(), assessed.summary(), detail);
     }
 
     private static BulkResult.Variation variation(Acc acc) {
@@ -225,19 +228,22 @@ public class BulkCheckService {
             for (CheckResult.FindingView finding : result.findings()) {
                 String level = finding.severity().name().toLowerCase(Locale.ROOT);
                 CheckResult.FixView fix = finding.fix();
-                items.add(new Item(level, BulkText.severityLabel(level), finding.ruleId(), finding.field(), finding.message(),
-                        finding.suggestion(), null, fix == null ? null : fix.description(), fix == null ? null : fix.proposedValue()));
+                items.add(new Item(level, BulkText.level(messages, level), finding.ruleId(), finding.field(), finding.message(),
+                        finding.suggestion(), null, messages.ruleExplanation(finding.ruleId()),
+                        fix == null ? null : fix.description(), fix == null ? null : fix.proposedValue()));
             }
-            return new BulkResult.Rules(true, null, readiness(result.readiness()), score(result.readiness()), List.copyOf(items));
+            String readiness = readiness(result.readiness());
+            return new BulkResult.Rules(true, null, readiness, readinessLabel(readiness), score(result.readiness()),
+                    List.copyOf(items));
         } catch (QuotaExceededException e) {
-            state.quotaNote = state.quotaNote == null ? BulkText.quota(e) : state.quotaNote;
-            return BulkResult.Rules.notRun(BulkText.quota(e));
+            state.quotaNote = state.quotaNote == null ? BulkText.quota(messages, e) : state.quotaNote;
+            return BulkResult.Rules.notRun(BulkText.quota(messages, e));
         } catch (PlanNotAllowedException e) {
-            return BulkResult.Rules.notRun(BulkText.plan(e));
+            return BulkResult.Rules.notRun(BulkText.plan(messages, e));
         } catch (RuntimeException e) {
             // the listing is client data: only the kind of failure and the line are logged
             log.warn("Bulk check: the rule check of line {} failed ({})", input.line(), e.getClass().getSimpleName());
-            return BulkResult.Rules.notRun(BulkText.CHECK_FAILED);
+            return BulkResult.Rules.notRun(BulkText.checkFailed(messages));
         }
     }
 
@@ -246,6 +252,14 @@ public class BulkCheckService {
             return "INCOMPLETE";
         }
         return view.ready() ? "READY" : "NOT_READY";
+    }
+
+    private String readinessLabel(String readiness) {
+        return switch (readiness) {
+            case "READY" -> messages.get("bulk.readiness.ready");
+            case "NOT_READY" -> messages.get("bulk.readiness.notready");
+            default -> messages.get("bulk.readiness.incomplete");
+        };
     }
 
     private static Integer score(CheckResult.ReadinessView view) {
@@ -257,13 +271,13 @@ public class BulkCheckService {
     /** Why the trademark check will not run for any row, or null when it will. */
     private String trademarkNote(UUID clientId) {
         if (trademarkCatalog.status().state() != TrademarkCatalogRuntime.State.READY) {
-            return BulkText.TRADEMARK_NOT_LOADED;
+            return BulkText.trademarkNotLoaded(messages);
         }
         try {
             plans.requirePack(clientId, Pack.TRADEMARK_RISK);
             return null;
         } catch (PlanNotAllowedException e) {
-            return BulkText.plan(e);
+            return BulkText.plan(messages, e);
         }
     }
 
@@ -273,22 +287,23 @@ public class BulkCheckService {
             List<Item> items = new ArrayList<>();
             for (TrademarkCheckResult.FindingView finding : result.findings()) {
                 String level = finding.risk().name().toLowerCase(Locale.ROOT);
-                items.add(new Item(level, BulkText.severityLabel(level), finding.ruleId(), finding.field(), finding.message(),
-                        finding.suggestion(), finding.mark() == null ? null : "Nhãn trong danh mục: " + finding.mark(), null, null));
+                items.add(new Item(level, BulkText.level(messages, level), finding.ruleId(), finding.field(), finding.message(),
+                        finding.suggestion(), finding.mark() == null ? null : messages.get("bulk.item.catalogmark", finding.mark()),
+                        messages.ruleExplanation(finding.ruleId()), null, null));
             }
             boolean complete = result.completeness() == Completeness.COMPLETE;
             String level = result.riskLevel() == RiskLevel.UNKNOWN || result.riskLevel() == null ? null : result.riskLevel().name();
             return new BulkResult.Trademark(complete ? Kind.RESULT : Kind.INCOMPLETE, level, null, List.copyOf(items));
         } catch (TrademarkUnavailableException e) {
-            return BulkResult.Trademark.notRun(BulkText.TRADEMARK_NOT_LOADED);
+            return BulkResult.Trademark.notRun(BulkText.trademarkNotLoaded(messages));
         } catch (PlanNotAllowedException e) {
-            return BulkResult.Trademark.notRun(BulkText.plan(e));
+            return BulkResult.Trademark.notRun(BulkText.plan(messages, e));
         } catch (QuotaExceededException e) {
-            state.quotaNote = state.quotaNote == null ? BulkText.quota(e) : state.quotaNote;
-            return BulkResult.Trademark.notRun(BulkText.quota(e));
+            state.quotaNote = state.quotaNote == null ? BulkText.quota(messages, e) : state.quotaNote;
+            return BulkResult.Trademark.notRun(BulkText.quota(messages, e));
         } catch (RuntimeException e) {
             log.warn("Bulk check: the trademark check of line {} failed ({})", input.line(), e.getClass().getSimpleName());
-            return BulkResult.Trademark.notRun(BulkText.CHECK_FAILED);
+            return BulkResult.Trademark.notRun(BulkText.checkFailed(messages));
         }
     }
 
@@ -300,7 +315,7 @@ public class BulkCheckService {
             plans.requirePack(clientId, Pack.VARIATION_CHECKS);
             return null;
         } catch (PlanNotAllowedException e) {
-            return BulkText.plan(e);
+            return BulkText.plan(messages, e);
         }
     }
 
@@ -417,16 +432,16 @@ public class BulkCheckService {
                         : Kind.INCOMPLETE;
                 findings = result.findings();
             } catch (QuotaExceededException e) {
-                state.quotaNote = state.quotaNote == null ? BulkText.quota(e) : state.quotaNote;
+                state.quotaNote = state.quotaNote == null ? BulkText.quota(messages, e) : state.quotaNote;
                 kind = Kind.NOT_RUN;
-                note = BulkText.quota(e);
+                note = BulkText.quota(messages, e);
             } catch (PlanNotAllowedException e) {
                 kind = Kind.NOT_RUN;
-                note = BulkText.plan(e);
+                note = BulkText.plan(messages, e);
             } catch (RuntimeException e) {
                 log.warn("Bulk check: a variation check failed ({})", e.getClass().getSimpleName());
                 kind = Kind.NOT_RUN;
-                note = BulkText.CHECK_FAILED;
+                note = BulkText.checkFailed(messages);
             }
         }
         for (int row : family.allRows()) {
@@ -436,8 +451,9 @@ public class BulkCheckService {
         }
         for (VariationCheckResult.FindingView finding : findings) {
             String level = finding.severity().name().toLowerCase(Locale.ROOT);
-            accs.get(family.rowOfFinding(finding.field())).variationItems.add(new Item(level, BulkText.severityLabel(level),
-                    finding.ruleId(), finding.field(), finding.message(), finding.suggestion(), null, null, null));
+            accs.get(family.rowOfFinding(finding.field())).variationItems.add(new Item(level, BulkText.level(messages, level),
+                    finding.ruleId(), finding.field(), finding.message(), finding.suggestion(), null,
+                    messages.ruleExplanation(finding.ruleId()), null, null));
         }
     }
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title desc">
   <title id="title">Listing Guard request flow and trademark data pipeline</title>
-  <desc id="desc">Seven steps trace a checks request through Cloudflare Access and Tunnel to the Oracle A1 Compose API, client authentication, cache, pack execution, PostgreSQL persistence and response. Lower panels show pre-publish and pre-production patterns and the USPTO catalog pipeline.</desc>
+  <desc id="desc">Seven steps trace a checks request through the Cloudflare edge and Tunnel to the Oracle A1 Compose API, client authentication, cache, pack execution, PostgreSQL persistence and response. Lower panels show pre-publish and pre-production patterns and the USPTO catalog pipeline.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#315b83"/></marker>
     <style>
@@ -26,7 +26,7 @@
   <circle cx="264" cy="202" r="17" class="step"/><text x="264" y="202" class="steptext">2</text>
   <path d="M300 259c0-14 11-25 25-25 8-17 32-15 38 2 14-1 25 10 25 23 0 14-11 24-25 24h-39c-13 0-24-10-24-24zM325 258h38M344 244v28" class="icon"/>
   <text x="261" y="315" class="label">Cloudflare</text>
-  <text x="261" y="344" class="body">Access validates token</text>
+  <text x="261" y="344" class="body">HTTPS at the edge</text>
   <text x="261" y="370" class="small">Tunnel forwards to origin</text>
 
   <rect x="467" y="177" width="194" height="210" rx="16" class="card"/>
