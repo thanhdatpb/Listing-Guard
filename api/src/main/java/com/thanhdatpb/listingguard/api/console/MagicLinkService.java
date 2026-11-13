@@ -23,6 +23,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @ConditionalOnProperty(prefix = "listing-guard.console", name = "enabled", havingValue = "true")
+@org.springframework.context.annotation.Conditional(ConsoleMagicLinkModeCondition.class)
 public class MagicLinkService {
 
     private static final Duration TOKEN_LIFETIME = Duration.ofMinutes(15);

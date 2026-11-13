@@ -47,4 +47,29 @@ class ConsoleStartupSafetyCheckTest {
 
         new ConsoleStartupSafetyCheck(properties, null, environment);
     }
+
+    @Test
+    void cloudflareAccessDoesNotRequireSmtpAndRequiresTeamAndAudience() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("prod");
+        ConsoleProperties configured = new ConsoleProperties(true, "https://console.example.test", true,
+                "", 5, 30, Duration.ofMinutes(15), 5, com.thanhdatpb.listingguard.api.console.ConsoleAuthMode.CLOUDFLARE_ACCESS,
+                "https://team.cloudflareaccess.com", "aud", "", Duration.ofHours(1), "example.test", "",
+                false, "");
+        new ConsoleStartupSafetyCheck(configured, null, environment);
+
+        ConsoleProperties noTeam = new ConsoleProperties(true, "https://console.example.test", true,
+                "", 5, 30, Duration.ofMinutes(15), 5, com.thanhdatpb.listingguard.api.console.ConsoleAuthMode.CLOUDFLARE_ACCESS,
+                "", "aud", "", Duration.ofHours(1), "example.test", "", false, "");
+        assertThatThrownBy(() -> new ConsoleStartupSafetyCheck(noTeam, null, environment))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("ACCESS_TEAM_DOMAIN")
+                .hasMessageContaining("ACCESS_AUD");
+
+        ConsoleProperties noAudience = new ConsoleProperties(true, "https://console.example.test", true,
+                "", 5, 30, Duration.ofMinutes(15), 5, com.thanhdatpb.listingguard.api.console.ConsoleAuthMode.CLOUDFLARE_ACCESS,
+                "https://team.cloudflareaccess.com", "", "", Duration.ofHours(1), "example.test", "", false, "");
+        assertThatThrownBy(() -> new ConsoleStartupSafetyCheck(noAudience, null, environment))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("ACCESS_TEAM_DOMAIN")
+                .hasMessageContaining("ACCESS_AUD");
+    }
 }

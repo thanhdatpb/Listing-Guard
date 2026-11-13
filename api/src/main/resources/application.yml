@@ -25,6 +25,7 @@ listing-guard:
   console:
     enabled: ${LISTING_GUARD_CONSOLE_ENABLED:false}
     base-url: ${LISTING_GUARD_CONSOLE_BASE_URL:}
+    auth-mode: ${LISTING_GUARD_CONSOLE_AUTH_MODE:MAGIC_LINK}
     cookie-secure: ${LISTING_GUARD_CONSOLE_COOKIE_SECURE:true}
     mail-from: ${LISTING_GUARD_CONSOLE_MAIL_FROM:}
     email-limit: 5
@@ -32,6 +33,14 @@ listing-guard:
     rate-window: 15m
     # The most active API keys one console account may hold (the "API keys" page). Keys made by the admin job count too.
     max-active-keys: ${LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS:5}
+    access-team-domain: ${LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN:}
+    access-aud: ${LISTING_GUARD_CONSOLE_ACCESS_AUD:}
+    access-certs-url: ${LISTING_GUARD_CONSOLE_ACCESS_CERTS_URL:}
+    access-cert-cache-ttl: ${LISTING_GUARD_CONSOLE_ACCESS_CERT_CACHE_TTL:1h}
+    access-allowed-domains: ${LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_DOMAINS:}
+    access-allowed-emails: ${LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS:}
+    access-auto-create: ${LISTING_GUARD_CONSOLE_ACCESS_AUTO_CREATE:false}
+    access-default-client-name: ${LISTING_GUARD_CONSOLE_ACCESS_DEFAULT_CLIENT_NAME:}
   rate-limit:
     enabled: true
     requests-per-minute: 60
