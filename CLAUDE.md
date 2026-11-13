@@ -593,6 +593,14 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   around a block. A name from a listing becomes a path only when it is a plain file name matching the patterns. Archives are
   never extracted to disk. Tests use `FakeOdpServer` (JDK `HttpServer` on the loopback address) and synthetic zips, never the
   real ODP.
+- **Image build and release** (`docs/deploy-readiness.md`, `docs/releases/`): the `Dockerfile` copies each Maven module by name, so a
+  **new module that `api` depends on (directly or through another module) needs its `COPY` line in the same PR**; `./mvnw verify`
+  does not build the image, so check with `docker build .` (the missing `listing-input-adapters` line made every release build fail
+  until v0.8.0). Runtime folders of a deployment (`backups/`, `logs/`, `catalogs/raw/`, `policy-monitor/`, ...) stay in `.gitignore`
+  and `.dockerignore`. A new setting that a deployment must control is forwarded by `docker-compose.prod.yml`, listed (commented)
+  in `deploy/env.prod.example` and in the table of `docs/deploy-readiness.md`; a new one-shot job gets a `mem_limit`. **v0.8.0 is
+  prepared** (`docs/releases/v0.8.0.md`, `Released YYYY-MM-DD` still to fill; **no tag exists**, v0.7.0 has notes and no tag too).
+  `docs/releases/unreleased.md` is a stub for the changes after it. After a tag the maintainer moves the ADR-022 baseline.
 - **TSDR status check** (ADR-009 "TSDR status check"): the job only proposes. It never writes a catalog table, activates a
   version, edits a finding or removes a mark, and `tsdr_status` is append-only (a trigger). The key comes only from
   `LISTING_GUARD_TSDR_API_KEY`, goes only in its header to the `base-url` host, and never into a log, a message, the database, a
