@@ -206,6 +206,35 @@ example for an application that calls the API. It needs no migration and no plan
   enough are revoked.
 - The page serves `/console/console.css` and `/console/keys.js` behind the console sign-in.
 
+### Bulk check page (ADR-029)
+
+A signed-in user can open **Bulk check** (*Kiểm tra hàng loạt*, `/console/bulk`; English or Vietnamese like the rest of the console)
+to paste rows copied from a Google Sheet, or upload a CSV or TSV,
+and get one status per row to read on the page, copy back into the Sheet or download as CSV. The guide for sellers is
+[bulk-check.md](bulk-check.md). The page calls the same services as the API and `batch-check`, so plans, quota and retention are
+theirs. One additive migration, **V36**, creates `console_bulk_mapping`: the column mapping an account used (the header text of each
+mapped column, the field it was given and the separator of each list field), never a cell of a Sheet. It is deleted with its
+account.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `LISTING_GUARD_CONSOLE_BULK_MAX_ROWS` | `200` | The most data rows of one paste or file (a blank row counts, a header row does not). A larger input is refused as a whole and never cut. At least 1. |
+| `LISTING_GUARD_CONSOLE_BULK_MAX_BYTES` | `1MB` | The most bytes of one pasted text or one file. At least 1KB, and below `spring.servlet.multipart.max-file-size` (10 MB by default). |
+
+- **Nothing the user pastes or uploads is kept.** The text lives in the request, goes back to the user's browser in a hidden field
+  between the mapping step and the run, and is not put in the session, a file or a log. The result table is built for the response
+  and is not stored; what is stored is what `/checks`, `/trademark-checks` and `/variation-checks` store for any check (a hash and
+  bounded evidence, with their retention), and the mapping table above. The pages are sent with `Cache-Control: no-store`; keep
+  `/console/bulk` out of any proxy cache.
+- The request body limit (`listing-guard.api.max-body-bytes`, 256 KB) does not apply to `POST /console/bulk/prepare` and `POST
+  /console/bulk/run` when they carry `multipart/form-data`: they may declare up to twice `LISTING_GUARD_CONSOLE_BULK_MAX_BYTES`
+  plus 64 KB, only while the console is on. Every other path keeps its limit. If a reverse proxy has its own body limit
+  (`client_max_body_size`, Cloudflare's plan limit), keep it above that number.
+- With plans on, a run needs the `listing-rules` pack and a unit left; it costs one unit per new result, like the API (a listing
+  checked before is free). The `batch` pack is not required.
+- Rolling back the migration (before the page was used): `DROP TABLE console_bulk_mapping;` and delete the row of V36 from
+  `flyway_schema_history`.
+
 ### Console language (ADR-028)
 
 Every console page and the sign-in e-mail exist in English and Vietnamese. The language of a page is chosen in this order: the

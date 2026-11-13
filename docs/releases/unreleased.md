@@ -1,13 +1,38 @@
 # Unreleased changes
 
 Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: the console in English and Vietnamese
-(ADR-028). It changes no API response, request, status, header or migration.
+(ADR-028) and the console bulk check (ADR-029). They change no API response, request, status or header; the bulk check adds one
+additive migration, V36 (see its section).
 
 Every pull request that changes the API runs the compatibility check (`./mvnw -B -pl contract-tools verify`, ADR-022) and copies the
 additive and non-breaking lines of `contract-tools/target/contract/compatibility-report.md` here, with a short section for the
 change. When the next version is cut, move this file to `docs/releases/v<version>.md` and start a new one.
 
 ## What is new
+
+### Console bulk check (ADR-029)
+
+The console gets a page, **Bulk check** (`/console/bulk`, *Kiểm tra hàng loạt*, in the menu and in English and Vietnamese like the
+rest of the console). A seller pastes rows copied from a Google Sheet or uploads a CSV/TSV, confirms what each column is (a guess from
+the column names, remembered per account by header text), and gets one status per row (OK, Warning, Error, or why the row was not
+judged) in the input's order, with a status filter, a row detail like the *Check listing* page, a block of two columns to paste back
+into the Sheet, and a CSV. The checks are the ones of `/checks`, `/trademark-checks` and, for rows that share a parent SKU,
+`/variation-checks`, called through the same services, so plans, quota (one unit per new result), cache and retention are unchanged. A
+file of a format the input adapters know (Etsy export, Amazon flat file, experimental Shopify) is recognized from its header and checked
+without a mapping step. Guide: [bulk-check.md](../bulk-check.md).
+
+- **Nothing pasted or uploaded is stored.** The only new state is `console_bulk_mapping` (**V36**, additive; V35 is the Cloudflare
+  Access migration): column labels, the field each was given and list separators, per account and marketplace, deleted with the account;
+  never a cell.
+- New settings `LISTING_GUARD_CONSOLE_BULK_MAX_ROWS` (200) and `LISTING_GUARD_CONSOLE_BULK_MAX_BYTES` (1MB). A larger input is refused
+  whole, never cut. The two `POST /console/bulk/*` paths may carry a `multipart/form-data` body over the 256 KB API body limit (only
+  while the console is on); `BodyLimitFilter` now takes a map of such paths.
+- Every sentence is a key of `messages.properties` and `messages_vi.properties` (ADR-028), the script reads its two sentences from
+  `data-i18n-*`, and each finding shows what its rule checks, like the editor. The English and Vietnamese texts of this page have not
+  been reviewed by a native reader.
+- The adapter module gains an optional `id_column` in a template and `ListingRecord.id` (additive; the three CSV built-ins set it).
+- No API endpoint, MCP tool, ruleset or `analysisVersion` changes: `docs/api/openapi.json` is unchanged, so the ADR-022 compatibility
+  report has no new line for it.
 
 ### The console in English and Vietnamese (ADR-028)
 

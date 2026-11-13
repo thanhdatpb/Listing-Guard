@@ -5,6 +5,7 @@ delimiter: ','
 encoding: UTF-8
 experimental: true
 required_columns: [Handle, Title, 'Variant Price']
+id_column: Handle
 fields:
   title: Title
   description: 'Body (HTML)'

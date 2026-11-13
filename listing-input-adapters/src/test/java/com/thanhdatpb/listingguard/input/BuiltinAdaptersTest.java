@@ -46,6 +46,36 @@ class BuiltinAdaptersTest {
     }
 
     @Test
+    void everyCsvTemplateNamesItsRowsByTheIdColumnAndABlankIdIsNull() throws Exception {
+        var adapters = BuiltinAdapterCatalog.adapters();
+        try (var rows = adapters.get(0).open(input("SKU,TITLE,DESCRIPTION,PRICE,QUANTITY,TAGS,MATERIALS\ne-1,Mug,,,,,\n ,Cup,,,,,\n"),
+                LIMITS)) {
+            assertThat(rows.next().id()).isEqualTo("e-1");
+            assertThat(rows.next().id()).isNull();
+        }
+        String amazonHeader = "item_sku\titem_name\tbrand_name\tproduct_description\tbullet_point1\tbullet_point2\tbullet_point3"
+                + "\tbullet_point4\tbullet_point5\tstandard_price\tquantity\tgeneric_keywords\tfeed_product_type\tparentage\tparent_sku\n";
+        try (var rows = adapters.get(1).open(input(amazonHeader + "a-1\tT\t\t\t\t\t\t\t\t\t\t\t\t\t\n"), LIMITS)) {
+            assertThat(rows.next().id()).isEqualTo("a-1");
+        }
+        try (var rows = adapters.get(2).open(input("Handle,Title,Body (HTML),Vendor,Type,Tags,Variant Price,Variant Inventory Qty\n"
+                + "s-1,Mug,,,,,1,1\n"), LIMITS)) {
+            assertThat(rows.next().id()).isEqualTo("s-1");
+        }
+        assertThat(((ConfiguredCsvAdapter) adapters.get(0)).delimiter()).isEqualTo(',');
+        assertThat(((ConfiguredCsvAdapter) adapters.get(1)).delimiter()).isEqualTo('\t');
+    }
+
+    @Test
+    void aTemplateWithoutAnIdColumnGivesNoId() throws Exception {
+        var adapter = new ConfiguredCsvAdapter("demo", "ETSY", java.util.Set.of("text/csv"), ',',
+                java.util.Map.of("title", "T"), List.of("T"));
+        try (var rows = adapter.open(input("T\nMug\n"), LIMITS)) {
+            assertThat(rows.next().id()).isNull();
+        }
+    }
+
+    @Test
     void genericJsonAdaptersAcceptBothStandardMarketplacesAndIgnoreUnknownFields() throws Exception {
         for (String marketplace : List.of("ETSY", "AMAZON")) {
             var adapter = adaptersFor(marketplace);

@@ -40,10 +40,18 @@ public interface ListingInputAdapter {
 
     record FieldError(String field, String code, String message) { }
 
+    /**
+     * One source record. {@code id} is the value of the template's {@code id_column} (a SKU or handle), null when the template
+     * names none or the cell is blank; it names the record in a report and is not a listing field.
+     */
     record ListingRecord(long line, Map<String, Object> listing, List<FieldError> errors,
-                         String familyId, String familyRole) {
+                         String familyId, String familyRole, String id) {
         public ListingRecord(long line, Map<String, Object> listing, List<FieldError> errors) {
-            this(line, listing, errors, null, null);
+            this(line, listing, errors, null, null, null);
+        }
+        public ListingRecord(long line, Map<String, Object> listing, List<FieldError> errors,
+                             String familyId, String familyRole) {
+            this(line, listing, errors, familyId, familyRole, null);
         }
         public ListingRecord {
             listing = Collections.unmodifiableMap(new LinkedHashMap<>(listing));

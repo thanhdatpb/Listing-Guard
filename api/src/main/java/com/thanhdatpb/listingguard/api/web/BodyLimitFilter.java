@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -24,11 +25,10 @@ public final class BodyLimitFilter extends OncePerRequestFilter {
 
     private final long maxBytes;
     private final ObjectMapper mapper;
-    private final String uploadPath;
-    private final long uploadMaxBytes;
+    private final Map<String, Long> uploadLimits;
 
     public BodyLimitFilter(long maxBytes, ObjectMapper mapper) {
-        this(maxBytes, mapper, null, 0);
+        this(maxBytes, mapper, Map.of());
     }
 
     /**
@@ -38,17 +38,28 @@ public final class BodyLimitFilter extends OncePerRequestFilter {
      * @param uploadMaxBytes the limit of that path
      */
     public BodyLimitFilter(long maxBytes, ObjectMapper mapper, String uploadPath, long uploadMaxBytes) {
+        this(maxBytes, mapper, uploadPath == null ? Map.of() : Map.of(uploadPath, uploadMaxBytes));
+    }
+
+    /**
+     * @param uploadLimits the paths whose {@code POST} may carry a {@code multipart/form-data} body up to the limit given for the
+     *                     path: the image checks (ADR-008) and the two pages of the console's bulk check (ADR-029). A path is the
+     *                     whole request path, not a prefix. Every other request keeps {@code maxBytes}
+     */
+    public BodyLimitFilter(long maxBytes, ObjectMapper mapper, Map<String, Long> uploadLimits) {
         this.maxBytes = maxBytes;
         this.mapper = mapper;
-        this.uploadPath = uploadPath;
-        this.uploadMaxBytes = uploadMaxBytes;
+        this.uploadLimits = Map.copyOf(uploadLimits);
     }
 
     private long limitFor(HttpServletRequest request) {
         String type = request.getContentType();
-        if (uploadPath != null && "POST".equals(request.getMethod()) && uploadPath.equals(request.getRequestURI())
-                && type != null && type.toLowerCase(java.util.Locale.ROOT).startsWith("multipart/form-data")) {
-            return uploadMaxBytes;
+        if ("POST".equals(request.getMethod()) && type != null
+                && type.toLowerCase(java.util.Locale.ROOT).startsWith("multipart/form-data")) {
+            Long upload = uploadLimits.get(request.getRequestURI());
+            if (upload != null) {
+                return upload;
+            }
         }
         return maxBytes;
     }

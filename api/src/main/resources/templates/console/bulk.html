@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{bulk.title}"></title>
+    <link rel="stylesheet" th:href="@{/console/editor.css}">
+    <link rel="stylesheet" th:href="@{/console/console.css}">
+    <link rel="stylesheet" th:href="@{/console/bulk.css}">
+    <script th:src="@{/console/bulk.js}" defer></script>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('bulk')}"></header>
+<main class="page wide" id="bulk-page">
+    <h1 th:text="#{bulk.heading}"></h1>
+    <p class="muted">
+        <span th:text="#{common.signedin(${email})}"></span>
+        <span th:text="#{bulk.intro}"></span>
+    </p>
+
+    <div class="notice refused" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
+
+    <!-- Step 1: paste or upload -->
+    <th:block th:if="${stage == 'form'}">
+        <nav class="tabs" th:aria-label="#{bulk.tabs.aria}">
+            <a th:href="@{/console/bulk(tab='paste',marketplace=${marketplace.code})}" id="tab-paste" th:text="#{bulk.tab.paste}"
+               th:classappend="${tab.key == 'paste'} ? 'active'" th:aria-current="${tab.key == 'paste'} ? 'page'"></a>
+            <a th:href="@{/console/bulk(tab='file',marketplace=${marketplace.code})}" id="tab-file" th:text="#{bulk.tab.file}"
+               th:classappend="${tab.key == 'file'} ? 'active'" th:aria-current="${tab.key == 'file'} ? 'page'"></a>
+        </nav>
+
+        <form id="paste-form" method="post" enctype="multipart/form-data" th:action="@{/console/bulk/prepare}"
+              th:if="${tab.key == 'paste'}">
+            <input type="hidden" name="source" value="paste">
+            <div class="field">
+                <label for="paste-marketplace" th:text="#{bulk.marketplace}"></label>
+                <select id="paste-marketplace" name="marketplace">
+                    <option th:each="m : ${marketplaces}" th:value="${m.code}" th:text="${m.label}" th:selected="${m == marketplace}"></option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="text" th:text="#{bulk.paste.label}"></label>
+                <textarea id="text" name="text" class="paste" rows="12" spellcheck="false" aria-describedby="text-hint"
+                          th:text="${pasted}"></textarea>
+                <p class="hint" id="text-hint" th:text="${pasteHint}"></p>
+            </div>
+            <div class="field">
+                <label for="paste-header" th:text="#{bulk.header.label}"></label>
+                <select id="paste-header" name="header">
+                    <option value="auto" selected th:text="#{bulk.header.auto}"></option>
+                    <option value="yes" th:text="#{bulk.header.yes}"></option>
+                    <option value="no" th:text="#{bulk.header.no}"></option>
+                </select>
+            </div>
+            <div class="actions">
+                <button type="submit" class="primary" th:text="#{bulk.paste.submit}"></button>
+            </div>
+        </form>
+
+        <form id="file-form" method="post" enctype="multipart/form-data" th:action="@{/console/bulk/prepare}"
+              th:if="${tab.key == 'file'}">
+            <input type="hidden" name="source" value="file">
+            <div class="field">
+                <label for="file-marketplace" th:text="#{bulk.marketplace}"></label>
+                <select id="file-marketplace" name="marketplace">
+                    <option th:each="m : ${marketplaces}" th:value="${m.code}" th:text="${m.label}" th:selected="${m == marketplace}"></option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="file" th:text="#{bulk.file.label}"></label>
+                <input type="file" id="file" name="file" required aria-describedby="file-hint"
+                       accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
+                <p class="hint" id="file-hint" th:text="${fileHint}"></p>
+            </div>
+            <div class="field">
+                <label for="file-header" th:text="#{bulk.file.header.label}"></label>
+                <select id="file-header" name="header">
+                    <option value="auto" selected th:text="#{bulk.header.auto}"></option>
+                    <option value="yes" th:text="#{bulk.header.yes}"></option>
+                    <option value="no" th:text="#{bulk.header.no}"></option>
+                </select>
+            </div>
+            <div class="actions">
+                <button type="submit" class="primary" th:text="#{bulk.file.submit}"></button>
+            </div>
+        </form>
+    </th:block>
+
+    <!-- Step 2: what is each column -->
+    <th:block th:if="${stage == 'mapping'}">
+        <h2 id="mapping-heading" th:text="#{bulk.mapping.heading}"></h2>
+        <p id="mapping-intro" th:text="${mapping.intro}"></p>
+        <div class="notice applied" id="remembered-note" role="status" th:if="${mapping.remembered}">
+            <p th:text="#{bulk.mapping.remembered}"></p>
+        </div>
+        <div class="notice refused" id="mapping-problems" role="alert" th:if="${!mapping.problems.isEmpty()}">
+            <ul class="problems"><li th:each="problem : ${mapping.problems}" th:text="${problem}"></li></ul>
+        </div>
+
+        <form id="run-form" method="post" enctype="multipart/form-data" th:action="@{/console/bulk/run}">
+            <input type="hidden" name="marketplace" th:value="${marketplace.code}">
+            <input type="hidden" name="delimiter" th:value="${mapping.delimiter}">
+            <input type="hidden" name="header" th:value="${mapping.header} ? 'yes' : 'no'">
+            <!-- The text goes back to the server in this field and nowhere else: the server keeps nothing between the two steps.
+                 The first line break is put in front by the controller, because an HTML textarea drops the one at its start. -->
+            <textarea name="data" hidden th:text="${mapping.dataField}"></textarea>
+
+            <table class="mapping" aria-labelledby="mapping-heading">
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{bulk.mapping.col.letter}"></th>
+                    <th scope="col" th:text="#{bulk.mapping.col.what}"></th>
+                    <th scope="col" th:text="#{bulk.mapping.col.is}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="c : ${mapping.columns}">
+                    <th scope="row"><span class="letter" th:text="${c.letter}"></span></th>
+                    <td class="what">
+                        <strong th:text="${c.label}"></strong>
+                        <br th:if="${!c.samples.isEmpty()}">
+                        <span class="muted small" th:each="sample, state : ${c.samples}"
+                              th:text="${state.last} ? ${sample} : ${sample} + ' · '"></span>
+                    </td>
+                    <td class="pick">
+                        <label class="visually-hidden" th:for="'col-' + ${c.index}" th:text="#{bulk.mapping.col.label(${c.letter})}"></label>
+                        <select th:id="'col-' + ${c.index}" th:name="'col.' + ${c.index}">
+                            <option value="" th:selected="${c.selected == ''}" th:text="#{bulk.mapping.skip}"></option>
+                            <option th:each="t : ${targets}" th:value="${t.key}" th:text="${t.label}"
+                                    th:selected="${t.key == c.selected}"></option>
+                        </select>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+
+            <fieldset class="separators" th:if="${!mapping.separators.isEmpty()}">
+                <legend th:text="#{bulk.separators.legend}"></legend>
+                <p class="muted small" th:text="#{bulk.separators.help}"></p>
+                <div class="field" th:each="s : ${mapping.separators}">
+                    <label th:for="'sep-' + ${s.key}" th:text="${s.label}"></label>
+                    <select th:id="'sep-' + ${s.key}" th:name="'sep.' + ${s.key}">
+                        <option th:each="o : ${separatorOptions}" th:value="${o.key}" th:text="${o.label}"
+                                th:selected="${o.key == s.selected}"></option>
+                    </select>
+                </div>
+            </fieldset>
+
+            <div class="checkbox">
+                <input type="checkbox" id="remember" name="remember" value="on" th:checked="${mapping.remember}">
+                <label for="remember" th:text="#{bulk.remember}"></label>
+            </div>
+
+            <p class="cost" id="cost" th:text="${mapping.costNote != null} ? ${mapping.costNote} : #{bulk.cost.none}"></p>
+            <div class="actions">
+                <button type="submit" class="primary" id="run-button" th:text="#{bulk.run}"></button>
+                <a class="button" th:href="@{/console/bulk(marketplace=${marketplace.code})}" th:text="#{bulk.restart}"></a>
+            </div>
+        </form>
+    </th:block>
+
+    <!-- The result -->
+    <th:block th:if="${stage == 'result'}">
+        <section id="result" aria-labelledby="result-heading">
+            <h2 id="result-heading" th:text="#{bulk.result.heading(${marketplace.label})}"></h2>
+            <p class="muted small" id="result-note" th:text="#{bulk.result.note}"></p>
+            <th:block th:with="note=${@consoleMessages.disclaimerNote(result.disclaimer)}">
+                <p class="muted small disclaimer" id="result-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
+                <p class="muted small disclaimer" id="result-disclaimer">
+                    <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
+                    <span th:text="${result.disclaimer}"></span>
+                </p>
+            </th:block>
+
+            <div class="notice" th:each="note : ${result.notes}"><p th:text="${note}"></p></div>
+
+            <ul class="counts" id="counts">
+                <li th:text="#{bulk.counts.total(${'' + result.counts.total})}"></li>
+                <li th:text="#{bulk.counts.error(${'' + result.counts.error})}"></li>
+                <li th:text="#{bulk.counts.warning(${'' + result.counts.warning})}"></li>
+                <li th:text="#{bulk.counts.ok(${'' + result.counts.ok})}"></li>
+                <li th:text="#{bulk.counts.others(${'' + result.counts.others})}"></li>
+            </ul>
+
+            <div class="filters" id="status-filters" role="group" th:aria-label="#{bulk.filter.aria}" hidden>
+                <button type="button" data-filter="ALL" aria-pressed="true" th:text="#{bulk.filter.all}"></button>
+                <button type="button" data-filter="ERROR" aria-pressed="false" th:text="#{bulk.filter.error}"></button>
+                <button type="button" data-filter="WARNING" aria-pressed="false" th:text="#{bulk.filter.warning}"></button>
+                <button type="button" data-filter="OK" aria-pressed="false" th:text="#{bulk.filter.ok}"></button>
+                <button type="button" data-filter="OTHER" aria-pressed="false" th:text="#{bulk.filter.other}"></button>
+            </div>
+
+            <div class="result-actions">
+                <button type="button" id="copy-sheet" data-copy-from="sheet-block" class="primary" hidden th:text="#{bulk.copy}"
+                        th:attr="data-i18n-copied=#{js.bulk.copied},data-i18n-failed=#{js.bulk.failed}"></button>
+                <a class="button" id="download-csv" th:href="${result.csvHref}" download="listing-guard-bulk-results.csv"
+                   th:text="#{bulk.csv}"></a>
+                <a class="button" th:href="@{/console/bulk(marketplace=${marketplace.code})}" th:text="#{bulk.another}"></a>
+            </div>
+            <p class="copy-status" id="copy-status" role="status" aria-live="polite"></p>
+
+            <details class="sheet-help" id="sheet-help">
+                <summary th:text="#{bulk.sheet.summary}"></summary>
+                <p class="muted small" th:text="${result.header} ? #{bulk.sheet.withheader} : #{bulk.sheet.noheader}"></p>
+                <label class="visually-hidden" for="sheet-block" th:text="#{bulk.sheet.label}"></label>
+                <textarea id="sheet-block" readonly rows="6" spellcheck="false" th:text="${result.sheetBlock}"></textarea>
+            </details>
+
+            <div class="report-scroll">
+                <table class="bulk-results" id="bulk-results" aria-labelledby="result-heading">
+                    <thead>
+                    <tr>
+                        <th scope="col" class="n" th:text="#{bulk.table.line}"></th>
+                        <th scope="col" th:text="#{bulk.table.sku}"></th>
+                        <th scope="col" th:text="#{bulk.table.status}"></th>
+                        <th scope="col" class="n" th:text="#{bulk.table.findings}"></th>
+                        <th scope="col" th:text="#{bulk.table.main}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${result.rows}" th:attr="data-group=${row.status.group()}" th:classappend="'row-' + ${row.status.css()}">
+                        <td class="n" th:text="${row.line}"></td>
+                        <td class="sku"><span th:if="${row.sku != null}" th:text="${row.sku}"></span><span class="muted" th:if="${row.sku == null}">&mdash;</span></td>
+                        <td><span class="status" th:classappend="${row.status.css()}" th:text="${row.statusLabel}"></span></td>
+                        <td class="n" th:text="${row.findings}"></td>
+                        <td class="main">
+                            <details th:if="${row.status.name() != 'EMPTY'}">
+                                <summary th:text="${row.main != null} ? ${row.main.message} : ${row.summary}"></summary>
+                                <div th:replace="~{console/bulk-fragments :: rowDetail(${row}, ${result.disclaimer})}"></div>
+                            </details>
+                            <span class="muted" th:if="${row.status.name() == 'EMPTY'}" th:text="#{bulk.row.empty}"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </th:block>
+</main>
+</body>
+</html>

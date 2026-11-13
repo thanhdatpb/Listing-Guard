@@ -262,7 +262,9 @@ It never edits a listing, never publishes, and does no SEO.
   and field errors under byte/row caps. Adapter templates are YAML; built-ins are Etsy CSV, Amazon flat file, experimental
   Shopify CSV (Amazon approximation), and generic standard-schema JSON. `GET /api/v1/input-adapters` is read-only and
   lists their formats, destinations and required columns. Legacy batch mapping YAML remains compatible. This feature never
-  writes to a marketplace and does not alter pack hashes or `analysisVersion`.
+  writes to a marketplace and does not alter pack hashes or `analysisVersion`. A template may name an `id_column`
+  (`ListingRecord.id`: a SKU or handle that names the record in a report; the three CSV built-ins set it); `ConfiguredCsvAdapter`
+  exposes its `delimiter()`. Both are additive.
 - **Listing health report** (`api/.../report/`, ADR-018, Proposed; implemented): counts of the results a client has stored over a
   period, for a lead. `GET /api/v1/reports/summary?from=&to=[&marketplace=]` (an API key; the client is the key's, there is no client
   parameter; `from` and `to` are required UTC dates, both included, at most `listing-guard.reports.max-days` = 92; `400
@@ -324,6 +326,26 @@ It never edits a listing, never publishes, and does no SEO.
   operator keys too; the count and insert hold a row lock on the client. `ConsoleModelAdvice` sets `demoCatalog` when
   `listing-guard.trademark.catalog-version` starts with `demo-`: every console page (sign-in pages included, inline style) shows
   the banner and the editor's trademark panel repeats it.
+  **Bulk check (ADR-029, V36)** (`api/.../console/bulk/`, `templates/console/bulk*.html`, `static/console/bulk.{css,js}`, English and
+  Vietnamese like the rest of the console: every sentence is a message key, ADR-028; `BulkText` and the pure classes take
+  `ConsoleMessages`): `GET /console/bulk`, `POST /console/bulk/prepare` and `POST /console/bulk/run` (multipart). A seller pastes
+  rows copied from a Google Sheet (tab "Paste from Sheet") or uploads a CSV/TSV (tab "Upload a file"), confirms what each column is, and gets
+  one status per row in the input's order, a filter, a row detail like the editor's, a block of two columns (status, summary) to paste
+  back into the Sheet and a CSV. `BulkCheckService` calls `CheckService.checkDetailed`, `TrademarkCheckService.check` and, for rows
+  that share a parent SKU, `VariationCheckService.check` once per family: plans (the `listing-rules` pack and a unit left before the
+  first row; the `batch` pack is not required), quota (one unit per new result), cache and retention are those services', and no
+  analysis is new. **The pasted text, the file and the result table are never stored**: the text goes back to the browser in a hidden
+  field between the two steps (no session attribute, no temporary file) and every page is `no-store`; the only new state is
+  `console_bulk_mapping` (V36: column labels, targets and list separators per account and marketplace, never a cell). `DelimitedText`
+  keeps a blank row in place (the pasted-back block must line up with the Sheet) and refuses a quote that never closes; a column is
+  guessed from a list of names (`BulkTargets`) and one that matches nothing is skipped; a price or quantity is never guessed at (a
+  decimal comma is an unreadable row, not 19.99). Limits `listing-guard.console.bulk.max-rows` (200) and `max-bytes` (1MB): a larger
+  input is refused whole, never cut; `BodyLimitFilter` takes a map of multipart upload paths (the image checks and these two POSTs,
+  the latter only while the console is on). A file one built-in input adapter recognizes is read with it and checks no variation
+  family (the adapters do not read variation attributes). The status OK (`Đạt`) only means no rule found an error or warning; an INCOMPLETE
+  part is Warning (`Cảnh báo`); a part that did not run (no catalog, plan, quota) is said in the row and never becomes a silent `Đạt`; the trademark
+  disclaimer is on the page and in each row's detail; a cell that starts like a formula gets a leading apostrophe in the pasted block
+  and the CSV. No API endpoint, MCP tool or `openapi.json` change.
   **Localization (ADR-028, Proposed; implemented)**: every sentence the console prints is a key of `api/src/main/resources/messages.properties`
   (English, the base) and `messages_vi.properties`, read through Spring's `MessageSource` (`#{...}` in a template, `ConsoleMessages` in
   Java; `spring.messages.basename: messages,rules`, no fallback to the JVM's language). The language of a page: the `lang` link in the
@@ -337,7 +359,7 @@ It never edits a listing, never publishes, and does no SEO.
   (`trademark.disclaimer.note`).
 - Current scope: Etsy and Amazon rule engines, the image checker (ADR-008: the core and the endpoint, off by default and without the bounded decode service), the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, policy ingest + retrieval, and the optional console (magic-link by default, or Cloudflare Access per ADR-027) with a plan/usage
+  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, the console bulk check (ADR-029), policy ingest + retrieval, and the optional console (magic-link by default, or Cloudflare Access per ADR-027) with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12c.yaml`): simple input format (`title`, `brand`,
@@ -438,6 +460,11 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     `ConsoleLocaleResolver`, the language links, the tests, docs). Open questions the maintainer decides are at the end of the ADR
     (storing the choice on the account, the default in the production compose file, a review of the Vietnamese sentences and of the
     English disclaimer statement). Not planned: translating the API's problem details, `report.html` of the job or the MCP server.
+16. Console bulk check (ADR-029, Proposed): done as one PR (`feature/console-bulk-check`: ADR, the adapters' `id_column`, `console/bulk`,
+    V36, tests, `docs/bulk-check.md`). Open questions the maintainer decides are at the end of the ADR (the `batch` pack, a larger input
+    that needs a background run, variation attributes for adapter files, a mapping shared by the members of a client, a decimal
+    comma). Not planned: storing a pasted table or its result, applying a fix, writing to a Sheet or a marketplace, a console page for
+    images, personalization or the health report in bulk.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
@@ -743,6 +770,17 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `COMPLETE`), never retry `quota-exceeded`, a `*-not-configured` 503, another `4xx` or a timed-out `POST`, never follow a redirect,
   never log, never put the key, an Access secret, a listing or a buyer's text in a message or `toString()`. The SDK version is the
   repository's (release tag); plugin versions in its POM are pinned.
+- **Console bulk check** (ADR-029): the pasted text, the file and the result table are never stored, put in the session, logged or
+  written to a temporary file of this application: the text lives in the request and goes back to the browser in a hidden field, and
+  every page is `no-store`. Only `console_bulk_mapping` (labels, targets, separators) is new state, and no cell value may reach it. The
+  checks go through `CheckService.checkDetailed`, `TrademarkCheckService` and `VariationCheckService` only, with the signed-in account's
+  client, so cache identity, plans and quota stay theirs: never a second analysis, never a query of its own. A column is never given
+  a meaning the seller did not confirm (the guess is a default, `BulkTargets` holds no marketplace limit), a price or quantity is never
+  guessed at, a blank row keeps its place so the pasted-back block lines up with the Sheet, an input over the limit is refused whole and
+  never cut, and a row that did not get a part of the check says so (no silent `Đạt`; `Đạt` is never a marketplace's or a trademark
+  verdict). Every printed value goes through `th:text` and every sentence is a message of both bundles (ADR-028: a new text is a key
+  in `messages.properties` and `messages_vi.properties`, never a literal in the template, the script or a class), a cell that starts like
+  a formula gets a leading apostrophe, and a fix is shown and never applied. A new multipart POST path outside the console needs its entry in `bodyLimitFilter` (`ApiSecurityConfig`) and an ADR.
 - **MCP server** (ADR-017, ADR-023): `mcp-server` stays a client of the REST API and depends on exactly one module, `client` (a test
   reads its POM and its imports: no database, no Spring, no `core`, no `api`); it calls the API only through `ApiGateway` (an SDK raw
   call with `RetryPolicy.none()`). A new tool means a new `Endpoint` entry, a `ToolSpec` with a schema that

@@ -25,11 +25,12 @@
     </th:block>
 </div>
 
-<!-- The bar of a signed-in page: where to go, the language, and sign out. "active" is dashboard, check, report or keys. -->
+<!-- The bar of a signed-in page: where to go, the language, and sign out. "active" is dashboard, check, bulk, report or keys. -->
 <header class="bar" th:fragment="nav(active)">
     <nav th:aria-label="#{nav.aria}">
         <a th:href="@{/console}" th:text="#{nav.dashboard}" th:aria-current="${active == 'dashboard'} ? 'page'"></a>
         <a th:href="@{/console/check}" th:text="#{nav.check}" th:aria-current="${active == 'check'} ? 'page'"></a>
+        <a th:href="@{/console/bulk}" th:text="#{nav.bulk}" th:aria-current="${active == 'bulk'} ? 'page'"></a>
         <a th:href="@{/console/report}" th:text="#{nav.report}" th:aria-current="${active == 'report'} ? 'page'"></a>
         <a th:href="@{/console/api-keys}" th:text="#{nav.keys}" th:aria-current="${active == 'keys'} ? 'page'"></a>
     </nav>
