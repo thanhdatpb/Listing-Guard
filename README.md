@@ -16,6 +16,7 @@ Self-hosted pre-publish compliance API for Etsy and Amazon listings: determinist
 The API checks listings and returns findings with their source, field and evidence. Separate endpoints screen variation families, buyer personalization text and listing images.
 The API stores results in each client's scope; optional plans, quota and fix/readiness output are disabled by default.
 Trademark checks require an operator loaded catalog, and image checks are disabled by default with thresholds still unverified.
+The optional console keeps magic-link sign-in by default and can use verified Cloudflare Access identities without SMTP (ADR-027).
 Listing Guard suggests and reports. It never edits or publishes a listing and does no SEO.
 
 ## What it checks
