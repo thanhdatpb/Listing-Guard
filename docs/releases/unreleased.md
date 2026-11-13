@@ -2,6 +2,14 @@
 
 Changes on `main` that have not shipped yet. This file lists the API contract and compatibility policy (ADR-022), listing input adapters (ADR-025), the policy change monitor (ADR-026), the Amazon description length rule, the batch review gate, the image checks endpoint, the capabilities endpoint with its MCP tool, one OpenAPI schema fix, the trademark product types, source links and generic words, the USPTO converter's latest-transaction rule and filters, the `uspto-sync` job with its catalog activation log, the TSDR status check, and the Java client SDK (with the MCP server moved onto it) below. Every `/api/v1` response gains the header `X-Listing-Guard-Version`; no status or body changes for it. When the next version is cut, move these changes into `docs/releases/v<version>.md` and delete this file. The Amazon ruleset is now `amazon-2026-12c`, so the `analysisVersion` of Amazon checks changes and a previously checked Amazon listing is checked again. The trademark ruleset is now `trademark-risk-2026-11b`, so the `analysisVersion` of trademark checks and personalization screenings changes (cached results are recomputed once). Etsy rule checks and their hashes are unchanged. The only changes to the request and response shapes of existing endpoints are additive and on `/api/v1/trademark-checks`; `docs/api/openapi.json` also gains `GET /api/v1/capabilities`, `GET /api/v1/input-adapters` and the schema of the trademark check's findings (see the sections below). There are seven additive migrations: V28 (trademark), V29 and V30 (image checks), V31 and V32 (USPTO sync), V33 (policy snapshots), and V34 (TSDR status).
 
+## Console authentication (ADR-027)
+
+The console keeps magic-link sign-in as its default and adds `CLOUDFLARE_ACCESS` and `BOTH` modes. Access assertions
+are signature-checked against cached Cloudflare team certificates and validated for issuer, audience and time before
+the email allowlist is applied. Access-only deployments do not need SMTP. Optional first-login provisioning attaches
+staff accounts to a configured shared FREE client. See [Oracle deployment](../deploy-oracle.md#cloudflare-access-sign-in-adr-027).
+Migration V35 allows multiple console accounts to share that client.
+
 ## What is new
 
 ### Listing input adapters (ADR-025)
