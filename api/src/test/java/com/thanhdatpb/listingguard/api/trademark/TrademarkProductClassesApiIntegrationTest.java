@@ -257,11 +257,11 @@ class TrademarkProductClassesApiIntegrationTest {
         JsonNode result = send(request("Zorvex " + unique(), "mug"));
 
         assertThat(fieldNames(result)).containsExactly("checkId", "marketplace", "productType", "rulesetVersion",
-                "catalogVersion", "analysisVersion", "cached", "completeness", "riskLevel", "failedRuleIds", "disclaimer",
-                "createdAt", "expiresAt", "findings");
-        assertThat(fieldNames(result.get("findings").get(0))).containsExactly("ruleId", "risk", "field", "start", "end",
+                "catalogVersion", "catalogStatus", "analysisVersion", "cached", "completeness", "riskLevel", "failedRuleIds",
+                "skippedRuleIds", "disclaimer", "createdAt", "expiresAt", "watchlist", "findings");
+        assertThat(fieldNames(result.get("findings").get(0))).containsExactly("ruleId", "source", "risk", "field", "start", "end",
                 "snippet", "mark", "matchType", "score", "insideColorPhrase", "otherRuleIds", "sourceIds", "sourceLinks",
-                "riskAdjustments", "message", "suggestion");
+                "riskAdjustments", "watchlistEntry", "message", "suggestion");
     }
 
     // ---- the OpenAPI examples

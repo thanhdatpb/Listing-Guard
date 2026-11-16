@@ -126,7 +126,9 @@ public class TrademarkCheckService {
         Long catalogVersionId;
         if (runtime.ready() || watchlist.watchlist().isEmpty()) {
             // without a watchlist an unserved catalog is refused here, exactly as before ADR-031
-            TrademarkCatalogRuntime.Serving serving = runtime.serving(marketplace, watchlistComponents);
+            // a client without a watchlist asks exactly as before (the one-argument form), so its fingerprint cannot move
+            TrademarkCatalogRuntime.Serving serving = watchlistComponents.isEmpty()
+                    ? runtime.serving(marketplace) : runtime.serving(marketplace, watchlistComponents);
             scanner = serving.scanner();
             fingerprint = serving.fingerprint().value();
             catalogVersionId = serving.catalogVersionId();
