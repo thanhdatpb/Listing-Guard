@@ -103,7 +103,14 @@ class OpenApiIntegrationTest {
                 "/api/v1/personalization-screenings", "/api/v1/personalization-screenings/{id}",
                 "/api/v1/image-checks", "/api/v1/image-checks/{id}",
                 "/api/v1/rulesets/{marketplace}/limits", "/api/v1/reports/summary", "/api/v1/capabilities",
-                "/api/v1/input-adapters", "/health");
+                "/api/v1/input-adapters", "/api/v1/feedback", "/api/v1/feedback/stats", "/health");
+        // feedback (ADR-034): explicit operation ids, so no generated id of another operation moves
+        assertThat(spec.at("/paths/~1api~1v1~1feedback/post/operationId").asText()).isEqualTo("recordFeedback");
+        assertThat(spec.at("/paths/~1api~1v1~1feedback~1stats/get/operationId").asText()).isEqualTo("getFeedbackStats");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1feedback/post/responses")))
+                .containsExactlyInAnyOrder("200", "400", "401", "404", "413", "429");
+        assertThat(spec.at("/components/schemas/ReviewerFeedbackView/properties/display").isMissingNode())
+                .as("a reviewer's e-mail never leaves through the API").isTrue();
         // capabilities (ADR-017): read only, no plan pack, no quota, no 404 (it needs no marketplace)
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1capabilities"))).as("read only: no other method")
                 .containsExactly("get");
@@ -138,7 +145,7 @@ class OpenApiIntegrationTest {
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1reports~1summary/get/responses/400/content/application~1problem+json/examples")))
                 .containsExactlyInAnyOrder("invalid-report-period", "report-period-too-long", "unknown-marketplace");
         assertThat(fieldNames(spec.at("/components/schemas/HealthReport/properties"))).containsExactlyInAnyOrder("period", "marketplace",
-                "generatedAt", "versions", "packs", "byWeek", "coverageNote");
+                "generatedAt", "versions", "packs", "byWeek", "coverageNote", "feedback");
         assertThat(fieldNames(spec.at("/components/schemas/ReadinessSummaryView/properties"))).containsExactlyInAnyOrder(
                 "checksWithReadiness", "scoredChecks", "incompleteChecks", "readyChecks", "readyRate", "averageScore",
                 "checksWithoutReadiness", "versions");

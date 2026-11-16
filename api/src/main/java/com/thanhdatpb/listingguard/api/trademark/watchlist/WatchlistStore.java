@@ -16,7 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Reads and writes client watchlists (ADR-031, V37). Every statement is scoped by {@code client_id}. {@link #lock} and
+ * Reads and writes client watchlists (ADR-031, V38). Every statement is scoped by {@code client_id}. {@link #lock} and
  * {@link #replace} must run in the caller's transaction.
  */
 @Component

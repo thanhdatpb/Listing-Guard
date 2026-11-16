@@ -264,6 +264,230 @@
         },
         "type" : "object"
       },
+      "FalsePositiveRankingView" : {
+        "properties" : {
+          "distinctRules" : {
+            "description" : "Every rule with a false positive in the period, before the list is cut.",
+            "example" : 2,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "items" : {
+            "description" : "Most false positives first, then most verdicts, then pack and rule id by code point.",
+            "items" : {
+              "$ref" : "#/components/schemas/FalsePositiveRuleView"
+            },
+            "type" : "array"
+          },
+          "limit" : {
+            "description" : "The most items the list holds (`listing-guard.reports.top-rules`).",
+            "example" : 10,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "FalsePositiveRuleView" : {
+        "properties" : {
+          "falsePositiveRate" : {
+            "description" : "`falsePositives / verdicts`, four decimals.",
+            "example" : 0.5,
+            "format" : "double",
+            "type" : "number"
+          },
+          "falsePositives" : {
+            "example" : 2,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "pack" : {
+            "example" : "listing-rules",
+            "type" : "string"
+          },
+          "ruleId" : {
+            "example" : "title_repeated_words",
+            "type" : "string"
+          },
+          "verdicts" : {
+            "description" : "Every verdict on this rule in the period.",
+            "example" : 4,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "FeedbackRequest" : {
+        "properties" : {
+          "checkId" : {
+            "description" : "The `checkId` of the stored result, as POST or GET of that pack returned it.",
+            "example" : "0f9e7c1a-2b3c-4d5e-8f90-1a2b3c4d5e6f",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "findingIndex" : {
+            "description" : "The index of the finding in that result's `findings`, from 0, in the order GET returns them.",
+            "example" : 0,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "note" : {
+            "description" : "An optional note of at most 280 characters. Do not paste listing text into it. Blank is no note.",
+            "example" : "The word is part of the product name.",
+            "type" : [ "string", "null" ]
+          },
+          "pack" : {
+            "description" : "The pack of the result: `listing-rules`, `trademark-risk` or `variation-checks`.",
+            "example" : "listing-rules",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "verdict" : {
+            "description" : "`CORRECT`, `FALSE_POSITIVE` or `NOT_USEFUL`.",
+            "example" : "FALSE_POSITIVE",
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "checkId", "findingIndex", "pack", "verdict" ],
+        "type" : "object"
+      },
+      "FeedbackResult" : {
+        "properties" : {
+          "analysisVersion" : {
+            "description" : "The analysisVersion of the result the finding belongs to.",
+            "example" : "etsy-2026-12",
+            "type" : "string"
+          },
+          "checkId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "created" : {
+            "description" : "True when this call stored the first verdict of this API key on the finding; false when it replaced an earlier one.",
+            "type" : "boolean"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "findingIndex" : {
+            "example" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "level" : {
+            "description" : "The finding's severity (`ERROR`, `WARNING`, `INFO`) or trademark risk (`HIGH`, `MEDIUM`, `LOW`).",
+            "example" : "WARNING",
+            "type" : "string"
+          },
+          "marketplace" : {
+            "example" : "ETSY",
+            "type" : "string"
+          },
+          "note" : {
+            "example" : "The word is part of the product name.",
+            "type" : [ "string", "null" ]
+          },
+          "pack" : {
+            "example" : "listing-rules",
+            "type" : "string"
+          },
+          "ruleId" : {
+            "example" : "title_repeated_words",
+            "type" : "string"
+          },
+          "source" : {
+            "description" : "`RULE`, `CATALOG` (a trademark finding that matched a catalog mark) or `WATCHLIST` (reserved).",
+            "example" : "RULE",
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "verdict" : {
+            "example" : "FALSE_POSITIVE",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FeedbackStats" : {
+        "properties" : {
+          "byReviewer" : {
+            "description" : "One entry per reviewer who gave a verdict in the period, most verdicts first.",
+            "items" : {
+              "$ref" : "#/components/schemas/ReviewerFeedbackView"
+            },
+            "type" : "array"
+          },
+          "byRule" : {
+            "description" : "One entry per rule and source that had a finding or a verdict in the period: most false positives first, then most verdicts, then most findings, then pack and rule id.",
+            "items" : {
+              "$ref" : "#/components/schemas/RuleFeedbackView"
+            },
+            "type" : "array"
+          },
+          "generatedAt" : {
+            "description" : "When the numbers were computed.",
+            "example" : "2026-11-16T03:00:00Z",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "marketplace" : {
+            "description" : "The marketplace the counts are limited to, or null for all.",
+            "example" : "ETSY",
+            "type" : [ "string", "null" ]
+          },
+          "period" : {
+            "$ref" : "#/components/schemas/PeriodView",
+            "description" : "The days counted, in UTC, both ends included."
+          },
+          "totals" : {
+            "$ref" : "#/components/schemas/VerdictTotalsView",
+            "description" : "Every verdict given in the period."
+          }
+        },
+        "type" : "object"
+      },
+      "FeedbackSummaryView" : {
+        "description" : "Verdicts are counted by when they were last given. A rate is what reviewers reported, not a measured precision.",
+        "properties" : {
+          "byVerdict" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Verdicts per verdict; `CORRECT`, `FALSE_POSITIVE` and `NOT_USEFUL` are always present.",
+            "example" : {
+              "CORRECT" : 8,
+              "FALSE_POSITIVE" : 3,
+              "NOT_USEFUL" : 1
+            },
+            "type" : "object"
+          },
+          "falsePositiveRate" : {
+            "description" : "`FALSE_POSITIVE / verdicts`, four decimals; null when there is no verdict.",
+            "example" : 0.25,
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "topFalsePositiveRules" : {
+            "$ref" : "#/components/schemas/FalsePositiveRankingView",
+            "description" : "The rules marked `FALSE_POSITIVE` most often."
+          },
+          "verdicts" : {
+            "description" : "Verdicts given in the period.",
+            "example" : 12,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "FindingView" : {
         "properties" : {
           "field" : {
@@ -345,6 +569,10 @@
           "coverageNote" : {
             "$ref" : "#/components/schemas/CoverageView",
             "description" : "Which packs delete their results, after how long, and so from which day their numbers are complete."
+          },
+          "feedback" : {
+            "$ref" : "#/components/schemas/FeedbackSummaryView",
+            "description" : "Verdicts that reviewers gave on findings in the period (ADR-034), for the whole period only."
           },
           "generatedAt" : {
             "description" : "When the report was computed. A result of a pack that deletes results is counted only if it was still stored at this instant.",
@@ -1026,6 +1254,41 @@
         },
         "type" : "object"
       },
+      "ReviewerFeedbackView" : {
+        "properties" : {
+          "correct" : {
+            "example" : 9,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "falsePositive" : {
+            "example" : 2,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "description" : "The account id, or the public key id of the API key. Never an e-mail.",
+            "example" : "0f9e7c1a-2b3c-4d5e-8f90-1a2b3c4d5e6f",
+            "type" : "string"
+          },
+          "kind" : {
+            "description" : "`ACCOUNT` (a console account) or `API_KEY`.",
+            "example" : "ACCOUNT",
+            "type" : "string"
+          },
+          "notUseful" : {
+            "example" : 1,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "verdicts" : {
+            "example" : 12,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "RiskAdjustmentView" : {
         "properties" : {
           "from" : {
@@ -1071,6 +1334,57 @@
             "description" : "A rule stored at two severities appears twice.",
             "example" : "ERROR",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RuleFeedbackView" : {
+        "properties" : {
+          "correct" : {
+            "example" : 6,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "falsePositive" : {
+            "example" : 3,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "falsePositiveRate" : {
+            "description" : "`falsePositive / verdicts`, four decimals; null when there is no verdict.",
+            "example" : 0.3,
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "findings" : {
+            "description" : "Findings of this rule in the results created in the period (retained packs: only while kept).",
+            "example" : 25,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "notUseful" : {
+            "example" : 1,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "pack" : {
+            "example" : "listing-rules",
+            "type" : "string"
+          },
+          "ruleId" : {
+            "example" : "title_repeated_words",
+            "type" : "string"
+          },
+          "source" : {
+            "description" : "`RULE`, `CATALOG` (a trademark finding that matched a catalog mark) or `WATCHLIST` (reserved).",
+            "example" : "RULE",
+            "type" : "string"
+          },
+          "verdicts" : {
+            "description" : "Verdicts given in the period.",
+            "example" : 10,
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -2048,6 +2362,37 @@
         },
         "type" : "object"
       },
+      "VerdictTotalsView" : {
+        "description" : "Verdicts are counted by when they were last given (a changed verdict counts once, as it is now).",
+        "properties" : {
+          "byVerdict" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "description" : "Verdicts per verdict; the three verdicts are always present.",
+            "example" : {
+              "CORRECT" : 30,
+              "FALSE_POSITIVE" : 8,
+              "NOT_USEFUL" : 2
+            },
+            "type" : "object"
+          },
+          "falsePositiveRate" : {
+            "description" : "`FALSE_POSITIVE / verdicts`, four decimals; null when there is no verdict. What reviewers reported, not a measured precision.",
+            "example" : 0.2,
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "verdicts" : {
+            "description" : "Verdicts given in the period.",
+            "example" : 40,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "VersionsView" : {
         "properties" : {
           "rulesets" : {
@@ -2949,6 +3294,529 @@
         },
         "summary" : "Read a stored check",
         "tags" : [ "Checks" ]
+      }
+    },
+    "/api/v1/feedback" : {
+      "post" : {
+        "description" : "Records what a person thought of one finding: `CORRECT`, `FALSE_POSITIVE` or `NOT_USEFUL`, with an optional note of at most 280 characters (do not paste listing text into it). The finding is addressed by the pack, the `checkId` of the stored result and its index in that result's `findings`, in the order GET returns them.\n\nOne verdict per API key per finding: sending another one replaces the verdict and the note (`created` is then false). Only a finding of the calling client's own results can be answered; an unknown result, another client's, a trademark or variation result past its retention, and an index outside the result are all `404 finding-not-found`.\n\nIt changes no finding, result, rule or cache, needs no plan pack and costs no unit of the quota. Nothing of the listing is stored: only the address, the rule id, the source, the level and the analysisVersion of the finding.",
+        "operationId" : "recordFeedback",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "examples" : {
+                "false-positive" : {
+                  "description" : "false-positive",
+                  "value" : {
+                    "checkId" : "0f9e7c1a-2b3c-4d5e-8f90-1a2b3c4d5e6f",
+                    "findingIndex" : 0,
+                    "note" : "The word is part of the product name.",
+                    "pack" : "listing-rules",
+                    "verdict" : "FALSE_POSITIVE"
+                  }
+                }
+              },
+              "schema" : {
+                "$ref" : "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "stored" : {
+                    "description" : "stored",
+                    "value" : {
+                      "analysisVersion" : "etsy-2026-12",
+                      "checkId" : "0f9e7c1a-2b3c-4d5e-8f90-1a2b3c4d5e6f",
+                      "created" : true,
+                      "createdAt" : "2026-11-16T03:00:00Z",
+                      "findingIndex" : 0,
+                      "level" : "WARNING",
+                      "marketplace" : "ETSY",
+                      "note" : "The word is part of the product name.",
+                      "pack" : "listing-rules",
+                      "ruleId" : "title_repeated_words",
+                      "source" : "RULE",
+                      "updatedAt" : "2026-11-16T03:00:00Z",
+                      "verdict" : "FALSE_POSITIVE"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/FeedbackResult"
+                }
+              }
+            },
+            "description" : "The verdict as stored.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-feedback" : {
+                    "description" : "invalid-feedback",
+                    "value" : {
+                      "code" : "invalid-feedback",
+                      "detail" : "note is 312 characters long; the limit is 280.",
+                      "instance" : "/api/v1/feedback",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-feedback"
+                    }
+                  },
+                  "invalid-request" : {
+                    "description" : "invalid-request",
+                    "value" : {
+                      "code" : "invalid-request",
+                      "detail" : "The request is not valid; see errors.",
+                      "errors" : [ {
+                        "field" : "listing",
+                        "message" : "must not be null"
+                      } ],
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-request"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not valid (code `invalid-request`), or the pack, the verdict or the note cannot be stored (code `invalid-feedback`).",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "finding-not-found",
+                  "detail" : "No finding of this client at that address. The result may be unknown, expired, or the index outside it.",
+                  "instance" : "/api/v1/feedback",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 404,
+                  "title" : "Not Found",
+                  "type" : "urn:listing-guard:problem:finding-not-found"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No finding of the calling client at that address (code `finding-not-found`).",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "payload-too-large",
+                  "detail" : "The request body is larger than the limit of 262144 bytes.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 413,
+                  "title" : "Payload Too Large",
+                  "type" : "urn:listing-guard:problem:payload-too-large"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is larger than the limit.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "Give a verdict on one finding of a stored result",
+        "tags" : [ "Feedback" ]
+      }
+    },
+    "/api/v1/feedback/stats" : {
+      "get" : {
+        "description" : "Counts the verdicts given in the period (by when each was last given) per verdict, per rule (with the findings of that rule in the results created in the period, to compare with) and per reviewer. A rate is computed from verdicts only: findings nobody judged are not counted as correct. It is what reviewers reported, not a measured precision. No note and no text of a listing is returned; a reviewer is given by kind and id, never an e-mail.\n\n`from` and `to` are UTC dates, both included, both required, with the limits of `GET /api/v1/reports/summary`. Read only, no plan pack, no unit of the quota, `Cache-Control: no-store`.",
+        "operationId" : "getFeedbackStats",
+        "parameters" : [ {
+          "description" : "The first day, a UTC date written as `YYYY-MM-DD`.",
+          "example" : "2026-10-20",
+          "in" : "query",
+          "name" : "from",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "The last day, included, a UTC date written as `YYYY-MM-DD`.",
+          "example" : "2026-11-16",
+          "in" : "query",
+          "name" : "to",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "`ETSY` or `AMAZON`, case-insensitive. Optional: without it every marketplace is counted.",
+          "example" : "ETSY",
+          "in" : "query",
+          "name" : "marketplace",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "four-weeks" : {
+                    "description" : "four-weeks",
+                    "value" : {
+                      "byReviewer" : [ {
+                        "correct" : 7,
+                        "falsePositive" : 2,
+                        "id" : "5b1c9d2e-3f4a-4b6c-8d7e-9f0a1b2c3d4e",
+                        "kind" : "ACCOUNT",
+                        "notUseful" : 1,
+                        "verdicts" : 10
+                      }, {
+                        "correct" : 1,
+                        "falsePositive" : 1,
+                        "id" : "lgk_7f3a9c",
+                        "kind" : "API_KEY",
+                        "notUseful" : 0,
+                        "verdicts" : 2
+                      } ],
+                      "byRule" : [ {
+                        "correct" : 2,
+                        "falsePositive" : 2,
+                        "falsePositiveRate" : 0.5,
+                        "findings" : 25,
+                        "notUseful" : 0,
+                        "pack" : "listing-rules",
+                        "ruleId" : "title_repeated_words",
+                        "source" : "RULE",
+                        "verdicts" : 4
+                      }, {
+                        "correct" : 2,
+                        "falsePositive" : 1,
+                        "falsePositiveRate" : 0.3333,
+                        "findings" : 6,
+                        "notUseful" : 0,
+                        "pack" : "trademark-risk",
+                        "ruleId" : "catalog_exact",
+                        "source" : "CATALOG",
+                        "verdicts" : 3
+                      }, {
+                        "correct" : 0,
+                        "falsePositive" : 0,
+                        "falsePositiveRate" : null,
+                        "findings" : 9,
+                        "notUseful" : 0,
+                        "pack" : "listing-rules",
+                        "ruleId" : "tag_length",
+                        "source" : "RULE",
+                        "verdicts" : 0
+                      } ],
+                      "generatedAt" : "2026-11-16T03:00:00Z",
+                      "marketplace" : null,
+                      "period" : {
+                        "days" : 28,
+                        "from" : "2026-10-20",
+                        "to" : "2026-11-16"
+                      },
+                      "totals" : {
+                        "byVerdict" : {
+                          "CORRECT" : 8,
+                          "FALSE_POSITIVE" : 3,
+                          "NOT_USEFUL" : 1
+                        },
+                        "falsePositiveRate" : 0.25,
+                        "verdicts" : 12
+                      }
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/FeedbackStats"
+                }
+              }
+            },
+            "description" : "The statistics.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "invalid-report-period" : {
+                    "description" : "invalid-report-period",
+                    "value" : {
+                      "code" : "invalid-report-period",
+                      "detail" : "from must not be after to.",
+                      "instance" : "/api/v1/reports/summary",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:invalid-report-period"
+                    }
+                  },
+                  "report-period-too-long" : {
+                    "description" : "report-period-too-long",
+                    "value" : {
+                      "code" : "report-period-too-long",
+                      "detail" : "The period covers 120 days, more than the 92 a report may cover (both ends count). Ask for a shorter period.",
+                      "instance" : "/api/v1/reports/summary",
+                      "maxDays" : 92,
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "requestedDays" : 120,
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:report-period-too-long"
+                    }
+                  },
+                  "unknown-marketplace" : {
+                    "description" : "unknown-marketplace",
+                    "value" : {
+                      "code" : "unknown-marketplace",
+                      "detail" : "Unknown marketplace: NOPE. Supported: AMAZON, ETSY.",
+                      "instance" : "/api/v1/checks",
+                      "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                      "status" : 400,
+                      "title" : "Bad Request",
+                      "type" : "urn:listing-guard:problem:unknown-marketplace"
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "`from` or `to` is missing, malformed or reversed (code `invalid-report-period`), the period is longer than the limit (code `report-period-too-long`), or the marketplace is unknown (code `unknown-marketplace`).",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "marketplace-not-yet-supported",
+                  "detail" : "Marketplace WALMART is planned but not supported yet. Supported: AMAZON, ETSY.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 422,
+                  "title" : "Unprocessable Entity",
+                  "type" : "urn:listing-guard:problem:marketplace-not-yet-supported"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The marketplace is planned but not supported yet (code `marketplace-not-yet-supported`).",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "Read the verdicts of the calling client per rule and per reviewer over a period",
+        "tags" : [ "Feedback" ]
       }
     },
     "/api/v1/image-checks" : {
@@ -4336,6 +5204,32 @@
                           "period" : "P30D"
                         } ],
                         "text" : "Every pack covers the whole period. Results of trademark-risk (kept P30D), variation-checks (kept P30D), personalization-screening (kept P30D) are deleted after the time in brackets; listing-rules results are not deleted."
+                      },
+                      "feedback" : {
+                        "byVerdict" : {
+                          "CORRECT" : 8,
+                          "FALSE_POSITIVE" : 3,
+                          "NOT_USEFUL" : 1
+                        },
+                        "falsePositiveRate" : 0.25,
+                        "topFalsePositiveRules" : {
+                          "distinctRules" : 2,
+                          "items" : [ {
+                            "falsePositiveRate" : 0.5,
+                            "falsePositives" : 2,
+                            "pack" : "listing-rules",
+                            "ruleId" : "title_repeated_words",
+                            "verdicts" : 4
+                          }, {
+                            "falsePositiveRate" : 0.3333,
+                            "falsePositives" : 1,
+                            "pack" : "trademark-risk",
+                            "ruleId" : "catalog_exact",
+                            "verdicts" : 3
+                          } ],
+                          "limit" : 10
+                        },
+                        "verdicts" : 12
                       },
                       "generatedAt" : "2026-11-09T03:00:00Z",
                       "marketplace" : null,
@@ -6990,6 +7884,9 @@
     "ApiKeyAuth" : [ ]
   } ],
   "tags" : [ {
+    "description" : "Verdicts on stored findings (correct, false positive, not useful) and their statistics.",
+    "name" : "Feedback"
+  }, {
     "description" : "Read-only listing input format metadata.",
     "name" : "Input adapters"
   }, {

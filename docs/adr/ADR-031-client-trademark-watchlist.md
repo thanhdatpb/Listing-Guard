@@ -26,7 +26,7 @@ has no notion of who in a client may change shared settings: every signed-in acc
 Each client may keep a **trademark watchlist**: its own entries, scanned by the trademark pack next to the served catalog, with
 findings of their own source. It is part of the `trademark-risk` pack (same endpoint, same result, same plan pack), not a new pack.
 
-### Data (V37, additive)
+### Data (V38, additive)
 
 - `trademark_watchlist`: one row per client that has ever had a watchlist (`client_id` primary key, `revision`, `updated_at`,
   `updated_by`). `revision` grows by one on every change; it is the ETag of the API and the stale-form guard of the console.
@@ -35,7 +35,7 @@ findings of their own source. It is part of the `trademark-risk` pack (same endp
   bị claim"), `enabled`, `added_by`, `added_at`, `updated_by`, `updated_at`. `added_by`/`updated_by` are `console:<account id>` or
   `api-key:<key id>`, never an email or a secret; the console resolves an account id to its email for display.
 - `account.role` (`ADMIN` or `MEMBER`, `CHECK` constraint, default `MEMBER`). Only an `ADMIN` account changes the watchlist from the
-  console. A magic-link account owns the client created for it, so a new one is `ADMIN`, and V37 makes every existing account that
+  console. A magic-link account owns the client created for it, so a new one is `ADMIN`, and V38 makes every existing account that
   is the only account of a `web-…` client `ADMIN`; an account created on the shared client of Cloudflare Access (ADR-027) is a
   `MEMBER`. The admin job sets a role (`account role <email> ADMIN|MEMBER`, `account list <client>`). The role is read from the
   database at each request, never kept in the session.

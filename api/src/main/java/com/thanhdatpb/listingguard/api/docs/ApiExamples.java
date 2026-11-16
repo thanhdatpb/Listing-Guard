@@ -1191,6 +1191,19 @@ public final class ApiExamples {
                   {"pack": "variation-checks", "period": "P30D", "coveredFrom": "2026-10-11"},
                   {"pack": "personalization-screening", "period": "P30D", "coveredFrom": "2026-10-11"}
                 ]
+              },
+              "feedback": {
+                "verdicts": 12,
+                "byVerdict": {"CORRECT": 8, "FALSE_POSITIVE": 3, "NOT_USEFUL": 1},
+                "falsePositiveRate": 0.25,
+                "topFalsePositiveRules": {
+                  "limit": 10,
+                  "distinctRules": 2,
+                  "items": [
+                    {"pack": "listing-rules", "ruleId": "title_repeated_words", "falsePositives": 2, "verdicts": 4, "falsePositiveRate": 0.5},
+                    {"pack": "trademark-risk", "ruleId": "catalog_exact", "falsePositives": 1, "verdicts": 3, "falsePositiveRate": 0.3333}
+                  ]
+                }
               }
             }
             """;
@@ -1218,6 +1231,81 @@ public final class ApiExamples {
               "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
               "maxDays": 92,
               "requestedDays": 120
+            }
+            """;
+
+    // ---- finding feedback (ADR-034); invented ids and notes only
+
+    public static final String FEEDBACK_REQUEST = """
+            {
+              "pack": "listing-rules",
+              "checkId": "0f9e7c1a-2b3c-4d5e-8f90-1a2b3c4d5e6f",
+              "findingIndex": 0,
+              "verdict": "FALSE_POSITIVE",
+              "note": "The word is part of the product name."
+            }
+            """;
+
+    public static final String FEEDBACK_RESULT = """
+            {
+              "pack": "listing-rules",
+              "checkId": "0f9e7c1a-2b3c-4d5e-8f90-1a2b3c4d5e6f",
+              "findingIndex": 0,
+              "marketplace": "ETSY",
+              "ruleId": "title_repeated_words",
+              "source": "RULE",
+              "level": "WARNING",
+              "analysisVersion": "etsy-2026-12",
+              "verdict": "FALSE_POSITIVE",
+              "note": "The word is part of the product name.",
+              "created": true,
+              "createdAt": "2026-11-16T03:00:00Z",
+              "updatedAt": "2026-11-16T03:00:00Z"
+            }
+            """;
+
+    public static final String FEEDBACK_STATS = """
+            {
+              "period": {"from": "2026-10-20", "to": "2026-11-16", "days": 28},
+              "marketplace": null,
+              "generatedAt": "2026-11-16T03:00:00Z",
+              "totals": {"verdicts": 12, "byVerdict": {"CORRECT": 8, "FALSE_POSITIVE": 3, "NOT_USEFUL": 1}, "falsePositiveRate": 0.25},
+              "byRule": [
+                {"pack": "listing-rules", "ruleId": "title_repeated_words", "source": "RULE", "findings": 25, "verdicts": 4,
+                 "correct": 2, "falsePositive": 2, "notUseful": 0, "falsePositiveRate": 0.5},
+                {"pack": "trademark-risk", "ruleId": "catalog_exact", "source": "CATALOG", "findings": 6, "verdicts": 3,
+                 "correct": 2, "falsePositive": 1, "notUseful": 0, "falsePositiveRate": 0.3333},
+                {"pack": "listing-rules", "ruleId": "tag_length", "source": "RULE", "findings": 9, "verdicts": 0,
+                 "correct": 0, "falsePositive": 0, "notUseful": 0, "falsePositiveRate": null}
+              ],
+              "byReviewer": [
+                {"kind": "ACCOUNT", "id": "5b1c9d2e-3f4a-4b6c-8d7e-9f0a1b2c3d4e", "verdicts": 10, "correct": 7, "falsePositive": 2, "notUseful": 1},
+                {"kind": "API_KEY", "id": "lgk_7f3a9c", "verdicts": 2, "correct": 1, "falsePositive": 1, "notUseful": 0}
+              ]
+            }
+            """;
+
+    public static final String PROBLEM_INVALID_FEEDBACK = """
+            {
+              "type": "urn:listing-guard:problem:invalid-feedback",
+              "title": "Bad Request",
+              "status": 400,
+              "detail": "note is 312 characters long; the limit is 280.",
+              "instance": "/api/v1/feedback",
+              "code": "invalid-feedback",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
+    public static final String PROBLEM_FINDING_NOT_FOUND = """
+            {
+              "type": "urn:listing-guard:problem:finding-not-found",
+              "title": "Not Found",
+              "status": 404,
+              "detail": "No finding of this client at that address. The result may be unknown, expired, or the index outside it.",
+              "instance": "/api/v1/feedback",
+              "code": "finding-not-found",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
             }
             """;
 }

@@ -8,21 +8,147 @@
     <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
 <body>
+<!-- The console home page (ADR-034): the week's numbers of the signed-in account's client, a chart drawn as SVG on the server (no
+     script, no chart library, the same numbers in a table under it), the rules most often marked false positive, shortcuts, and the
+     plan at the foot. Every value goes through th:text and every sentence is a message (ADR-028). -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('dashboard')}"></header>
-<main class="page">
+<main class="page wide">
     <h1 th:text="#{dashboard.heading}"></h1>
-    <p th:text="#{common.signedin(${email})}"></p>
-    <p><a th:href="@{/console/check}" th:text="#{nav.check}"></a></p>
-    <p><a th:href="@{/console/api-keys}" th:text="#{nav.keys}"></a></p>
-    <h2 th:text="#{dashboard.plan.heading}"></h2>
-    <p th:text="#{dashboard.plan(${usage.plan})}"></p>
-    <p th:text="#{dashboard.usage(${#strings.toString(usage.used)})}"></p>
-    <p th:if="${usage.enforced and usage.monthlyQuota != null}"
-       th:text="#{dashboard.quota(${#strings.toString(usage.monthlyQuota)}, ${#strings.toString(usage.remaining)})}"></p>
-    <p th:if="${usage.enforced and usage.monthlyQuota == null}" th:text="#{dashboard.quota.unlimited}"></p>
-    <p th:unless="${usage.enforced}" th:text="#{dashboard.notenforced}"></p>
-    <p><span th:text="#{dashboard.reset}"></span> <time th:text="${usage.resetAt}"></time></p>
+    <p class="muted">
+        <span th:text="#{common.signedin(${email})}"></span>
+        <span th:text="#{home.week(${#temporals.format(home.weekFrom, 'dd/MM/yyyy')}, ${#temporals.format(home.today, 'dd/MM/yyyy')})}"></span>
+    </p>
+
+    <!-- No result and no verdict in eight weeks: how to start, not a page of zeros. -->
+    <section class="empty-state" id="home-empty" th:if="${home.empty}" aria-labelledby="empty-heading">
+        <h2 id="empty-heading" th:text="#{home.empty.heading}"></h2>
+        <p th:text="#{home.empty.intro}"></p>
+        <ol>
+            <li><span th:text="#{home.empty.step1}"></span>
+                <a th:href="@{/console/check}" th:text="#{nav.check}"></a> &middot; <a th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a></li>
+            <li th:text="#{home.empty.step2}"></li>
+            <li th:text="#{home.empty.step3}"></li>
+        </ol>
+    </section>
+
+    <th:block th:unless="${home.empty}">
+        <section id="home-cards" aria-labelledby="cards-heading">
+            <h2 id="cards-heading" class="visually-hidden" th:text="#{home.cards.heading}"></h2>
+            <div class="cards">
+                <div class="card" id="card-checked">
+                    <p class="card-label" th:text="#{home.card.checked}"></p>
+                    <p class="card-value" th:text="${home.checked}"></p>
+                    <p class="card-note small muted" th:text="#{home.card.checked.note}"></p>
+                </div>
+                <div class="card error" id="card-error">
+                    <p class="card-label" th:text="#{home.card.error}"></p>
+                    <p class="card-value" th:text="${home.withError}"></p>
+                    <p class="card-note small muted" th:if="${home.errorRate != null}"
+                       th:text="#{home.card.error.note(${#numbers.formatPercent(home.errorRate, 1, 0)})}"></p>
+                    <p class="card-note small muted" th:if="${home.errorRate == null}" th:text="#{home.card.none}"></p>
+                </div>
+                <div class="card warning" id="card-trademark">
+                    <p class="card-label" th:text="#{home.card.trademark}"></p>
+                    <p class="card-value" th:text="${home.trademarkHolds}"></p>
+                    <ul class="card-note small muted">
+                        <li th:text="#{home.card.trademark.catalog(${#strings.toString(home.holdsCatalog)})}"></li>
+                        <li th:text="#{home.card.trademark.rule(${#strings.toString(home.holdsRule)})}"></li>
+                        <li th:text="#{home.card.trademark.watchlist}"></li>
+                    </ul>
+                </div>
+                <div class="card" id="card-feedback">
+                    <p class="card-label" th:text="#{home.card.feedback}"></p>
+                    <p class="card-value" th:text="${home.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(home.falsePositiveRate, 1, 0)}"></p>
+                    <p class="card-note small muted" th:if="${home.verdicts > 0}"
+                       th:text="#{home.card.feedback.note(${#strings.toString(home.falsePositives)}, ${#strings.toString(home.verdicts)})}"></p>
+                    <p class="card-note small muted" th:if="${home.verdicts == 0}" th:text="#{home.card.feedback.none}"></p>
+                </div>
+            </div>
+        </section>
+
+        <section id="home-chart" aria-labelledby="chart-heading">
+            <h2 id="chart-heading" th:text="#{home.chart.heading}"></h2>
+            <p class="legend small">
+                <span class="key checked" aria-hidden="true"></span> <span th:text="#{home.chart.checked}"></span>
+                <span class="key with-error" aria-hidden="true"></span> <span th:text="#{home.chart.error}"></span>
+            </p>
+            <svg class="chart" role="img" th:attr="viewBox='0 0 ' + ${home.chart.width} + ' ' + ${home.chart.height},aria-labelledby='chart-heading'"
+                 xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+                <g class="ticks">
+                    <th:block th:each="tick : ${home.chart.ticks}">
+                        <line th:attr="x1=${home.chart.left},x2=${home.chart.width - 8},y1=${tick.y},y2=${tick.y}"></line>
+                        <text class="tick" text-anchor="end" th:attr="x=${home.chart.left - 6},y=${tick.y + 4}" th:text="${tick.value}"></text>
+                    </th:block>
+                </g>
+                <g th:each="column : ${home.chart.columns}" th:classappend="${column.week.partial} ? 'partial'">
+                    <rect class="bar checked" th:attr="x=${column.checked.x},y=${column.checked.y},width=${column.checked.width},height=${column.checked.height}">
+                        <title th:text="#{home.chart.bar.checked(${column.week.isoWeek}, ${#strings.toString(column.week.checked)})}"></title>
+                    </rect>
+                    <rect class="bar with-error" th:attr="x=${column.withError.x},y=${column.withError.y},width=${column.withError.width},height=${column.withError.height}">
+                        <title th:text="#{home.chart.bar.error(${column.week.isoWeek}, ${#strings.toString(column.week.withError)})}"></title>
+                    </rect>
+                    <text class="label" text-anchor="middle" th:attr="x=${column.labelX},y=${home.chart.baseline + 18}" th:text="${column.week.label}"></text>
+                </g>
+            </svg>
+            <p class="small muted" th:text="#{home.chart.note}"></p>
+            <details class="chart-data">
+                <summary class="small" th:text="#{home.chart.table}"></summary>
+                <div class="report-scroll">
+                    <table class="report" id="chart-table">
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{home.chart.col.week}"></th>
+                            <th scope="col" class="n" th:text="#{home.chart.checked}"></th>
+                            <th scope="col" class="n" th:text="#{home.chart.error}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="column : ${home.chart.columns}">
+                            <td><span th:text="${column.week.isoWeek}"></span><span class="muted small" th:if="${column.week.partial}"> <span th:text="#{home.chart.partial}"></span></span></td>
+                            <td class="n" th:text="${column.week.checked}"></td>
+                            <td class="n" th:text="${column.week.withError}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </section>
+
+        <section id="home-top" aria-labelledby="top-heading">
+            <h2 id="top-heading" th:text="#{home.top.heading}"></h2>
+            <p class="muted" th:if="${home.topFalsePositives.isEmpty()}" th:text="#{home.top.none}"></p>
+            <ol class="top-rules" th:unless="${home.topFalsePositives.isEmpty()}">
+                <li th:each="item : ${home.topFalsePositives}">
+                    <code th:text="${item.ruleId}"></code> <span class="muted small" th:text="${item.pack}"></span>
+                    <span th:text="#{home.top.item(${#strings.toString(item.falsePositives)}, ${#strings.toString(item.verdicts)})}"></span>
+                </li>
+            </ol>
+            <p class="small"><a th:href="@{/console/stats}" th:text="#{home.top.more}"></a></p>
+        </section>
+    </th:block>
+
+    <section id="home-shortcuts" aria-labelledby="shortcuts-heading">
+        <h2 id="shortcuts-heading" th:text="#{home.shortcuts.heading}"></h2>
+        <ul class="shortcuts">
+            <li><a class="button" th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a></li>
+            <li><a class="button" th:href="@{/console/check}" th:text="#{nav.check}"></a></li>
+            <li><a class="button" th:href="@{/console/stats}" th:text="#{nav.stats}"></a></li>
+            <li><a class="button" th:href="@{/console/report}" th:text="#{nav.report}"></a></li>
+            <li><a class="button" th:href="@{/console/api-keys}" th:text="#{nav.keys}"></a></li>
+        </ul>
+    </section>
+
+    <section id="home-plan" aria-labelledby="plan-heading">
+        <h2 id="plan-heading" th:text="#{dashboard.plan.heading}"></h2>
+        <p th:text="#{dashboard.plan(${usage.plan})}"></p>
+        <p th:text="#{dashboard.usage(${#strings.toString(usage.used)})}"></p>
+        <p th:if="${usage.enforced and usage.monthlyQuota != null}"
+           th:text="#{dashboard.quota(${#strings.toString(usage.monthlyQuota)}, ${#strings.toString(usage.remaining)})}"></p>
+        <p th:if="${usage.enforced and usage.monthlyQuota == null}" th:text="#{dashboard.quota.unlimited}"></p>
+        <p th:unless="${usage.enforced}" th:text="#{dashboard.notenforced}"></p>
+        <p><span th:text="#{dashboard.reset}"></span> <time th:text="${usage.resetAt}"></time></p>
+    </section>
 </main>
 </body>
 </html>

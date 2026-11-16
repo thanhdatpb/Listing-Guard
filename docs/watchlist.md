@@ -123,9 +123,9 @@ docker compose run --rm admin account list web-1a2b3c4d5e6f
 docker compose run --rm admin account role seller@example.com ADMIN
 ```
 
-Migration **V37** is additive: `account.role`, `trademark_watchlist`, `trademark_watchlist_entry`, and the columns a check made without a
+Migration **V38** is additive: `account.role`, `trademark_watchlist`, `trademark_watchlist_entry`, and the columns a check made without a
 catalog needs (`trademark_check.catalog_version_id` becomes nullable, `skipped_rule_ids`, `watchlist_revision`, `watchlist_version`,
-`watchlist_entries`, and `trademark_check_finding.watchlist_entry`). V37 makes an account that is the only account of a `web-…` client an
+`watchlist_entries`, and `trademark_check_finding.watchlist_entry`). V38 makes an account that is the only account of a `web-…` client an
 `ADMIN`; every other existing account is a `MEMBER`.
 
 ## What it does not do

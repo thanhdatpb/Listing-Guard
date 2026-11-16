@@ -25,12 +25,21 @@
     </th:block>
 </div>
 
-<!-- The bar of a signed-in page: where to go, the language, and sign out. "active" is dashboard, check, bulk, report, watchlist or keys. -->
+<!-- htmx (ADR-034), for the pages that show the feedback widget: the WebJar file served by ConsoleVendorResources, no CDN. The
+     configuration lets a 4xx answer of the widget (a note too long, a finding not found) replace the widget, so the reason shows. -->
+<th:block th:fragment="htmx">
+    <meta name="htmx-config"
+          content='{"includeIndicatorStyles":false,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[4]..","swap":true,"error":false},{"code":"...","swap":false,"error":true}]}'>
+    <script th:src="@{/console/vendor/htmx.min.js}" defer></script>
+</th:block>
+
+<!-- The bar of a signed-in page: where to go, the language, and sign out. "active" is dashboard, check, bulk, stats, report, watchlist or keys. -->
 <header class="bar" th:fragment="nav(active)">
     <nav th:aria-label="#{nav.aria}">
         <a th:href="@{/console}" th:text="#{nav.dashboard}" th:aria-current="${active == 'dashboard'} ? 'page'"></a>
         <a th:href="@{/console/check}" th:text="#{nav.check}" th:aria-current="${active == 'check'} ? 'page'"></a>
         <a th:href="@{/console/bulk}" th:text="#{nav.bulk}" th:aria-current="${active == 'bulk'} ? 'page'"></a>
+        <a th:href="@{/console/stats}" th:text="#{nav.stats}" th:aria-current="${active == 'stats'} ? 'page'"></a>
         <a th:href="@{/console/report}" th:text="#{nav.report}" th:aria-current="${active == 'report'} ? 'page'"></a>
         <a th:href="@{/console/watchlist}" th:text="#{nav.watchlist}" th:aria-current="${active == 'watchlist'} ? 'page'"></a>
         <a th:href="@{/console/api-keys}" th:text="#{nav.keys}" th:aria-current="${active == 'keys'} ? 'page'"></a>

@@ -92,6 +92,7 @@ final class HealthReportHtml {
         trademark(html, r.packs().trademarkRisk());
         variation(html, r.packs().variationChecks());
         personalization(html, r.packs().personalizationScreening());
+        feedback(html, r.feedback());
         weeks(html, r.byWeek());
         versions(html, r);
         html.append("</section>\n");
@@ -177,6 +178,30 @@ final class HealthReportHtml {
         html.append("<h3>personalization-screening: finding của luật ký tự theo mức</h3>\n");
         severities(html, v.findings());
         rules(html, "personalization-screening: luật ký tự có nhiều finding nhất", v.topRules());
+    }
+
+    /** The verdicts of the period and the rules marked "Báo nhầm" most often (ADR-034); no note is in the report. */
+    private static void feedback(StringBuilder html, HealthReport.FeedbackSummaryView v) {
+        html.append("<h3>Phản hồi: rule bị báo nhầm nhiều nhất</h3>\n<table>\n");
+        row(html, "Phản hồi trong khoảng ngày", v.verdicts());
+        row(html, "Đúng (CORRECT)", v.byVerdict().getOrDefault("CORRECT", 0L));
+        row(html, "Báo nhầm (FALSE_POSITIVE)", v.byVerdict().getOrDefault("FALSE_POSITIVE", 0L));
+        row(html, "Không hữu ích (NOT_USEFUL)", v.byVerdict().getOrDefault("NOT_USEFUL", 0L));
+        row(html, "Tỷ lệ báo nhầm", v.falsePositiveRate() == null ? "-" : percent(v.falsePositiveRate()));
+        html.append("</table>\n");
+        if (v.topFalsePositiveRules().items().isEmpty()) {
+            html.append("<p>Chưa có rule nào bị báo nhầm trong khoảng ngày.</p>\n");
+        } else {
+            html.append("<table>\n");
+            header(html, "Pack", "Rule", "Báo nhầm", "Số phản hồi", "Tỷ lệ báo nhầm");
+            for (HealthReport.FalsePositiveRuleView item : v.topFalsePositiveRules().items()) {
+                row(html, item.pack(), item.ruleId(), item.falsePositives(), item.verdicts(), percent(item.falsePositiveRate()));
+            }
+            html.append("</table>\n<p class=\"note\">").append(v.topFalsePositiveRules().items().size()).append(" trên ")
+                    .append(v.topFalsePositiveRules().distinctRules()).append(" rule bị báo nhầm.</p>\n");
+        }
+        html.append("<p class=\"note\">Đây là điều người xem đã đánh dấu, không phải độ chính xác đo được. Phản hồi được tính theo "
+                + "lần đánh dấu gần nhất; ghi chú không có trong báo cáo.</p>\n");
     }
 
     private static void weeks(StringBuilder html, List<HealthReport.WeekView> weeks) {

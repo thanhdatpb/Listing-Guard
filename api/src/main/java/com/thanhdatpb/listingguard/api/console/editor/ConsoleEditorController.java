@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.editor;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleFeedbackSupport;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
@@ -38,13 +39,15 @@ public class ConsoleEditorController {
     private final RulesetLimitsService rulesetLimits;
     private final EditorCheckService checks;
     private final ConsoleMessages messages;
+    private final ConsoleFeedbackSupport feedback;
 
     public ConsoleEditorController(PlanService plans, RulesetLimitsService rulesetLimits, EditorCheckService checks,
-                                   ConsoleMessages messages) {
+                                   ConsoleMessages messages, ConsoleFeedbackSupport feedback) {
         this.plans = plans;
         this.rulesetLimits = rulesetLimits;
         this.checks = checks;
         this.messages = messages;
+        this.feedback = feedback;
     }
 
     @GetMapping("/console/check")
@@ -71,6 +74,7 @@ public class ConsoleEditorController {
         EditorResult result = checks.check(user.clientId(), selected, mapped.listing());
         populate(model, user, selected, form, Map.of());
         model.addAttribute("result", result);
+        feedback.populate(model, user, result.targets());
         model.addAttribute("otherOpen", result.requiredFieldsFinding() || form.hasOtherFields());
         return VIEW;
     }

@@ -1,9 +1,10 @@
 # Unreleased changes
 
-Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: the console in English and Vietnamese
-(ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030), the value backtest with the labelled
-evaluation (ADR-032) and the client trademark watchlist (ADR-031). Only the watchlist changes the API, and only
-additively (see its section); the bulk check adds one additive migration, V36, and the watchlist another, V37.
+Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: finding feedback (ADR-034), the console in English
+and Vietnamese (ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030), the value backtest with the labelled
+evaluation (ADR-032) and the client trademark watchlist (ADR-031). Finding feedback and the watchlist touch the API, and only
+additively (see their sections); the bulk check adds migration V36, finding feedback V37 and the watchlist V38, all additive. The other
+changes touch no API response, request, status, header or migration.
 
 Every pull request that changes the API runs the compatibility check (`./mvnw -B -pl contract-tools verify`, ADR-022) and copies the
 additive and non-breaking lines of `contract-tools/target/contract/compatibility-report.md` here, with a short section for the
@@ -29,10 +30,10 @@ looks for them next to the catalog. Guide: [watchlist.md](../watchlist.md).
   list at once in `400 errors[]`). The Java SDK adds `trademarkWatchlist()` and `replaceTrademarkWatchlist(...)` (the one `PUT` of the SDK,
   an amendment of ADR-023), the MCP server one read-only tool, `get_watchlist` (an amendment of ADR-017; no tool changes a list).
 - **Console.** A **Watchlist** page: list, add, edit, switch off, delete, import by pasting from a Google Sheet or uploading a CSV (with a preview
-  and a confirmation), CSV export; in English and Vietnamese. **Only an `ADMIN` account changes the list.** **V37 adds `account.role`:** an account
+  and a confirmation), CSV export; in English and Vietnamese. **Only an `ADMIN` account changes the list.** **V38 adds `account.role`:** an account
   that is the only account of a `web-…` client becomes `ADMIN`, every other existing account (the shared Cloudflare Access client, accounts an
   operator made) is a `MEMBER`; promote one with `docker compose run --rm admin account role <email> ADMIN` (`account list <client>` shows them).
-- **Migration V37** is additive (see [watchlist.md](../watchlist.md)); `trademark_check.catalog_version_id` becomes nullable.
+- **Migration V38** is additive (see [watchlist.md](../watchlist.md)); `trademark_check.catalog_version_id` becomes nullable.
 - **Compatibility report (ADR-022), additive:** `operation-added` at `GET /api/v1/trademark-watchlist` and `PUT /api/v1/trademark-watchlist`;
   `problem-code-added` at `problem watchlist-revision-mismatch`; `response-property-added` at `schema TrademarkCheckResult.catalogStatus`,
   `.skippedRuleIds` and `.watchlist`, and at `schema TrademarkCheckFindingView.watchlistEntry`; `response-enum-value-added` at
@@ -44,6 +45,32 @@ looks for them next to the catalog. Guide: [watchlist.md](../watchlist.md).
 - **For the maintainer to decide** (ADR-031, open questions): the client's own minimum level, Nice classes lowering a level, personalization
   screening reading the list, limiting key creation to administrators, and reading a Google Sheet directly. The Vietnamese texts have not been
   reviewed by a native reader.
+### Finding feedback and the weekly home page (ADR-034)
+
+Every finding of the console's *Check listing* and *Bulk check* pages now has three buttons, **Correct / Đúng**, **False positive / Báo
+nhầm** and **Not useful / Không hữu ích**, and an optional note of at most 280 characters (do not paste listing text). One click saves
+without reloading the page (htmx 2.0.4, from a WebJar served by the console; no CDN), a second click changes the verdict, and the form
+works without scripts. The console home page (`/console`) becomes a weekly view: listings checked, listings held back by an `ERROR`,
+trademark holds by source, the reported false-positive rate, an eight-week SVG chart drawn on the server, the rules most often marked false
+positive, shortcuts, and an empty state with three steps. A new **Statistics** page (`/console/stats`, and a CSV) shows verdicts per rule
+and per reviewer for a report to a manager. Guide: [feedback.md](../feedback.md).
+
+- **V37** (additive): table `finding_verdict`. It stores the client, the reviewer (a console account or an API key), the address of the
+  finding (pack, result id, index), `rule_id`, source, level, `analysisVersion`, the verdict, the note and times. **No text of a listing.**
+  The legacy, unused `finding_feedback` table of V1 is left alone.
+- **API, additive:** `POST /api/v1/feedback` (operation `recordFeedback`) and `GET /api/v1/feedback/stats` (`getFeedbackStats`); new
+  problem codes `invalid-feedback` (400) and `finding-not-found` (404); `HealthReport.feedback` on `GET /api/v1/reports/summary`, the
+  `health-report` job's `report.json` and `report.html`, and the console Report page. Neither endpoint needs a plan pack or costs a unit.
+  The compatibility check reports additive lines only:
+  - `operation-added` at `POST /api/v1/feedback` and `GET /api/v1/feedback/stats`
+  - `problem-code-added` at `problem invalid-feedback` and `problem finding-not-found`
+  - `response-property-added` at `schema HealthReport.feedback`
+- The MCP server stays read-only (no tool for feedback) and the Java SDK has no method for it yet.
+- A verdict changes no finding, rule, result, cache or `analysisVersion`. A rate is what reviewers reported, not a measured precision.
+- New dependency: `org.webjars.npm:htmx.org` 2.0.4 (`api/pom.xml`, `htmx.version`).
+- The history page, the edit mode and the watchlist named in the request are not on `main`; their feedback widget and shortcuts come with
+  them (ADR-034, "Pages not on main"). The English and Vietnamese texts have not been reviewed by a native reader.
+
 ### A trademark catalog from the Hugging Face USPTO rebuild: `hf-convert` (ADR-030)
 
 A new one-shot job converts the public Parquet dataset

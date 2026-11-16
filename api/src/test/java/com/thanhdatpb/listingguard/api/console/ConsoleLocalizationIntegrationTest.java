@@ -182,6 +182,7 @@ class ConsoleLocalizationIntegrationTest {
             pages.put("check (Etsy)", get("/console/check").param("marketplace", "ETSY").with(signedIn(user)));
             pages.put("check (Amazon)", get("/console/check").param("marketplace", "AMAZON").with(signedIn(user)));
             pages.put("report", get("/console/report").with(signedIn(user)));
+            pages.put("stats", get("/console/stats").with(signedIn(user)));
             pages.put("keys", get("/console/api-keys").with(signedIn(user)));
             pages.put("revoke", get("/console/api-keys/" + keyId + "/revoke").with(signedIn(user)));
             pages.put("a result", checkPost(user, etsyForm("a".repeat(150))));

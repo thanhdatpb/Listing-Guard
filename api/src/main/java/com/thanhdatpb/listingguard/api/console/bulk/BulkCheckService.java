@@ -7,6 +7,7 @@ import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.CheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
+import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Detail;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Item;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Kind;
@@ -225,12 +226,14 @@ public class BulkCheckService {
         try {
             CheckResult result = checks.checkDetailed(clientId, new CheckRequest(marketplace.code(), input.listing()));
             List<Item> items = new ArrayList<>();
-            for (CheckResult.FindingView finding : result.findings()) {
+            for (int index = 0; index < result.findings().size(); index++) {
+                CheckResult.FindingView finding = result.findings().get(index);
                 String level = finding.severity().name().toLowerCase(Locale.ROOT);
                 CheckResult.FixView fix = finding.fix();
                 items.add(new Item(level, BulkText.level(messages, level), finding.ruleId(), finding.field(), finding.message(),
                         finding.suggestion(), null, messages.ruleExplanation(finding.ruleId()),
-                        fix == null ? null : fix.description(), fix == null ? null : fix.proposedValue()));
+                        fix == null ? null : fix.description(), fix == null ? null : fix.proposedValue(),
+                        FeedbackTarget.listingRules(result.checkId(), index)));
             }
             String readiness = readiness(result.readiness());
             return new BulkResult.Rules(true, null, readiness, readinessLabel(readiness), score(result.readiness()),
@@ -286,11 +289,13 @@ public class BulkCheckService {
         try {
             TrademarkCheckResult result = trademarks.check(clientId, new CheckRequest(marketplace.code(), input.listing()));
             List<Item> items = new ArrayList<>();
-            for (TrademarkCheckResult.FindingView finding : result.findings()) {
+            for (int index = 0; index < result.findings().size(); index++) {
+                TrademarkCheckResult.FindingView finding = result.findings().get(index);
                 String level = finding.risk().name().toLowerCase(Locale.ROOT);
                 items.add(new Item(level, BulkText.level(messages, level), finding.ruleId(), finding.field(), finding.message(),
                         finding.suggestion(), finding.mark() == null ? null : messages.get("bulk.item.catalogmark", finding.mark()),
-                        messages.ruleExplanation(finding.ruleId()), null, null));
+                        messages.ruleExplanation(finding.ruleId()), null, null,
+                        FeedbackTarget.trademark(result.checkId(), index)));
             }
             boolean complete = result.completeness() == Completeness.COMPLETE;
             String level = result.riskLevel() == RiskLevel.UNKNOWN || result.riskLevel() == null ? null : result.riskLevel().name();
@@ -423,6 +428,7 @@ public class BulkCheckService {
         Kind kind;
         String note = null;
         List<VariationCheckResult.FindingView> findings = List.of();
+        java.util.UUID checkId = null;
         if (planNote != null) {
             kind = Kind.NOT_RUN;
             note = planNote;
@@ -432,6 +438,7 @@ public class BulkCheckService {
                 kind = result.completeness() == com.thanhdatpb.listingguard.variation.Completeness.COMPLETE ? Kind.RESULT
                         : Kind.INCOMPLETE;
                 findings = result.findings();
+                checkId = result.checkId();
             } catch (QuotaExceededException e) {
                 state.quotaNote = state.quotaNote == null ? BulkText.quota(messages, e) : state.quotaNote;
                 kind = Kind.NOT_RUN;
@@ -450,11 +457,13 @@ public class BulkCheckService {
             acc.variationKind = kind;
             acc.variationNote = note;
         }
-        for (VariationCheckResult.FindingView finding : findings) {
+        for (int index = 0; index < findings.size(); index++) {
+            VariationCheckResult.FindingView finding = findings.get(index);
             String level = finding.severity().name().toLowerCase(Locale.ROOT);
             accs.get(family.rowOfFinding(finding.field())).variationItems.add(new Item(level, BulkText.level(messages, level),
                     finding.ruleId(), finding.field(), finding.message(), finding.suggestion(), null,
-                    messages.ruleExplanation(finding.ruleId()), null, null));
+                    messages.ruleExplanation(finding.ruleId()), null, null,
+                    checkId == null ? null : FeedbackTarget.variation(checkId, index)));
         }
     }
 

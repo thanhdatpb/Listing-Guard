@@ -6,6 +6,7 @@ import com.thanhdatpb.listingguard.api.check.CheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
+import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
 import com.thanhdatpb.listingguard.api.plan.QuotaExceededException;
@@ -121,9 +122,11 @@ public class EditorCheckService {
         int nextFixId = 0;
         for (Severity severity : SEVERITY_ORDER) {
             List<EditorResult.RuleItem> items = new ArrayList<>();
-            for (CheckResult.FindingView finding : result.findings()) {
+            for (int index = 0; index < result.findings().size(); index++) {
+                CheckResult.FindingView finding = result.findings().get(index);
                 if (finding.severity() == severity) {
-                    items.add(ruleItem(finding, finding.fix() == null ? null : nextFixId++));
+                    items.add(ruleItem(finding, finding.fix() == null ? null : nextFixId++,
+                            FeedbackTarget.listingRules(result.checkId(), index)));
                 }
             }
             if (!items.isEmpty()) {
@@ -141,11 +144,12 @@ public class EditorCheckService {
         });
     }
 
-    private static EditorResult.RuleItem ruleItem(CheckResult.FindingView finding, Integer fixId) {
+    private static EditorResult.RuleItem ruleItem(CheckResult.FindingView finding, Integer fixId, FeedbackTarget target) {
         CheckResult.FixView fix = finding.fix();
         return new EditorResult.RuleItem(finding.ruleId(), finding.field(), finding.message(), finding.suggestion(),
                 finding.value(), EditorEvidence.ofValue(finding.value()),
-                fix == null ? null : new EditorResult.Fix(fix.action().name(), fix.description(), fix.proposedValue()), fixId);
+                fix == null ? null : new EditorResult.Fix(fix.action().name(), fix.description(), fix.proposedValue()), fixId,
+                target);
     }
 
     private EditorResult.Trademark trademark(UUID clientId, CheckRequest request, Listing listing) {
@@ -192,8 +196,13 @@ public class EditorCheckService {
     private List<EditorResult.Group<EditorResult.TrademarkItem>> trademarkGroups(TrademarkCheckResult result, Listing listing) {
         List<EditorResult.Group<EditorResult.TrademarkItem>> groups = new ArrayList<>();
         for (RiskLevel risk : RISK_ORDER) {
-            List<EditorResult.TrademarkItem> items = result.findings().stream().filter(finding -> finding.risk() == risk)
-                    .map(finding -> trademarkItem(finding, listing)).toList();
+            List<EditorResult.TrademarkItem> items = new ArrayList<>();
+            for (int index = 0; index < result.findings().size(); index++) {
+                TrademarkCheckResult.FindingView finding = result.findings().get(index);
+                if (finding.risk() == risk) {
+                    items.add(trademarkItem(finding, listing, FeedbackTarget.trademark(result.checkId(), index)));
+                }
+            }
             if (!items.isEmpty()) {
                 groups.add(new EditorResult.Group<>(messages.get("editor.trademark.group." + risk.name().toLowerCase(Locale.ROOT)),
                         risk.name().toLowerCase(Locale.ROOT), items));
@@ -202,11 +211,12 @@ public class EditorCheckService {
         return groups;
     }
 
-    private static EditorResult.TrademarkItem trademarkItem(TrademarkCheckResult.FindingView finding, Listing listing) {
+    private static EditorResult.TrademarkItem trademarkItem(TrademarkCheckResult.FindingView finding, Listing listing,
+                                                            FeedbackTarget target) {
         String text = EditorEvidence.fieldText(listing, finding.field());
         return new EditorResult.TrademarkItem(finding.ruleId(), finding.risk().name(), finding.field(),
                 finding.matchType().name(), finding.mark(), finding.message(), finding.suggestion(),
-                EditorEvidence.ofSpan(text, finding.start(), finding.end(), finding.snippet()));
+                EditorEvidence.ofSpan(text, finding.start(), finding.end(), finding.snippet()), target);
     }
 
     private static EditorResult.Trademark panel(EditorResult.TrademarkKind kind, String big, String headline, String detail,

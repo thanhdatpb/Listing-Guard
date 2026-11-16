@@ -20,7 +20,7 @@
   <text x="120" y="207" class="label">Chrome extension</text><text x="120" y="232" class="small">Listing-Guard-extension</text>
   <rect x="60" y="274" width="275" height="70" rx="14" class="card"/>
   <rect x="78" y="294" width="27" height="25" rx="3" class="icon"/><path d="M78 302h27M84 298h2M90 298h2" class="icon"/>
-  <text x="120" y="316" class="label">Seller console</text>
+  <text x="120" y="316" class="label">Seller console</text><text x="120" y="340" class="small">Home, feedback, statistics</text>
   <rect x="60" y="364" width="275" height="83" rx="14" class="card"/>
   <path d="M79 389h24v20H79zM85 415h12M91 409v6M84 397l4 4 9-10" class="icon"/>
   <text x="120" y="396" class="label">AI agent via MCP</text><text x="120" y="422" class="small">STDIO default; HTTP private only</text>
@@ -64,7 +64,7 @@
   <rect x="430" y="633" width="680" height="128" rx="15" class="card"/>
   <text x="455" y="669" class="label">Shared API capabilities</text>
   <text x="455" y="701" class="body">Verified fixes + listing-rules readiness (optional) | ruleset limits | health report</text>
-  <text x="455" y="733" class="body">Capabilities | usage | client-scoped results | RFC 7807 problems</text>
+  <text x="455" y="733" class="body">Finding feedback + stats | capabilities | usage | RFC 7807 problems</text>
 
   <rect x="1180" y="112" width="385" height="430" rx="20" class="soft"/>
   <text x="1210" y="151" class="head">Versioned inputs</text>

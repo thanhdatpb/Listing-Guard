@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.editor;
 
+import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import java.util.List;
 import java.util.Locale;
 
@@ -52,13 +53,23 @@ public record EditorResult(Readiness readiness, Trademark trademark, List<Group<
     /**
      * One finding of the listing rules; {@code value} is the value it is about (null when no single value applies).
      * {@code fixId} numbers the findings that carry a fix, in the order the page shows them (null when there is none); the
-     * page uses it to name the form values of the "Apply suggestion" button.
+     * page uses it to name the form values of the "Apply suggestion" button. {@code target} is the address of the stored finding
+     * the feedback widget answers (ADR-034).
      */
     public record RuleItem(String ruleId, String field, String message, String suggestion, String value, Evidence evidence,
-                           Fix fix, Integer fixId) {
+                           Fix fix, Integer fixId, FeedbackTarget target) {
     }
 
+    /** {@code target} is the address of the stored finding the feedback widget answers (ADR-034). */
     public record TrademarkItem(String ruleId, String risk, String field, String matchType, String mark, String message,
-                                String suggestion, Evidence evidence) {
+                                String suggestion, Evidence evidence, FeedbackTarget target) {
+    }
+
+    /** Every finding of the page that the feedback widget can answer, in the order shown. */
+    public List<FeedbackTarget> targets() {
+        List<FeedbackTarget> targets = new java.util.ArrayList<>();
+        ruleGroups.forEach(group -> group.items().forEach(item -> targets.add(item.target())));
+        trademark.groups().forEach(group -> group.items().forEach(item -> targets.add(item.target())));
+        return targets.stream().filter(java.util.Objects::nonNull).toList();
     }
 }

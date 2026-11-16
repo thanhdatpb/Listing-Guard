@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- The feedback widget of a stored finding (ADR-034). This file is never served on its own: a page that shows stored findings calls
+     ConsoleFeedbackSupport.populate and includes widget(target) next to each finding; POST /console/feedback answers the same
+     fragment. It is a plain POST form with its CSRF token, so it works without a script; with htmx (hx-post) a press swaps only the
+     widget and the page is not reloaded. The page shows the reader's own verdict and note only. No text is written here (ADR-028).
+
+     Model: feedbackEnabled (the reader has an account), feedbackVerdicts (their verdicts by target key), feedbackNoteMax, and on an
+     answer of POST /console/feedback also feedbackSavedKey, feedbackError and feedbackDraft. -->
+<form class="feedback" th:fragment="widget(target)" th:if="${feedbackEnabled == true and target != null}"
+      th:with="key=${target.key()}, mine=${feedbackVerdicts == null ? null : feedbackVerdicts.get(key)},
+               current=${mine == null ? '' : mine.verdict().name()},
+               saved=${feedbackSavedKey != null and feedbackSavedKey == key},
+               failed=${feedbackError != null and feedbackErrorKey == key},
+               draft=${failed ? feedbackDraft : (mine == null ? null : mine.note())}"
+      method="post" th:action="@{/console/feedback}" th:id="'fb-' + ${key}"
+      th:attr="hx-post=@{/console/feedback},hx-swap='outerHTML'">
+    <input type="hidden" name="pack" th:value="${target.pack()}">
+    <input type="hidden" name="checkId" th:value="${target.checkId()}">
+    <input type="hidden" name="position" th:value="${target.position()}">
+    <div class="fb-row">
+        <span class="fb-label small muted" th:id="'fbl-' + ${key}" th:text="#{feedback.legend}"></span>
+        <span class="fb-buttons" role="group" th:attr="aria-labelledby='fbl-' + ${key}">
+            <button type="submit" name="verdict" value="CORRECT" class="fb correct" th:aria-pressed="${current == 'CORRECT'}"
+                    th:text="#{feedback.verdict.correct}"></button>
+            <button type="submit" name="verdict" value="FALSE_POSITIVE" class="fb false-positive" th:aria-pressed="${current == 'FALSE_POSITIVE'}"
+                    th:text="#{feedback.verdict.false-positive}"></button>
+            <button type="submit" name="verdict" value="NOT_USEFUL" class="fb not-useful" th:aria-pressed="${current == 'NOT_USEFUL'}"
+                    th:text="#{feedback.verdict.not-useful}"></button>
+        </span>
+    </div>
+    <details class="fb-note" th:open="${draft != null}">
+        <summary class="small" th:text="#{feedback.note.summary}"></summary>
+        <label class="small" th:for="'fbn-' + ${key}" th:text="#{feedback.note.label}"></label>
+        <textarea name="note" rows="2" th:id="'fbn-' + ${key}" th:attr="maxlength=${feedbackNoteMax}" th:text="${draft}"></textarea>
+        <p class="small muted" th:text="#{feedback.note.hint(${#strings.toString(feedbackNoteMax)})}"></p>
+    </details>
+    <p class="fb-status small" role="status" aria-live="polite">
+        <span class="fb-saved" th:if="${saved and !failed and current != ''}"
+              th:text="#{feedback.saved(${#messages.msg('feedback.verdict.' + mine.verdict().css())})}"></span>
+        <span class="fb-error" th:if="${failed}" th:text="${feedbackError}"></span>
+    </p>
+</form>
+</body>
+</html>

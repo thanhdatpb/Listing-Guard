@@ -78,6 +78,7 @@
             <p class="small" th:if="${f.fixValue != null}"><span th:text="#{bulk.item.fix.value}"></span> <code th:text="${f.fixValue}"></code></p>
             <p class="small" th:if="${f.fixValue == null}" th:text="#{bulk.item.fix.remove}"></p>
         </div>
+        <form th:replace="~{console/feedback :: widget(${f.target})}"></form>
     </li>
 </ul>
 </body>

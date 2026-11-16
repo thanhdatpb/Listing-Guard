@@ -69,6 +69,7 @@ The eight tools are `check_listing`, `check_trademark`, `check_variations`, `scr
 - [Java client SDK](client/README.md) for Java backends.
 - [`batch-check`](docs/batch-check.md) for CSV or Amazon flat-file reports.
 - [Console bulk check](docs/bulk-check.md) to paste rows from a Google Sheet (or upload a CSV) and copy the results back.
+- [Finding feedback and the weekly home page](docs/feedback.md): mark each finding Correct, False positive or Not useful, and show the week's value and false-positive rates ([ADR-034](docs/adr/ADR-034-finding-feedback-and-value-dashboard.md)).
 - [`backtest`](docs/backtest.md) to measure the checks on past claims and takedowns, with a one-page summary for a manager; a labelled sample set gates rule precision in CI ([ADR-032](docs/adr/ADR-032-value-backtest-and-labeled-evaluation.md)).
 - The optional web console speaks English and Vietnamese (`LISTING_GUARD_CONSOLE_DEFAULT_LOCALE`, [ADR-028](docs/adr/ADR-028-console-localization.md)); the API does not change.
 

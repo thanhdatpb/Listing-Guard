@@ -3,6 +3,8 @@ package com.thanhdatpb.listingguard.api.web;
 import com.thanhdatpb.listingguard.api.check.CheckNotFoundException;
 import com.thanhdatpb.listingguard.api.check.MarketplaceNotYetSupportedException;
 import com.thanhdatpb.listingguard.api.check.UnknownMarketplaceException;
+import com.thanhdatpb.listingguard.api.feedback.FindingNotFoundException;
+import com.thanhdatpb.listingguard.api.feedback.InvalidFeedbackException;
 import com.thanhdatpb.listingguard.api.image.ImageCheckNotFoundException;
 import com.thanhdatpb.listingguard.api.image.ImageChecksUnavailableException;
 import com.thanhdatpb.listingguard.api.image.TooManyImagesException;
@@ -205,6 +207,18 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidReportPeriodException.class)
     public ProblemDetail invalidReportPeriod(InvalidReportPeriodException e) {
         return Problems.of(HttpStatus.BAD_REQUEST, InvalidReportPeriodException.CODE, e.getMessage());
+    }
+
+    /** A verdict whose pack, verdict or note cannot be stored; the message never repeats the note (ADR-034). */
+    @ExceptionHandler(InvalidFeedbackException.class)
+    public ProblemDetail invalidFeedback(InvalidFeedbackException e) {
+        return Problems.of(HttpStatus.BAD_REQUEST, InvalidFeedbackException.CODE, e.getMessage());
+    }
+
+    /** No finding of the calling client at that address: unknown, another client's and expired answer alike (ADR-034). */
+    @ExceptionHandler(FindingNotFoundException.class)
+    public ProblemDetail findingNotFound(FindingNotFoundException e) {
+        return Problems.of(HttpStatus.NOT_FOUND, FindingNotFoundException.CODE, e.getMessage());
     }
 
     /** The period of a report is longer than the deployment allows; the limit and the request are in the members (ADR-018). */

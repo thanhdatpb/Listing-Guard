@@ -4,7 +4,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * What a console account may do in its client (ADR-031, V37). Keep in sync with the {@code ck_account_role} constraint.
+ * What a console account may do in its client (ADR-031, V38). Keep in sync with the {@code ck_account_role} constraint.
  */
 public enum ConsoleRole {
     /** May change the client's shared settings, such as the trademark watchlist. */

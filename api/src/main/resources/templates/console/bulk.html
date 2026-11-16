@@ -8,6 +8,7 @@
     <link rel="stylesheet" th:href="@{/console/console.css}">
     <link rel="stylesheet" th:href="@{/console/bulk.css}">
     <script th:src="@{/console/bulk.js}" defer></script>
+    <th:block th:replace="~{console/layout :: htmx}"></th:block>
 </head>
 <body>
 <div th:replace="~{console/layout :: demoBanner}"></div>
