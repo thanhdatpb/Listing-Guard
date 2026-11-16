@@ -6,6 +6,7 @@ import com.thanhdatpb.listingguard.api.listing.Normalizer;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.trademark.tsdr.TsdrStatusOverlay;
+import com.thanhdatpb.listingguard.api.trademark.judge.TrademarkContextJudge;
 import com.thanhdatpb.listingguard.api.trademark.watchlist.WatchlistService;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.trademark.CanonicalInput;
@@ -58,6 +59,7 @@ public class TrademarkCheckService {
     private final PlanService plans;
     private final TsdrStatusOverlay tsdrStatus;
     private final WatchlistService watchlists;
+    private final TrademarkContextJudge judge;
 
     /** A service whose answers never carry a TSDR status (the overlay is off). */
     public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
@@ -73,10 +75,19 @@ public class TrademarkCheckService {
         this(normalizers, runtime, rulesets, store, transactions, plans, tsdrStatus, null);
     }
 
-    @Autowired
+    /** A service whose answers are never judged by a language model: the checks of before ADR-036. */
     public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
                                  TrademarkRulesets rulesets, TrademarkCheckStore store, TransactionTemplate transactions,
                                  PlanService plans, TsdrStatusOverlay tsdrStatus, WatchlistService watchlists) {
+        this(normalizers, runtime, rulesets, store, transactions, plans, tsdrStatus, watchlists, TrademarkContextJudge.off());
+    }
+
+    @Autowired
+    public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
+                                 TrademarkRulesets rulesets, TrademarkCheckStore store, TransactionTemplate transactions,
+                                 PlanService plans, TsdrStatusOverlay tsdrStatus, WatchlistService watchlists,
+                                 TrademarkContextJudge judge) {
+        this.judge = judge;
         this.watchlists = watchlists;
         this.tsdrStatus = tsdrStatus;
         this.normalizers = normalizers;
@@ -120,7 +131,10 @@ public class TrademarkCheckService {
         // an undeclared product type is the client's mistake: refuse it, never scan as if none had been named
         String productType = productType(requestedProductType);
         WatchlistService.Active watchlist = watchlists == null ? WatchlistService.Active.NONE : watchlists.active(clientId);
-        Map<String, String> watchlistComponents = watchlist.watchlist().fingerprintComponents();
+        // the watchlist and, when the LLM judge is on (ADR-036), its prompt and models are part of the analysis version; with both
+        // absent the map is empty and the fingerprint is the one a check always had
+        Map<String, String> watchlistComponents = new java.util.TreeMap<>(watchlist.watchlist().fingerprintComponents());
+        watchlistComponents.putAll(judge.fingerprintComponents());
         TrademarkScanner scanner;
         String fingerprint;
         Long catalogVersionId;
@@ -152,7 +166,7 @@ public class TrademarkCheckService {
         // a cached answer costs nothing and was returned above; a new result is stored, and a complete one is counted
         // (ADR-013). An INCOMPLETE result is stored for GET and never reused, so the client is not charged for it.
         plans.requireQuota(admission);
-        TrademarkResult result = scanner.scan(input, watchlist.watchlist());
+        TrademarkResult result = judge.judge(input, scanner.scan(input, watchlist.watchlist()), scanner.catalog());
         try {
             return transactions.execute(status -> {
                 if (result.completeness() == Completeness.COMPLETE) {

@@ -19,10 +19,12 @@ import java.util.List;
  * @param falsePositives    of those, FALSE_POSITIVE
  * @param falsePositiveRate {@code falsePositives / verdicts}, or null with no verdict
  * @param topFalsePositives the rules marked FALSE_POSITIVE most often over the eight weeks
+ * @param llm               LLM requests sent today against the daily limit (ADR-036); {@code enabled} is false when the LLM is off
  */
 public record HomeView(LocalDate weekFrom, LocalDate today, boolean empty, long checked, long withError, long trademarkHolds,
                        long holdsCatalog, long holdsRule, long verdicts, long falsePositives, Double falsePositiveRate,
-                       WeeklyChart chart, List<HealthReport.FalsePositiveRuleView> topFalsePositives) {
+                       WeeklyChart chart, List<HealthReport.FalsePositiveRuleView> topFalsePositives,
+                       com.thanhdatpb.listingguard.api.llm.LlmClient.Usage llm) {
 
     /** {@code withError / checked}, or null when nothing was checked. */
     public Double errorRate() {

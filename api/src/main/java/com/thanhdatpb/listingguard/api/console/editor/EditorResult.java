@@ -68,9 +68,13 @@ public record EditorResult(Readiness readiness, Trademark trademark, List<Group<
                            Fix fix, Integer fixId, FeedbackTarget target) {
     }
 
-    /** {@code target} is the address of the stored finding the feedback widget answers (ADR-034). */
+    /**
+     * {@code target} is the address of the stored finding the feedback widget answers (ADR-034). {@code llmReason} is the reason of
+     * a language model that called the word descriptive (ADR-036): an empty text when it gave none, null when the finding has no
+     * LLM label.
+     */
     public record TrademarkItem(String ruleId, String risk, String field, String matchType, String mark, String message,
-                                String suggestion, Evidence evidence, FeedbackTarget target) {
+                                String suggestion, Evidence evidence, FeedbackTarget target, String llmReason) {
     }
 
     /** Every finding of the page that the feedback widget can answer, in the order shown. */

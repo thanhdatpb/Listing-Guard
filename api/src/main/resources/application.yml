@@ -225,6 +225,47 @@ listing-guard:
       min-chars: 200
     search-endpoint:
       enabled: false
+  llm:
+    # Free-tier LLM providers and the trademark context judge (ADR-036, docs/llm.md). Everything is off by default: with enabled=false
+    # no key is read and no request is made. Providers are tried in this order. A provider without a key is skipped.
+    # listing-text-allowed / personal-data-allowed: false until you have read the provider's terms; a call that carries data a
+    # provider may not see never reaches it. The limits are conservative and are settings: read them from each vendor's console.
+    enabled: false
+    cache:
+      max-entries: 2000
+      ttl: 24h
+    judge:
+      enabled: false
+      max-per-check: 8
+      snippet-chars: 160
+      max-output-tokens: 600
+      timeout: 20s
+    providers:
+      - id: groq
+        base-url: https://api.groq.com/openai/v1
+        model: openai/gpt-oss-20b
+        key: ${LISTING_GUARD_LLM_GROQ_KEY:}
+        requests-per-minute: 25
+        requests-per-day: 900
+        listing-text-allowed: ${LISTING_GUARD_LLM_GROQ_LISTING_TEXT_ALLOWED:false}
+        personal-data-allowed: false
+      - id: cloudflare
+        base-url: https://api.cloudflare.com/client/v4/accounts/${LISTING_GUARD_LLM_CLOUDFLARE_ACCOUNT_ID:unset}/ai/v1
+        model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+        key: ${LISTING_GUARD_LLM_CLOUDFLARE_KEY:}
+        requests-per-minute: 20
+        requests-per-day: 200
+        listing-text-allowed: ${LISTING_GUARD_LLM_CLOUDFLARE_LISTING_TEXT_ALLOWED:false}
+        personal-data-allowed: false
+      - id: gemini
+        # free usage may be used by Google to improve its products: keep listing-text-allowed false unless billing is on
+        base-url: https://generativelanguage.googleapis.com/v1beta/openai
+        model: gemini-2.5-flash
+        key: ${LISTING_GUARD_LLM_GEMINI_KEY:}
+        requests-per-minute: 5
+        requests-per-day: 15
+        listing-text-allowed: ${LISTING_GUARD_LLM_GEMINI_LISTING_TEXT_ALLOWED:false}
+        personal-data-allowed: false
   embedding:
     # none (default: no model and no key; rule checks work, policy retrieval is off), api (Google Gemini, ADR-012),
     # ollama (local server) or hashing (tests and the admin job).

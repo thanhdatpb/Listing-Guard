@@ -42,8 +42,11 @@ public class ConsoleHomeService {
     private final HealthReportService reports;
     private final FeedbackStatsQueries feedback;
     private final Clock clock;
+    private final com.thanhdatpb.listingguard.api.llm.LlmClient llm;
 
-    public ConsoleHomeService(HealthReportService reports, FeedbackStatsQueries feedback, Clock clock) {
+    public ConsoleHomeService(HealthReportService reports, FeedbackStatsQueries feedback, Clock clock,
+                              com.thanhdatpb.listingguard.api.llm.LlmClient llm) {
+        this.llm = llm;
         this.reports = reports;
         this.feedback = feedback;
         this.clock = clock;
@@ -83,7 +86,7 @@ public class ConsoleHomeService {
         List<HealthReport.FalsePositiveRuleView> top = report.feedback().topFalsePositiveRules().items().stream().limit(TOP).toList();
         return new HomeView(monday, today, empty, current.listingRules().checks(), errorChecks(current.listingRules()),
                 feedback.trademarkHolds(scope), catalog, rule, verdicts.verdicts(), falsePositives, verdicts.falsePositiveRate(),
-                WeeklyChart.of(weeks), top);
+                WeeklyChart.of(weeks), top, llm.usage());
     }
 
     private static long errorChecks(HealthReport.ListingRulesView view) {

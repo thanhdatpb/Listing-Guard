@@ -12,7 +12,13 @@ public enum AdjustmentReason {
     OUTSIDE_PRODUCT_CLASSES("outside_product_classes"),
 
     /** The mark is a word in the ruleset's {@code generic_words} and the match has no brand context. */
-    COMMON_WORD("common_word");
+    COMMON_WORD("common_word"),
+
+    /**
+     * A language model read the sentence around the match and said the word probably describes the product instead of naming a
+     * brand (ADR-036). Only ever added by {@link LlmJudgement}, which can lower a MEDIUM catalog finding to LOW and does nothing else.
+     */
+    LLM_DESCRIPTIVE("llm_descriptive");
 
     private final String code;
 

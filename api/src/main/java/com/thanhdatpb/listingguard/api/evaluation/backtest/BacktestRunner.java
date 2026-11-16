@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.evaluation.backtest;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.evaluation.EvaluationProperties;
 import com.thanhdatpb.listingguard.api.evaluation.ListingAnalyzer;
+import com.thanhdatpb.listingguard.api.trademark.judge.TrademarkContextJudge;
 import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCatalogRuntime;
 import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
@@ -34,9 +35,11 @@ public class BacktestRunner implements ApplicationRunner {
     private final RuleEngine engine;
     private final ActiveRulesets rulesets;
     private final TrademarkCatalogRuntime trademark;
+    private final TrademarkContextJudge judge;
 
     public BacktestRunner(EvaluationProperties properties, NormalizerRegistry normalizers, RuleEngine engine,
-                          ActiveRulesets rulesets, TrademarkCatalogRuntime trademark) {
+                          ActiveRulesets rulesets, TrademarkCatalogRuntime trademark, TrademarkContextJudge judge) {
+        this.judge = judge;
         this.properties = properties;
         this.normalizers = normalizers;
         this.engine = engine;
@@ -51,7 +54,38 @@ public class BacktestRunner implements ApplicationRunner {
                 properties.backtestOut().resolve(STAMP.format(Instant.now(clock))));
         ListingAnalyzer analyzer = new ListingAnalyzer(normalizers::get, engine, this::ruleset,
                 marketplace -> trademark.serving(marketplace).scanner());
-        new BacktestJob(analyzer, this::ruleset, this::served, System.out, clock).run(options);
+        BacktestJob.Result before = new BacktestJob(analyzer, this::ruleset, this::served, System.out, clock).run(options);
+        if (args.containsOption("llm-judge")) {
+            compareWithJudge(analyzer, options, before, clock);
+        }
+    }
+
+    /**
+     * {@code --llm-judge} (ADR-036 item 11): the same file again with the trademark context judge applied, written to
+     * {@code <out>/llm-judge/}, and one comparison of recall of the claimed rows and of the share of unclaimed rows flagged. It
+     * needs {@code listing-guard.llm.enabled}, {@code listing-guard.llm.judge.enabled} and a provider allowed to see listing text.
+     */
+    private void compareWithJudge(ListingAnalyzer analyzer, BacktestOptions options, BacktestJob.Result before, Clock clock) {
+        if (!judge.active()) {
+            throw new IllegalStateException("--llm-judge needs listing-guard.llm.enabled=true, listing-guard.llm.judge.enabled=true "
+                    + "and a provider with listing-text-allowed=true (docs/llm.md).");
+        }
+        BacktestJob.Result after = new BacktestJob(analyzer.withJudge(judge), this::ruleset, this::served, System.out, clock)
+                .run(options.withOut(options.out().resolve("llm-judge")));
+        String lost = after.caught() < before.caught() ? "RECALL FELL: the judge must stay off by default." : "Recall did not fall.";
+        String text = String.join(System.lineSeparator(), "LLM judge, before and after (ADR-036)",
+                "recall of claimed rows: before " + before.recall().text() + ", after " + after.recall().text(),
+                "claimed rows caught: before " + before.caught() + ", after " + after.caught() + " (lost "
+                        + (before.caught() - after.caught()) + ")",
+                "unclaimed rows flagged: before " + before.unclaimedFlagged().text() + ", after "
+                        + after.unclaimedFlagged().text(),
+                lost, "");
+        System.out.print(text);
+        try {
+            java.nio.file.Files.writeString(options.out().resolve("llm-judge-comparison.txt"), text);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
     }
 
     private RulesetConfig ruleset(String marketplace) {

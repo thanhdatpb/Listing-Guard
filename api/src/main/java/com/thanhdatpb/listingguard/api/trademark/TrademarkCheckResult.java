@@ -233,7 +233,9 @@ public record TrademarkCheckResult(
     public record RiskAdjustmentView(
             @Schema(description = "`outside_product_classes`: the request named a product type and none of the mark's Nice classes is "
                     + "one of the product type's. `common_word`: the mark is an ordinary word of the ruleset's list and the match is "
-                    + "not an exact or phrase match in a brand field.", example = "outside_product_classes") String reason,
+                    + "not an exact or phrase match in a brand field. `llm_descriptive`: a language model read the sentence around "
+                    + "the match and thinks the word describes the product (only when the operator turned the LLM judge on, "
+                    + "ADR-036); the finding is kept and its note starts with the label.", example = "outside_product_classes") String reason,
             @Schema(description = "The level the rule assigned before any adjustment.") RiskLevel from,
             @Schema(description = "The level this reason alone gives; lower than `from`.") RiskLevel to,
             @Schema(description = "Human text, currently Vietnamese.") String note) {

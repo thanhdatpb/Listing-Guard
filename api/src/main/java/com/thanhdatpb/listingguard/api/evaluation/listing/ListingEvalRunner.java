@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.evaluation.listing;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.evaluation.EvaluationProperties;
 import com.thanhdatpb.listingguard.api.evaluation.ListingAnalyzer;
+import com.thanhdatpb.listingguard.api.trademark.judge.TrademarkContextJudge;
 import com.thanhdatpb.listingguard.api.evaluation.listing.ListingEvalBaseline.Regression;
 import com.thanhdatpb.listingguard.api.listing.Normalizer;
 import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
@@ -43,16 +44,18 @@ public class ListingEvalRunner implements ApplicationRunner {
         }
     }
 
-    private static final Set<String> KNOWN = Set.of("update-baseline");
+    private static final Set<String> KNOWN = Set.of("update-baseline", "llm-judge");
 
     private final EvaluationProperties properties;
     private final NormalizerRegistry normalizers;
     private final RuleEngine engine;
     private final ActiveRulesets rulesets;
     private final TrademarkRulesets trademarkRulesets;
+    private final TrademarkContextJudge judge;
 
     public ListingEvalRunner(EvaluationProperties properties, NormalizerRegistry normalizers, RuleEngine engine,
-                             ActiveRulesets rulesets, TrademarkRulesets trademarkRulesets) {
+                             ActiveRulesets rulesets, TrademarkRulesets trademarkRulesets, TrademarkContextJudge judge) {
+        this.judge = judge;
         this.properties = properties;
         this.normalizers = normalizers;
         this.engine = engine;
@@ -64,7 +67,7 @@ public class ListingEvalRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         for (String name : args.getOptionNames()) {
             if (!name.contains(".") && !KNOWN.contains(name)) {
-                throw new IllegalArgumentException("Unknown option --" + name + ". Usage: [--update-baseline]");
+                throw new IllegalArgumentException("Unknown option --" + name + ". Usage: [--update-baseline] [--llm-judge]");
             }
         }
         boolean update = args.containsOption("update-baseline");
@@ -73,10 +76,32 @@ public class ListingEvalRunner implements ApplicationRunner {
                 marketplace -> rulesets.get(RulesetConfig.DEFAULT_PACK_ID, marketplace).config(), trademarkRulesets.ruleset(),
                 dir.resolve("out"), update);
         print(outcome, dir, System.out);
+        if (args.containsOption("llm-judge")) {
+            compareWithJudge(dir, outcome);
+        }
         if (outcome.failed()) {
             throw new IllegalStateException("eval-listing: the gate failed; see " + dir.resolve("out").resolve(
                     ListingEvalReport.MARKDOWN_FILE));
         }
+    }
+
+    /**
+     * {@code --llm-judge} (ADR-036 item 11): the sample set again with the trademark context judge, written to
+     * {@code <out>/llm-judge/}, and the agreement with the labelled trademark level before and after. The sample set is scanned with
+     * the fictional DEMO catalog, so this proves the step works on labelled cases; the false-alarm and recall figures of real marks
+     * come from the backtest.
+     */
+    private void compareWithJudge(Path dir, Outcome before) {
+        if (!judge.active()) {
+            throw new IllegalStateException("--llm-judge needs listing-guard.llm.enabled=true, listing-guard.llm.judge.enabled=true "
+                    + "and a provider with listing-text-allowed=true (docs/llm.md).");
+        }
+        Outcome after = evaluate(dir, Path.of(properties.demoCatalogDir()), normalizers::get, engine,
+                marketplace -> rulesets.get(RulesetConfig.DEFAULT_PACK_ID, marketplace).config(), trademarkRulesets.ruleset(),
+                dir.resolve("out").resolve("llm-judge"), false, judge);
+        System.out.println("eval-listing with the LLM judge: cases as labelled " + before.result().casesPassed() + " -> "
+                + after.result().casesPassed() + " of " + after.result().cases() + "; trademark level agreement "
+                + before.result().trademarkRiskAgreement().text() + " -> " + after.result().trademarkRiskAgreement().text() + ".");
     }
 
     /**
@@ -86,8 +111,19 @@ public class ListingEvalRunner implements ApplicationRunner {
     public static Outcome evaluate(Path listingDir, Path demoCatalogDir, Function<String, Normalizer> normalizers,
                                    RuleEngine engine, Function<String, RulesetConfig> rulesets,
                                    TrademarkRuleset trademarkRuleset, Path outDir, boolean updateBaseline) {
+        return evaluate(listingDir, demoCatalogDir, normalizers, engine, rulesets, trademarkRuleset, outDir, updateBaseline, null);
+    }
+
+    /** The same with a trademark context judge (ADR-036) applied to every scan; null is the evaluation as it always was. */
+    public static Outcome evaluate(Path listingDir, Path demoCatalogDir, Function<String, Normalizer> normalizers,
+                                   RuleEngine engine, Function<String, RulesetConfig> rulesets,
+                                   TrademarkRuleset trademarkRuleset, Path outDir, boolean updateBaseline,
+                                   TrademarkContextJudge judge) {
         TrademarkScanner scanner = DemoCatalogScanner.load(trademarkRuleset, demoCatalogDir);
         ListingAnalyzer analyzer = new ListingAnalyzer(normalizers, engine, rulesets, marketplace -> scanner);
+        if (judge != null) {
+            analyzer = analyzer.withJudge(judge);
+        }
         ListingEvaluator.Result result = new ListingEvaluator(analyzer, rulesets, scanner)
                 .evaluate(ListingEvalCase.loadAll(listingDir.resolve("cases")));
         Path baselineFile = listingDir.resolve(ListingEvalBaseline.FILE);

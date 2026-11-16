@@ -4,6 +4,7 @@ import com.thanhdatpb.listingguard.api.batch.BatchConfigException;
 import com.thanhdatpb.listingguard.api.batch.BatchCsvReader;
 import com.thanhdatpb.listingguard.api.batch.BatchMapping;
 import com.thanhdatpb.listingguard.api.evaluation.ListingAnalyzer;
+import com.thanhdatpb.listingguard.api.evaluation.Rate;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,7 +44,7 @@ public final class BacktestJob {
     }
 
     /** What a finished run reports to its caller. */
-    public record Result(int rows, int claimed, int caught, int missed, Path reportDir) {
+    public record Result(int rows, int claimed, int caught, int missed, Path reportDir, Rate recall, Rate unclaimedFlagged) {
     }
 
     private final ListingAnalyzer analyzer;
@@ -137,7 +138,8 @@ public final class BacktestJob {
             throw new IllegalStateException("The backtest stopped after line " + lastLine + ": " + abortReason
                     + ". The report in " + options.out() + " covers the rows before it and says so.");
         }
-        return new Result(written.rows().total(), claimed.total(), claimed.caught(), claimed.missed(), options.out());
+        return new Result(written.rows().total(), claimed.total(), claimed.caught(), claimed.missed(), options.out(), claimed.recall(),
+                written.unclaimed().flaggedShare());
     }
 
     private BacktestRow assess(BatchCsvReader.Row row, BatchMapping.Bound bound, BacktestLabels labels, String marketplace,
