@@ -1476,6 +1476,33 @@ and keep its `report.json`: that is the record that outlives the retention (see 
 The same numbers are in the console (`/console/report`, when the operator turns the console on) and in the `health-report` job, from
 the same service, so the three always agree.
 
+**`feedback`** (ADR-034) counts the verdicts given in the period on the client's findings (by when each was last given): `verdicts`,
+`byVerdict` (`CORRECT`, `FALSE_POSITIVE`, `NOT_USEFUL`, always present), `falsePositiveRate` (null without verdicts) and
+`topFalsePositiveRules` (pack, rule id, false positives, verdicts, rate; limit `listing-guard.reports.top-rules`). It is for the whole
+period only, not per week, and holds no note.
+
+## Finding feedback
+
+Tell Listing Guard whether a finding was right (ADR-034, [feedback.md](feedback.md)). Nothing about the result or the rules changes; the
+verdicts are counted for the client and for whoever tunes the rules. Both endpoints need no plan pack and cost no unit of the quota.
+
+`POST /api/v1/feedback` with `{"pack", "checkId", "findingIndex", "verdict", "note"}`:
+
+- `pack` is `listing-rules`, `trademark-risk` or `variation-checks`; `checkId` is the result's id and `findingIndex` the finding's index
+  in that result's `findings`, in the order `GET` of that pack returns them. No response carries a separate finding id.
+- `verdict` is `CORRECT`, `FALSE_POSITIVE` or `NOT_USEFUL`; `note` is optional, at most 280 characters, blank is none. Do not put listing
+  text in it.
+- The reviewer is the API key that sends it: one verdict per key per finding, and sending again replaces it (`created` is `false`). Give
+  each person of your team their own key if you want their verdicts apart.
+- `200` answers the stored verdict with what was copied of the finding (`ruleId`, `source`, `level`, `analysisVersion`). `400
+  invalid-feedback` for a pack, verdict or note that cannot be stored; `404 finding-not-found` for another client's result, an unknown
+  one, a trademark or variation result past its retention, or an index outside the result.
+
+`GET /api/v1/feedback/stats?from=&to=[&marketplace=]` takes the period of the health report (same limits and problems) and answers
+`totals`, `byRule` (findings of the rule in the results created in the period, verdicts given in the period per verdict, and
+`falsePositiveRate`, null without verdicts) and `byReviewer` (`kind` `ACCOUNT` or `API_KEY` and its `id`, never an e-mail). A rate is
+what reviewers reported, not a measured precision. The MCP server has no tool for either endpoint.
+
 ## Errors
 
 Errors are `application/problem+json` (RFC 7807) with these members: `type` (`urn:listing-guard:problem:<code>`),
