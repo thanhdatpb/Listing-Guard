@@ -84,7 +84,7 @@
             <h2 id="rules-heading" class="lg-section-title lg-section" th:text="#{stats.byrule.heading}"></h2>
             <div class="lg-empty" th:if="${stats.byRule.isEmpty()}"><p class="lg-empty__text" th:text="#{stats.byrule.none}"></p></div>
             <div class="lg-table-wrap" th:unless="${stats.byRule.isEmpty()}">
-                <table class="lg-table lg-table--scroll" id="stats-rule-table">
+                <table class="lg-table lg-table--scroll lg-table--dense" id="stats-rule-table">
                     <caption class="lg-sr-only" th:text="#{stats.byrule.heading}"></caption>
                     <thead>
                     <tr>

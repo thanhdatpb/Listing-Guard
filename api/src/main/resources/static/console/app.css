@@ -753,3 +753,4 @@ button.lg-switch:focus-visible { outline: 2px solid var(--brand); outline-offset
 .lg-kv + .lg-counts { margin-top: var(--space-4); }
 /* A table with many columns: the sides of a cell are narrower, so the page does not scroll for ten columns. */
 .lg-table--dense th, .lg-table--dense td { padding-left: var(--space-3); padding-right: var(--space-3); }
+.lg-table--dense td.lg-main { min-width: 12rem; }

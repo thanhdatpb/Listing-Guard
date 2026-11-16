@@ -19,7 +19,7 @@
 .lg-bulk__after { margin-top: var(--space-4); }
 
 /* the title of the listing, one line, only in this answer; a narrow screen has no room for it */
-.lg-table td.lg-col-title { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
+.lg-table td.lg-col-title { max-width: 15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
 @media (max-width: 860px) {
   .lg-col-title { display: none; }
 }
