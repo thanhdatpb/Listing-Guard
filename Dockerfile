@@ -16,11 +16,26 @@ COPY client client
 COPY api api
 COPY mcp-server mcp-server
 COPY contract-tools contract-tools
+COPY hf-convert hf-convert
 # The release version the API sends as X-Listing-Guard-Version (ADR-022); the release workflow passes the tag without its v.
 ARG LISTING_GUARD_RELEASE=dev
 RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw -B -q -DskipTests -Dlisting-guard.release=${LISTING_GUARD_RELEASE} -pl api -am package
 
+# The hf-convert job (ADR-030): its own jar and image, so DuckDB never reaches the API image. Built only with
+# `--target hf-convert` (the compose services hf-convert do that); a plain build stops at the API image below.
+FROM build AS hf-convert-build
+RUN --mount=type=cache,target=/root/.m2 \
+    ./mvnw -B -q -DskipTests -pl hf-convert -am package
+
+FROM --platform=$TARGETPLATFORM eclipse-temurin:25-jre AS hf-convert
+RUN useradd --system --uid 10001 --no-create-home app
+WORKDIR /app
+COPY --from=hf-convert-build /workspace/hf-convert/target/listing-guard-hf-convert.jar hf-convert.jar
+USER app
+ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "/app/hf-convert.jar"]
+
+# The API image: the last stage, so the default target.
 FROM --platform=$TARGETPLATFORM eclipse-temurin:25-jre
 RUN apt-get update \
     && apt-get upgrade -y \

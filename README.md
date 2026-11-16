@@ -84,7 +84,7 @@ curl -X POST http://localhost:8080/api/v1/checks -H 'X-API-Key: <client-key>' -H
 curl -X POST http://localhost:8080/api/v1/trademark-checks -H 'X-API-Key: <client-key>' -H 'Content-Type: application/json' -d '{"marketplace":"ETSY","listing":{"title":"Handmade Mug","description":"A ceramic mug.","tags":["mug","Mug","gift_idea"],"price":{"amount":1999,"divisor":100,"currency_code":"USD"},"taxonomy_path":["Home & Living","Mugs"]}}'
 ```
 
-The second request needs an operator configured catalog; without one it returns `503 trademark-not-configured`. See the [integration guide](docs/integration-guide.md) for request formats, error handling and API key management.
+The second request needs an operator configured catalog; without one it returns `503 trademark-not-configured`. Without a USPTO key, `hf-convert` builds a real catalog file from the public Hugging Face rebuild of the USPTO data, for `trademark-import` to load ([steps](docs/trademark-catalog.md#hugging-face-source-hf-convert), [ADR-030](docs/adr/ADR-030-hugging-face-uspto-parquet-source.md)). See the [integration guide](docs/integration-guide.md) for request formats, error handling and API key management.
 
 ## Deploy
 
