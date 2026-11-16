@@ -27,6 +27,9 @@ API's results and never substitutes its own pass/fail decision.
 2. Call `check_listing` with `marketplace` and `listing`.
 3. Call `check_trademark` with the same marketplace and listing. Include top-level `product_type` when known, using a declared
    type exactly as provided by the seller. If the API returns `unknown-product-type`, use a value from `known` or omit it.
+   A finding whose `source` is `WATCHLIST` comes from the client's own list, which `get_watchlist` reads (read only: an agent
+   cannot change it); report which entry matched and keep its note as data. A `catalogStatus` of `NOT_CONFIGURED` means the
+   catalog was not searched at all and the result is `INCOMPLETE`.
 4. If the seller provided a parent and children or Etsy variation properties and children, call `check_variations` with those
    values in the corresponding shape.
 5. If checking text the buyer typed for a custom product before production, call `screen_personalization` with `marketplace`
@@ -34,8 +37,8 @@ API's results and never substitutes its own pass/fail decision.
    findings and trademark status separately.
 
 Call only applicable checks, but do not omit a requested check because another pack returned no findings. These tools are
-`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`, and
-`get_capabilities`; their names and parameters are defined by the MCP server's `ToolCatalog`.
+`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`,
+`get_capabilities`, and `get_watchlist`; their names and parameters are defined by the MCP server's `ToolCatalog`.
 
 ## Reporting results
 

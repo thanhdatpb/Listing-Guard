@@ -47,7 +47,7 @@ Rule sources stay labeled as they are in the rulesets; no unverified limit is pr
 
 ## Use it from AI agents
 
-![A user asks an AI agent to use a planned Agent Skill and the MCP server, which checks listings without editing or publishing; its exact seven tools call the Java client SDK and Listing Guard API, while compatibility and evaluation support blocks are shown below.](docs/images/agent-integration.svg)
+![A user asks an AI agent to use a planned Agent Skill and the MCP server, which checks listings without editing or publishing; its exact eight tools call the Java client SDK and Listing Guard API, while compatibility and evaluation support blocks are shown below.](docs/images/agent-integration.svg)
 
 Build the MCP jar and configure a client key and API URL. STDIO is the default transport; its HTTP transport has no authentication and must stay on loopback or a private network.
 
@@ -58,7 +58,7 @@ export LISTING_GUARD_MCP_BASE_URL='https://listing-api.example.com'
 java -jar mcp-server/target/listing-guard-mcp.jar
 ```
 
-The seven tools are `check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage` and `get_capabilities`. Listing access is read-only: check calls can store API results and may use quota, but no tool edits or publishes a listing. Successful API responses are passed through unchanged; the model does not decide what a finding means. See the [MCP guide](docs/mcp.md).
+The eight tools are `check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`, `get_capabilities` and `get_watchlist`. Listing access is read-only: check calls can store API results and may use quota, but no tool edits or publishes a listing. Successful API responses are passed through unchanged; the model does not decide what a finding means. See the [MCP guide](docs/mcp.md).
 
 ## Ecosystem
 

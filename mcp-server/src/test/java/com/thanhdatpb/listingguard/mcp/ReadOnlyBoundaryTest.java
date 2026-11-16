@@ -28,7 +28,7 @@ class ReadOnlyBoundaryTest {
     }
 
     @Test
-    void theClientCanOnlyIssueGetAndPostToTheSevenApiPaths() {
+    void theServerCanOnlyIssueGetAndPostToTheEightApiPaths() {
         assertThat(Arrays.stream(Endpoint.values()).map(Endpoint::method).collect(Collectors.toSet()))
                 .isSubsetOf("GET", "POST");
         assertThat(Arrays.stream(Endpoint.values()).map(Endpoint::path)).containsExactlyInAnyOrder(
@@ -38,7 +38,8 @@ class ReadOnlyBoundaryTest {
                 "/api/v1/personalization-screenings",
                 "/api/v1/rulesets/{marketplace}/limits",
                 "/api/v1/usage",
-                "/api/v1/capabilities");
+                "/api/v1/capabilities",
+                "/api/v1/trademark-watchlist");
     }
 
     @Test
