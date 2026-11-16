@@ -91,6 +91,26 @@ It never edits a listing, never publishes, and does no SEO.
   (`reason`, `from` = the rule's original level, `to`, `note`) and the finding's `risk` is the lowest `to`; links and adjustments
   are stored (V28, JSONB) with `trademark_check.product_type`. Input hash `trademark-input/v2`, `matcher-2`. Personalization is
   unchanged (`TrademarkRulesetUnchangedTest`). The MCP `check_trademark` tool takes no `product_type` yet.
+- **Hugging Face USPTO source** (`hf-convert/`, ADR-030, Proposed; implemented): a one-shot job of its own (plain Java `main`, no
+  Spring, no database) that converts the Parquet dataset `illeatmyhat/uspto-trademarks` (a third party's rebuild of the USPTO bulk
+  XML, card `us-government-work`) to one `jsonl-1` file for the unchanged `trademark-import`. **DuckDB JDBC 1.5.6.0 is in this
+  module only**: shaded jar `hf-convert/target/listing-guard-hf-convert.jar`, Dockerfile target `hf-convert` (the API image stays the
+  last, default stage), compose service `hf-convert` in `tools` of both files, built from the checkout (`mem_limit` 3g, `-Xmx512m`,
+  DuckDB `memory_limit` 2GB via `HF_CONVERT_MEMORY_LIMIT`; 1GB was measured to fail). Input `catalogs/raw/<folder>/` laid out like the
+  repository (`data/case_file/*.parquet`, `data/intl_class/*.parquet`, `profile/build_lineage.json`, `lookups/status_codes.csv`), or
+  `hf://datasets/<owner>/<name>[@rev]` only with `HF_CONVERT_ALLOW_NETWORK=true`; with it off a URL is refused before DuckDB opens and
+  DuckDB runs with auto-install/auto-load off, `allowed_directories` = input + temp, `enable_external_access=false`, configuration
+  locked (a test holds it). Columns read: `serial_no`, `mark_id_char`, `status_cd`, `mark_draw_cd`, `registration_dt`, `filing_dt`,
+  `file_dt_source`, `file_name_source` (`case_file`) and `intl_class_cd` (`intl_class`). The repository ships files of two builds side
+  by side, so the latest row of a serial number wins by (`file_dt_source`, `file_name_source`); different rows with the same latest
+  lineage are `conflicting_duplicate` (64-bit `hash`); classes come only from `intl_class` rows of the winning lineage. Filters
+  `hf/hf-convert-filters-2026-11.yaml` (immutable, every value `unverified`): Live/Registered codes + 717 as REGISTERED, Live/Pending
+  as PENDING (checked against the input's lookup when present), classes 14, 16, 18, 20, 21, 24, 25, 28, `text_only`, `min_mark_chars`
+  2 after the ruleset's normalization, `min_year` null (`--min-year` per run). Output sorted by serial number, `source_id` = serial
+  number (manifest entry printed with `source_key: uspto`), `<output>.report.json` (`listing-guard/hf-convert-report/v1`; counts by
+  reason, build lineage, file SHA-256, `source_*` keys; no mark or serial number). `INCOMPLETE` (still written) for a missing lineage
+  or lookup, a count that differs from the lineage, a record error or a filter code the lookup does not call live; `--strict` stops.
+  Measured: 1,224,122 marks from build 2026-10-31, 104 MB, about a minute, 2.1 GB; import 1,040,779 entries, about 5 minutes, 292 MB.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`, `FixSuggestion`). No Spring.
 - **Image checker core** (`image-checker/`, ADR-008, Proposed): Java-only ImageIO module, independent image input and canonical byte/metadata hash, immutable Amazon/Etsy `image-compliance` rulesets, runtime-aware analysis fingerprint, EXIF orientation, embedded ICC-to-sRGB conversion, alpha compositing on white, dimensions/aspect ratio, image count, Amazon main-image edge whiteness, occupancy and Laplacian variance. No Spring, database, HTTP or original-image persistence. Both shipped marketplace rulesets keep policy thresholds null until the maintainer reviews saved official sources; affected checks return `INCOMPLETE`. Every shipped source is `unverified`, and findings are only WARNING/INFO. The CUSTOMER_CONTENT rule reads the caller-declared source only; there is no text/logo/watermark detection.
 - **Image checks endpoint** (`api/.../image/`, ADR-008, Proposed; implemented, off by default): `POST /api/v1/image-checks` (multipart:
@@ -359,7 +379,7 @@ It never edits a listing, never publishes, and does no SEO.
   (`trademark.disclaimer.note`).
 - Current scope: Etsy and Amazon rule engines, the image checker (ADR-008: the core and the endpoint, off by default and without the bounded decode service), the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, the console bulk check (ADR-029), policy ingest + retrieval, and the optional console (magic-link by default, or Cloudflare Access per ADR-027) with a plan/usage
+  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, the `hf-convert` job (ADR-030), the console bulk check (ADR-029), policy ingest + retrieval, and the optional console (magic-link by default, or Cloudflare Access per ADR-027) with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12c.yaml`): simple input format (`title`, `brand`,
@@ -465,6 +485,10 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     that needs a background run, variation attributes for adapter files, a mapping shared by the members of a client, a decimal
     comma). Not planned: storing a pasted table or its result, applying a fix, writing to a Sheet or a marketplace, a console page for
     images, personalization or the health report in bulk.
+17. Hugging Face USPTO source (ADR-030, Proposed): done as one PR (`feature/hf-trademark-import`: ADR, `hf-convert/` module, filters
+    YAML, Dockerfile target and compose services, tests, measurements, docs). Open questions the maintainer decides are at the end of
+    the ADR (the dataset's terms, 717 and the codes the 2005 table counted as live, classes 9 and 26, a pinned revision, DuckDB 2.0).
+    Next: import it on the A1 and measure a trademark check against a catalog of a million entries, then A4 evaluation on it.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
@@ -487,7 +511,8 @@ without it.
 
 ```bash
 ./mvnw -B verify                 # build + all tests (needs Docker for Testcontainers)
-./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening,image-checker,client,mcp-server,contract-tools verify   # fast: no Docker needed
+./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening,image-checker,client,mcp-server,contract-tools,hf-convert verify   # fast: no Docker needed
+./mvnw -B -pl hf-convert -am package # -> hf-convert/target/listing-guard-hf-convert.jar (ADR-030; DuckDB only here)
 ./mvnw -B -pl contract-tools verify # API compatibility check against the latest release (ADR-022); report in contract-tools/target/contract/
 ./mvnw -B -pl mcp-server -am package # -> mcp-server/target/listing-guard-mcp.jar (the MCP server, with the SDK; see docs/mcp.md)
 ./mvnw -B -pl client -Prelease package -DskipTests # the SDK jar with its sources and Javadoc jars (client/README.md)
@@ -501,6 +526,7 @@ Policy corpus (see README "Policy corpus and retrieval"):
 ```bash
 # optional: needs a provider, default is `none` and then both jobs fail at once (ADR-012).
 # EMBEDDING_PROVIDER=api + LISTING_GUARD_EMBEDDING_API_KEY in .env (Google Gemini), or EMBEDDING_PROVIDER=ollama
+docker compose --profile tools run --rm --build hf-convert --input=hf --output=<name>.jsonl [--min-year=2015] [--strict]   # catalogs/raw/hf/ (Hugging Face Parquet, ADR-030) -> catalogs/raw/<name>.jsonl + report + manifest entry (no database; no network unless HF_CONVERT_ALLOW_NETWORK=true)
 docker compose run --rm uspto-convert --input-dir=uspto --output=<name>.jsonl [--strict]   # catalogs/raw/uspto/*.xml (or --input=uspto/<file.xml> once per file) -> latest record per serial number, filtered -> catalogs/raw/<name>.jsonl + report (profile `uspto-convert`; no network, no model)
 docker compose run --rm trademark-import --catalog=<label>           # catalogs/ -> trademark_entry (profile `trademark-import`; no network, no model)
 docker compose run --rm ingest                                       # policies/ -> pgvector (profile `ingest`)
@@ -629,7 +655,7 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   retention cleanup (trademark, variation and personalization results, ADR-010, ADR-015, ADR-016): no other kind of query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
 - Ingest, eval, admin, trademark-import, batch-check, health-report, policy-diff and tsdr-status are one-shot jobs (profiles
   `ingest`, `eval-retrieval`, `admin`, `trademark-import`, `batch-check`, `health-report`, `policy-diff`, `tsdr-status`), not
-  HTTP endpoints.
+  HTTP endpoints. `hf-convert` (ADR-030) is one-shot too, but a jar and image of its own, not a Spring profile.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
   with the default `none`, `admin` does not (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
@@ -658,6 +684,14 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   service-token settings in the MCP server (`docs/deploy-readiness.md` section 7). `cloudflared` is pinned in
   `docker-compose.prod.cloudflared.yml` with its source in a comment; update it from the releases page, never to `latest`.
   `docs/releases/unreleased.md` is a stub for the changes after it. After a tag the maintainer moves the ADR-022 baseline.
+- **Hugging Face source** (ADR-030): DuckDB stays in `hf-convert` (never a dependency of `api` or any module the API image
+  builds) and the API image stays the Dockerfile's last stage. Never read a column whose name you did not see in the dataset's own
+  files (`profile/null_rates.csv` lists them); a new column or a new dataset needs that first. The filters file is immutable and
+  `unverified`; a change is a new file and version. The network stays off unless the flag allows it: keep the URL refusal before
+  DuckDB opens and the DuckDB lockdown (`enable_external_access=false`, `allowed_directories`, extensions off, configuration locked)
+  and their test. Keep the output sorted and reproducible, never hold mark text for dropped serial numbers (the first version that
+  did spilled more than 3 GB), and keep `distinctSerials == written + errors + dead + filtered`. Tests build Parquet with DuckDB
+  `COPY ... TO` from invented marks and serial numbers; never commit the dataset or a part of it (`catalogs/raw/` is git-ignored).
 - **TSDR status check** (ADR-009 "TSDR status check"): the job only proposes. It never writes a catalog table, activates a
   version, edits a finding or removes a mark, and `tsdr_status` is append-only (a trigger). The key comes only from
   `LISTING_GUARD_TSDR_API_KEY`, goes only in its header to the `base-url` host, and never into a log, a message, the database, a

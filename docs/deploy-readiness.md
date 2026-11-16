@@ -112,6 +112,7 @@ Run with `docker compose -f docker-compose.prod.yml --profile prod --profile <pr
 | `batch-check` / `tools` | on demand | `LISTING_GUARD_PLANS_ENABLED`, `LISTING_GUARD_FIXES_ENABLED` (same as the API) | a CSV and a mapping you supply | real |
 | `trademark-import` / `tools` | on demand | `catalogs/manifest.yaml` | files you supply and whose terms you checked | mechanics real; **no data ships** |
 | `uspto-convert` / `tools` | on demand | `USPTO_*` | USPTO daily XML you download | **unverified against real data** |
+| `hf-convert` / `tools` (ADR-030) | on demand; **built from the checkout** (`--build`, Dockerfile target `hf-convert`), no release image | `HF_CONVERT_*`, `HF_FILTERS`; network off (`HF_CONVERT_ALLOW_NETWORK`) | the Hugging Face Parquet files you download into `catalogs/raw/hf/`; no database | real: run on the build of 2026-10-31 (1,224,122 marks, `COMPLETE`); the source is a third-party rebuild whose terms you check |
 | `uspto-sync` / `uspto-sync` | on demand; cron line **commented** | `USPTO_SYNC_DOWNLOAD_ENABLED` (off), `LISTING_GUARD_USPTO_ODP_API_KEY`, `USPTO_SYNC_LICENSE` (required) | USPTO files; for the download an ODP key | offline mode only; the ODP download is **unverified**, no key yet |
 | `tsdr-status` / `tsdr-status` | on demand; cron line **commented** | `TSDR_DOWNLOAD_ENABLED` (off), `LISTING_GUARD_TSDR_API_KEY` | a served catalog; for calls a TSDR key | offline mode only; key header and field names **unverified**, no key yet |
 | `policy-diff` / `policy-diff` | on demand; cron line **commented** | `POLICY_MONITOR_*` | policy files you saved under `policies/raw/` | real mechanics; needs your files |
@@ -148,7 +149,7 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 
 | Group | Variables |
 |---|---|
-| Resources | `API_MEM_LIMIT` 2g, `JAVA_TOOL_OPTIONS` `-XX:MaxRAMPercentage=75.0`, `POSTGRES_MEM_LIMIT` 4g, `POSTGRES_SHARED_BUFFERS` 2GB, `POSTGRES_WORK_MEM` 16MB, `POSTGRES_MAX_CONNECTIONS` 50; jobs: `JOB_MEM_LIMIT` 1g, `JOB_JAVA_TOOL_OPTIONS` 70 %, `USPTO_CONVERT_MEM_LIMIT` 3g, `USPTO_SYNC_MEM_LIMIT` 3g, `TSDR_STATUS_MEM_LIMIT` 1g, and a `*_JAVA_TOOL_OPTIONS` for convert, sync and tsdr |
+| Resources | `API_MEM_LIMIT` 2g, `JAVA_TOOL_OPTIONS` `-XX:MaxRAMPercentage=75.0`, `POSTGRES_MEM_LIMIT` 4g, `POSTGRES_SHARED_BUFFERS` 2GB, `POSTGRES_WORK_MEM` 16MB, `POSTGRES_MAX_CONNECTIONS` 50; jobs: `JOB_MEM_LIMIT` 1g, `JOB_JAVA_TOOL_OPTIONS` 70 %, `USPTO_CONVERT_MEM_LIMIT` 3g, `USPTO_SYNC_MEM_LIMIT` 3g, `TSDR_STATUS_MEM_LIMIT` 1g, and a `*_JAVA_TOOL_OPTIONS` for convert, sync and tsdr; `hf-convert`: `HF_CONVERT_MEM_LIMIT` 3g, `HF_CONVERT_MEMORY_LIMIT` 2GB (DuckDB), `HF_CONVERT_THREADS` 2, `HF_CONVERT_JAVA_TOOL_OPTIONS` `-Xmx512m` |
 | Backups (read by the scripts from `.env`, not by Compose) | `BACKUP_RETENTION_COUNT` 14; with R2: `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`, `BACKUP_S3_REGION`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` (secrets), `BACKUP_S3_PREFIX`, `BACKUP_S3_SESSION_TOKEN`; the Sunday cron line sets `BACKUP_S3_TIER=weekly` itself |
 | Trademark | `TRADEMARK_CATALOG_VERSION` (empty), `TRADEMARK_FOLLOW_ACTIVATION` false (the two exclude each other), `USPTO_SYNC_LICENSE` (required before `uspto-sync` runs), `USPTO_SYNC_KEEP_VERSIONS` 3, `USPTO_SYNC_DOWNLOAD_ENABLED` false, `LISTING_GUARD_USPTO_ODP_API_KEY` (secret), `USPTO_MAX_DISTINCT_SERIALS`, `USPTO_FILTERS`, `USPTO_STRICT`, `USPTO_ALLOW_OTHER_VERSION`, `USPTO_SYNC_WARN_FREE_GB` 30, `USPTO_SYNC_MIN_FREE_GB` 15, `USPTO_SYNC_LOG_RETENTION` 30 |
 | TSDR | `TSDR_DOWNLOAD_ENABLED` false, `LISTING_GUARD_TSDR_API_KEY` (secret), `TSDR_MAX_MARKS` 100, `TSDR_UNMATCHED_PER_RUN` 0, `TSDR_RECHECK_INTERVAL` 30d, `TSDR_FINDING_STATUS_ENABLED` false, `TSDR_STATUS_LOG_RETENTION` 30 |
@@ -201,7 +202,8 @@ without notice (ADR-019): check the console before you rely on them.
 | `uspto-sync` | 3 GB | peak not measured | heap 75 % of the cap; it also loads PostgreSQL |
 | `uspto-convert` | 3 GB (new) | holds one number per serial number, about 17 to 34 bytes each | `USPTO_MAX_DISTINCT_SERIALS` 20 million in the sync |
 | `tsdr-status` | 1 GB | small | |
-| `admin`, `batch-check`, `health-report`, `policy-diff`, `trademark-import` | 1 GB each (new), heap 70 % | a few hundred MB at most (not measured on real data) | |
+| `hf-convert` (ADR-030) | 3 GB | **measured on a dev machine:** 1.95 GiB in its container (DuckDB `memory_limit` 2GB + `-Xmx512m`), about 1 to 3 minutes | no database; 1500MB also works, 1GB does not; or run it elsewhere and copy the 104 MB `.jsonl` |
+| `admin`, `batch-check`, `health-report`, `policy-diff`, `trademark-import` | 1 GB each (new), heap 70 % | a few hundred MB at most; `trademark-import` of the Hugging Face catalog (1.22 million records) peaked at 517 MB with `-Xmx768m` on a dev machine, about 5 minutes (ADR-030) | the imported catalog took 292 MB of database per version |
 
 Worst cases on 12 GB: API 2 + PostgreSQL 4 + `uspto-sync` 3 + OS 1 = **10 GB**, about 11 GB with a second job. That fits, but not
 with room to spare. **Run one heavy job at a time**; the sample crontab keeps them apart (backup 02:15, health report Monday

@@ -1,14 +1,43 @@
 # Unreleased changes
 
 Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: the console in English and Vietnamese
-(ADR-028) and the console bulk check (ADR-029). They change no API response, request, status or header; the bulk check adds one
-additive migration, V36 (see its section).
+(ADR-028), the console bulk check (ADR-029) and the `hf-convert` job (ADR-030). They change no API response, request, status or
+header; the bulk check adds one additive migration, V36 (see its section).
 
 Every pull request that changes the API runs the compatibility check (`./mvnw -B -pl contract-tools verify`, ADR-022) and copies the
 additive and non-breaking lines of `contract-tools/target/contract/compatibility-report.md` here, with a short section for the
 change. When the next version is cut, move this file to `docs/releases/v<version>.md` and start a new one.
 
 ## What is new
+
+### A trademark catalog from the Hugging Face USPTO rebuild: `hf-convert` (ADR-030)
+
+A new one-shot job converts the public Parquet dataset
+[`illeatmyhat/uspto-trademarks`](https://huggingface.co/datasets/illeatmyhat/uspto-trademarks) to a `jsonl-1` file that the
+unchanged `trademark-import` loads. That dataset is a third party's rebuild of the USPTO bulk XML; its card says the data is a US
+government work, in the public domain. The job gives a real catalog without the USPTO key that the ID.me check still blocks.
+Steps: [trademark-catalog.md, "Hugging Face source"](../trademark-catalog.md#hugging-face-source-hf-convert).
+
+- **Its own module and image.** `hf-convert/` is plain Java with DuckDB JDBC 1.5.6.0. It builds the jar
+  `listing-guard-hf-convert.jar` and the Dockerfile target `hf-convert`. DuckDB is never on the API's classpath or in the release
+  image. The Compose service `hf-convert` (profile `tools`, 3 GB, DuckDB 2GB) is built from the checkout in both Compose files.
+- **No network by default.** It reads `catalogs/raw/hf/`. DuckDB is locked to that folder and its temporary folder, with no external
+  access and no extension download. `hf://datasets/...` is read only with `HF_CONVERT_ALLOW_NETWORK=true`.
+- **Filters** come from `hf/hf-convert-filters-2026-11.yaml`, where every value is `unverified`:
+  - the live status codes of the dataset's own lookup;
+  - the Nice classes 14, 16, 18, 20, 21, 24, 25 and 28;
+  - marks with words only, at least two letters or digits;
+  - optional `--min-year`.
+
+  The latest row of a serial number wins: the dataset currently ships files of two builds side by side.
+- **Output and report.** The output is sorted `jsonl-1` with `source_id` = serial number, so the stored ids are `uspto:<serial>`.
+  Next to it, `.report.json` holds the counts by reason, the build, the files' SHA-256 and the manifest keys. The job also prints
+  the `sha256` and a manifest entry.
+- **Measured on the dev machine** (build data through 2026-10-31): 1,224,122 marks (104 MB) in 50 to 83 s, with a peak of about
+  2.1 GB. `trademark-import` took about 5 minutes for 1,040,779 entries and 292 MB of database. The numbers and an Oracle A1
+  recommendation are in ADR-030.
+- `trademark-import`, activation, the DEMO catalog, the API and the OpenAPI document are unchanged, and there is no migration. The
+  ADR-022 compatibility report has no new line.
 
 ### Console bulk check (ADR-029)
 
