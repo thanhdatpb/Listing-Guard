@@ -1,0 +1,55 @@
+# What the hf-convert job keeps from the Hugging Face dataset illeatmyhat/uspto-trademarks (ADR-030). A published version
+# is immutable (ADR-002): change anything in a new file with a new `version`, and pass it with --filters (or HF_FILTERS).
+#
+# Everything here is the maintainer's choice and is `unverified`: it is not a USPTO statement, not checked by the USPTO and
+# not a legal conclusion. The loader refuses any other source.status.
+#
+# status_lookup            where the status codes below were read: lookups/status_codes.csv of the dataset at commit
+#                          50e430b4 (build-20261102-070543), which says it is Table 1 "Trademark Status Codes" of the USPTO
+#                          TRTDXFAP product documentation (upstream), with USPTO's Live/Dead/Indifferent column. When the
+#                          input folder holds lookups/status_codes.csv, the job checks every code below against it and
+#                          reports the live codes of the lookup that are not listed here.
+# registered_status_codes  written with status REGISTERED: every code whose live_dead_indicator is "Live/Registered", plus
+#                          717 "REGISTERED - AWAITING DIVISIONAL FEE", whose indicator is "Live" with no kind (the
+#                          maintainer's reading of its description).
+# pending_status_codes     written with status PENDING: every code whose live_dead_indicator is "Live/Pending".
+#                          Any other code (Dead/*, Indifferent, Indifferent/Cancelled, a code not in the lookup) is left
+#                          out and counted under deadByStatus. Quote every code: an unquoted 080 is not read as text.
+# nice_classes             keep a mark that has at least one of these classes (1 to 45); it is written with all its valid
+#                          classes. The default is a print-on-demand set: 14 jewelry, 16 paper goods and stickers, 18 bags,
+#                          20 furniture and decor, 21 mugs and household goods, 24 textiles, 25 clothing, 28 toys. A class
+#                          outside the list is a mark the scanner will never warn about.
+# text_only                true: a mark with no words is dropped (mark_draw_cd 2 design only, 6 no drawing, a code the
+#                          drawing lookup does not list such as 0, or none)
+# min_mark_chars           the fewest letters and digits the mark has after the trademark ruleset's normalization (spaces
+#                          are not counted); a shorter mark is dropped. 2 keeps two-letter marks and drops one-letter ones.
+# min_year                 null, or keep only a mark whose date is in that year or later: registration_dt, or filing_dt when
+#                          it has no registration date. A mark with neither is dropped. --min-year overrides it for one run
+#                          (the report names the value used).
+version: hf-convert-filters-2026-11
+dataset: illeatmyhat/uspto-trademarks
+checked_at: 2026-11-16
+source:
+  status: unverified
+  note: The maintainer's choice, from the dataset's own status lookup and the Nice classes of print-on-demand products; not checked by the USPTO.
+status_lookup:
+  url: https://huggingface.co/datasets/illeatmyhat/uspto-trademarks/blob/50e430b4c021614e1302bddb45a4afcdcb7823f2/lookups/status_codes.csv
+  upstream: https://data.uspto.gov/ui/datasets/products/files/TRTDXFAP/Table1TrademarkStatusCodes_20250813.doc
+  read_at: 2026-11-16
+registered_status_codes: [
+    "624", "625", "700", "701", "702", "703", "704", "705", "706", "707", "708", "717", "739", "778", "780", "790",
+    "800"
+]
+pending_status_codes: [
+    "410", "413", "616", "620", "630", "631", "638", "640", "641", "642", "643", "644", "645", "646", "647", "648",
+    "649", "650", "651", "652", "653", "654", "655", "656", "657", "658", "659", "660", "661", "663", "664", "665",
+    "666", "667", "668", "672", "680", "681", "682", "686", "688", "689", "690", "692", "693", "694", "718", "719",
+    "720", "721", "722", "724", "725", "730", "731", "732", "733", "734", "740", "744", "745", "746", "748", "752",
+    "753", "756", "757", "760", "762", "763", "764", "765", "766", "771", "772", "773", "774", "775", "777", "779",
+    "794", "801", "802", "803", "804", "806", "807", "808", "809", "810", "811", "812", "813", "814", "815", "816",
+    "817", "818", "819", "820", "821", "822", "823", "824", "825", "969", "973"
+]
+nice_classes: [14, 16, 18, 20, 21, 24, 25, 28]
+text_only: true
+min_mark_chars: 2
+min_year: null
