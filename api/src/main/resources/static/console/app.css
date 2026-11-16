@@ -689,3 +689,22 @@ body:has(> .lg-auth) { display: flex; flex-direction: column; min-height: 100vh;
 .lg-pager p { margin: 0; }
 .lg-nowrap { white-space: nowrap; }
 .lg-wrap { overflow-wrap: anywhere; }
+
+/* A switch that is a button (it posts) or, when the reader cannot change it, a picture with a name: the knob is on the right when it is on, so
+   the state is told by position and not by color alone. */
+.lg-switch { position: relative; display: inline-block; flex: none; width: 36px; height: 20px; padding: 0; border: 0; border-radius: var(--radius-full); background: var(--border-strong); vertical-align: middle; }
+button.lg-switch { cursor: pointer; }
+.lg-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: var(--radius-full); background: var(--surface-1); }
+.lg-switch--on { background: var(--brand); }
+.lg-switch--on::after { left: 18px; background: var(--on-brand); }
+button.lg-switch:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+/* The first cell of a row is its name: a header cell that reads like a cell. */
+.lg-table tbody th[scope="row"] { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); background: transparent; color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 600; white-space: normal; vertical-align: top; }
+.lg-table tbody tr:last-child th[scope="row"] { border-bottom: 0; }
+.lg-table tbody tr:hover th[scope="row"] { background: var(--surface-2); }
+.lg-rowhead .lg-disclosure { margin-top: var(--space-1); font-weight: 400; }
+.lg-rowhead .lg-disclosure p { margin: 0; }
+.lg-inline { display: inline; margin: 0; }
+.lg-plain { margin: 0; padding-left: var(--space-4); }
+/* A form in a card: one column, as wide as a line can be read. */
+.lg-form { max-width: 40rem; }

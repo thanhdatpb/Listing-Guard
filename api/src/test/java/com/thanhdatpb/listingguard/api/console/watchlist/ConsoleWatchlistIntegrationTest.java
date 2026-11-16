@@ -369,4 +369,119 @@ class ConsoleWatchlistIntegrationTest {
 
         assertThat(html).doesNotContain("<script>alert(1)</script>").contains("&lt;script&gt;alert(1)&lt;/script&gt;");
     }
+
+    private static int countOf(String html, String text) {
+        int count = 0;
+        for (int at = html.indexOf(text); at >= 0; at = html.indexOf(text, at + text.length())) {
+            count++;
+        }
+        return count;
+    }
+
+    private static int rowsOf(String html) {
+        int start = html.indexOf("<tbody>");
+        return start < 0 ? 0 : countOf(html.substring(start, html.indexOf("</tbody>")), "<tr>");
+    }
+
+    private String page(ConsoleUser user, String... params) throws Exception {
+        var request = get(PAGE).with(signedIn(user));
+        for (int i = 0; i < params.length; i += 2) {
+            request.param(params[i], params[i + 1]);
+        }
+        return mvc.perform(request).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void anEmptyListInvitesTheAdministratorToAddTheFirstMarkAndSaysAtWhichLevelAMatchIsReported() throws Exception {
+        Team team = team();
+
+        String html = page(team.admin());
+
+        assertThat(html).contains("id=\"no-entries\"").contains("The list is empty.").doesNotContain("id=\"entries-table\"")
+                .doesNotContain("id=\"watchlist-filters\"").doesNotContain("id=\"save-form\"").doesNotContain("/console/console.css")
+                .doesNotContain("/console/watchlist.css").doesNotContain("class=\"page\"");
+        // the banner is the watchlist's one promise: a match is reported at the level of the setting or higher
+        assertThat(html).containsPattern("id=\"minimum\"[^>]*>\\s*<p>A match with the watchlist is always reported as high risk or higher");
+        // one brand button: the invitation's; the two buttons of the header are plain
+        assertThat(countOf(html, "lg-btn--primary")).isEqualTo(1);
+        assertThat(html).doesNotContainPattern("lg-btn--primary\"[^>]*id=\"add-open\"");
+        assertThat(html).contains("id=\"import-open\"");
+        String member = page(team.member());
+        assertThat(member).contains("id=\"no-entries\"").doesNotContain("lg-btn--primary").doesNotContain("id=\"add-open\"");
+    }
+
+    @Test
+    void theAddFormTheEditFormAndTheImportOpenFromTheAddressAndTheBrandButtonMovesToTheOpenForm() throws Exception {
+        Team team = team();
+        seed(team, "Brimwick Otters", "Quillmark Rovers");
+        String id = stored(team).entries().get(0).id().toString();
+
+        String closed = page(team.admin());
+        assertThat(closed).doesNotContain("id=\"save-form\"").doesNotContain("id=\"import-form\"").contains("id=\"entries-table\"");
+        assertThat(closed).containsPattern("lg-btn--primary\"[^>]*id=\"add-open\"");
+        assertThat(countOf(closed, "lg-btn--primary")).isEqualTo(1);
+
+        String add = page(team.admin(), "add", "1");
+        assertThat(add).contains("id=\"save-form\"").contains("Add an entry").doesNotContain("name=\"id\"").doesNotContain("id=\"import-form\"");
+        assertThat(countOf(add, "lg-btn--primary")).as("the form's own submit is the brand button").isEqualTo(1);
+        assertThat(add).doesNotContainPattern("lg-btn--primary\"[^>]*id=\"add-open\"");
+        assertThat(add).contains("for=\"mark\"").contains("aria-describedby=\"mark-hint\"").contains("id=\"mark-hint\"");
+
+        String edit = page(team.admin(), "edit", id);
+        assertThat(edit).contains("Edit an entry").contains("name=\"id\" value=\"" + id + "\"").contains("value=\"Brimwick Otters\"");
+
+        String bulk = page(team.admin(), "import", "1");
+        assertThat(bulk).contains("id=\"import-form\"").contains("for=\"pasted\"").contains("for=\"file\"").doesNotContain("id=\"save-form\"");
+        assertThat(countOf(bulk, "lg-btn--primary")).isEqualTo(1);
+
+        // a member never gets a form from the address
+        String member = page(team.member(), "add", "1", "import", "1");
+        assertThat(member).doesNotContain("id=\"save-form\"").doesNotContain("id=\"import-form\"");
+    }
+
+    @Test
+    void theFilterRowNarrowsTheTableAndOnlyTheTable() throws Exception {
+        Team team = team();
+        watchlists.replace(team.client().getId(), List.of(
+                new EntryInput("Brimwick Otters", List.of("Otterz"), List.of(25), null, "a claim", true),
+                new EntryInput("Quillmark Rovers", List.of("QR"), List.of(28), null, null, false),
+                new EntryInput("Paddle Hard", null, List.of(25, 28), null, "slogan", true)), "api-key:seed", null);
+
+        assertThat(rowsOf(page(team.admin()))).isEqualTo(3);
+        String word = page(team.admin(), "q", "OTTERZ");
+        assertThat(rowsOf(word)).as("an alias, in any case").isEqualTo(1);
+        assertThat(word).contains("Brimwick Otters").doesNotContain("Quillmark Rovers").contains("value=\"OTTERZ\"")
+                .contains("Showing 1 of 3 marks").contains("id=\"watchlist-reset\"");
+        assertThat(rowsOf(page(team.admin(), "q", "slogan"))).as("the note").isEqualTo(1);
+        assertThat(rowsOf(page(team.admin(), "class", "28"))).isEqualTo(2);
+        assertThat(rowsOf(page(team.admin(), "status", "off"))).isEqualTo(1);
+        assertThat(rowsOf(page(team.admin(), "status", "on"))).isEqualTo(2);
+        assertThat(rowsOf(page(team.admin(), "status", "whatever"))).as("anything else is both").isEqualTo(3);
+        String none = page(team.admin(), "class", "25", "status", "off");
+        assertThat(none).contains("id=\"no-matches\"").contains("No mark matches these filters").contains("Showing 0 of 3 marks")
+                .doesNotContain("id=\"entries-table\"").contains("id=\"watchlist-filters\"");
+        assertThat(page(team.admin())).contains(">Class 25</option>").contains(">Class 28</option>");
+
+        // a change from a filtered page is a change of the whole list: its revision is the list's
+        assertThat(revisionIn(page(team.admin(), "class", "28"))).isEqualTo(String.valueOf(stored(team).revision()));
+    }
+
+    @Test
+    void theSwitchIsAButtonWithAStateForTheAdministratorAndAPictureWithAWordForTheMember() throws Exception {
+        Team team = team();
+        watchlists.replace(team.client().getId(), List.of(
+                new EntryInput("Brimwick Otters", null, null, null, null, true),
+                new EntryInput("Quillmark Rovers", null, null, null, null, false)), "api-key:seed", null);
+
+        String admin = page(team.admin());
+        assertThat(admin).containsPattern("role=\"switch\"[^>]*aria-checked=\"true\"[^>]*aria-label=\"Look for Brimwick Otters in listings\"")
+                .containsPattern("role=\"switch\"[^>]*aria-checked=\"false\"[^>]*aria-label=\"Look for Quillmark Rovers in listings\"");
+        assertThat(countOf(admin, "lg-switch--on")).isEqualTo(1);
+        // a mark is the name of its row
+        assertThat(admin).containsPattern("<th scope=\"row\" class=\"lg-rowhead\">\\s*<span class=\"lg-wrap\">Brimwick Otters</span>");
+
+        String member = page(team.member());
+        assertThat(member).doesNotContain("role=\"switch\"").containsPattern("role=\"img\"[^>]*aria-label=\"On\"")
+                .containsPattern("role=\"img\"[^>]*aria-label=\"Off\"");
+    }
 }

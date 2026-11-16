@@ -24,9 +24,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -68,7 +71,37 @@ public class ConsoleWatchlistController {
 
     /** What the table shows of one entry, times in UTC. */
     public record EntryRow(UUID id, String mark, String aliases, String classes, String serialNumber, String note,
-                           boolean enabled, String addedBy, String added, String updatedBy, String updated) {
+                           boolean enabled, String addedBy, String added, String updatedBy, String updated,
+                           List<Integer> niceClasses) {
+
+        /** True when the entry has the word in its mark, an alias or its note, in any case. */
+        boolean mentions(String word) {
+            String needle = word.toLowerCase(Locale.ROOT);
+            return Stream.of(mark, aliases, note).anyMatch(text -> text != null && text.toLowerCase(Locale.ROOT).contains(needle));
+        }
+    }
+
+    /**
+     * The filter row: a word, a Nice class, and "on" or "off" (anything else is both). It narrows what the table shows, never what
+     * the list holds, so a change made from a filtered page still goes through the whole list and its revision.
+     */
+    public record Filters(String q, Integer niceClass, String status) {
+
+        static Filters none() {
+            return new Filters("", null, "");
+        }
+
+        public boolean active() {
+            return !q.isEmpty() || niceClass != null || !status.isEmpty();
+        }
+
+        List<EntryRow> apply(List<EntryRow> rows) {
+            return rows.stream()
+                    .filter(row -> q.isEmpty() || row.mentions(q))
+                    .filter(row -> niceClass == null || row.niceClasses().contains(niceClass))
+                    .filter(row -> status.isEmpty() || (status.equals("on") == row.enabled()))
+                    .toList();
+        }
     }
 
     /** The values of the add or edit form, as typed. */
@@ -101,16 +134,32 @@ public class ConsoleWatchlistController {
 
     @GetMapping("/console/watchlist")
     public String page(@AuthenticationPrincipal ConsoleUser user, @RequestParam(name = "edit", required = false) UUID edit,
+                       @RequestParam(name = "add", required = false) String add,
+                       @RequestParam(name = "import", required = false) String importing,
+                       @RequestParam(name = "q", defaultValue = "") String q,
+                       @RequestParam(name = "class", required = false) Integer niceClass,
+                       @RequestParam(name = "status", defaultValue = "") String status,
                        Model model, HttpServletResponse response) {
         noStore(response);
         WatchlistView view = populate(model, user, response);
+        boolean admin = Boolean.TRUE.equals(model.getAttribute("admin"));
         EntryForm form = EntryForm.empty();
-        if (view != null && edit != null && Boolean.TRUE.equals(model.getAttribute("admin"))) {
+        if (view != null && edit != null && admin) {
             EntryView entry = view.entries().stream().filter(e -> e.id().equals(edit)).findFirst()
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
             form = EntryForm.of(entry);
         }
         model.addAttribute("form", form);
+        // the form and the import open from the address, so the buttons of the header are plain links
+        model.addAttribute("formOpen", view != null && admin && (edit != null || add != null));
+        model.addAttribute("importOpen", view != null && admin && importing != null);
+        Filters filters = new Filters(q.strip(), niceClass, "on".equals(status) || "off".equals(status) ? status : "");
+        model.addAttribute("filters", filters);
+        @SuppressWarnings("unchecked")
+        List<EntryRow> all = (List<EntryRow>) model.getAttribute("rows");
+        if (all != null && filters.active()) {
+            model.addAttribute("rows", filters.apply(all));
+        }
         return VIEW;
     }
 
@@ -252,6 +301,11 @@ public class ConsoleWatchlistController {
     private WatchlistView populate(Model model, ConsoleUser user, HttpServletResponse response) {
         model.addAttribute("email", user.email());
         model.addAttribute("admin", roles.isAdmin(user));
+        model.addAttribute("formOpen", false);
+        model.addAttribute("importOpen", false);
+        model.addAttribute("filters", Filters.none());
+        model.addAttribute("total", 0);
+        model.addAttribute("classOptions", List.of());
         WatchlistView view;
         try {
             view = watchlists.read(user.clientId());
@@ -263,10 +317,18 @@ public class ConsoleWatchlistController {
         }
         Map<UUID, String> emails = roles.emails(user.clientId());
         model.addAttribute("revision", view.revision());
-        model.addAttribute("rows", view.entries().stream().map(entry -> row(entry, emails)).toList());
+        List<EntryRow> rows = view.entries().stream().map(entry -> row(entry, emails)).toList();
+        model.addAttribute("rows", rows);
+        model.addAttribute("total", rows.size());
+        model.addAttribute("classOptions",
+                rows.stream().flatMap(row -> row.niceClasses().stream()).collect(Collectors.toCollection(TreeSet::new)));
         model.addAttribute("enabledCount", view.entries().stream().filter(EntryView::enabled).count());
         model.addAttribute("limits", view.limits());
-        model.addAttribute("minimumRisk", watchlists.settings().minimumRisk().name());
+        String minimum = watchlists.settings().minimumRisk().name();
+        model.addAttribute("minimumRisk", minimum);
+        // the label sits inside a sentence, so it is written in lower case ("high risk", "rủi ro cao")
+        Locale language = org.springframework.context.i18n.LocaleContextHolder.getLocale();
+        model.addAttribute("minimumLabel", messages.get("bulk.level." + minimum.toLowerCase(Locale.ROOT)).toLowerCase(language));
         return view;
     }
 
@@ -274,7 +336,7 @@ public class ConsoleWatchlistController {
         return new EntryRow(entry.id(), entry.mark(), String.join("; ", entry.aliases()),
                 String.join(", ", entry.niceClasses().stream().map(String::valueOf).toList()), entry.serialNumber(), entry.note(),
                 entry.enabled(), actor(entry.addedBy(), emails), time(entry.addedAt()), actor(entry.updatedBy(), emails),
-                time(entry.updatedAt()));
+                time(entry.updatedAt()), List.copyOf(entry.niceClasses()));
     }
 
     /** {@code console:<account id>} as the account's email, {@code api-key:<key id>} as the key. */
@@ -309,6 +371,7 @@ public class ConsoleWatchlistController {
         populate(model, user, response);
         response.setStatus(HttpStatus.BAD_REQUEST.value());
         model.addAttribute("form", form);
+        model.addAttribute("formOpen", Boolean.TRUE.equals(model.getAttribute("admin")));
         model.addAttribute("errors", problems);
         return VIEW;
     }
@@ -325,6 +388,7 @@ public class ConsoleWatchlistController {
         populate(model, user, response);
         response.setStatus(HttpStatus.BAD_REQUEST.value());
         model.addAttribute("form", EntryForm.empty());
+        model.addAttribute("importOpen", Boolean.TRUE.equals(model.getAttribute("admin")));
         model.addAttribute("importError", problem);
         return VIEW;
     }
