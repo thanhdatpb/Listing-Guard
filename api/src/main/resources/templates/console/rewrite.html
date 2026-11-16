@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <body>
-<!-- Parts of the "Gợi ý sửa" feature (ADR-037). This file is never served on its own: editor.html and bulk-fragments.html include the
+<!-- Parts of the "Gợi ý sửa" feature (ADR-037, ADR-041). This file is never served on its own: editor.html and bulk-fragments.html include the
      buttons, POST /console/rewrite/* answers the panel. A suggestion is text for the seller to read and copy; nothing here changes the
      editor's fields or a listing. Every value is printed with th:text, so the model's text is never markup. No text is written here
      (ADR-028): every sentence is a message. Model: rewriteAvailable (the feature is on), and on an answer rewrite and rewriteDisclaimer. -->
 
-<!-- Style and script of the feature, linked only while it is on. The script holds no text: the "copied" word is a data attribute. -->
+<!-- The script of the feature, linked only while it is on. It holds no text: the "copied" word is a data attribute. -->
 <th:block th:fragment="assets">
-    <link rel="stylesheet" th:href="@{/console/rewrite.css}">
     <script th:src="@{/console/rewrite.js}" defer></script>
 </th:block>
 
@@ -22,10 +21,10 @@
 </th:block>
 
 <!-- The editor: the form as it was checked, sent again so the page keeps no copy of the listing anywhere else. -->
-<section class="rewrite" id="rewrite" th:fragment="editorButton(form, anchor)" aria-labelledby="rewrite-heading">
-    <h2 id="rewrite-heading" th:text="#{rewrite.heading}"></h2>
-    <p class="muted small" th:text="#{rewrite.intro}"></p>
-    <p class="muted small" th:text="#{rewrite.privacy}"></p>
+<section class="lg-card rewrite" id="rewrite" th:fragment="editorButton(form, anchor)" aria-labelledby="rewrite-heading">
+    <h2 id="rewrite-heading" class="lg-card__title" th:text="#{rewrite.heading}"></h2>
+    <p class="lg-text-muted lg-small" th:text="#{rewrite.intro}"></p>
+    <p class="lg-text-muted lg-small" th:text="#{rewrite.privacy}"></p>
     <form method="post" th:action="@{/console/rewrite/editor}"
           th:attr="hx-post=@{/console/rewrite/editor},hx-target='#rewrite-result',hx-swap='innerHTML',hx-disabled-elt='find button'">
         <input type="hidden" name="marketplace" th:value="${form.marketplace}">
@@ -42,75 +41,81 @@
         <input type="hidden" name="searchTerms" th:value="${form.searchTerms}">
         <input type="hidden" name="productType" th:value="${form.productType}">
         <th:block th:replace="~{console/rewrite :: anchor(${anchor})}"></th:block>
-        <button type="submit" class="rewrite-button" th:text="#{rewrite.button}" th:aria-label="#{rewrite.button.aria}"></button>
+        <button type="submit" class="lg-btn" th:text="#{rewrite.button}" th:aria-label="#{rewrite.button.aria}"></button>
     </form>
-    <div id="rewrite-result" aria-live="polite"></div>
+    <div class="lg-rewrite__result" id="rewrite-result" aria-live="polite"></div>
 </section>
 
 <!-- A bulk row: the row's listing as standard JSON, carried only while the feature is on. -->
-<div class="rewrite" th:fragment="bulkButton(marketplace, row)">
+<div class="lg-card rewrite" th:fragment="bulkButton(marketplace, row)">
     <form method="post" th:action="@{/console/rewrite/bulk}"
           th:attr="hx-post=@{/console/rewrite/bulk},hx-target=${'#rewrite-result-' + row.index},hx-swap='innerHTML',hx-disabled-elt='find button'">
         <input type="hidden" name="marketplace" th:value="${marketplace}">
         <input type="hidden" name="listing" th:value="${row.rewriteListing}">
         <th:block th:replace="~{console/rewrite :: anchor(${row.rewriteAnchor()})}"></th:block>
-        <button type="submit" class="rewrite-button" th:text="#{rewrite.button}" th:aria-label="#{rewrite.button.aria}"></button>
+        <button type="submit" class="lg-btn" th:text="#{rewrite.button}" th:aria-label="#{rewrite.button.aria}"></button>
     </form>
-    <p class="muted small" th:text="#{rewrite.privacy}"></p>
-    <div th:id="'rewrite-result-' + ${row.index}" aria-live="polite"></div>
+    <p class="lg-text-muted lg-small" th:text="#{rewrite.privacy}"></p>
+    <div class="lg-rewrite__result" th:id="'rewrite-result-' + ${row.index}" aria-live="polite"></div>
 </div>
 
 <!-- One copy button. It posts that suggestion was used (htmx, no swap) and rewrite.js puts the text on the clipboard. -->
-<form class="copy" method="post" th:fragment="copy(runId, number, text, what)" th:action="@{/console/rewrite/used}"
+<form class="lg-candidate__copy" method="post" th:fragment="copy(runId, number, text, what)" th:action="@{/console/rewrite/used}"
       th:attr="hx-post=@{/console/rewrite/used},hx-swap='none'">
     <input type="hidden" name="runId" th:value="${runId}">
     <input type="hidden" name="candidate" th:value="${number}">
-    <button type="submit" class="copy-button" th:attr="data-copy-text=${text},data-copied=#{rewrite.copied},aria-label=#{rewrite.copy.aria(${what})}"
-            th:text="#{rewrite.copy}"></button>
+    <button type="submit" class="lg-btn lg-btn--small" th:attr="data-copy-text=${text},data-copied=#{rewrite.copied},aria-label=#{rewrite.copy.aria(${what})}">
+        <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-copy"/></svg>
+        <th:block th:text="#{rewrite.copy}"></th:block>
+    </button>
 </form>
 
-<!-- The answer. -->
-<section class="rewrite-panel" id="rewrite-panel" th:fragment="panel" th:with="r=${rewrite}">
+<!-- The answer: the proposals as cards, or a state that says why there is none. "No safe suggestion" is the empty state. -->
+<section class="lg-rewrite-panel lg-stack" id="rewrite-panel" th:fragment="panel" th:with="r=${rewrite}">
     <th:block th:switch="${r.status.name()}">
-        <div th:case="'SUGGESTIONS'">
-            <h3 th:text="#{rewrite.result.heading}"></h3>
-            <p class="muted small" th:text="#{rewrite.verified}"></p>
-            <article class="candidate" th:each="c : ${r.candidates}">
-                <h4 th:text="#{rewrite.candidate(${c.number})}"></h4>
-                <div class="change" th:if="${c.title != null}">
-                    <p class="small muted" th:text="#{rewrite.title}"></p>
-                    <p class="old"><span class="label small muted" th:text="#{rewrite.old}"></span> <span th:text="${r.originalTitle}"></span></p>
-                    <p class="new"><span class="label small muted" th:text="#{rewrite.new}"></span> <strong th:text="${c.title}"></strong></p>
+        <div th:case="'SUGGESTIONS'" class="lg-stack">
+            <h3 class="lg-section-title" th:text="#{rewrite.result.heading}"></h3>
+            <p class="lg-text-muted lg-small" th:text="#{rewrite.verified}"></p>
+            <article class="lg-card lg-candidate" th:each="c : ${r.candidates}">
+                <h4 class="lg-card__title" th:text="#{rewrite.candidate(${c.number})}"></h4>
+                <div class="lg-candidate__change" th:if="${c.title != null}">
+                    <p class="lg-text-muted lg-small" th:text="#{rewrite.title}"></p>
+                    <p class="lg-candidate__line"><span class="lg-candidate__tag" th:text="#{rewrite.old}"></span><span class="lg-candidate__text" th:text="${r.originalTitle}"></span></p>
+                    <p class="lg-candidate__line"><span class="lg-candidate__tag" th:text="#{rewrite.new}"></span><strong class="lg-candidate__text lg-candidate__new" th:text="${c.title}"></strong></p>
                     <form th:replace="~{console/rewrite :: copy(${r.runId}, ${c.number}, ${c.title}, #{rewrite.title})}"></form>
                 </div>
-                <div class="change" th:each="t : ${c.tags}">
-                    <p class="small muted" th:text="#{rewrite.tag(${t.index + 1})}"></p>
-                    <p class="old"><span class="label small muted" th:text="#{rewrite.old}"></span> <span th:text="${t.from}"></span></p>
-                    <p class="new"><span class="label small muted" th:text="#{rewrite.new}"></span> <strong th:text="${t.to}"></strong></p>
+                <div class="lg-candidate__change" th:each="t : ${c.tags}">
+                    <p class="lg-text-muted lg-small" th:text="#{rewrite.tag(${t.index + 1})}"></p>
+                    <p class="lg-candidate__line"><span class="lg-candidate__tag" th:text="#{rewrite.old}"></span><span class="lg-candidate__text" th:text="${t.from}"></span></p>
+                    <p class="lg-candidate__line"><span class="lg-candidate__tag" th:text="#{rewrite.new}"></span><strong class="lg-candidate__text lg-candidate__new" th:text="${t.to}"></strong></p>
                     <form th:replace="~{console/rewrite :: copy(${r.runId}, ${c.number}, ${t.to}, #{rewrite.tag(${t.index + 1})})}"></form>
                 </div>
             </article>
         </div>
-        <div th:case="'NONE_SAFE'">
-            <h3 th:text="#{rewrite.none}"></h3>
-            <p class="small" th:text="#{rewrite.none.detail}"></p>
+        <div th:case="'NONE_SAFE'" class="lg-empty">
+            <h3 class="lg-empty__title" th:text="#{rewrite.none}"></h3>
+            <p class="lg-empty__text" th:text="#{rewrite.none.detail}"></p>
         </div>
-        <div th:case="'NOT_NEEDED'">
-            <h3 th:text="#{rewrite.notneeded}"></h3>
-            <p class="small" th:text="#{rewrite.notneeded.detail}"></p>
+        <div th:case="'NOT_NEEDED'" class="lg-empty">
+            <h3 class="lg-empty__title" th:text="#{rewrite.notneeded}"></h3>
+            <p class="lg-empty__text" th:text="#{rewrite.notneeded.detail}"></p>
         </div>
-        <div th:case="'RATE_LIMITED'">
-            <h3 th:text="#{rewrite.ratelimited}"></h3>
-            <p class="small" th:text="#{rewrite.ratelimited.detail}"></p>
+        <div th:case="'RATE_LIMITED'" class="lg-banner lg-banner--warning" role="status">
+            <div class="lg-banner__body">
+                <h3 class="lg-banner__title" th:text="#{rewrite.ratelimited}"></h3>
+                <p th:text="#{rewrite.ratelimited.detail}"></p>
+            </div>
         </div>
-        <div th:case="*">
-            <h3 th:text="#{rewrite.unavailable}"></h3>
-            <p class="small" th:text="#{rewrite.unavailable.detail}"></p>
+        <div th:case="*" class="lg-banner lg-banner--warning" role="status">
+            <div class="lg-banner__body">
+                <h3 class="lg-banner__title" th:text="#{rewrite.unavailable}"></h3>
+                <p th:text="#{rewrite.unavailable.detail}"></p>
+            </div>
         </div>
     </th:block>
     <th:block th:if="${r.status.name() == 'SUGGESTIONS' or r.status.name() == 'NONE_SAFE'}">
-        <p class="muted small" th:text="#{rewrite.disclaimer}"></p>
-        <p class="muted small disclaimer" th:text="${rewriteDisclaimer}"></p>
+        <p class="lg-text-muted lg-small" th:text="#{rewrite.disclaimer}"></p>
+        <p class="lg-text-muted lg-small" th:text="${rewriteDisclaimer}"></p>
     </th:block>
 </section>
 </body>

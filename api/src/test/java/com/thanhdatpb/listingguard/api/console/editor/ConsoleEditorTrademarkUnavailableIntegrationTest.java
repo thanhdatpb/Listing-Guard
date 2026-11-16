@@ -94,9 +94,9 @@ class ConsoleEditorTrademarkUnavailableIntegrationTest {
         String html = press(userOf(client()), form);
 
         String trademark = section(html, "trademark-panel");
-        assertThat(trademark).contains("Trademark check unavailable").contains("<p class=\"big\">Unavailable</p>")
+        assertThat(trademark).contains("Trademark check unavailable").contains("<span class=\"lg-pill\">Unavailable</span>")
                 .contains(trademarkRulesets.ruleset().disclaimer());
-        assertThat(section(html, "readiness-panel")).containsPattern("<p class=\"big\">\\d+</p>");
+        assertThat(section(html, "readiness-panel")).containsPattern("class=\"lg-meter__value\">\\d+/\\d+</span>");
         assertThat(section(html, "rule-findings")).contains("tag_length");
         assertThat(html).doesNotContain("id=\"trademark-findings\"");
     }
@@ -117,8 +117,8 @@ class ConsoleEditorTrademarkUnavailableIntegrationTest {
         String html = press(userOf(client()), etsyForm("Incomplete mug " + unique()));
 
         String readiness = section(html, "readiness-panel");
-        assertThat(readiness).contains("<p class=\"big\">Not scored</p>").doesNotContain("Ready").doesNotContain("Not ready");
-        assertThat(html).contains("verdict incomplete");
+        assertThat(readiness).contains("class=\"lg-meter__value\">Not scored</span>").doesNotContain("Ready").doesNotContain("Not ready");
+        assertThat(html).contains("lg-meter--incomplete");
         assertThat(section(html, "trademark-panel")).contains("Trademark check unavailable");
     }
 

@@ -1,134 +1,30 @@
-/* Console editor styles. Plain CSS, no build step. Colors are tokens; the dark scheme follows the system setting. */
-:root {
-  /* The names this sheet and the other page sheets were written with, now pointing at the design tokens (ADR-040). Their old values are
-     gone; the old --accent (a blue) became --brand, because the token --accent is the red of the problem mark. A page that is rewritten
-     on app.css stops using these names, and when none does the block goes. */
-  --bg: var(--surface-0);
-  --fg: var(--ink);
-  --muted: var(--ink-muted);
-  --line: var(--border);
-  --card: var(--surface-1);
-  --accent-fg: var(--on-brand);
-  --error: var(--danger);
-  --info: var(--brand-text);
-  --ok: var(--success);
-  --mark: var(--warning-subtle);
-}
+/* The Check listing page (ADR-014 part B3, ADR-041): what belongs to this page and to no other component. The components (card, field,
+   pill, finding, meter) are app.css; every color here is a token of /brand/tokens.css (a test scans this file for color codes). */
 
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-}
+.lg-editor__note { margin: var(--space-3) 0 var(--space-4); }
+.lg-editor__other { margin: var(--space-4) 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-0); }
+.lg-editor__actions { margin-top: var(--space-4); }
+.lg-editor__cost { flex: 1 1 18rem; margin: 0; }
 
-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+/* the live counter next to a field: editor.js writes its text and adds "over" when a limit is passed */
+.counter.over { color: var(--danger); font-weight: 600; }
 
-/* The language links (ADR-028): the current language is plain text, the other is a link. */
-.lang { display: flex; gap: 0.4rem; }
-.lang a[aria-current="true"] { color: var(--fg); font-weight: 600; text-decoration: none; }
-
-.layout {
-  display: grid;
-  gap: 1.5rem;
-  max-width: 80rem;
-  margin: 0 auto;
-  padding: 1rem;
-}
-@media (min-width: 62rem) {
-  .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
-}
-
-
-.muted { color: var(--muted); }
-.small { font-size: 0.875rem; }
-
-.tabs { display: flex; gap: 0.5rem; margin: 1rem 0 0.25rem; }
-.tabs a {
-  padding: 0.35rem 0.9rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  text-decoration: none;
-  color: var(--fg);
-}
-.tabs a.active { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
-
-.field { margin: 1rem 0; }
-.field label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
-.field label .muted { font-weight: 400; }
-input[type="text"], textarea {
-  width: 100%;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--fg);
-  font: inherit;
-}
-textarea { resize: vertical; }
-input:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible, a:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
-}
-input[aria-invalid="true"] { border-color: var(--error); }
-
-.counter, .hint { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--muted); }
-.counter.over { color: var(--error); font-weight: 600; }
-.error { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--error); font-weight: 600; }
-
-details.other { margin: 1rem 0; padding: 0.5rem 0.75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
-details.other summary { cursor: pointer; font-weight: 600; padding: 0.25rem 0; }
-
-.actions { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: center; margin-top: 1rem; }
-.cost { margin: 0; flex: 1 1 18rem; font-size: 0.875rem; color: var(--muted); }
-
-button {
-  font: inherit;
-  padding: 0.5rem 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--card);
-  color: var(--fg);
-  cursor: pointer;
-}
-button.primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand); font-weight: 600; }
-button.link { border: 0; background: none; color: var(--brand); padding: 0; text-decoration: underline; }
-
-/* Results: the readiness panel and the trademark panel are always side by side with the same size, so a high score never
-   stands alone. They stack only when the screen is too narrow for two. */
-.verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-.verdict { padding: 1rem; border: 1px solid var(--line); border-left-width: 6px; border-radius: 8px; background: var(--card); }
-.verdict h2 { font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.verdict .big { margin: 0; font-size: 2.25rem; font-weight: 700; line-height: 1.1; }
-.verdict .headline { margin: 0.25rem 0 0.5rem; font-weight: 600; }
-.verdict p.small { margin: 0.25rem 0 0; }
-.verdict.ready, .verdict.result { border-left-color: var(--ok); }
-.verdict.not-ready, .verdict.incomplete, .verdict.unavailable, .verdict.not-in-plan, .verdict.quota-exceeded,
-.verdict.not-run { border-left-color: var(--warning); }
-.hint-upgrade { font-weight: 600; }
-.disclaimer { border-top: 1px solid var(--line); padding-top: 0.5rem; }
+/* the trademark panel, beside the readiness */
+.lg-panel__headline { margin: 0 0 var(--space-1); }
+.lg-panel__hint { margin: var(--space-2) 0 0; font-weight: 600; }
 /* the demonstration catalog (ConsoleModelAdvice): said again in the trademark panel, beside the result it is about */
-.demo-note { font-weight: 700; border-top: 1px solid var(--line); padding-top: 0.5rem; }
+.lg-panel__demo { margin: var(--space-3) 0 0; padding-top: var(--space-2); border-top: 1px solid var(--line-soft); font-weight: 700; }
+.lg-panel__disclaimer { margin: var(--space-3) 0 0; padding-top: var(--space-2); border-top: 1px solid var(--line-soft); }
+.lg-section-title--small { margin: 0 0 var(--space-2); font-size: 15px; line-height: 24px; }
 
-.findings { margin: 1.5rem 0; }
-.group { margin: 1rem 0; border-left: 4px solid var(--line); padding-left: 0.75rem; }
-.group.error, .group.high { border-left-color: var(--error); }
-.group.warning, .group.medium { border-left-color: var(--warning); }
-.group.info, .group.low { border-left-color: var(--info); }
-.group ul { list-style: none; margin: 0; padding: 0; }
-.group li { margin: 0 0 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
-.group li:last-child { border-bottom: 0; }
-.group p { margin: 0.25rem 0; }
-.msg { font-weight: 600; }
-.ev mark { background: var(--mark); color: inherit; padding: 0 0.1em; border-radius: 2px; }
 /* The simulation: plain boxes in the console's own colors. No logo, no image, no color or font taken from any marketplace. */
-.preview { margin-top: 2rem; }
 .badge {
   display: inline-block;
   margin-left: 0.5rem;
   padding: 0.1rem 0.6rem;
-  border: 1px solid var(--muted);
-  border-radius: 999px;
-  color: var(--muted);
+  border: 1px solid var(--ink-muted);
+  border-radius: var(--radius-full);
+  color: var(--ink-muted);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -136,14 +32,14 @@ button.link { border: 0; background: none; color: var(--brand); padding: 0; text
   vertical-align: middle;
 }
 .sim-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1.25rem; align-items: start; }
-.sim-card { margin: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overflow: hidden; }
+.sim-card { margin: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-0); overflow: hidden; }
 .sim-card.tile { max-width: 16rem; }
 .sim-card.tile figcaption { padding: 0.6rem 0.75rem; }
 .sim-card.row { display: flex; gap: 0.75rem; padding: 0.75rem; align-items: flex-start; }
 .sim-card figcaption { min-width: 0; }
-.sim-photo { background: var(--line); }
+.sim-photo { background: var(--border); }
 .sim-card.tile .sim-photo { width: 100%; aspect-ratio: 4 / 3; }
-.sim-card.row .sim-photo { flex: 0 0 5.5rem; height: 5.5rem; border-radius: 6px; }
+.sim-card.row .sim-photo { flex: 0 0 5.5rem; height: 5.5rem; border-radius: var(--radius-sm); }
 /* the search result is cut by style: two lines and an ellipsis; no character count is assumed */
 .sim-title {
   margin: 0 0 0.25rem;
@@ -156,44 +52,11 @@ button.link { border: 0; background: none; color: var(--brand); padding: 0; text
   text-overflow: ellipsis;
   overflow-wrap: anywhere;
 }
-.sim-title.placeholder, .sim-page-title.placeholder { color: var(--muted); font-weight: 400; }
-.sim-brand, .sim-price { margin: 0 0 0.25rem; font-size: 0.875rem; color: var(--muted); }
-.sim-page { padding: 0.75rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.sim-title.placeholder, .sim-page-title.placeholder { color: var(--ink-muted); font-weight: 400; }
+.sim-brand, .sim-price { margin: 0 0 0.25rem; font-size: 0.875rem; color: var(--ink-muted); }
+.sim-page { padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-0); }
 .sim-page-title { margin: 0 0 0.5rem; font-size: 1.1rem; line-height: 1.35; overflow-wrap: anywhere; }
 .sim-bullets { margin: 0.5rem 0; padding-left: 1.25rem; font-size: 0.9rem; }
 .sim-description { margin-top: 0.5rem; max-height: 12rem; overflow: auto; font-size: 0.9rem; white-space: pre-line; overflow-wrap: anywhere; }
 /* the part past the limit is set apart by background and underline, not by color alone */
-mark.beyond { background: var(--mark); color: inherit; text-decoration: underline wavy var(--error); text-underline-offset: 3px; }
-
-.notice { margin: 0 0 1rem; padding: 0.75rem 1rem; border: 1px solid var(--line); border-left-width: 6px; border-radius: 8px; background: var(--card); }
-.notice p { margin: 0; }
-.notice.applied { border-left-color: var(--ok); }
-.notice.refused { border-left-color: var(--error); }
-button.apply { padding: 0.3rem 0.9rem; font-size: 0.875rem; margin-top: 0.25rem; }
-.fix { margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: var(--card); border: 1px dashed var(--line); border-radius: 6px; }
-
-/* The feedback widget next to a finding (ADR-034), on the editor, the bulk check and any page that shows a stored finding. */
-form.feedback { margin: 0.5rem 0 0; padding-top: 0.4rem; border-top: 1px dashed var(--line); }
-form.feedback .fb-row { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: center; }
-form.feedback .fb-buttons { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; }
-form.feedback button.fb {
-  font: inherit; font-size: 0.85rem; padding: 0.15rem 0.6rem; border: 1px solid var(--line); border-radius: 999px;
-  background: var(--card); color: var(--fg); cursor: pointer;
-}
-form.feedback button.fb:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-form.feedback button.fb[aria-pressed="true"] { font-weight: 600; color: var(--on-brand); background: var(--brand); border-color: var(--brand); }
-form.feedback button.fb.false-positive[aria-pressed="true"] { background: var(--error); border-color: var(--error); }
-form.feedback button.fb.not-useful[aria-pressed="true"] { background: var(--muted); border-color: var(--muted); }
-form.feedback .fb-note { margin-top: 0.35rem; }
-form.feedback .fb-note label { display: block; margin: 0.3rem 0 0.15rem; }
-form.feedback .fb-note textarea { width: 100%; font: inherit; }
-form.feedback .fb-status { margin: 0.25rem 0 0; min-height: 1.2em; }
-form.feedback .fb-saved { color: var(--ok); }
-form.feedback .fb-error { color: var(--error); font-weight: 600; }
-.edit-columns {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-}
-.edit-columns textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; }
-@media (max-width: 760px) { .edit-columns { grid-template-columns: 1fr; } }
+mark.beyond { background: var(--warning-subtle); color: inherit; text-decoration: underline wavy var(--danger); text-underline-offset: 3px; }

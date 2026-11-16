@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{rewrite.page.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/console.css}">
     <th:block th:replace="~{console/layout :: htmx}"></th:block>
     <th:block th:replace="~{console/rewrite :: assets}"></th:block>
 </head>
@@ -13,11 +12,15 @@
 <!-- The answer of POST /console/rewrite/* for a browser without a script (ADR-037): the same panel, on a page of its own. -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('check')}"></header>
-<main class="layout">
+<main class="lg-page">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{rewrite.page.heading}"></h1>
-    <div th:replace="~{console/rewrite :: panel}"></div>
-    <p><a th:href="@{/console/check(marketplace=${marketplace.code()})}" th:text="#{rewrite.back}"></a></p>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{rewrite.page.heading}"></h1>
+        </div>
+    </div>
+    <div class="lg-section" th:replace="~{console/rewrite :: panel}"></div>
+    <p><a class="lg-btn" th:href="@{/console/check(marketplace=${marketplace.code()})}" th:text="#{rewrite.back}"></a></p>
 </main>
 </body>
 </html>

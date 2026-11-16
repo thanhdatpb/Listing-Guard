@@ -93,7 +93,7 @@ class ConsoleRewriteIntegrationTest {
         String rewrite = section(broken, "rewrite");
         assertThat(rewrite).contains("action=\"/console/rewrite/editor\"").contains("name=\"title\"").contains("name=\"tags\"")
                 .contains("name=\"pack\" value=\"listing-rules\"").contains("name=\"checkId\" value=\"");
-        assertThat(broken).contains("/console/rewrite.js").contains("/console/rewrite.css");
+        assertThat(broken).contains("/console/rewrite.js").doesNotContain("/console/rewrite.css");
         assertThat(clean).doesNotContain("/console/rewrite/editor").doesNotContain("id=\"rewrite\"");
     }
 

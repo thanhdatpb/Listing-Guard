@@ -11,9 +11,11 @@ import java.util.Locale;
  *
  * @param rulesRan              false when the listing rules did not run (quota or plan), so there are no rule findings
  * @param requiredFieldsFinding true when a {@code required_fields} finding exists, which opens "Other listing fields"
+ * @param listing               the listing as it was checked, with the text the findings point at marked (ADR-041); the page adds
+ *                              the rules' limits to it
  */
 public record EditorResult(Readiness readiness, Trademark trademark, List<Group<RuleItem>> ruleGroups, boolean rulesRan,
-                           boolean requiredFieldsFinding) {
+                           boolean requiredFieldsFinding, com.thanhdatpb.listingguard.api.console.ListingView listing) {
 
     public enum ReadinessKind {
         READY, NOT_READY, INCOMPLETE, NOT_RUN;
@@ -75,6 +77,16 @@ public record EditorResult(Readiness readiness, Trademark trademark, List<Group<
      */
     public record TrademarkItem(String ruleId, String risk, String field, String matchType, String mark, String message,
                                 String suggestion, Evidence evidence, FeedbackTarget target, String llmReason) {
+    }
+
+    /** How many findings of the listing rules have this level ({@code error}, {@code warning} or {@code info}). */
+    public int count(String level) {
+        return ruleGroups.stream().filter(group -> level.equals(group.css())).mapToInt(group -> group.items().size()).sum();
+    }
+
+    /** How many trademark findings there are, of any risk. */
+    public int trademarkCount() {
+        return trademark.groups().stream().mapToInt(group -> group.items().size()).sum();
     }
 
     /**

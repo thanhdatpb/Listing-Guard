@@ -6,6 +6,7 @@ import com.thanhdatpb.listingguard.api.check.CheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.console.ConsoleLlmLabel;
+import com.thanhdatpb.listingguard.api.console.ListingView;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import com.thanhdatpb.listingguard.api.plan.Pack;
@@ -68,8 +69,18 @@ public class EditorCheckService {
         CheckRequest request = new CheckRequest(marketplace.code(), listingJson);
         Listing listing = normalizers.get(marketplace.code()).normalize(listingJson);
         Rules rules = rules(clientId, request);
-        EditorResult.Trademark trademark = trademark(clientId, request, listing);
-        return new EditorResult(rules.readiness(), trademark, rules.groups(), rules.ran(), rules.requiredFields());
+        List<ListingView.Mark> marks = new ArrayList<>();
+        for (EditorResult.Group<EditorResult.RuleItem> group : rules.groups()) {
+            for (EditorResult.RuleItem item : group.items()) {
+                ListingView.Mark mark = ListingView.ruleMark(item.field(), item.value(), group.css());
+                if (mark != null) {
+                    marks.add(mark);
+                }
+            }
+        }
+        EditorResult.Trademark trademark = trademark(clientId, request, listing, marks);
+        return new EditorResult(rules.readiness(), trademark, rules.groups(), rules.ran(), rules.requiredFields(),
+                ListingView.of(listing, marketplace == EditorMarketplace.ETSY, marks, null, null));
     }
 
     private record Rules(EditorResult.Readiness readiness, List<EditorResult.Group<EditorResult.RuleItem>> groups, boolean ran,
@@ -153,10 +164,13 @@ public class EditorCheckService {
                 target);
     }
 
-    private EditorResult.Trademark trademark(UUID clientId, CheckRequest request, Listing listing) {
+    private EditorResult.Trademark trademark(UUID clientId, CheckRequest request, Listing listing, List<ListingView.Mark> marks) {
         String disclaimer = trademarkRulesets.ruleset().disclaimer();
         try {
             TrademarkCheckResult result = trademarks.check(clientId, request);
+            for (TrademarkCheckResult.FindingView finding : result.findings()) {
+                marks.add(ListingView.Mark.span(finding.field(), finding.start(), finding.end(), "trademark"));
+            }
             return fromResult(result, listing);
         } catch (TrademarkUnavailableException e) {
             return panel(EditorResult.TrademarkKind.UNAVAILABLE, messages.get("editor.trademark.unavailable.big"),
