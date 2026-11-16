@@ -93,6 +93,7 @@ final class HealthReportHtml {
         variation(html, r.packs().variationChecks());
         personalization(html, r.packs().personalizationScreening());
         feedback(html, r.feedback());
+        reaudit(html, r.reaudit());
         weeks(html, r.byWeek());
         versions(html, r);
         html.append("</section>\n");
@@ -202,6 +203,21 @@ final class HealthReportHtml {
         }
         html.append("<p class=\"note\">Đây là điều người xem đã đánh dấu, không phải độ chính xác đo được. Phản hồi được tính theo "
                 + "lần đánh dấu gần nhất; ghi chú không có trong báo cáo.</p>\n");
+    }
+
+    /** The periodic re-audits of the period and which scopes are due for one (ADR-035); counts only. */
+    private static void reaudit(StringBuilder html, HealthReport.ReauditSummaryView v) {
+        html.append("<h3>Rà định kỳ listing đang bán</h3>\n<table>\n");
+        row(html, "Lần rà trong khoảng ngày", v.runs());
+        row(html, "Client đã rà", v.clients());
+        row(html, "Listing đã kiểm tra (cộng các lần rà)", v.listingsChecked());
+        row(html, "Rủi ro cần sửa", v.findings());
+        row(html, "Trong đó rủi ro mới", v.newFindings());
+        row(html, "Catalog đang phục vụ", v.servedCatalog() == null ? "-" : v.servedCatalog());
+        row(html, "Phạm vi nên rà lại (lần rà gần nhất dùng catalog khác)", v.scopesToReaudit() == null ? "-" : v.scopesToReaudit());
+        html.append("</table>\n<p class=\"note\">Rủi ro cần sửa là ERROR/WARNING của luật listing và finding trademark MEDIUM/HIGH. "
+                + "Rủi ro mới là rủi ro do nhãn trong catalog hoặc watchlist mà lần rà trước của cùng phạm vi chưa có. "
+                + "Báo cáo không chứa SKU hay nội dung listing.</p>\n");
     }
 
     private static void weeks(StringBuilder html, List<HealthReport.WeekView> weeks) {

@@ -593,6 +593,10 @@
             "$ref" : "#/components/schemas/PeriodView",
             "description" : "The days counted, in UTC, both ends included."
           },
+          "reaudit" : {
+            "$ref" : "#/components/schemas/ReauditSummaryView",
+            "description" : "The periodic re-audits of the console in the period (ADR-035), for the whole period only. Counts only: no listing, SKU or finding text is in it."
+          },
           "versions" : {
             "$ref" : "#/components/schemas/VersionsView",
             "description" : "What runs now. Results of the period may have been made under older versions."
@@ -1230,6 +1234,53 @@
           },
           "version" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ReauditSummaryView" : {
+        "description" : "A run of the console's periodic re-audit is counted by when it started. `findings` are the risks that need fixing (listing-rules ERROR or WARNING, trademark MEDIUM or HIGH); `newFindings` are those caused by a catalog mark or watchlist entry the previous run of the same scope did not have.",
+        "properties" : {
+          "clients" : {
+            "description" : "Clients that ran at least one.",
+            "example" : 1,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "findings" : {
+            "description" : "Risks found, all runs together.",
+            "example" : 41,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "listingsChecked" : {
+            "description" : "Listings read and checked, all runs together (a listing counts once per run).",
+            "example" : 540,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "newFindings" : {
+            "description" : "Of those, the new ones.",
+            "example" : 6,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "runs" : {
+            "description" : "Runs that started in the period.",
+            "example" : 3,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "scopesToReaudit" : {
+            "description" : "Scopes (client, marketplace, account label) whose latest run was made with another catalog than the one served now, so a new run is due. Null when no catalog is served. Counted over all time, not the period.",
+            "example" : 2,
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "servedCatalog" : {
+            "description" : "The catalog version this deployment serves now; null when none is served.",
+            "example" : "uspto-2026-11-0123456789ab",
+            "type" : [ "string", "null" ]
           }
         },
         "type" : "object"
@@ -5378,6 +5429,15 @@
                         "days" : 7,
                         "from" : "2026-11-02",
                         "to" : "2026-11-08"
+                      },
+                      "reaudit" : {
+                        "clients" : 1,
+                        "findings" : 41,
+                        "listingsChecked" : 540,
+                        "newFindings" : 6,
+                        "runs" : 3,
+                        "scopesToReaudit" : 2,
+                        "servedCatalog" : "uspto-2026-11-0123456789ab"
                       },
                       "versions" : {
                         "rulesets" : [ {

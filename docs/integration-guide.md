@@ -1503,6 +1503,12 @@ the same service, so the three always agree.
 `topFalsePositiveRules` (pack, rule id, false positives, verdicts, rate; limit `listing-guard.reports.top-rules`). It is for the whole
 period only, not per week, and holds no note.
 
+**`reaudit`** (ADR-035, [reaudit.md](reaudit.md)) counts the periodic re-audits of the console that started in the period: `runs`,
+`clients`, `listingsChecked`, `findings` (risks that need fixing) and `newFindings` (those caused by a catalog mark or a watchlist entry the
+previous run of the same scope did not have). `servedCatalog` is the catalog version the deployment serves now (null when none) and
+`scopesToReaudit` how many (client, marketplace, account label) scopes were last audited with another catalog, so a new run is due; it is
+null when no catalog is served and counts over all time, not the period. Counts only: no SKU and no text of a listing.
+
 ## Finding feedback
 
 Tell Listing Guard whether a finding was right (ADR-034, [feedback.md](feedback.md)). Nothing about the result or the rules changes; the

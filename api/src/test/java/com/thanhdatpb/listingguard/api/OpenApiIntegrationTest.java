@@ -145,7 +145,9 @@ class OpenApiIntegrationTest {
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1reports~1summary/get/responses/400/content/application~1problem+json/examples")))
                 .containsExactlyInAnyOrder("invalid-report-period", "report-period-too-long", "unknown-marketplace");
         assertThat(fieldNames(spec.at("/components/schemas/HealthReport/properties"))).containsExactlyInAnyOrder("period", "marketplace",
-                "generatedAt", "versions", "packs", "byWeek", "coverageNote", "feedback");
+                "generatedAt", "versions", "packs", "byWeek", "coverageNote", "feedback", "reaudit");
+        assertThat(fieldNames(spec.at("/components/schemas/ReauditSummaryView/properties"))).containsExactlyInAnyOrder("runs",
+                "clients", "listingsChecked", "findings", "newFindings", "servedCatalog", "scopesToReaudit");
         assertThat(fieldNames(spec.at("/components/schemas/ReadinessSummaryView/properties"))).containsExactlyInAnyOrder(
                 "checksWithReadiness", "scoredChecks", "incompleteChecks", "readyChecks", "readyRate", "averageScore",
                 "checksWithoutReadiness", "versions");
