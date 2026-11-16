@@ -49,6 +49,12 @@ listing-guard:
     access-allowed-emails: ${LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS:}
     access-auto-create: ${LISTING_GUARD_CONSOLE_ACCESS_AUTO_CREATE:false}
     access-default-client-name: ${LISTING_GUARD_CONSOLE_ACCESS_DEFAULT_CLIENT_NAME:}
+  llm:
+    # LLM rewrite suggestions (ADR-037, docs/llm.md): the console's "Gợi ý sửa" button. Off by default, and it also needs an LlmProvider bean
+    # (ADR-036). When on, the title, tags and findings of a listing are sent to the provider each time a seller presses the button.
+    rewrite:
+      enabled: ${LISTING_GUARD_LLM_REWRITE_ENABLED:false}
+      max-per-hour: ${LISTING_GUARD_LLM_REWRITE_MAX_PER_HOUR:20}
   rate-limit:
     enabled: true
     requests-per-minute: 60

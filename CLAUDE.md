@@ -404,7 +404,19 @@ It never edits a listing, never publishes, and does no SEO.
   editor shows before/after and new/modified/remaining findings. History is scoped to the signed-in account's client, filters and
   paginates saved pack results, and stores event references (actor, result, time, marketplace, row count, optional SKU) only; listing
   text is never stored. A history result cannot restore the prior listing: edit mode leaves Before blank and asks the seller to paste it.
-  SDK, read-only MCP `check_listing_edit`, agent skill, OpenAPI and integration docs are updated. **Bulk check (ADR-029, V36)** (`api/.../console/bulk/`, `templates/console/bulk*.html`, `static/console/bulk.{css,js}`, English and
+  SDK, read-only MCP `check_listing_edit`, agent skill, OpenAPI and integration docs are updated. **LLM rewrite suggestions (ADR-037, Proposed; V40)** (`api/.../rewrite/`,
+  `console/editor/ConsoleRewriteController`, `templates/console/rewrite{,-page}.html`, `static/console/rewrite.{js,css}`,
+  [docs/llm.md](docs/llm.md)): **off by default** (`listing-guard.llm.rewrite.enabled=false`) and needs an `LlmProvider` bean (ADR-036 is
+  not in the repository: only `ScriptedLlmProvider` and tests' `StubLlm` exist); with either missing there is no bean of the package, no
+  route and no button (`rewriteAvailable` from `ConsoleRewriteAdvice`). A press of "Gợi ý sửa" (editor, and each bulk row with an ERROR or a
+  trademark finding; the row carries its listing as `BulkResult.Row.rewriteListing`, printed only while the feature is on) sends the title,
+  tags and findings (never the description or other fields) through `ListingRewriter`, up to 3 candidates. **The model proposes, the
+  checks decide:** each candidate is verified through `CheckService.evaluate` and `TrademarkCheckService.evaluate` (no storing, no cache, no
+  quota): every rule ran, no ERROR, trademark complete and no signature the original lacked (catalog or watchlist), fewer problems than
+  before, no more words, no stuffed word, exact tag value. Anything unverified is never shown; none passing is "Không có gợi ý an toàn".
+  Nothing applies a suggestion (copy button only; ADR-014 A2 still holds for rules). `rewrite_suggestion_run` (V40) keeps counts and the
+  ADR-034 finding address, never text; `RewriteRunStore.markUsed` counts the first copy of a run for the use-rate on `/console/stats`.
+  No HTTP API, SDK or MCP change. **Bulk check (ADR-029, V36)** (`api/.../console/bulk/`, `templates/console/bulk*.html`, `static/console/bulk.{css,js}`, English and
   Vietnamese like the rest of the console: every sentence is a message key, ADR-028; `BulkText` and the pure classes take
   `ConsoleMessages`): `GET /console/bulk`, `POST /console/bulk/prepare` and `POST /console/bulk/run` (multipart). A seller pastes
   rows copied from a Google Sheet (tab "Paste from Sheet") or uploads a CSV/TSV (tab "Upload a file"), confirms what each column is, and gets

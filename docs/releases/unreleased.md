@@ -4,14 +4,32 @@ Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shippe
 and Vietnamese (ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030), the value backtest with the labelled
 evaluation (ADR-032), the client trademark watchlist (ADR-031) and edit mode and check history (ADR-033). Finding feedback,
 the watchlist and edit mode touch the API, and only additively (see their sections); the bulk check adds migration V36, finding
-feedback V37, the watchlist V38 and check history V39, all additive. The other changes touch no API response, request, status,
-header or migration.
+feedback V37, the watchlist V38, check history V39 and the LLM rewrite suggestions (ADR-037, off by default, console only) V40, all
+additive. The other changes touch no API response, request, status, header or migration.
 
 Every pull request that changes the API runs the compatibility check (`./mvnw -B -pl contract-tools verify`, ADR-022) and copies the
 additive and non-breaking lines of `contract-tools/target/contract/compatibility-report.md` here, with a short section for the
 change. When the next version is cut, move this file to `docs/releases/v<version>.md` and start a new one.
 
 ## What is new
+
+### LLM rewrite suggestions verified by rules (ADR-037)
+
+An optional console button, **Gợi ý sửa**, for a listing with an `ERROR` finding or a trademark finding: an AI model proposes up to three
+titles and replacement tags, and Listing Guard shows only the proposals that pass every check again. Guide: [llm.md](../llm.md).
+
+- **Off by default.** `listing-guard.llm.rewrite.enabled=false`, and it needs an `LlmProvider` (ADR-036, not in the repository yet). With
+  either missing there is no route and no button, and nothing leaves the system. **With it on, the title, tags and findings of a listing are
+  sent to the provider each time a seller presses the button**; the description and other fields are not.
+- **The model proposes, the checks decide.** A proposal is shown only when every listing rule ran and none reports an `ERROR`, the trademark
+  check (catalog and watchlist) is complete and finds nothing the original did not, it has fewer problems than before, no more words, no
+  stuffed word, and a tag change names the exact current tag. None passing is **"Không có gợi ý an toàn"**. Nothing unverified is shown.
+- **Nothing is applied.** The editor and each bulk row only offer a copy button; ADR-014 A2 still holds for rules.
+- **Verification is free of side effects.** `CheckService.evaluate` and `TrademarkCheckService.evaluate` store nothing, cache nothing and use no quota.
+- **Use is measured (ADR-034).** **Migration V40** adds `rewrite_suggestion_run` (counts and the finding address, no text); **Statistics** shows
+  the share of runs whose suggestion was copied. At most 20 runs per client per hour (`max-per-hour`).
+- **Compatibility report (ADR-022):** none. No HTTP API, OpenAPI, SDK, MCP or agent-skill change.
+- **Open:** the Vietnamese and English texts, and the sentence that a verified suggestion is not legal clearance, need a native and legal read.
 
 ### Client trademark watchlist (ADR-031)
 
