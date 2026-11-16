@@ -16,7 +16,7 @@
     <span id="main" tabindex="-1"></span>
     <div class="lg-page__head">
         <div>
-            <p class="lg-page__crumb" th:text="#{home.week(${#temporals.format(home.weekFrom, 'dd/MM/yyyy')}, ${#temporals.format(home.today, 'dd/MM/yyyy')})}"></p>
+            <p class="lg-page__crumb" th:with="pattern=#{format.date}" th:text="#{home.week(${#temporals.format(home.weekFrom, pattern)}, ${#temporals.format(home.today, pattern)})}"></p>
             <h1 th:text="#{dashboard.heading}"></h1>
             <p class="lg-page__sub" th:text="#{home.sub}"></p>
         </div>
@@ -100,7 +100,7 @@
                             </div>
                             <p class="lg-feed__text" th:text="${item.message}"></p>
                             <p class="lg-feed__meta"
-                               th:text="#{home.attention.meta(${item.marketplace}, ${#temporals.format(item.checkedAt, 'dd/MM HH:mm')})}"></p>
+                               th:with="pattern=#{format.datetime}" th:text="#{home.attention.meta(${item.marketplace}, ${#temporals.format(item.checkedAt, pattern)})}"></p>
                         </div>
                     </li>
                 </ul>
@@ -115,7 +115,7 @@
                         <div class="lg-kv__main">
                             <div class="lg-kv__label" th:text="#{home.data.catalog}"></div>
                             <div class="lg-kv__value" th:if="${home.data.catalogSource != null and home.data.catalogDate != null}"
-                                 th:text="#{home.data.catalog.value(${home.data.catalogSource}, ${#temporals.format(home.data.catalogDate, 'dd/MM/yyyy')})}"></div>
+                                 th:with="pattern=#{format.date}" th:text="#{home.data.catalog.value(${home.data.catalogSource}, ${#temporals.format(home.data.catalogDate, pattern)})}"></div>
                             <div class="lg-code" th:if="${home.data.catalogVersion != null}" th:text="${home.data.catalogVersion}"></div>
                         </div>
                         <span class="lg-pill lg-pill--clean" th:if="${home.data.catalogState == 'READY'}" th:text="#{home.data.catalog.ready}"></span>
@@ -133,7 +133,7 @@
                         <div class="lg-kv__main">
                             <div class="lg-kv__label" th:text="#{home.data.reaudit}"></div>
                             <div class="lg-kv__value" th:if="${home.data.lastReauditAt != null}"
-                                 th:text="#{home.data.reaudit.value(${#temporals.format(home.data.lastReauditAt, 'dd/MM')}, ${#strings.toString(home.data.lastReauditNew)})}"></div>
+                                 th:with="pattern=#{format.daymonth}" th:text="#{home.data.reaudit.value(${#temporals.format(home.data.lastReauditAt, pattern)}, ${#strings.toString(home.data.lastReauditNew)})}"></div>
                             <div class="lg-kv__value" th:if="${home.data.lastReauditAt == null}" th:text="#{home.data.reaudit.never}"></div>
                         </div>
                         <a class="lg-small" th:href="@{/console/reaudit}" th:text="#{home.data.open}"></a>

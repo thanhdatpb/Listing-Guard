@@ -16,7 +16,7 @@
             <li th:each="item : ${notice.stale}">
                 <span th:text="${item.marketplace}"></span>
                 <span th:text="${item.account.isEmpty()} ? #{reaudit.account.none} : ${item.account}"></span>:
-                <span th:text="#{home.reaudit.last(${#strings.substring(#strings.toString(item.startedAt), 0, 10)}, ${item.catalogVersion == null} ? #{reaudit.catalog.none} : ${item.catalogVersion})}"></span>
+                <span th:with="pattern=#{format.date}" th:text="#{home.reaudit.last(${#temporals.format(item.startedAt, pattern)}, ${item.catalogVersion == null} ? #{reaudit.catalog.none} : ${item.catalogVersion})}"></span>
             </li>
         </ul>
         <p th:if="${notice.more > 0}" th:text="#{home.reaudit.more(${#strings.toString(notice.more)})}"></p>

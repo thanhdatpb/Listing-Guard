@@ -65,7 +65,7 @@
     </div>
 
     <div class="lg-table-wrap" th:unless="${history.rows().isEmpty()}" th:with="datetime=#{format.datetime}">
-        <table class="lg-table lg-table--scroll" id="history-table">
+        <table class="lg-table lg-table--scroll lg-table--dense" id="history-table">
             <caption class="lg-sr-only" th:text="#{history.table.caption}"></caption>
             <thead>
             <tr>
@@ -76,22 +76,21 @@
                 <th scope="col" class="lg-num" th:text="#{history.col.rows}"></th>
                 <th scope="col" th:text="#{history.col.errors}"></th>
                 <th scope="col" th:text="#{history.col.trademarks}"></th>
-                <th scope="col" th:text="#{history.col.status}"></th>
                 <th scope="col" th:text="#{history.col.feedback}"></th>
                 <th scope="col"><span class="lg-sr-only" th:text="#{history.col.result}"></span></th>
             </tr>
             </thead>
             <tbody>
             <tr th:each="row : ${history.rows()}">
-                <td class="lg-nowrap" th:text="${#temporals.format(row.checkedAt(), datetime)}"></td>
-                <td class="lg-wrap" th:text="${row.checker()}"></td>
+                <td class="lg-nowrap"><span th:text="${#temporals.format(row.checkedAt(), datetime)}"></span>
+                    <th:block th:unless="${row.status() == 'COMPLETE' or row.status() == 'COMPLETED'}"><br><span th:replace="~{console/history-fragments :: status(${row.status()})}"></span></th:block></td>
+                <td class="lg-ellip" th:title="${row.checker()}" th:text="${row.checker()}"></td>
                 <td th:text="${row.marketplace()}"></td>
                 <td class="lg-sku"><code class="lg-code" th:if="${row.sku() != null}" th:text="${row.sku()}"></code><span class="lg-text-muted" th:if="${row.sku() == null}">&mdash;</span></td>
                 <td class="lg-num" th:text="${#numbers.formatInteger(row.rowCount(), 1)}"></td>
                 <td><span class="lg-pill lg-pill--error" th:if="${row.errors() > 0}" th:text="${#numbers.formatInteger(row.errors(), 1)}"></span><span class="lg-text-muted" th:if="${row.errors() == 0}">0</span></td>
                 <td><span class="lg-pill lg-pill--trademark" th:if="${row.trademarks() > 0}" th:text="${#numbers.formatInteger(row.trademarks(), 1)}"></span><span class="lg-text-muted" th:if="${row.trademarks() == 0}">0</span></td>
-                <td><span th:replace="~{console/history-fragments :: status(${row.status()})}"></span></td>
-                <td class="lg-text-muted">
+                <td class="lg-text-muted lg-nowrap">
                     <th:block th:if="${row.feedbackTotal() == 0}">&mdash;</th:block>
                     <th:block th:if="${row.feedbackTotal() > 0 and row.feedbackGiven() == 0}" th:text="#{history.feedback.none}"></th:block>
                     <th:block th:if="${row.feedbackGiven() > 0}" th:text="#{history.feedback.given(${#strings.toString(row.feedbackGiven())}, ${#strings.toString(row.feedbackTotal())})}"></th:block>

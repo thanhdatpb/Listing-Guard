@@ -31,8 +31,8 @@
 
     <th:block th:if="${report != null}">
         <section id="coverage" th:aria-label="#{report.coverage.aria}">
-            <div class="lg-banner lg-banner--success lg-section" role="note" th:if="${report.coverageNote.complete}"><p th:text="${coverageText}"></p></div>
-            <div class="lg-banner lg-banner--warning lg-section" role="note" th:unless="${report.coverageNote.complete}"><p th:text="${coverageText}"></p></div>
+            <div class="lg-banner lg-banner--success lg-section" role="note" th:if="${report.coverageNote.complete}"><div class="lg-banner__body"><p th:text="${coverageText}"></p></div></div>
+            <div class="lg-banner lg-banner--warning lg-section" role="note" th:unless="${report.coverageNote.complete}"><div class="lg-banner__body"><p th:text="${coverageText}"></p></div></div>
         </section>
 
         <!-- the figures first: what a lead looks at, each with its own unit -->
@@ -51,9 +51,9 @@
         <section class="lg-card lg-section" id="overview" aria-labelledby="overview-heading">
             <h2 id="overview-heading" class="lg-card__title" th:text="#{report.overview.heading}"></h2>
             <p class="lg-text-muted">
-                <time th:text="${report.period.from}"></time> <span th:text="#{report.overview.to}"></span> <time th:text="${report.period.to}"></time>
+                <time th:datetime="${report.period.from}" th:with="pattern=#{format.date}" th:text="${#temporals.format(report.period.from, pattern)}"></time> <span th:text="#{report.overview.to}"></span> <time th:datetime="${report.period.to}" th:with="pattern=#{format.date}" th:text="${#temporals.format(report.period.to, pattern)}"></time>
                 (<span th:text="#{report.overview.days(${#strings.toString(report.period.days)})}"></span>)<span th:if="${report.marketplace != null}"> &middot; <span th:text="#{report.overview.marketplace}"></span>
-                <strong th:text="${report.marketplace}"></strong></span>. <span th:text="#{report.overview.generated}"></span> <time th:text="${report.generatedAt}"></time>.
+                <strong th:text="${report.marketplace}"></strong></span>. <time th:datetime="${report.generatedAt}" th:with="pattern=#{format.datetime}" th:text="#{report.overview.generated.at(${#temporals.format(report.generatedAt, pattern)})}"></time>
             </p>
             <p class="lg-small lg-text-muted" th:text="#{report.overview.note}"></p>
             <div class="lg-table-wrap">
@@ -299,8 +299,8 @@
                     </thead>
                     <tbody>
                     <tr th:each="item : ${report.feedback.topFalsePositiveRules.items}">
-                        <td th:text="${item.pack}"></td>
-                        <td th:text="${item.ruleId}"></td>
+                        <td class="lg-nowrap" th:text="${item.pack}"></td>
+                        <td><code class="lg-code" th:text="${item.ruleId}"></code></td>
                         <td class="lg-num" th:text="${item.falsePositives}"></td>
                         <td class="lg-num" th:text="${item.verdicts}"></td>
                         <td class="lg-num" th:text="${#numbers.formatPercent(item.falsePositiveRate, 1, 1)}"></td>

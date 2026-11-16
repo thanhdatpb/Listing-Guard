@@ -141,7 +141,8 @@
                     <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.facts.previous}"></span>
                         <span class="lg-kv__value" th:if="${result.firstRun}" th:text="#{reaudit.previous.none}"></span>
                         <span class="lg-kv__value" th:unless="${result.firstRun}"
-                              th:text="#{reaudit.previous.at(${#strings.toString(result.previousAt)}, ${result.previousCatalogVersion == null} ? #{reaudit.catalog.none} : ${result.previousCatalogVersion})}"></span></li>
+                              th:with="pattern=#{format.datetime}"
+                              th:text="#{reaudit.previous.at(${#temporals.format(result.previousAt, pattern)}, ${result.previousCatalogVersion == null} ? #{reaudit.catalog.none} : ${result.previousCatalogVersion})}"></span></li>
                     <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.facts.rows}"></span>
                         <span class="lg-kv__value" th:text="#{reaudit.facts.rows.value(${#strings.toString(result.rowsTotal)}, ${#strings.toString(result.rowsChecked)})}"></span></li>
                 </ul>

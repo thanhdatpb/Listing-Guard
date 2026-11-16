@@ -38,7 +38,7 @@
         <section id="stats-totals" class="lg-section" aria-labelledby="totals-heading">
             <h2 id="totals-heading" class="lg-section-title lg-section" th:text="#{stats.totals.heading}"></h2>
             <p class="lg-text-muted lg-small">
-                <time th:text="${stats.period.from}"></time> <span th:text="#{report.overview.to}"></span> <time th:text="${stats.period.to}"></time>
+                <time th:datetime="${stats.period.from}" th:with="pattern=#{format.date}" th:text="${#temporals.format(stats.period.from, pattern)}"></time> <span th:text="#{report.overview.to}"></span> <time th:datetime="${stats.period.to}" th:with="pattern=#{format.date}" th:text="${#temporals.format(stats.period.to, pattern)}"></time>
                 (<span th:text="#{report.overview.days(${#strings.toString(stats.period.days)})}"></span>)<span th:if="${stats.marketplace != null}"> &middot; <strong th:text="${stats.marketplace}"></strong></span>
             </p>
             <div class="lg-grid lg-grid--stats lg-section">
@@ -101,7 +101,7 @@
                     </thead>
                     <tbody>
                     <tr th:each="rule : ${stats.byRule}" th:with="explanation=${@consoleMessages.ruleExplanation(rule.ruleId)}">
-                        <td th:text="${rule.pack}"></td>
+                        <td class="lg-nowrap" th:text="${rule.pack}"></td>
                         <td class="lg-main"><code class="lg-code" th:text="${rule.ruleId}"></code><span class="lg-text-muted lg-small" th:if="${explanation != null}"><br><span th:text="${explanation}"></span></span></td>
                         <td th:text="${rule.source}"></td>
                         <td class="lg-num" th:text="${rule.findings}"></td>

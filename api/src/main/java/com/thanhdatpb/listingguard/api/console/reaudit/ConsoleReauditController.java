@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccount;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRepository;
+import com.thanhdatpb.listingguard.api.console.ConsoleDates;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkProperties;
@@ -60,7 +61,6 @@ public class ConsoleReauditController {
     static final int MAX_ACCOUNT_CHARS = 80;
     private static final int RECENT = 10;
     private static final int LABELS = 30;
-    private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT);
 
     /** One earlier run, for the table under the form; every text is ready to print. */
     public record RunView(String when, String marketplace, String account, String catalog, int rows, int findings, int fresh) {
@@ -263,7 +263,7 @@ public class ConsoleReauditController {
     }
 
     private RunView view(ReauditStore.Run run) {
-        return new RunView(WHEN.format(run.startedAt().atOffset(ZoneOffset.UTC)), EditorMarketplace.parse(run.marketplace())
+        return new RunView(ConsoleDates.dateTime(messages, run.startedAt()), EditorMarketplace.parse(run.marketplace())
                 .map(EditorMarketplace::label).orElse(run.marketplace()), run.account(), run.catalogVersion(), run.rowsTotal(),
                 run.findings(), run.findingsNew());
     }

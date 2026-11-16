@@ -329,8 +329,9 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 
 /* ---------- table ---------- */
 
-/* The wrapper scrolls sideways on a narrow screen instead of squeezing the columns. */
-.lg-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-1); }
+/* The wrapper scrolls sideways on a narrow screen instead of squeezing the columns. It is positioned so that a word only a screen reader hears (an
+   absolute box in a far column) stays inside it: without that the box leaves the wrapper and makes the whole page scroll sideways. */
+.lg-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-1); }
 .lg-table { width: 100%; font-size: 14px; line-height: 20px; }
 .lg-table--scroll { min-width: 40rem; }
 .lg-table th {
@@ -688,7 +689,7 @@ body:has(> .lg-auth) { display: flex; flex-direction: column; min-height: 100vh;
 .lg-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); }
 .lg-pager p { margin: 0; }
 .lg-nowrap { white-space: nowrap; }
-.lg-wrap { overflow-wrap: anywhere; }
+.lg-wrap { overflow-wrap: break-word; }
 
 /* A switch that is a button (it posts) or, when the reader cannot change it, a picture with a name: the knob is on the right when it is on, so
    the state is told by position and not by color alone. */
@@ -738,3 +739,17 @@ button.lg-switch:focus-visible { outline: 2px solid var(--brand); outline-offset
 /* A secret in a banner: the read-only field and the copy button on one line, the field taking what is left. */
 .lg-secret { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
 .lg-secret__field { flex: 1 1 18rem; width: auto; min-width: 0; font-family: var(--font-mono); font-size: 13px; }
+
+/* Review of the pages (ADR-042): the text of a header stays a line a person can read, so the buttons of the page sit beside it and not under it;
+   a cell with an address or a note has room to be read; a filter does not stretch to the longest e-mail it lists. */
+.lg-page__sub { max-width: 46rem; }
+.lg-page__head > :first-child { flex: 1 1 24rem; min-width: 0; }
+.lg-page__sub .lg-code { white-space: nowrap; }
+.lg-table td.lg-wrap { min-width: 9rem; }
+.lg-table tbody th[scope="row"].lg-rowhead { min-width: 9rem; }
+/* An address in a table: one line, cut with an ellipsis; the whole of it is in the title and in the page for a screen reader. */
+.lg-table td.lg-ellip { max-width: 11rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-filters .lg-select { max-width: 16rem; text-overflow: ellipsis; }
+.lg-kv + .lg-counts { margin-top: var(--space-4); }
+/* A table with many columns: the sides of a cell are narrower, so the page does not scroll for ten columns. */
+.lg-table--dense th, .lg-table--dense td { padding-left: var(--space-3); padding-right: var(--space-3); }

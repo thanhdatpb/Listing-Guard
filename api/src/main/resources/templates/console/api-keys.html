@@ -66,7 +66,7 @@
                 </thead>
                 <tbody>
                 <tr th:each="key : ${keys}">
-                    <td><code class="lg-code" th:text="${key.keyId}"></code></td>
+                    <td class="lg-nowrap"><code class="lg-code" th:text="${key.keyId}"></code></td>
                     <td class="lg-wrap"><strong th:if="${key.label != null}" th:text="${key.label}"></strong><span class="lg-text-muted" th:if="${key.label == null}" th:text="#{keys.nolabel}"></span></td>
                     <td class="lg-nowrap"><time th:text="${key.created}"></time></td>
                     <td class="lg-nowrap"><time th:if="${key.lastUsed != null}" th:text="${key.lastUsed}"></time><span class="lg-text-muted" th:if="${key.lastUsed == null}" th:text="#{keys.never}"></span></td>

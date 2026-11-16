@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.api.console.watchlist;
 
 import com.thanhdatpb.listingguard.api.console.ConsoleAccount;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRoles;
+import com.thanhdatpb.listingguard.api.console.ConsoleDates;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.console.bulk.DelimitedText;
@@ -63,7 +64,6 @@ public class ConsoleWatchlistController {
 
     static final String VIEW = "console/watchlist";
 
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC);
     private static final Pattern ENTRY_PATH = Pattern.compile("entries\\[(\\d+)]");
     private static final Pattern CONSOLE_ACTOR = Pattern.compile("console:([0-9a-f-]{36})");
     /** The largest text a preview echoes back in its hidden field: the body limit bounds it already. */
@@ -497,8 +497,8 @@ public class ConsoleWatchlistController {
         };
     }
 
-    private static String time(Instant instant) {
-        return instant == null ? "" : TIME.format(instant);
+    private String time(Instant instant) {
+        return instant == null ? "" : ConsoleDates.dateTime(messages, instant);
     }
 
     /** The bytes as UTF-8, or null when they are not (a file saved in another encoding would be read wrongly). */

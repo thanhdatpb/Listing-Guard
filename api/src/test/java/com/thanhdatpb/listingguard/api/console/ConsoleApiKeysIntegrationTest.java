@@ -112,7 +112,7 @@ class ConsoleApiKeysIntegrationTest {
 
         String html = page(mine);
 
-        assertThat(html).contains(kept.keyId()).contains("billing sync").contains("2026-11-15 10:00").contains("(1 of " + LIMIT + ")");
+        assertThat(html).contains(kept.keyId()).contains("billing sync").contains("Nov 15, 2026 10:00").contains("(1 of " + LIMIT + ")");
         assertThat(html).doesNotContain(revoked.keyId()).doesNotContain("retired one");
         assertThat(html).doesNotContain(foreign.keyId()).doesNotContain("someone else");
         assertThat(html).doesNotContain(kept.secret()).doesNotContain(revoked.secret()).doesNotContain(foreign.secret());
