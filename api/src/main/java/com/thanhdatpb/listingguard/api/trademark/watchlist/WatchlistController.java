@@ -57,6 +57,7 @@ public class WatchlistController {
 
     @GetMapping
     @Operation(
+            operationId = "getTrademarkWatchlist",
             summary = "Read the client's trademark watchlist",
             description = """
                     Returns the calling client's watchlist: every entry (enabled or not) in the client's order, the `revision` \
@@ -85,6 +86,7 @@ public class WatchlistController {
 
     @PutMapping
     @Operation(
+            operationId = "replaceTrademarkWatchlist",
             summary = "Replace the client's trademark watchlist",
             description = """
                     Replaces the calling client's whole watchlist with `entries`, in that order. An entry is identified by the \

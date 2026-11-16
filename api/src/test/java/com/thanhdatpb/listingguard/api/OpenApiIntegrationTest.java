@@ -98,7 +98,7 @@ class OpenApiIntegrationTest {
         JsonNode spec = mapper.readTree(generatedSpec());
 
         assertThat(fieldNames(spec.at("/paths"))).containsExactlyInAnyOrder("/api/v1/checks", "/api/v1/checks/{id}",
-                "/api/v1/trademark-checks", "/api/v1/trademark-checks/{id}", "/api/v1/usage",
+                "/api/v1/trademark-checks", "/api/v1/trademark-checks/{id}", "/api/v1/trademark-watchlist", "/api/v1/usage",
                 "/api/v1/variation-checks", "/api/v1/variation-checks/{id}",
                 "/api/v1/personalization-screenings", "/api/v1/personalization-screenings/{id}",
                 "/api/v1/image-checks", "/api/v1/image-checks/{id}",
@@ -226,8 +226,17 @@ class OpenApiIntegrationTest {
                 .as("its own finding schema: springdoc merges nested records of one simple name, which gave it the /checks finding")
                 .isEqualTo("#/components/schemas/TrademarkCheckFindingView");
         assertThat(fieldNames(spec.at("/components/schemas/TrademarkCheckFindingView/properties"))).containsExactlyInAnyOrder(
-                "ruleId", "risk", "field", "start", "end", "snippet", "mark", "matchType", "score", "insideColorPhrase",
-                "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "message", "suggestion", "tsdrStatuses");
+                "ruleId", "source", "risk", "field", "start", "end", "snippet", "mark", "matchType", "score",
+                "insideColorPhrase", "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "watchlistEntry", "message",
+                "suggestion", "tsdrStatuses");
+        // the client's watchlist (ADR-031): its own operations name themselves, so no other operation id moves
+        assertThat(spec.at("/paths/~1api~1v1~1trademark-watchlist/get/operationId").asText()).isEqualTo("getTrademarkWatchlist");
+        assertThat(spec.at("/paths/~1api~1v1~1trademark-watchlist/put/operationId").asText()).isEqualTo("replaceTrademarkWatchlist");
+        assertThat(fieldNames(spec.at("/paths/~1api~1v1~1trademark-watchlist"))).containsExactlyInAnyOrder("get", "put");
+        assertThat(fieldNames(spec.at("/components/schemas/TrademarkWatchlist/properties")))
+                .containsExactlyInAnyOrder("revision", "version", "updatedAt", "entries", "limits");
+        assertThat(spec.at("/components/schemas/TrademarkCheckFindingView/required").toString()).doesNotContain("watchlistEntry")
+                .as("additive: a finding of another source has no entry").doesNotContain("source");
         assertThat(spec.at("/components/schemas/TrademarkCheckFindingView/properties/tsdrStatuses/items/$ref").asText())
                 .as("the optional TSDR status (ADR-009): additive, present only when the deployment turns it on")
                 .isEqualTo("#/components/schemas/TsdrStatusView");

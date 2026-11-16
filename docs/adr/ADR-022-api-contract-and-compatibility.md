@@ -379,7 +379,7 @@ these members. A client generated from the v0.6.0 document had them typed and al
 
 - `response-property-removed` at `schema TrademarkCheckFindingView (was FindingView).fix`
 - `response-property-removed` at `schema TrademarkCheckFindingView (was FindingView).severity`
-- `response-property-removed` at `schema TrademarkCheckFindingView (was FindingView).source`
 - `response-property-removed` at `schema TrademarkCheckFindingView (was FindingView).value`
 
-They leave the exception file when the baseline moves to the next release.
+A fourth, `source`, was declared too; it left the file when ADR-031 gave a trademark finding a `source` member of its own (`CATALOG`, `CONTEXT` or
+`WATCHLIST`), so the member is no longer removed. They leave the exception file when the baseline moves to the next release.
