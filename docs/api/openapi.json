@@ -1595,6 +1595,11 @@
             "example" : "Zorvex",
             "type" : "string"
           },
+          "source" : {
+            "description" : "Where the finding comes from: CATALOG (a mark of the catalog), CONTEXT (a rule about place, sport or color) or WATCHLIST (an entry of the client's own watchlist, rule `watchlist_match`, ADR-031).",
+            "enum" : [ "CATALOG", "CONTEXT", "WATCHLIST" ],
+            "type" : "string"
+          },
           "sourceIds" : {
             "description" : "Ids of the source records of the catalog mark; empty when there is no mark.",
             "items" : {
@@ -1625,6 +1630,11 @@
               "$ref" : "#/components/schemas/TsdrStatusView"
             },
             "type" : "array"
+          },
+          "watchlistEntry" : {
+            "$ref" : "#/components/schemas/TrademarkWatchlistMatch",
+            "description" : "The watchlist entry the finding comes from; null for any finding whose `source` is not WATCHLIST.",
+            "type" : "null"
           }
         },
         "type" : "object"
@@ -1664,8 +1674,13 @@
             "description" : "True when the stored result of an identical earlier check is returned instead of a new analysis. Only a COMPLETE result is ever returned from the cache.",
             "type" : "boolean"
           },
+          "catalogStatus" : {
+            "description" : "SERVED when the text was compared with the catalog. NOT_CONFIGURED when the deployment serves no catalog and the check ran only the client's watchlist and the rules that need no catalog (ADR-031): the result is then INCOMPLETE, `skippedRuleIds` names the rules that did not run, and its absence of catalog findings says nothing.",
+            "enum" : [ "SERVED", "NOT_CONFIGURED" ],
+            "type" : "string"
+          },
           "catalogVersion" : {
-            "description" : "Version of the trademark catalog the text was compared with. Opaque.",
+            "description" : "Version of the trademark catalog the text was compared with. Opaque. `none` when no catalog was served (`catalogStatus` NOT_CONFIGURED); a real catalog version is never `none`.",
             "example" : "synthetic-2026-11-0123456789ab",
             "type" : "string"
           },
@@ -1726,6 +1741,19 @@
             "description" : "Version of the trademark ruleset that produced the result.",
             "example" : "trademark-risk-2026-11b",
             "type" : "string"
+          },
+          "skippedRuleIds" : {
+            "description" : "Rules that did not run because no catalog is served (`catalogStatus` NOT_CONFIGURED); empty otherwise.",
+            "example" : [ ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "watchlist" : {
+            "$ref" : "#/components/schemas/TrademarkWatchlistUsage",
+            "description" : "The client's watchlist the check used (ADR-031); null when the client had no enabled entry.",
+            "type" : "null"
           }
         },
         "type" : "object"
@@ -1890,6 +1918,234 @@
           "status" : {
             "description" : "COMPLETE; INCOMPLETE (a trademark rule failed, findings kept); NOT_CONFIGURED (no catalog is served, so the scan did not run).",
             "enum" : [ "COMPLETE", "INCOMPLETE", "NOT_CONFIGURED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkWatchlist" : {
+        "properties" : {
+          "entries" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TrademarkWatchlistEntry"
+            },
+            "type" : "array"
+          },
+          "limits" : {
+            "$ref" : "#/components/schemas/TrademarkWatchlistLimits"
+          },
+          "revision" : {
+            "description" : "Grows by one at every change; 0 when the client never had a list. It is the ETag, and `If-Match` on PUT compares it.",
+            "example" : 3,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "updatedAt" : {
+            "description" : "When the list last changed (UTC); null when it never existed.",
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "version" : {
+            "description" : "SHA-256 of the enabled entries, the `watchlist.version` a trademark check reports; null when no entry is enabled (checks then use no watchlist).",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkWatchlistEntry" : {
+        "properties" : {
+          "addedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "addedBy" : {
+            "description" : "Who added it: `console:<account id>` or `api-key:<key id>`.",
+            "example" : "api-key:k1a2b3c4",
+            "type" : "string"
+          },
+          "aliases" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "description" : "The entry's id. It is kept while the entry's mark keeps its normalized form.",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "mark" : {
+            "example" : "Brimwick Otters",
+            "type" : "string"
+          },
+          "niceClasses" : {
+            "items" : {
+              "format" : "int32",
+              "type" : "integer"
+            },
+            "type" : "array"
+          },
+          "note" : {
+            "example" : "từng bị claim",
+            "type" : [ "string", "null" ]
+          },
+          "serialNumber" : {
+            "example" : "12345678",
+            "type" : [ "string", "null" ]
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "updatedBy" : {
+            "description" : "Who changed it last, in the same form as `addedBy`.",
+            "example" : "api-key:k1a2b3c4",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkWatchlistEntryInput" : {
+        "properties" : {
+          "aliases" : {
+            "description" : "Other ways the mark is written: nicknames, short forms, slogans. Optional.",
+            "example" : [ "Otterz", "BWO" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "enabled" : {
+            "description" : "False keeps the entry in the list without scanning for it. Default true.",
+            "type" : [ "boolean", "null" ]
+          },
+          "mark" : {
+            "description" : "The mark, as it should be reported. It identifies the entry: after normalization (case, accents, punctuation, look-alike letters) no two marks or aliases of one list may be equal.",
+            "example" : "Brimwick Otters",
+            "type" : "string"
+          },
+          "niceClasses" : {
+            "description" : "Nice classes (1 to 45) the client notes for the mark. Shown in findings; they do not change a level.",
+            "example" : [ 25 ],
+            "items" : {
+              "format" : "int32",
+              "type" : "integer"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "note" : {
+            "description" : "Why the entry is listed, for example a claim received. Shown in the finding's message.",
+            "example" : "từng bị claim",
+            "type" : [ "string", "null" ]
+          },
+          "serialNumber" : {
+            "description" : "A USPTO serial number (eight digits), optional. A finding then carries the source id `uspto:<serialNumber>` and its look-up link.",
+            "example" : "12345678",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "mark" ],
+        "type" : "object"
+      },
+      "TrademarkWatchlistLimits" : {
+        "properties" : {
+          "maxAliases" : {
+            "example" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxEntries" : {
+            "example" : 500,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxNoteChars" : {
+            "description" : "Longest note, in characters.",
+            "example" : 500,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxTextChars" : {
+            "description" : "Longest mark or alias, in characters.",
+            "example" : 100,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxTokens" : {
+            "description" : "Most words in one mark or alias after normalization.",
+            "example" : 12,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkWatchlistMatch" : {
+        "properties" : {
+          "entryId" : {
+            "description" : "The entry's id, as `GET /api/v1/trademark-watchlist` shows it.",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "mark" : {
+            "example" : "Brimwick Otters",
+            "type" : "string"
+          },
+          "matchedAlias" : {
+            "description" : "The alias that matched; null when the mark itself did.",
+            "type" : [ "string", "null" ]
+          },
+          "niceClasses" : {
+            "description" : "The Nice classes the client noted; they do not change the level.",
+            "items" : {
+              "format" : "int32",
+              "type" : "integer"
+            },
+            "type" : "array"
+          },
+          "note" : {
+            "description" : "Why the client listed the entry.",
+            "type" : [ "string", "null" ]
+          },
+          "serialNumber" : {
+            "example" : "12345678",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkWatchlistReplaceRequest" : {
+        "properties" : {
+          "entries" : {
+            "description" : "Every entry of the list, in the order to keep. An empty list removes every entry.",
+            "items" : {
+              "$ref" : "#/components/schemas/TrademarkWatchlistEntryInput"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "entries" ],
+        "type" : "object"
+      },
+      "TrademarkWatchlistUsage" : {
+        "properties" : {
+          "entries" : {
+            "description" : "How many enabled entries were looked for.",
+            "example" : 2,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "revision" : {
+            "description" : "The watchlist's revision when the check ran.",
+            "example" : 3,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "version" : {
+            "description" : "SHA-256 of the enabled entries; part of `analysisVersion`.",
             "type" : "string"
           }
         },
@@ -5662,6 +5918,7 @@
                     "value" : {
                       "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
                       "cached" : true,
+                      "catalogStatus" : "SERVED",
                       "catalogVersion" : "synthetic-2026-11-0123456789ab",
                       "checkId" : "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
                       "completeness" : "COMPLETE",
@@ -5682,10 +5939,12 @@
                         "ruleId" : "catalog_exact",
                         "score" : 1.0,
                         "snippet" : "Zorvex",
+                        "source" : "CATALOG",
                         "sourceIds" : [ "S-001", "S-002" ],
                         "sourceLinks" : [ ],
                         "start" : 0,
-                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                        "watchlistEntry" : null
                       }, {
                         "end" : 31,
                         "field" : "title",
@@ -5699,10 +5958,12 @@
                         "ruleId" : "geo_sport_combination",
                         "score" : null,
                         "snippet" : "Northvale Baseball",
+                        "source" : "CONTEXT",
                         "sourceIds" : [ ],
                         "sourceLinks" : [ ],
                         "start" : 13,
-                        "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                        "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                        "watchlistEntry" : null
                       }, {
                         "end" : 26,
                         "field" : "tags[1]",
@@ -5716,15 +5977,19 @@
                         "ruleId" : "pure_color_description",
                         "score" : null,
                         "snippet" : "royal blue white pinstripe",
+                        "source" : "CONTEXT",
                         "sourceIds" : [ ],
                         "sourceLinks" : [ ],
                         "start" : 0,
-                        "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                        "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing.",
+                        "watchlistEntry" : null
                       } ],
                       "marketplace" : "ETSY",
                       "productType" : null,
                       "riskLevel" : "HIGH",
-                      "rulesetVersion" : "trademark-risk-2026-11b"
+                      "rulesetVersion" : "trademark-risk-2026-11b",
+                      "skippedRuleIds" : [ ],
+                      "watchlist" : null
                     }
                   },
                   "findings" : {
@@ -5733,6 +5998,7 @@
                     "value" : {
                       "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
                       "cached" : false,
+                      "catalogStatus" : "SERVED",
                       "catalogVersion" : "synthetic-2026-11-0123456789ab",
                       "checkId" : "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
                       "completeness" : "COMPLETE",
@@ -5753,10 +6019,12 @@
                         "ruleId" : "catalog_exact",
                         "score" : 1.0,
                         "snippet" : "Zorvex",
+                        "source" : "CATALOG",
                         "sourceIds" : [ "S-001", "S-002" ],
                         "sourceLinks" : [ ],
                         "start" : 0,
-                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                        "watchlistEntry" : null
                       }, {
                         "end" : 31,
                         "field" : "title",
@@ -5770,10 +6038,12 @@
                         "ruleId" : "geo_sport_combination",
                         "score" : null,
                         "snippet" : "Northvale Baseball",
+                        "source" : "CONTEXT",
                         "sourceIds" : [ ],
                         "sourceLinks" : [ ],
                         "start" : 13,
-                        "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                        "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                        "watchlistEntry" : null
                       }, {
                         "end" : 26,
                         "field" : "tags[1]",
@@ -5787,15 +6057,19 @@
                         "ruleId" : "pure_color_description",
                         "score" : null,
                         "snippet" : "royal blue white pinstripe",
+                        "source" : "CONTEXT",
                         "sourceIds" : [ ],
                         "sourceLinks" : [ ],
                         "start" : 0,
-                        "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                        "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing.",
+                        "watchlistEntry" : null
                       } ],
                       "marketplace" : "ETSY",
                       "productType" : null,
                       "riskLevel" : "HIGH",
-                      "rulesetVersion" : "trademark-risk-2026-11b"
+                      "rulesetVersion" : "trademark-risk-2026-11b",
+                      "skippedRuleIds" : [ ],
+                      "watchlist" : null
                     }
                   },
                   "product-type" : {
@@ -5804,6 +6078,7 @@
                     "value" : {
                       "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
                       "cached" : false,
+                      "catalogStatus" : "SERVED",
                       "catalogVersion" : "synthetic-2026-11-0123456789ab",
                       "checkId" : "5d2e8a17-3c4b-4f69-8b0e-6a1c9d7f2e35",
                       "completeness" : "COMPLETE",
@@ -5829,15 +6104,76 @@
                         "ruleId" : "catalog_exact",
                         "score" : 1.0,
                         "snippet" : "Zorvex",
+                        "source" : "CATALOG",
                         "sourceIds" : [ "S-001", "S-002" ],
                         "sourceLinks" : [ ],
                         "start" : 0,
-                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                        "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                        "watchlistEntry" : null
                       } ],
                       "marketplace" : "ETSY",
                       "productType" : "mug",
                       "riskLevel" : "MEDIUM",
-                      "rulesetVersion" : "trademark-risk-2026-11b"
+                      "rulesetVersion" : "trademark-risk-2026-11b",
+                      "skippedRuleIds" : [ ],
+                      "watchlist" : null
+                    }
+                  },
+                  "watchlist-only" : {
+                    "description" : "watchlist-only",
+                    "summary" : "No catalog is served, the client has a watchlist: INCOMPLETE, watchlist findings only",
+                    "value" : {
+                      "analysisVersion" : "3c5e7a9b1d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c",
+                      "cached" : false,
+                      "catalogStatus" : "NOT_CONFIGURED",
+                      "catalogVersion" : "none",
+                      "checkId" : "5d1e7c2a-9b40-4f63-8e21-3c7a9d0b4f12",
+                      "completeness" : "INCOMPLETE",
+                      "createdAt" : "2026-11-16T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+                      "expiresAt" : "2026-12-16T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "end" : 15,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : "Brimwick Otters",
+                        "matchType" : "PHRASE",
+                        "message" : "Cụm 'Brimwick Otters' ở title trùng với mục 'Brimwick Otters' trong watchlist của khách hàng. Ghi chú trong watchlist: từng bị claim",
+                        "otherRuleIds" : [ ],
+                        "risk" : "HIGH",
+                        "riskAdjustments" : [ ],
+                        "ruleId" : "watchlist_match",
+                        "score" : 1.0,
+                        "snippet" : "Brimwick Otters",
+                        "source" : "WATCHLIST",
+                        "sourceIds" : [ "uspto:12345678" ],
+                        "sourceLinks" : [ {
+                          "label" : "USPTO TSDR",
+                          "sourceId" : "uspto:12345678",
+                          "url" : "https://tsdr.uspto.gov/#caseNumber=12345678&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch"
+                        } ],
+                        "start" : 0,
+                        "suggestion" : "Xem lại việc dùng 'Brimwick Otters' ở title: mục này do chính khách hàng đưa vào watchlist. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                        "watchlistEntry" : {
+                          "entryId" : "6f2a9c4e-1b3d-4e58-a7c9-0d2e4f6a8b1c",
+                          "mark" : "Brimwick Otters",
+                          "matchedAlias" : null,
+                          "niceClasses" : [ 25 ],
+                          "note" : "từng bị claim",
+                          "serialNumber" : "12345678"
+                        }
+                      } ],
+                      "marketplace" : "ETSY",
+                      "productType" : null,
+                      "riskLevel" : "HIGH",
+                      "rulesetVersion" : "trademark-risk-2026-11b",
+                      "skippedRuleIds" : [ "catalog_exact", "catalog_phrase", "catalog_fuzzy", "color_name_contains_mark", "pure_color_description" ],
+                      "watchlist" : {
+                        "entries" : 2,
+                        "revision" : 3,
+                        "version" : "8a1f3c5e7b9d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a"
+                      }
                     }
                   }
                 },
@@ -6113,7 +6449,7 @@
                 }
               }
             },
-            "description" : "Trademark checks are not available on this server: no catalog is configured or the configured one is refused (code `trademark-not-configured`). `POST /api/v1/checks` is not affected. Retrying does not help; an operator must configure a catalog.",
+            "description" : "Trademark checks are not available on this server: no catalog is configured or the configured one is refused (code `trademark-not-configured`), and the calling client has no enabled watchlist entry (a client that has one gets a `200` with `catalogStatus` NOT_CONFIGURED instead). `POST /api/v1/checks` is not affected. Retrying does not help; an operator must configure a catalog.",
             "headers" : {
               "Deprecation" : {
                 "$ref" : "#/components/headers/Deprecation"
@@ -6152,6 +6488,7 @@
                 "example" : {
                   "analysisVersion" : "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
                   "cached" : false,
+                  "catalogStatus" : "SERVED",
                   "catalogVersion" : "synthetic-2026-11-0123456789ab",
                   "checkId" : "0b9f4c1e-7d2a-4e58-9a63-2f1d8c5b7a40",
                   "completeness" : "COMPLETE",
@@ -6172,10 +6509,12 @@
                     "ruleId" : "catalog_exact",
                     "score" : 1.0,
                     "snippet" : "Zorvex",
+                    "source" : "CATALOG",
                     "sourceIds" : [ "S-001", "S-002" ],
                     "sourceLinks" : [ ],
                     "start" : 0,
-                    "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                    "suggestion" : "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                    "watchlistEntry" : null
                   }, {
                     "end" : 31,
                     "field" : "title",
@@ -6189,10 +6528,12 @@
                     "ruleId" : "geo_sport_combination",
                     "score" : null,
                     "snippet" : "Northvale Baseball",
+                    "source" : "CONTEXT",
                     "sourceIds" : [ ],
                     "sourceLinks" : [ ],
                     "start" : 13,
-                    "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                    "suggestion" : "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                    "watchlistEntry" : null
                   }, {
                     "end" : 26,
                     "field" : "tags[1]",
@@ -6206,15 +6547,19 @@
                     "ruleId" : "pure_color_description",
                     "score" : null,
                     "snippet" : "royal blue white pinstripe",
+                    "source" : "CONTEXT",
                     "sourceIds" : [ ],
                     "sourceLinks" : [ ],
                     "start" : 0,
-                    "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
+                    "suggestion" : "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing.",
+                    "watchlistEntry" : null
                   } ],
                   "marketplace" : "ETSY",
                   "productType" : null,
                   "riskLevel" : "HIGH",
-                  "rulesetVersion" : "trademark-risk-2026-11b"
+                  "rulesetVersion" : "trademark-risk-2026-11b",
+                  "skippedRuleIds" : [ ],
+                  "watchlist" : null
                 },
                 "schema" : {
                   "$ref" : "#/components/schemas/TrademarkCheckResult"
@@ -6348,6 +6693,494 @@
         },
         "summary" : "Read a stored trademark check",
         "tags" : [ "Trademark checks" ]
+      }
+    },
+    "/api/v1/trademark-watchlist" : {
+      "get" : {
+        "description" : "Returns the calling client's watchlist: every entry (enabled or not) in the client's order, the `revision` (0 when the client never had a list), the `version` a trademark check reports while at least one entry is enabled, and the deployment's limits. Every trademark check of the client looks for the enabled entries' marks and aliases next to the catalog; a match is a finding with `source` `WATCHLIST`. The answer carries an `ETag` of the revision. It needs the `trademark-risk` plan pack where plans are on and costs no quota.",
+        "operationId" : "getTrademarkWatchlist",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "entries" : [ {
+                    "addedAt" : "2026-11-10T03:40:00.000000Z",
+                    "addedBy" : "console:2b7d9f1a-3c5e-4a6b-8d0f-1e3a5c7b9d2f",
+                    "aliases" : [ "Otterz", "BWO" ],
+                    "enabled" : true,
+                    "id" : "6f2a9c4e-1b3d-4e58-a7c9-0d2e4f6a8b1c",
+                    "mark" : "Brimwick Otters",
+                    "niceClasses" : [ 25 ],
+                    "note" : "từng bị claim",
+                    "serialNumber" : "12345678",
+                    "updatedAt" : "2026-11-16T08:02:11.512000Z",
+                    "updatedBy" : "api-key:k1a2b3c4"
+                  }, {
+                    "addedAt" : "2026-11-16T08:02:11.512000Z",
+                    "addedBy" : "api-key:k1a2b3c4",
+                    "aliases" : [ ],
+                    "enabled" : true,
+                    "id" : "0c4e8a2b-6d1f-4b39-9e5a-7f3c1d9b5e20",
+                    "mark" : "Paddle Hard Brimwick Never Quits",
+                    "niceClasses" : [ ],
+                    "note" : null,
+                    "serialNumber" : null,
+                    "updatedAt" : "2026-11-16T08:02:11.512000Z",
+                    "updatedBy" : "api-key:k1a2b3c4"
+                  } ],
+                  "limits" : {
+                    "maxAliases" : 20,
+                    "maxEntries" : 500,
+                    "maxNoteChars" : 500,
+                    "maxTextChars" : 100,
+                    "maxTokens" : 12
+                  },
+                  "revision" : 3,
+                  "updatedAt" : "2026-11-16T08:02:11.512000Z",
+                  "version" : "8a1f3c5e7b9d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/TrademarkWatchlist"
+                }
+              }
+            },
+            "description" : "The client's watchlist.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "304" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TrademarkWatchlist"
+                }
+              }
+            },
+            "description" : "The `If-None-Match` header matches the `ETag`: nothing changed, there is no body.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "plan-not-allowed",
+                  "detail" : "The FREE plan does not include trademark-risk. Ask the operator for a plan that does.",
+                  "instance" : "/api/v1/trademark-checks",
+                  "pack" : "trademark-risk",
+                  "plan" : "FREE",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 403,
+                  "title" : "Forbidden",
+                  "type" : "urn:listing-guard:problem:plan-not-allowed"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The client's plan does not include `trademark-risk` (code `plan-not-allowed`; only where plans are on).",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "Read the client's trademark watchlist",
+        "tags" : [ "Trademark watchlist" ]
+      },
+      "put" : {
+        "description" : "Replaces the calling client's whole watchlist with `entries`, in that order. An entry is identified by the normalized form of its mark (case, accents and punctuation are ignored): an entry whose mark is already listed keeps its `id`, `addedBy` and `addedAt`. No two marks or aliases of the list may have the same normalized form. Every problem of the list is answered at once (`invalid-request` with `errors`) and nothing is stored. With `If-Match: \"<revision>\"` the list is replaced only if it is still at that revision (else `412 watchlist-revision-mismatch`); without it, whatever is stored is replaced. An identical list changes nothing, not even the revision. A change of an enabled entry changes the `analysisVersion` of the client's next trademark checks, so they are analysed again. It needs the `trademark-risk` plan pack where plans are on and costs no quota. Nothing is written to a marketplace.",
+        "operationId" : "replaceTrademarkWatchlist",
+        "parameters" : [ {
+          "description" : "The revision the change is based on, as the `ETag` of GET gave it, for example `\"3\"`.",
+          "in" : "header",
+          "name" : "If-Match",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "example" : {
+                "entries" : [ {
+                  "aliases" : [ "Otterz", "BWO" ],
+                  "enabled" : true,
+                  "mark" : "Brimwick Otters",
+                  "niceClasses" : [ 25 ],
+                  "note" : "từng bị claim",
+                  "serialNumber" : "12345678"
+                }, {
+                  "mark" : "Paddle Hard Brimwick Never Quits"
+                } ]
+              },
+              "schema" : {
+                "$ref" : "#/components/schemas/TrademarkWatchlistReplaceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "entries" : [ {
+                    "addedAt" : "2026-11-10T03:40:00.000000Z",
+                    "addedBy" : "console:2b7d9f1a-3c5e-4a6b-8d0f-1e3a5c7b9d2f",
+                    "aliases" : [ "Otterz", "BWO" ],
+                    "enabled" : true,
+                    "id" : "6f2a9c4e-1b3d-4e58-a7c9-0d2e4f6a8b1c",
+                    "mark" : "Brimwick Otters",
+                    "niceClasses" : [ 25 ],
+                    "note" : "từng bị claim",
+                    "serialNumber" : "12345678",
+                    "updatedAt" : "2026-11-16T08:02:11.512000Z",
+                    "updatedBy" : "api-key:k1a2b3c4"
+                  }, {
+                    "addedAt" : "2026-11-16T08:02:11.512000Z",
+                    "addedBy" : "api-key:k1a2b3c4",
+                    "aliases" : [ ],
+                    "enabled" : true,
+                    "id" : "0c4e8a2b-6d1f-4b39-9e5a-7f3c1d9b5e20",
+                    "mark" : "Paddle Hard Brimwick Never Quits",
+                    "niceClasses" : [ ],
+                    "note" : null,
+                    "serialNumber" : null,
+                    "updatedAt" : "2026-11-16T08:02:11.512000Z",
+                    "updatedBy" : "api-key:k1a2b3c4"
+                  } ],
+                  "limits" : {
+                    "maxAliases" : 20,
+                    "maxEntries" : 500,
+                    "maxNoteChars" : 500,
+                    "maxTextChars" : 100,
+                    "maxTokens" : 12
+                  },
+                  "revision" : 3,
+                  "updatedAt" : "2026-11-16T08:02:11.512000Z",
+                  "version" : "8a1f3c5e7b9d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/TrademarkWatchlist"
+                }
+              }
+            },
+            "description" : "The watchlist as stored now.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "invalid-request",
+                  "detail" : "The watchlist is not valid; see errors.",
+                  "errors" : [ {
+                    "field" : "entries[1].mark",
+                    "message" : "'brimwick-otters' is the same as entries[0].mark after normalization (case, accents and punctuation are ignored)."
+                  }, {
+                    "field" : "entries[2].serialNumber",
+                    "message" : "A serial number is eight digits."
+                  } ],
+                  "instance" : "/api/v1/trademark-watchlist",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 400,
+                  "title" : "Bad Request",
+                  "type" : "urn:listing-guard:problem:invalid-request"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The list or the `If-Match` header is not valid (code `invalid-request`); `errors` names every problem with its `field`, such as `entries[1].aliases[0]`.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "unauthorized",
+                  "detail" : "The X-API-Key header is missing.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 401,
+                  "title" : "Unauthorized",
+                  "type" : "urn:listing-guard:problem:unauthorized"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "plan-not-allowed",
+                  "detail" : "The FREE plan does not include trademark-risk. Ask the operator for a plan that does.",
+                  "instance" : "/api/v1/trademark-checks",
+                  "pack" : "trademark-risk",
+                  "plan" : "FREE",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 403,
+                  "title" : "Forbidden",
+                  "type" : "urn:listing-guard:problem:plan-not-allowed"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The client's plan does not include `trademark-risk` (code `plan-not-allowed`; only where plans are on).",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "412" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "watchlist-revision-mismatch",
+                  "currentRevision" : 4,
+                  "detail" : "The watchlist is at revision 4, not 3: it changed since it was read. Read it again and apply the change to the current list.",
+                  "instance" : "/api/v1/trademark-watchlist",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 412,
+                  "title" : "Precondition Failed",
+                  "type" : "urn:listing-guard:problem:watchlist-revision-mismatch"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The list is no longer at the revision of `If-Match` (code `watchlist-revision-mismatch`; the current one is in `currentRevision`). Read it again and apply the change to the current list.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "payload-too-large",
+                  "detail" : "The request body is larger than the limit of 262144 bytes.",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 413,
+                  "title" : "Payload Too Large",
+                  "type" : "urn:listing-guard:problem:payload-too-large"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request body is over the size limit (256 KB).",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not application/json (code `unsupported-media-type`).",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "code" : "rate-limited",
+                  "detail" : "Too many requests for this client. Retry after 2 second(s).",
+                  "instance" : "/api/v1/checks",
+                  "requestId" : "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+                  "status" : 429,
+                  "title" : "Too Many Requests",
+                  "type" : "urn:listing-guard:problem:rate-limited"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate limit exceeded for the calling client.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "Replace the client's trademark watchlist",
+        "tags" : [ "Trademark watchlist" ]
       }
     },
     "/api/v1/usage" : {
@@ -7062,6 +7895,9 @@
   }, {
     "description" : "Counts of the calling client's stored results over a period.",
     "name" : "Reports"
+  }, {
+    "description" : "The client's own list of marks, reported by every trademark check.",
+    "name" : "Trademark watchlist"
   }, {
     "description" : "Structure of a listing's parent/child variations, as a reference warning.",
     "name" : "Variation checks"

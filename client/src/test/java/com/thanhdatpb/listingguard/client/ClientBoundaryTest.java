@@ -27,9 +27,13 @@ class ClientBoundaryTest {
     }
 
     @Test
-    void theSdkCanOnlyIssueGetAndPostToTheSevenApiPaths() {
+    void theSdkCanOnlyIssueGetAndPostAndTheOnePutOfTheWatchlist() {
         assertThat(Arrays.stream(Operation.values()).map(Operation::method).collect(Collectors.toSet()))
-                .isSubsetOf("GET", "POST");
+                .isSubsetOf("GET", "POST", "PUT");
+        // ADR-031 amends ADR-023: one PUT, the replacement of the calling client's own watchlist, and no other
+        assertThat(Arrays.stream(Operation.values()).filter(o -> o.method().equals("PUT")))
+                .containsExactly(Operation.TRADEMARK_WATCHLIST_REPLACE);
+        assertThat(Operation.TRADEMARK_WATCHLIST_REPLACE.path()).isEqualTo("/api/v1/trademark-watchlist");
         assertThat(Arrays.stream(Operation.values()).map(Operation::path)).containsExactlyInAnyOrder(
                 "/api/v1/checks",
                 "/api/v1/trademark-checks",
@@ -37,15 +41,26 @@ class ClientBoundaryTest {
                 "/api/v1/personalization-screenings",
                 "/api/v1/rulesets/{marketplace}/limits",
                 "/api/v1/usage",
-                "/api/v1/capabilities");
+                "/api/v1/capabilities",
+                "/api/v1/trademark-watchlist",
+                "/api/v1/trademark-watchlist");
     }
 
     @Test
     void noSourceUsesAWriteMethodOrBuildsARequestFromAnArbitraryMethod() throws IOException {
-        Pattern write = Pattern.compile("\\.(PUT|DELETE|PATCH|HEAD|OPTIONS)\\(|\"(PUT|DELETE|PATCH)\"|\\.method\\([^)]");
+        Pattern write = Pattern.compile("\\.(DELETE|PATCH|HEAD|OPTIONS)\\(|\"(DELETE|PATCH)\"|\\.method\\([^)]");
+        // a PUT is allowed in the transport (the one request builder) and in Operation (its one constant), nowhere else
+        Pattern put = Pattern.compile("\\.PUT\\(|\"PUT\"");
         for (Path source : mainSources()) {
-            assertThat(write.matcher(Files.readString(source)).find()).as(source.toString()).isFalse();
+            String text = Files.readString(source);
+            assertThat(write.matcher(text).find()).as(source.toString()).isFalse();
+            String name = source.getFileName().toString();
+            if (!name.equals("HttpTransport.java") && !name.equals("Operation.java")) {
+                assertThat(put.matcher(text).find()).as(source.toString()).isFalse();
+            }
         }
+        assertThat(Files.readString(MAIN.resolve("com/thanhdatpb/listingguard/client/HttpTransport.java"))
+                .split("\\.PUT\\(", -1)).as("one PUT in the transport").hasSize(2);
     }
 
     @Test

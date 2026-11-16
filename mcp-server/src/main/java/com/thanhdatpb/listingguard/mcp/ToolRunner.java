@@ -68,6 +68,7 @@ final class ToolRunner {
             case RULESET_LIMITS -> RawRequest.rulesetLimits((String) args.get("marketplace"), (String) args.get("product_type"));
             case USAGE -> RawRequest.usage();
             case CAPABILITIES -> RawRequest.capabilities();
+            case TRADEMARK_WATCHLIST -> RawRequest.trademarkWatchlist();
             default -> RawRequest.post(tool.endpoint().operation(), mapper.writeValueAsString(args));
         };
     }

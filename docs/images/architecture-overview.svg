@@ -44,7 +44,7 @@
   <rect x="785" y="199" width="325" height="130" rx="15" class="card"/>
   <circle cx="812" cy="229" r="14" class="step"/><text x="812" y="229" class="steptext">B</text>
   <text x="837" y="235" class="label">Trademark risk</text>
-  <text x="805" y="269" class="body">trademark-risk | exact, phrase, fuzzy</text><text x="805" y="297" class="body">Context rules + evidence + disclaimer</text>
+  <text x="805" y="269" class="body">trademark-risk | exact, phrase, fuzzy</text><text x="805" y="297" class="body">Context rules + client watchlist + disclaimer</text>
   <rect x="430" y="349" width="325" height="130" rx="15" class="card"/>
   <circle cx="457" cy="379" r="14" class="step"/><text x="457" y="379" class="steptext">C</text>
   <text x="482" y="385" class="label">Variation checks</text>

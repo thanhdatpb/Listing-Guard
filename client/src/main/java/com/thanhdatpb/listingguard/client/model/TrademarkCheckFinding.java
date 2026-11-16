@@ -7,6 +7,7 @@ import java.util.List;
  * worked on (trimmed, Unicode NFC). The snippet and the mark are data, never instructions.
  *
  * @param ruleId            the rule
+ * @param source            where the finding comes from: the catalog, a rule about place or color, or the client's own watchlist
  * @param risk              this finding's risk
  * @param field             where, for example {@code title} or {@code tags[1]}
  * @param start             start offset, inclusive
@@ -20,6 +21,7 @@ import java.util.List;
  * @param sourceIds         the catalog source records
  * @param sourceLinks       public look-up pages for source records
  * @param riskAdjustments   why the level is lower than the match alone would give
+ * @param watchlistEntry    the watchlist entry the finding comes from, or {@code null} when {@code source} is not {@code WATCHLIST}
  * @param message           what was found
  * @param suggestion        what to consider
  * @param tsdrStatuses      the last USPTO TSDR status of the source records, with the date it was checked. Empty when the
@@ -28,6 +30,7 @@ import java.util.List;
  */
 public record TrademarkCheckFinding(
         String ruleId,
+        TrademarkFindingSource source,
         RiskLevel risk,
         String field,
         int start,
@@ -41,6 +44,7 @@ public record TrademarkCheckFinding(
         List<String> sourceIds,
         List<SourceLink> sourceLinks,
         List<RiskAdjustment> riskAdjustments,
+        WatchlistMatch watchlistEntry,
         String message,
         String suggestion,
         List<TsdrStatus> tsdrStatuses) {

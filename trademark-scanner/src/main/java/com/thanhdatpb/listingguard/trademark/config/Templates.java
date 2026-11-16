@@ -14,7 +14,7 @@ public final class Templates {
     }
 
     /** Fails when {@code text} uses a placeholder that is not in {@code allowed} or has a stray brace. */
-    static void validate(String where, String text, Set<String> allowed) {
+    public static void validate(String where, String text, Set<String> allowed) {
         Matcher matcher = PLACEHOLDER.matcher(text);
         while (matcher.find()) {
             if (!allowed.contains(matcher.group(1))) {

@@ -1,0 +1,30 @@
+/* The watchlist page (ADR-031). The colors and the base layout come from editor.css and console.css. */
+.table-wrap {
+    overflow-x: auto;
+}
+
+table.watchlist td {
+    vertical-align: top;
+}
+
+table.watchlist tr.disabled td {
+    opacity: 0.6;
+}
+
+table.watchlist td.actions {
+    white-space: nowrap;
+}
+
+form.inline {
+    display: inline;
+}
+
+ul.plain {
+    margin: 0;
+    padding-left: 1rem;
+}
+
+#pasted {
+    width: 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

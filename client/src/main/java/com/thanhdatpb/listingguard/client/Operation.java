@@ -20,7 +20,15 @@ public enum Operation {
     /** {@code GET /api/v1/usage}. */
     USAGE("GET", "/api/v1/usage"),
     /** {@code GET /api/v1/capabilities}. */
-    CAPABILITIES("GET", "/api/v1/capabilities");
+    CAPABILITIES("GET", "/api/v1/capabilities"),
+    /** {@code GET /api/v1/trademark-watchlist} (ADR-031). */
+    TRADEMARK_WATCHLIST("GET", "/api/v1/trademark-watchlist"),
+    /**
+     * {@code PUT /api/v1/trademark-watchlist} (ADR-031, which amends ADR-023): the one call that is neither a {@code GET} nor a
+     * {@code POST}. It replaces the client's own watchlist, a configuration of the calling client; it never edits a listing and
+     * never writes to a marketplace.
+     */
+    TRADEMARK_WATCHLIST_REPLACE("PUT", "/api/v1/trademark-watchlist");
 
     private final String method;
     private final String path;
@@ -30,7 +38,7 @@ public enum Operation {
         this.path = path;
     }
 
-    /** {@code GET} or {@code POST}. */
+    /** {@code GET}, {@code POST} or, for {@link #TRADEMARK_WATCHLIST_REPLACE} only, {@code PUT}. */
     public String method() {
         return method;
     }
@@ -40,8 +48,13 @@ public enum Operation {
         return path;
     }
 
-    /** True for the four calls that send a JSON body. */
+    /** True for the four checks, the {@code POST} calls. */
     public boolean isPost() {
         return "POST".equals(method);
+    }
+
+    /** True for the calls that send a JSON body: the four {@code POST}s and the {@code PUT} of the watchlist. */
+    public boolean hasBody() {
+        return !"GET".equals(method);
     }
 }

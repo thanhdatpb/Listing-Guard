@@ -105,9 +105,10 @@ public final class BatchCheckJob {
         try (BatchCsvReader reader = BatchCsvReader.open(options.input(), mapping.csv())) {
             BatchMapping.Bound bound = bind(options, mapping, reader);
             TrademarkCatalogRuntime.Status status = trademark.status();
-            boolean trademarkReady = status.state() == TrademarkCatalogRuntime.State.READY && planNote == null;
-            String notReady = status.state() != TrademarkCatalogRuntime.State.READY
-                    ? status.state() + ": " + status.detail() : planNote;
+            // a client with a watchlist is checked without a catalog too (ADR-031): its results are then INCOMPLETE
+            boolean available = trademarkChecks.available(client.getId());
+            boolean trademarkReady = available && planNote == null;
+            String notReady = !available ? status.state() + ": " + status.detail() : planNote;
 
             try (BatchReport report = new BatchReport(options.out(), fixes.enabled());
                  SplitOutput split = options.splitOutput()

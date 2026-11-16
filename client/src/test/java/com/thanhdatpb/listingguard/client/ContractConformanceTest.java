@@ -29,6 +29,11 @@ import com.thanhdatpb.listingguard.client.model.SourceLink;
 import com.thanhdatpb.listingguard.client.model.Summary;
 import com.thanhdatpb.listingguard.client.model.TrademarkCatalogCapability;
 import com.thanhdatpb.listingguard.client.model.TrademarkCheckFinding;
+import com.thanhdatpb.listingguard.client.model.TrademarkWatchlist;
+import com.thanhdatpb.listingguard.client.model.TrademarkWatchlistEntry;
+import com.thanhdatpb.listingguard.client.model.TrademarkWatchlistLimits;
+import com.thanhdatpb.listingguard.client.model.WatchlistMatch;
+import com.thanhdatpb.listingguard.client.model.WatchlistUsage;
 import com.thanhdatpb.listingguard.client.model.TsdrStatus;
 import com.thanhdatpb.listingguard.client.model.TrademarkCheckRequest;
 import com.thanhdatpb.listingguard.client.model.TrademarkCheckResult;
@@ -101,6 +106,11 @@ class ContractConformanceTest {
             entry(RiskAdjustment.class, "RiskAdjustmentView"),
             entry(SourceLink.class, "SourceLinkView"),
             entry(TsdrStatus.class, "TsdrStatusView"),
+            entry(TrademarkWatchlist.class, "TrademarkWatchlist"),
+            entry(TrademarkWatchlistEntry.class, "TrademarkWatchlistEntry"),
+            entry(TrademarkWatchlistLimits.class, "TrademarkWatchlistLimits"),
+            entry(WatchlistUsage.class, "TrademarkWatchlistUsage"),
+            entry(WatchlistMatch.class, "TrademarkWatchlistMatch"),
             entry(VariationCheckResult.class, "VariationCheckResult"),
             entry(PersonalizationScreeningResult.class, "PersonalizationScreeningResult"),
             entry(CharacterFinding.class, "CharacterFindingView"),
@@ -290,6 +300,7 @@ class ContractConformanceTest {
             case "rate-limited" -> RateLimitedException.class;
             case "invalid-request", "unprocessable-request" -> ValidationException.class;
             case "unknown-product-type" -> UnknownProductTypeException.class;
+            case "watchlist-revision-mismatch" -> WatchlistRevisionMismatchException.class;
             default -> code.endsWith("-not-configured") ? NotConfiguredException.class : ListingGuardApiException.class;
         };
     }

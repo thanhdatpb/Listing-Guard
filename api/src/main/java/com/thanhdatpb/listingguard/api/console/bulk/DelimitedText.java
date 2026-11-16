@@ -14,23 +14,23 @@ import java.util.List;
  * order mark at the start is dropped. A blank line in the middle is a row with one empty cell; blank rows at the end are dropped (a
  * Sheet's copy ends with a line break, and nothing after the last row can be pasted back against anything).
  */
-final class DelimitedText {
+public final class DelimitedText {
 
     /** One row: the line of the text where it starts (the first line is 1) and its cells, as written. */
-    record Row(int line, List<String> cells) {
+    public record Row(int line, List<String> cells) {
 
-        boolean blank() {
+        public boolean blank() {
             return cells.stream().allMatch(String::isBlank);
         }
     }
 
-    record Table(char delimiter, List<Row> rows) {
+    public record Table(char delimiter, List<Row> rows) {
     }
 
     /** A quote that is never closed: the text after it cannot be told apart from the cell. */
-    static final class FormatException extends RuntimeException {
+    public static final class FormatException extends RuntimeException {
 
-        final int line;
+        public final int line;
 
         FormatException(int line) {
             super("quote opened at line " + line + " is never closed", null, false, false);
@@ -42,7 +42,7 @@ final class DelimitedText {
     }
 
     /** Tab, comma or semicolon, whichever the first row (outside quotes) holds most of; tab when it holds none. */
-    static char detectDelimiter(String text) {
+    public static char detectDelimiter(String text) {
         String s = withoutByteOrderMark(text);
         int tabs = 0;
         int commas = 0;
@@ -75,7 +75,7 @@ final class DelimitedText {
     }
 
     /** @throws FormatException if a quoted cell is never closed */
-    static Table parse(String text, char delimiter) {
+    public static Table parse(String text, char delimiter) {
         String s = withoutByteOrderMark(text);
         List<Row> rows = new ArrayList<>();
         List<String> cells = new ArrayList<>();

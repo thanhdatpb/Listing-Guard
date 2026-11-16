@@ -105,7 +105,10 @@ public class HealthReportQueries {
                         rs.getString("risk_level"), rs.getLong("checks")));
     }
 
-    /** The catalog marks matched most often. A finding with no mark (the colour and place rules) is left out. */
+    /**
+     * The catalog marks matched most often. A finding with no mark (the colour and place rules) is left out, and so is a match of
+     * the client's own watchlist (ADR-031): its mark is text the client typed.
+     */
     List<MarkRow> trademarkTopMarks(Scope scope, int limit) {
         Clause where = clause(scope, true);
         List<Object> args = new ArrayList<>(where.args());
@@ -115,7 +118,7 @@ public class HealthReportQueries {
                        max(CASE f.risk WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END) AS highest,
                        count(*) OVER () AS distinct_total
                 FROM trademark_check c JOIN trademark_check_finding f ON f.check_id = c.id
-                WHERE %s AND f.matched_mark IS NOT NULL
+                WHERE %s AND f.matched_mark IS NOT NULL AND f.rule_id <> 'watchlist_match'
                 GROUP BY f.matched_mark
                 ORDER BY findings DESC, checks DESC, f.matched_mark COLLATE "C"
                 LIMIT ?""".formatted(where.sql()), args,

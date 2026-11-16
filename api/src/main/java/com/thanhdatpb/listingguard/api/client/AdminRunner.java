@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.client;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleAccountRoles;
 import com.thanhdatpb.listingguard.api.trademark.CatalogAdminCommands;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -20,14 +21,16 @@ public class AdminRunner implements ApplicationRunner {
 
     private final ClientProvisioning provisioning;
     private final CatalogAdminCommands catalog;
+    private final ConsoleAccountRoles accounts;
 
-    public AdminRunner(ClientProvisioning provisioning, CatalogAdminCommands catalog) {
+    public AdminRunner(ClientProvisioning provisioning, CatalogAdminCommands catalog, ConsoleAccountRoles accounts) {
+        this.accounts = accounts;
         this.provisioning = provisioning;
         this.catalog = catalog;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        new AdminCommands(provisioning, catalog, System.out).execute(args);
+        new AdminCommands(provisioning, catalog, accounts, System.out).execute(args);
     }
 }

@@ -14,7 +14,9 @@ enum Endpoint {
     PERSONALIZATION_SCREENINGS(Operation.PERSONALIZATION_SCREENINGS),
     RULESET_LIMITS(Operation.RULESET_LIMITS),
     USAGE(Operation.USAGE),
-    CAPABILITIES(Operation.CAPABILITIES);
+    CAPABILITIES(Operation.CAPABILITIES),
+    /** Read only: the watchlist is changed in the console or with the API, never by an agent (ADR-031, ADR-017). */
+    TRADEMARK_WATCHLIST(Operation.TRADEMARK_WATCHLIST);
 
     private final Operation operation;
 

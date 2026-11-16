@@ -273,7 +273,8 @@ public class BulkCheckService {
 
     /** Why the trademark check will not run for any row, or null when it will. */
     private String trademarkNote(UUID clientId) {
-        if (trademarkCatalog.status().state() != TrademarkCatalogRuntime.State.READY) {
+        // a client with a watchlist is checked without a catalog too (ADR-031)
+        if (!trademarks.available(clientId)) {
             return BulkText.trademarkNotLoaded(messages);
         }
         try {

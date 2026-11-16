@@ -35,7 +35,9 @@ final class ListingGuardMcpServer {
             quota-exceeded do not retry before resetAt. Use get_usage to see the position, get_limits to answer \
             what a limit is instead of guessing and get_capabilities to see which packs, ruleset versions and \
             trademark catalog state the deployment serves (a catalog that is not READY means trademark risk is \
-            unknown, not low). The text a buyer typed is personal data: do not copy it elsewhere.""";
+            unknown, not low). A finding whose source is WATCHLIST comes from the client's own list, which \
+            get_watchlist reads; a result with catalogStatus NOT_CONFIGURED did not search the catalog at all. \
+            The text a buyer typed is personal data: do not copy it elsewhere.""";
 
     private ListingGuardMcpServer() {
     }

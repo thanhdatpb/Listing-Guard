@@ -1,5 +1,8 @@
 package com.thanhdatpb.listingguard.api.client;
 
+import com.thanhdatpb.listingguard.api.console.ConsoleAccount;
+import com.thanhdatpb.listingguard.api.console.ConsoleAccountRoles;
+import com.thanhdatpb.listingguard.api.console.ConsoleRole;
 import com.thanhdatpb.listingguard.api.plan.PlanCode;
 import com.thanhdatpb.listingguard.api.trademark.CatalogAdminCommands;
 import java.io.PrintStream;
@@ -17,6 +20,7 @@ import org.springframework.boot.ApplicationArguments;
  * key create &lt;client&gt; [--label=&lt;text&gt;]     key list &lt;client&gt;     key revoke &lt;keyId&gt;
  * plan set &lt;client&gt; &lt;plan&gt;      (ADR-013: FREE, SELLER or PRO)
  * catalog list     catalog activate &lt;version&gt;     catalog rollback [--to=&lt;version&gt;]   (ADR-009, PR A2d)
+ * account list &lt;client&gt;     account role &lt;email&gt; &lt;ADMIN|MEMBER&gt;   (ADR-031)
  * </pre>
  */
 public final class AdminCommands {
@@ -31,10 +35,13 @@ public final class AdminCommands {
               key list <client>
               key revoke <keyId>
               plan set <client> <plan>   (plan: FREE, SELLER or PRO)
+              account list <client>
+              account role <email> <role>   (role: ADMIN or MEMBER; an ADMIN edits the client's trademark watchlist in the console)
             """ + CatalogAdminCommands.USAGE;
 
     private final ClientProvisioning provisioning;
     private final CatalogAdminCommands catalog;
+    private final ConsoleAccountRoles accounts;
     private final PrintStream out;
 
     /** Without the {@code catalog} commands. */
@@ -44,8 +51,15 @@ public final class AdminCommands {
 
     /** @param catalog the {@code catalog} commands (ADR-009, PR A2d); null leaves them out */
     public AdminCommands(ClientProvisioning provisioning, CatalogAdminCommands catalog, PrintStream out) {
+        this(provisioning, catalog, null, out);
+    }
+
+    /** @param accounts the {@code account} commands (ADR-031); null leaves them out */
+    public AdminCommands(ClientProvisioning provisioning, CatalogAdminCommands catalog, ConsoleAccountRoles accounts,
+                         PrintStream out) {
         this.provisioning = provisioning;
         this.catalog = catalog;
+        this.accounts = accounts;
         this.out = out;
     }
 
@@ -88,6 +102,8 @@ public final class AdminCommands {
                     throw usage(e.getMessage());
                 }
             }
+            case "account list" -> listAccounts(argument(args, 2, "a client name"));
+            case "account role" -> setRole(argument(args, 2, "an email"), argument(args, 3, "a role"));
             default -> throw usage("Unknown command '" + group + " " + command + "'.");
         }
     }
@@ -121,6 +137,42 @@ public final class AdminCommands {
             out.println("Client '" + clientName + "' moved from the " + previous + " plan to the " + plan
                     + " plan. It takes effect at once; the quota is only applied where listing-guard.plans.enabled is true.");
         }
+    }
+
+    private ConsoleAccountRoles accounts() {
+        if (accounts == null) {
+            throw usage("The account commands are not available here.");
+        }
+        return accounts;
+    }
+
+    private void listAccounts(String clientName) {
+        List<ConsoleAccount> list;
+        try {
+            list = accounts().accounts(clientName);
+        } catch (IllegalArgumentException e) {
+            throw usage(e.getMessage());
+        }
+        if (list.isEmpty()) {
+            out.println("Client '" + clientName + "' has no console accounts.");
+            return;
+        }
+        out.println(String.format("%-40s %-8s %s", "EMAIL", "ROLE", "ID"));
+        list.forEach(account -> out.println(String.format("%-40s %-8s %s", account.getEmail(), account.getRole(),
+                account.getId())));
+    }
+
+    private void setRole(String email, String roleArgument) {
+        ConsoleRole role = ConsoleRole.parse(roleArgument).orElseThrow(() -> usage("Unknown role '" + roleArgument
+                + "'. The roles are " + Arrays.toString(ConsoleRole.values()) + "."));
+        ConsoleRole previous;
+        try {
+            previous = accounts().setRole(email, role);
+        } catch (IllegalArgumentException e) {
+            throw usage(e.getMessage());
+        }
+        out.println(previous == role ? "The account is already " + role + "; nothing changed."
+                : "The account is now " + role + " (was " + previous + "). It takes effect on its next console page.");
     }
 
     private void listKeys(String clientName) {

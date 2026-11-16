@@ -294,7 +294,7 @@ listing format differs, map it to this one on your side.
 From Java, use the official SDK `com.thanhdatpb.listingguard:listing-guard-client` ([`client/README.md`](../client/README.md),
 [ADR-023](adr/ADR-023-java-client-sdk.md)). It sends the headers above, follows no redirect, maps every problem below to a typed
 exception (`QuotaExceededException`, `PlanNotAllowedException`, `RateLimitedException` with `retryAfter()`,
-`NotConfiguredException`, `ValidationException` with `errors()`, `UnknownProductTypeException` with `known()`, otherwise
+`NotConfiguredException`, `ValidationException` with `errors()`, `UnknownProductTypeException` with `known()`, `WatchlistRevisionMismatchException` with `currentRevision()`, otherwise
 `ListingGuardApiException` with `status`, `type`, `code` and `detail`), retries `429 rate-limited` and a retryable `503` within a
 bounded policy and reads new fields and enum values without failing. It needs Java 21 and Jackson only; each release tag
 publishes it to GitHub Packages.
@@ -930,7 +930,10 @@ curl -X POST http://localhost:8080/api/v1/trademark-checks \
 |---|---|
 | `checkId` | Identifier of the stored result; `GET /api/v1/trademark-checks/{id}` until `expiresAt`. |
 | `productType` | The `product_type` the request named, or `null`. |
-| `rulesetVersion`, `catalogVersion`, `analysisVersion` | What produced the result. Opaque strings: compare for equality, do not parse. |
+| `rulesetVersion`, `catalogVersion`, `analysisVersion` | What produced the result. Opaque strings: compare for equality, do not parse. `catalogVersion` is `none` when no catalog was served (see `catalogStatus`). |
+| `catalogStatus` | `SERVED`, or `NOT_CONFIGURED` when the deployment serves no catalog and the check ran only the client's [watchlist](watchlist.md) and the rules that need no catalog: the result is then `INCOMPLETE` and no catalog finding says nothing about the catalog. |
+| `skippedRuleIds` | The rules that did not run because no catalog is served; empty otherwise. Not the same as `failedRuleIds`. |
+| `watchlist` | The client's watchlist the check used (`revision`, `version`, `entries`), or `null` when the client had no enabled entry. |
 | `cached` | `true` when the stored result of an identical earlier request is returned. |
 | `completeness` | `COMPLETE`, or `INCOMPLETE` when a rule failed (see below). |
 | `riskLevel` | `LOW`, `MEDIUM`, `HIGH` or `UNKNOWN` (see below). |
@@ -940,7 +943,8 @@ curl -X POST http://localhost:8080/api/v1/trademark-checks \
 | `findings[]` | One entry per possible reference, most serious first within a field. |
 
 A finding: `ruleId` (`catalog_exact`, `catalog_phrase`, `catalog_fuzzy`, `geo_sport_combination`,
-`pure_color_description`), `risk` (`LOW` is informational, `MEDIUM`, `HIGH`), `field`, `start` and `end`, `snippet`
+`pure_color_description`, `watchlist_match`), `source` (`CATALOG`, `CONTEXT`, or `WATCHLIST` for an entry of the client's own
+[watchlist](watchlist.md), whose entry is in `watchlistEntry`; `null` otherwise; ignore a value you do not know), `risk` (`LOW` is informational, `MEDIUM`, `HIGH`), `field`, `start` and `end`, `snippet`
 (the text of the span, cut to a length limit), `mark` (the catalog mark, `null` for a finding without one), `matchType`
 (`EXACT`, `PHRASE`, `FUZZY`, `CONTEXT`), `score` (1.0 for `EXACT` and `PHRASE`, the similarity for `FUZZY`, `null` for
 `CONTEXT`), `insideColorPhrase` (the match lies in a color description; this explains the finding and never lowers it),
@@ -1045,6 +1049,24 @@ reads your results, and a `checkId` of another client answers `404` exactly like
 limit is the one of the client, shared with the other endpoints.
 
 Known limitation: the catalog is shared, so if your own brand matches a mark in it the check can report a false positive.
+
+## Trademark watchlist
+
+A client's own list of names to watch (team names, nicknames, slogans, marks it received a claim for), scanned by every trademark
+check next to the catalog ([watchlist.md](watchlist.md), [ADR-031](adr/ADR-031-client-trademark-watchlist.md)). A match is a finding
+with `source` `WATCHLIST`, at least `HIGH` by default, with the entry in `watchlistEntry`. While a client has an enabled entry, a
+check works even when the deployment serves no catalog (`catalogStatus` `NOT_CONFIGURED`, `INCOMPLETE`, never `LOW`).
+
+- `GET /api/v1/trademark-watchlist`: `revision`, `version`, `updatedAt`, `entries[]`, `limits`; `ETag` `"<revision>"` and `If-None-Match`.
+  A client that never had a list reads revision 0.
+- `PUT /api/v1/trademark-watchlist`: replaces the whole list with `{"entries": [{"mark", "aliases", "niceClasses", "serialNumber", "note",
+  "enabled"}]}`. `If-Match: "<revision>"` makes it replace only a list still at that revision (`412 watchlist-revision-mismatch` with
+  `currentRevision` otherwise). All the problems of a list come back at once as `400 invalid-request` with `errors[]` (`field` such as
+  `entries[3].aliases[1]`) and nothing is stored. An identical list changes nothing.
+- Both need the `trademark-risk` pack where plans are on and cost no quota. Changing an enabled entry changes the client's
+  `analysisVersion`, so its next checks are analysed again.
+- In Java: `client.trademarkWatchlist()` and `client.replaceTrademarkWatchlist(request, expectedRevision)`; `PUT` is the one method of
+  the SDK beyond `GET` and `POST`, and a stale revision throws `WatchlistRevisionMismatchException`.
 
 ## Variation checks
 
@@ -1514,6 +1536,7 @@ Cloudflare Access see "Calling through Cloudflare Access".
 |---|---|---|---|
 | 400 | `invalid-request` | Body missing, not JSON, or `marketplace` / `listing` missing; `listing` not an object. | Fix the request. Do not retry unchanged. |
 | 400 | `unknown-marketplace` | The marketplace code is not known. | Fix the code. `detail` lists the supported ones. |
+| 400 | `invalid-request` (watchlist) | `PUT /api/v1/trademark-watchlist`: the list has problems, or `If-Match` is not a revision. `errors[]` names every problem with its `field`. Nothing is stored. | Fix every listed field and send the list again. |
 | 400 | `unknown-product-type` | `POST /api/v1/trademark-checks`: `product_type` names a product type the active trademark ruleset does not declare (the keys are exact, `Apparel` is not `apparel`). `known` lists the declared keys. Nothing is stored or counted. | Fix the key, or leave `product_type` out. |
 | 400 | `unknown-print-profile` | `POST /api/v1/personalization-screenings`: `print_profile` names a profile the ruleset does not declare. `known` lists the declared codes. | Fix the code, or leave it out for the default profile. |
 | 400 | `unknown-image-profile` | `POST /api/v1/image-checks`: `metadata.profile` names a profile the marketplace's image ruleset does not declare. `known` lists the declared names. | Fix the name, or leave it out for the default profile. |
@@ -1533,13 +1556,14 @@ Cloudflare Access see "Calling through Cloudflare Access".
 | 413 | `payload-too-large` | Body over 256 KB; for `POST /api/v1/image-checks` one image over the deployment's file limit (10 MB by default) or a request over its request limit (60 MB). | Send less. |
 | 415 | `unsupported-media-type` | Not `application/json` (not `multipart/form-data` for `POST /api/v1/image-checks`). | |
 | 422 | `marketplace-not-yet-supported` | A marketplace that is planned but not supported yet. None is planned today, so you will not see it now. | Skip the check for it. |
+| 412 | `watchlist-revision-mismatch` | `PUT /api/v1/trademark-watchlist` with an `If-Match` that is no longer the list's revision; `currentRevision` says what it is now. Nothing is stored. | Read the list again (`GET`), apply your change to it and send it with the new revision. |
 | 429 | `rate-limited` | Over the per-client limit. | Wait `Retry-After` seconds, then retry. |
 | 429 | `quota-exceeded` | Only where plans are on. The month's quota of your plan is used up; `plan`, `quota`, `used` and `resetAt` say where you are. **No `Retry-After`.** | Do not retry before `resetAt` or a plan change. Results you already have are still answered from the cache. |
 | 500 | `internal-error` | Unexpected failure. No details are exposed. | Retry later with backoff; report the `requestId`. |
 | 503 | `embedding-not-configured` | Only on routes that need embeddings (the policy search debug view). The deployment runs without an embedding provider, which is the default. Not `POST /api/v1/checks`. | An operator must choose a provider; retrying does not help. |
 | 503 | `embedding-unavailable` | Only on routes that need the embedding backend. Not `POST /api/v1/checks`. | |
 | 503 | `corpus-model-mismatch` | Only on routes that search the policy corpus. The stored corpus was embedded with another model than the configured one, so searching is refused. Not `POST /api/v1/checks`. | An operator must run the ingest job again. |
-| 503 | `trademark-not-configured` | Only `POST /api/v1/trademark-checks`. The deployment has no trademark catalog configured, or the configured one is refused. `POST /api/v1/checks` is not affected. | Skip the trademark check; retrying does not help. An operator must configure a catalog. |
+| 503 | `trademark-not-configured` | Only `POST /api/v1/trademark-checks`. The deployment has no trademark catalog configured, or the configured one is refused, and your client has no enabled watchlist entry (with one you get a `200` with `catalogStatus` `NOT_CONFIGURED`). `POST /api/v1/checks` is not affected. | Skip the trademark check; retrying does not help. An operator must configure a catalog. |
 | 503 | `image-checks-not-configured` | Only `POST /api/v1/image-checks`. Image checks are not enabled in this deployment (they are off by default). The other endpoints are not affected. | Skip the image check; retrying does not help. An operator must enable it. |
 | 503 | `service-unavailable` | The API key could not be checked because the database did not answer. | Retry later with backoff. |
 

@@ -104,10 +104,10 @@ class ToolRunnerTest {
     // ---- the tools ----------------------------------------------------------------------------------------------
 
     @Test
-    void thereAreExactlySevenToolsWithTheFixedNames() {
+    void thereAreExactlyEightToolsWithTheFixedNames() {
         assertThat(catalog.tools()).extracting(ToolSpec::name).containsExactly(
                 "check_listing", "check_trademark", "check_variations", "screen_personalization", "get_limits",
-                "get_usage", "get_capabilities");
+                "get_usage", "get_capabilities", "get_watchlist");
     }
 
     @Test
@@ -129,9 +129,9 @@ class ToolRunnerTest {
     }
 
     @Test
-    void onlyTheThreeReadersAreReadOnlyAndNoToolIsNamedLikeAWrite() {
+    void onlyTheFourReadersAreReadOnlyAndNoToolIsNamedLikeAWrite() {
         assertThat(catalog.tools().stream().filter(ToolSpec::readOnly).map(ToolSpec::name))
-                .containsExactlyInAnyOrder("get_limits", "get_usage", "get_capabilities");
+                .containsExactlyInAnyOrder("get_limits", "get_usage", "get_capabilities", "get_watchlist");
         for (ToolSpec tool : catalog.tools()) {
             assertThat(tool.name()).doesNotContainIgnoringCase("apply").doesNotContainIgnoringCase("publish")
                     .doesNotContainIgnoringCase("edit").doesNotContainIgnoringCase("fix")
@@ -161,7 +161,8 @@ class ToolRunnerTest {
                 Arguments.of("get_limits", map("marketplace", "AMAZON"),
                         "GET", "/api/v1/rulesets/AMAZON/limits"),
                 Arguments.of("get_usage", map(), "GET", "/api/v1/usage"),
-                Arguments.of("get_capabilities", map(), "GET", "/api/v1/capabilities"));
+                Arguments.of("get_capabilities", map(), "GET", "/api/v1/capabilities"),
+                Arguments.of("get_watchlist", map(), "GET", "/api/v1/trademark-watchlist"));
     }
 
     @ParameterizedTest(name = "{0} calls {2} {3}")
@@ -552,7 +553,8 @@ class ToolRunnerTest {
                 Arguments.of("get_limits", map(), "marketplace"),
                 Arguments.of("get_limits", map("marketplace", "ETSY", "productType", "x"), "productType"),
                 Arguments.of("get_usage", map("marketplace", "ETSY"), "no arguments"),
-                Arguments.of("get_capabilities", map("marketplace", "ETSY"), "no arguments"));
+                Arguments.of("get_capabilities", map("marketplace", "ETSY"), "no arguments"),
+                Arguments.of("get_watchlist", map("entries", List.of()), "no arguments"));
     }
 
     @ParameterizedTest(name = "{0} {1}")
