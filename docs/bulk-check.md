@@ -14,7 +14,8 @@ OK, Warning, Error trên trang tiếng Anh.
 
 > **Ảnh chụp.** Các ô `[Ảnh chụp: ...]` bên dưới là chỗ để ảnh. Chưa chụp được ở lần viết này; khi chụp, đặt file vào
 > `docs/images/bulk-check/` với đúng tên ghi trong từng ô và thay ô bằng một ảnh Markdown trỏ tới `images/bulk-check/` cùng tên
-> file đó. Dùng listing giả (ví dụ mục `Zibblefrax` của catalog DEMO), không dùng dữ liệu thật của khách.
+> file đó. Dùng listing giả (ví dụ mục `Zibblefrax` của catalog DEMO), không dùng dữ liệu thật của khách. Ảnh của bảng kết quả và của
+> chi tiết một dòng đã có ở mục 4 (listing giả, catalog DEMO, giao diện sáng và tối).
 
 ## 1. Dán từ Sheet
 
@@ -33,7 +34,9 @@ bị cắt sẽ lệch dòng so với Sheet. Hãy chia thành nhiều lần dán
 
 ## 2. Chọn mỗi cột là gì
 
-Trang liệt kê các cột của bảng, vài ô mẫu của mỗi cột và một danh sách chọn.
+Trang cho thấy các cột đã được nhận dưới dạng nhãn (ví dụ `A → SKU`, `B → Title`, `C → Tags`) và nút chính **Kiểm tra N dòng** (N là
+số dòng sẽ được kiểm tra, không tính dòng trống). Liên kết **Sửa ánh xạ** mở bảng các cột, mỗi cột có vài ô mẫu và một danh sách chọn;
+bảng tự mở khi chưa cột nào được nhận hoặc khi có lỗi cần sửa.
 
 `[Ảnh chụp: bulk-02-mapping.png — bước chọn cột với các cột đã được đoán sẵn]`
 
@@ -68,10 +71,14 @@ phân tách bằng dấu phẩy*).
 
 ## 4. Đọc kết quả
 
-`[Ảnh chụp: bulk-04-result.png — bảng kết quả với bộ lọc trạng thái và nút sao chép]`
+![Kết quả kiểm tra hàng loạt, giao diện sáng](images/console/bulk-result-light.png)
+![Kết quả kiểm tra hàng loạt, giao diện tối](images/console/bulk-result-dark.png)
+
+Đầu thẻ kết quả có các nhãn tóm tắt: số dòng, **Lỗi**, **Trademark** (số dòng có phát hiện nhãn hiệu; tính riêng nên một dòng có thể vừa
+Lỗi vừa Trademark), **Cảnh báo**, **Đạt** và **Chưa kiểm tra hoặc bỏ qua**.
 
 Bảng có một dòng cho mỗi dòng bạn đã dán, **đúng thứ tự**: số dòng gốc (dòng của văn bản nơi hàng đó bắt đầu, dòng tiêu đề là dòng 1),
-SKU nếu có, trạng thái, số phát hiện và phát hiện chính.
+SKU nếu có, trạng thái, số phát hiện và phát hiện chính. Dấu thoi đỏ đứng trước phát hiện chính khi đó là lỗi hoặc rủi ro nhãn hiệu cao.
 
 | Trạng thái | Nghĩa |
 | --- | --- |
@@ -84,9 +91,18 @@ SKU nếu có, trạng thái, số phát hiện và phát hiện chính.
 
 Phát hiện chính là cái đầu tiên trong thứ tự: lỗi quy tắc, rủi ro nhãn hiệu cao, cảnh báo quy tắc, cảnh báo biến thể, rủi ro nhãn hiệu
 trung bình, thông tin, rủi ro nhãn hiệu thấp. **Lọc** theo trạng thái bằng các nút phía trên bảng (cần JavaScript; không có thì mọi dòng
-đều hiện). **Bấm vào phát hiện chính** của một dòng để mở chi tiết như trang *Check listing*: điểm sẵn sàng đăng và bảng rủi ro nhãn
-hiệu cạnh nhau (kèm lời tuyên bố của catalog nhãn hiệu), rồi các phát hiện với thông điệp, gợi ý và, nếu có, gợi ý sửa đã được kiểm
-chứng. Gợi ý sửa chỉ để đọc; trang không áp dụng nó.
+đều hiện). Bấm **Chi tiết** ở cuối dòng để mở chi tiết ngay dưới dòng đó (không cần JavaScript; bấm **Đóng chi tiết** hoặc nút Quay lại của trình
+duyệt để đóng; mỗi lúc mở một chi tiết).
+
+![Chi tiết một dòng, giao diện sáng](images/console/bulk-detail-light.png)
+![Chi tiết một dòng, giao diện tối](images/console/bulk-detail-dark.png)
+
+Chi tiết có hai cột. Bên trái là **nội dung listing đã kiểm tra**: title với chữ bị phát hiện được tô (nền vàng nhạt cho nhãn hiệu, nền
+đỏ nhạt cho lỗi), tag dạng chip (chip bị gắn cờ có hình thoi hoặc tam giác, và chữ cho người đọc màn hình), phần đầu mô tả, điểm sẵn
+sàng đăng dạng thanh tiến độ, và kết quả nhãn hiệu kèm lời tuyên bố của catalog nhãn hiệu. Bên phải là **một thẻ cho mỗi phát hiện**:
+mức và rule id, thông điệp, quy tắc kiểm tra điều gì, bằng chứng, gợi ý và (nếu có) gợi ý sửa đã được kiểm chứng, nguồn của ngưỡng và
+mức xác minh, rồi ba nút phản hồi *Đúng*, *Báo nhầm*, *Không hữu ích*. Gợi ý sửa chỉ để đọc; trang không áp dụng nó. Nội dung listing
+chỉ có trong trang vừa nhận được; nó không được lưu.
 
 ### Chép kết quả ngược vào Sheet
 

@@ -129,7 +129,9 @@ Every console page now loads the tokens and `app.css` and sits in the new shell.
 renamed to `--brand` where it was read (the token `--accent` is red); the old top bar, the body font and the heading sizes are gone from
 `editor.css` because `app.css` owns them. Pages are moved to the components one per pull request and their old rules deleted; when none
 remains, the alias block goes. Until then a few old rules break the brief (the home page's cards with a colored top edge, for example) and are
-listed in the pull request that introduced this ADR.
+listed in the pull request that introduced this ADR. [ADR-041](ADR-041-console-work-pages.md) moved the pages of daily work (home, Check
+listing, bulk check, edit mode, rewrite suggestions, the feedback buttons): `rewrite.css` and the alias block are gone, `editor.css` and
+`bulk.css` keep the layout of their page, and `console.css` is the sheet of the pages not moved yet.
 
 ## Consequences
 

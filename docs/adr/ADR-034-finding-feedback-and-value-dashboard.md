@@ -198,6 +198,16 @@ The history page, the edit mode and the watchlist named in the brief are not on 
 - The rates are what reviewers said, not a measured precision: a seller marks what they look at, so the sample is biased toward
   findings that surprised them. The pages say "reported", never "accuracy".
 
+## Amendment (ADR-041)
+
+[ADR-041](ADR-041-console-work-pages.md) redrew the home page on the design system and changed what it reads. The statement that the page
+holds counts only is no longer true for one block: **Cần xử lý** prints, for the latest five results of the client with an `ERROR` or a `HIGH`
+trademark risk, the SKU a bulk row gave (or the rule id), the first such finding's own message, the marketplace and the time, read from
+`check_history_event` and the stored finding with the client's id first (the same text the History page prints to the same account). The
+health report, the statistics page and the CSV still read no text. The trademark holds are now counted by three sources (catalog, the
+client's own watchlist, context rule) and the chart draws one series, the listings held back by an `ERROR` (the listings checked stay in
+the table under it).
+
 ## Open questions
 
 1. Should a client's members see each other's verdicts at the finding (a team review), or only the counts (this record)?
