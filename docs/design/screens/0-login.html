@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<!-- Mockup tham chiếu, dữ liệu mẫu. Nguồn: canvas "Listing Guard Console – Giao diện". Không copy chữ vào template: mọi câu đi qua messages*.properties (ADR-028). -->
+<head>
+<meta charset="utf-8">
+<title>Đăng nhập</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1f3fbf}a:hover{color:#17309a}
+*{box-sizing:border-box}
+.app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:900px;font-family:'Be Vietnam Pro',system-ui,sans-serif;color:#111111;background:#f7f7f5;font-size:15px;line-height:24px}
+.side{background:#ffffff;border-right:1px solid #e3e2de;padding:20px 14px;display:flex;flex-direction:column;gap:4px}
+.logo{display:block;height:28px;margin:4px 8px 24px}
+.nav{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;color:#3d3d3a;text-decoration:none;font-size:14px;font-weight:500}
+.nav:hover{background:#f1f1ee;color:#111111}
+.nav.on{background:#eaeefc;color:#1a36a8;font-weight:600}
+.nav svg{flex:none}
+.navlabel{font-size:12px;color:#5b5b57;font-weight:600;margin:18px 10px 6px}
+.me{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-top:1px solid #e3e2de;font-size:13px;color:#5b5b57}
+.av{width:32px;height:32px;border-radius:9999px;background:#eaeefc;color:#1a36a8;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.main{padding:28px 36px 48px;min-width:0}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.crumb{font-size:13px;color:#5b5b57;margin:0 0 4px}
+h1{margin:0;font-size:28px;line-height:36px;font-weight:700;letter-spacing:-0.01em}
+.sub{margin:4px 0 0;color:#5b5b57;font-size:14px}
+h2{margin:0;font-size:17px;line-height:26px;font-weight:600}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:10px;border:1px solid #d4d3ce;background:#ffffff;color:#111111;font:600 14px 'Be Vietnam Pro',sans-serif;cursor:pointer}
+.btn:hover{background:#f1f1ee}
+.btn.pri{background:#1f3fbf;border-color:#1f3fbf;color:#ffffff}
+.btn.pri:hover{background:#17309a}
+.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.card{background:#ffffff;border:1px solid #e3e2de;border-radius:14px;padding:20px}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
+.kpi .lab{font-size:13px;color:#5b5b57;font-weight:500}
+.kpi .num{font-size:34px;line-height:42px;font-weight:700;letter-spacing:-0.02em;margin-top:6px}
+.kpi .delta{font-size:13px;color:#5b5b57;margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:9999px;font-size:12px;font-weight:600;white-space:nowrap}
+.p-err{background:#fcebe7;color:#a62e1a}
+.p-tm{background:#fdf1dc;color:#8a5100}
+.p-ok{background:#e5f4ea;color:#1a6e3f}
+.p-neu{background:#f1f1ee;color:#3d3d3a}
+.tw{overflow-x:auto;border:1px solid #e3e2de;border-radius:12px;background:#ffffff}
+table{width:100%;border-collapse:collapse;font-size:14px;line-height:20px}
+th{text-align:left;font-size:12px;font-weight:600;color:#5b5b57;padding:10px 14px;border-bottom:1px solid #e3e2de;background:#fbfbfa;white-space:nowrap}
+td{padding:12px 14px;border-bottom:1px solid #efeeea;vertical-align:top}
+tr:last-child td{border-bottom:0}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:#3d3d3a}
+.muted{color:#5b5b57}
+.small{font-size:13px}
+.row{display:flex;align-items:center;gap:10px}
+.list{display:flex;flex-direction:column}
+.li{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid #efeeea}
+.li:first-child{border-top:0;padding-top:0}
+.grow{flex:1;min-width:0}
+.mark{background:#fdf1dc;color:#111111;border-radius:4px;padding:0 3px;box-shadow:inset 0 -2px 0 #e0a43a}
+.field label{display:block;font-size:13px;font-weight:600;color:#3d3d3a;margin-bottom:6px}
+.in{width:100%;border:1px solid #d4d3ce;border-radius:10px;padding:10px 12px;font:14px 'Be Vietnam Pro',sans-serif;background:#ffffff;color:#111111}
+textarea.in{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:20px;min-height:132px;resize:vertical}
+.seg{display:inline-flex;background:#f1f1ee;border-radius:10px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;height:32px;padding:0 14px;border-radius:8px;font:600 13px 'Be Vietnam Pro',sans-serif;color:#5b5b57;cursor:pointer}
+.seg button.on{background:#ffffff;color:#111111;box-shadow:0 1px 2px rgba(17,17,17,.08)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid #e3e2de;border-radius:8px;font-size:13px;background:#ffffff}
+.tag{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;background:#f1f1ee;font-size:13px;margin:0 6px 6px 0}
+.tag.flag{background:#fdf1dc;color:#8a5100;font-weight:600}
+.banner{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:12px;background:#eaeefc;color:#1a36a8;margin-bottom:16px;flex-wrap:wrap}
+.drop{border:1.5px dashed #c9c8c2;border-radius:14px;padding:28px;text-align:center;background:#fbfbfa}
+.bar{height:8px;border-radius:9999px;background:#efeeea;overflow:hidden}
+.bar span{display:block;height:100%;background:#1f3fbf;border-radius:9999px}
+.fb{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.toggle{width:36px;height:20px;border-radius:9999px;background:#1f3fbf;position:relative;display:inline-block}
+.toggle::after{content:'';position:absolute;top:2px;left:18px;width:16px;height:16px;border-radius:9999px;background:#ffffff}
+.toggle.off{background:#c9c8c2}.toggle.off::after{left:2px}
+@media (max-width:860px){.app{grid-template-columns:1fr}.side{border-right:0;border-bottom:1px solid #e3e2de;flex-direction:row;flex-wrap:wrap;align-items:center}.navlabel,.me{display:none}.logo{margin:0 12px 0 4px}.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}.main{padding:20px 16px}}
+</style>
+<div style="min-height:780px;background:#f7f7f5;display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Be Vietnam Pro',system-ui,sans-serif;color:#111111">
+<div style="width:100%;max-width:420px;background:#ffffff;border:1px solid #e3e2de;border-radius:16px;padding:36px 32px">
+<img src="../logo/lockup-horizontal.svg" alt="Listing Guard" style="height:30px;display:block;margin-bottom:28px">
+<h1 style="margin:0;font-size:24px;line-height:32px;font-weight:700">Đăng nhập</h1>
+<p style="margin:6px 0 24px;color:#5b5b57;font-size:14px;line-height:22px">Dùng email công ty để vào console kiểm tra listing.</p>
+<button class="btn pri" style="width:100%;justify-content:center;height:44px">Tiếp tục với email công ty</button>
+<p style="margin:16px 0 0;color:#5b5b57;font-size:13px;line-height:20px">Bạn sẽ nhận mã đăng nhập qua email. Chỉ email trong danh sách của HappyC được vào.</p>
+<div style="margin-top:28px;padding-top:18px;border-top:1px solid #efeeea;display:flex;justify-content:space-between;font-size:13px"><a href="#">Hướng dẫn sử dụng</a><span style="color:#5b5b57">v0.8</span></div>
+</div></div>
+</body>
+</html>
