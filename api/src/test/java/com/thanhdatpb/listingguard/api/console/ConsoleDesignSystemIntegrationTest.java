@@ -30,7 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
- * The visual identity of the console (ADR-040): the brand files are public and cached for a year, the sign-in pages use them with their
+ * The visual identity of the console (ADR-040): the brand files (tokens, fonts, logos, icons and the base style sheet) are public and cached for a year, the sign-in pages use them with their
  * CSRF field intact, and every console page renders in the new shell (the sidebar, the skip link, the current page marked, the account)
  * while keeping the style sheet it had.
  */
@@ -76,7 +76,7 @@ class ConsoleDesignSystemIntegrationTest {
         for (String path : new String[] {"/brand/tokens.css", "/brand/fonts/be-vietnam-pro-latin-400-normal.woff2",
                 "/brand/fonts/be-vietnam-pro-vietnamese-700-normal.woff2", "/brand/logo/lockup-horizontal.svg",
                 "/brand/logo/lockup-horizontal-reverse.svg", "/brand/logo/symbol.svg", "/brand/favicon.ico",
-                "/brand/icons/icon-180.png", "/console/app.css"}) {
+                "/brand/icons/icon-180.png", "/brand/app.css"}) {
             MvcResult result = mvc.perform(get(path)).andExpect(status().isOk())
                     .andExpect(header().string("X-Content-Type-Options", "nosniff")).andReturn();
             String cache = result.getResponse().getHeader("Cache-Control");
@@ -95,7 +95,7 @@ class ConsoleDesignSystemIntegrationTest {
 
     @Test
     void theOtherConsoleFilesStayBehindTheSignIn() throws Exception {
-        for (String path : new String[] {"/console/editor.css", "/console/console.css", "/console/vendor/htmx.min.js", "/console"}) {
+        for (String path : new String[] {"/console/app.css", "/console/editor.css", "/console/console.css", "/console/vendor/htmx.min.js", "/console"}) {
             mvc.perform(get(path)).andExpect(status().is3xxRedirection()).andExpect(header().string("Location", "/login"));
         }
     }
@@ -104,7 +104,7 @@ class ConsoleDesignSystemIntegrationTest {
     void theSignInPageUsesTheBrandAndKeepsItsFormAndItsCsrfField() throws Exception {
         String html = body(mvc.perform(get("/login")).andExpect(status().isOk()).andReturn());
 
-        assertThat(html).contains("/brand/tokens.css?v=" + assets.version()).contains("/console/app.css?v=" + assets.version())
+        assertThat(html).contains("/brand/tokens.css?v=" + assets.version()).contains("/brand/app.css?v=" + assets.version())
                 .contains("/brand/favicon.ico?v=").contains("rel=\"apple-touch-icon\"").contains("name=\"theme-color\"")
                 .contains("class=\"lg-card lg-card--raised lg-auth__card\"").contains("<picture>")
                 .contains("lockup-horizontal-reverse.svg").contains("prefers-color-scheme: dark")
@@ -133,7 +133,7 @@ class ConsoleDesignSystemIntegrationTest {
     void theConfirmationPageUsesTheSameCard() throws Exception {
         String html = body(mvc.perform(get("/login/verify").param("token", "not-a-token")).andExpect(status().isOk()).andReturn());
 
-        assertThat(html).contains("/console/app.css?v=" + assets.version()).contains("lg-auth__card").contains("role=\"alert\"")
+        assertThat(html).contains("/brand/app.css?v=" + assets.version()).contains("lg-auth__card").contains("role=\"alert\"")
                 .doesNotContain("app-side");
     }
 
@@ -152,10 +152,10 @@ class ConsoleDesignSystemIntegrationTest {
             String as = page[0] + " (" + page[1] + ")";
 
             assertThat(html).as(as).contains("class=\"app-side\"").contains("href=\"#main\"").contains("id=\"main\"")
-                    .contains("/brand/tokens.css?v=" + assets.version()).contains("/console/app.css?v=" + assets.version())
+                    .contains("/brand/tokens.css?v=" + assets.version()).contains("/brand/app.css?v=" + assets.version())
                     .contains("rel=\"icon\"").contains("action=\"/logout\"").contains("app-account__avatar")
                     .contains(user.email()).contains(clientName).contains("Work").contains("Manage");
-            assertThat(html.indexOf("/brand/tokens.css")).as(as + ": tokens before app.css").isLessThan(html.indexOf("/console/app.css"));
+            assertThat(html.indexOf("/brand/tokens.css")).as(as + ": tokens before app.css").isLessThan(html.indexOf("/brand/app.css"));
             assertThat(countOf(html, "class=\"app-nav__link\"[^>]*aria-current=\"page\"")).as(as + ": one marked link").isEqualTo(1);
             assertThat(html).as(as).containsPattern("aria-current=\"page\"[^>]*>" + Pattern.quote(page[1]) + "<");
             assertThat(countOf(html, "class=\"app-nav__link\"")).as(as + ": nine links").isEqualTo(9);
@@ -188,8 +188,8 @@ class ConsoleDesignSystemIntegrationTest {
 
         assertThat(editor).contains("/console/editor.css").contains("/console/editor.js");
         assertThat(keys).contains("/console/editor.css").contains("/console/console.css");
-        assertThat(editor.indexOf("/console/app.css")).isLessThan(editor.indexOf("/console/editor.css"));
-        assertThat(keys.indexOf("/console/app.css")).isLessThan(keys.indexOf("/console/console.css"));
+        assertThat(editor.indexOf("/brand/app.css")).isLessThan(editor.indexOf("/console/editor.css"));
+        assertThat(keys.indexOf("/brand/app.css")).isLessThan(keys.indexOf("/console/console.css"));
         assertThat(editor).doesNotContain("style=\"");
     }
 

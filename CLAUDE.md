@@ -1039,6 +1039,20 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   (`-Deval.listing.update=true` or `--update-baseline`), never by hand, and is committed in the PR that changes it; never lower the gate
   or drop a case to make a build pass. Sample cases are synthetic, list every expected finding, and use only DEMO marks.
 - Tests read boundary values from the ruleset instead of hard-coding limits.
+- **Console look (ADR-040, Proposed; `docs/design/`)**: the visual identity is the design pack in `docs/design/` (`brand.md`, `tokens.json`, `tokens.css`,
+  fonts, logos, screens). The console serves a copy of it from `api/src/main/resources/static/brand/` (public `/brand/**`, one-year `immutable` cache,
+  every link written with `?v=<BrandAssets.version()>`; fonts and logos are self-hosted, nothing from a CDN) and its base sheet
+  `static/console/app.css`, served at `/brand/app.css` so Cloudflare Access in front of `/console/*` never sits between the sign-in page and its style.
+  **A new console page uses `templates/console/layout.html` (`head` after the title, `demoBanner`, `nav('<key>')`) and `app.css` and adds no color of
+  its own**: colors, spacing, radii and shadows are `var(--...)` of `tokens.css`, never a hex, `rgb()` or a font family (`ConsoleAppCssTest` scans
+  `app.css`); a shade the tokens lack is derived in the `:root` of `app.css` with `color-mix()` and its text/ground pairs go into
+  `ConsoleContrastTest` (4.5:1 text, 3:1 lines, light and dark). A new component is added to `app.css` first, named `lg-<thing>` (`__part`,
+  `--variant`; the shell is `app-`), with a state shown by a word and a shape (red only for a problem: `--danger` text, `--accent` the diamond
+  mark), and its text from message keys in both bundles. No gradient, no emoji, no card with a colored edge on one side. Dark is
+  `prefers-color-scheme` only. Never edit `static/brand/` by hand: change `docs/design/` and run `scripts/sync-brand-assets.sh`
+  (`BrandTokensInSyncTest` fails a copy that differs). The old page sheets (`editor.css`, `console.css`, `bulk.css`, `rewrite.css`,
+  `watchlist.css`) are being retired page by page; `editor.css` keeps aliases of its old color names to tokens (`--accent` there is gone: the
+  token `--accent` is red). A test that scans a page for `<img>`, `<svg>` or `<script>` strips the sidebar first (`ConsoleTestSupport.withoutShell`).
 
 ## Git
 

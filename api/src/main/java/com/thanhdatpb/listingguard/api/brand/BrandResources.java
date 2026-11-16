@@ -9,8 +9,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 /**
  * Serves the visual identity of the console (ADR-040) with a long cache. {@code /brand/**} (the tokens, the self-hosted fonts, the
  * logos and the icons) is public, with no sign-in and no API key (see {@code ApiKeyFilter}), because the sign-in page needs it, and
- * so is the one style sheet {@code /console/app.css} (the console chain lets it through, {@code ApiSecurityConfig}). They are
- * files of the product, never data of a client.
+ * so is the console's base style sheet, {@code /brand/app.css} (the file {@code static/console/app.css}). They are files of the product,
+ * never data of a client.
  *
  * <p>The cache is one year and {@code immutable}, which is safe only because every address a page writes carries
  * {@code ?v=}{@link BrandAssets#version()}, and the fonts, which a style sheet names without it, are never replaced under the same
@@ -27,8 +27,10 @@ public class BrandResources implements WebMvcConfigurer {
         registry.addResourceHandler("/brand/**")
                 .addResourceLocations("classpath:/static/brand/")
                 .setCacheControl(LONG_CACHE);
-        // a pattern with a wildcard on purpose: a handler for a literal path finds no file name inside it
-        registry.addResourceHandler("/console/app.*")
+        // The console's base style sheet lives in static/console/ with the other console sheets and is served at /brand/app.css, outside
+        // /console/**: the sign-in pages need it before anyone is signed in, and Cloudflare Access (ADR-027), which fronts /console/* only,
+        // must never sit between a page and its style. The pattern has a wildcard on purpose: a handler for a literal path finds no file name.
+        registry.addResourceHandler("/brand/app.*")
                 .addResourceLocations("classpath:/static/console/")
                 .setCacheControl(LONG_CACHE);
     }

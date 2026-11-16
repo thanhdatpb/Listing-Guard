@@ -113,8 +113,6 @@ public class ApiSecurityConfig {
         http.securityMatcher("/login", "/login/**", "/console", "/console/**", "/logout")
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/login", "/login/**").permitAll()
-                        // the console style sheet is a file of the product: the sign-in pages load it before anyone is signed in (ADR-040)
-                        .requestMatchers("/console/app.css").permitAll()
                         .anyRequest().authenticated())
                 .csrf(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionFixation(fixation -> fixation.changeSessionId()))

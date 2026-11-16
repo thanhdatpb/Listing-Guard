@@ -2,7 +2,7 @@
 <html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <body>
 <!-- Parts every console page shares. This file is never served on its own; the pages include the fragments below.
-     "head" links the brand tokens and app.css (ADR-040): both are public files (/brand/** and /console/app.css), so the sign-in pages use
+     "head" links the brand tokens and app.css (ADR-040): both are public files under /brand/, so the sign-in pages use
      them too, before anyone is signed in. "nav" is the sidebar of a signed-in page, "logo" the lockup in its light or dark file.
      No text is written in a template (ADR-028): every sentence is a key of messages.properties and messages_vi.properties. -->
 
@@ -16,7 +16,7 @@
     <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
     <link rel="stylesheet" th:href="@{/brand/tokens.css(v=${assetVersion})}">
-    <link rel="stylesheet" th:href="@{/console/app.css(v=${assetVersion})}">
+    <link rel="stylesheet" th:href="@{/brand/app.css(v=${assetVersion})}">
 </th:block>
 
 <!-- The lockup (symbol and wordmark): the cobalt file, or the reverse file when the system is dark. cssClass sizes it. -->

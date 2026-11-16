@@ -2,7 +2,7 @@
 
 Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: edit mode and check history (ADR-033), finding feedback (ADR-034), the console in English
 and Vietnamese (ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030), the value backtest with the labelled
-evaluation (ADR-032), the client trademark watchlist (ADR-031) and the periodic re-audit of active listings (ADR-035). Finding feedback,
+evaluation (ADR-032), the client trademark watchlist (ADR-031) the periodic re-audit of active listings (ADR-035) and the console's visual identity (ADR-040). Finding feedback,
 the watchlist, edit mode and the re-audit touch the API, and only additively (see their sections); the bulk check adds migration V36,
 finding feedback V37, the watchlist V38, check history V39, the re-audit V40, the LLM usage counter V41 (ADR-036, off by default) and the rewrite suggestions V42 (ADR-037, off by default, console only), all additive. The other changes touch no API response,
 request, status, header or migration.
@@ -12,6 +12,26 @@ additive and non-breaking lines of `contract-tools/target/contract/compatibility
 change. When the next version is cut, move this file to `docs/releases/v<version>.md` and start a new one.
 
 ## What is new
+
+### Console visual identity and design system (ADR-040)
+
+The console has the Listing Guard look: the cobalt wordmark with the red diamond, the Be Vietnam Pro typeface, light and dark from the
+system setting, and one page shell. Sellers see it on every page; no page was rewritten, so each keeps its content and its own sheet for now.
+
+- **A sidebar** replaces the row of links: the lockup, the group "Làm việc" (Trang chủ, Kiểm tra, Kiểm tra hàng loạt, Lịch sử, Rà định kỳ,
+  Watchlist), the group "Quản lý" (Thống kê, Báo cáo, API keys), the current page marked, and at the foot the signed-in account and client, the
+  language and sign out. Below 860 px it is a bar with a menu that opens without a script and works with the keyboard. A "Bỏ qua tới nội dung"
+  link is the first control of every page.
+- **The sign-in and confirmation pages** are a card with the lockup, as in `docs/design/screens/0-login`. The form, route, CSRF field and the
+  sign-in modes (e-mail link, Cloudflare Access, both) are unchanged. The demo-catalog banner behaves as before and takes the warning colors.
+- **Public brand files.** `GET /brand/**` (tokens, fonts, logos, icons and the base sheet `/brand/app.css`) needs no sign-in and no API key and
+  is cached for a year; every address carries a hash of the build, so a new release reaches every browser. Nothing is loaded from a CDN. The
+  files are the product's own; no data of a client is under `/brand/`. Every other path under `/console/` still needs the sign-in.
+- **For developers**: `docs/design/` is the source, `static/brand/` its copy (`scripts/sync-brand-assets.sh`, `BrandTokensInSyncTest`), `app.css`
+  the base components (`lg-*`), and a page adds no color of its own. Tests scan `app.css` for color codes and check text contrast in both schemes.
+- **No API, migration or setting changes.** The new Vietnamese words (group names, skip link, menu) are in the message files and need the
+  same native read as the rest of ADR-028's Vietnamese. The home page's cards (colored top edge) and a few other old rules still break the
+  brief until their pages move to the components.
 
 ### LLM rewrite suggestions verified by rules (ADR-037)
 
