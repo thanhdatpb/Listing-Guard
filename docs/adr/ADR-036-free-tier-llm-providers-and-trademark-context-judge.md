@@ -44,7 +44,8 @@ names, and the result may only get *quieter* for it.
    `llm_context_judge` in `skippedRuleIds` (the mechanism of ADR-031). An INCOMPLETE result is stored for `GET`, never served from
    cache and not charged to the quota, so the next check retries. Only a finding the judge would have looked at causes this.
 5. **Cache.** Answers are cached in memory by `SHA-256(model id, prompt version, system, user, schema)` (bounded, 24 h). A hit makes
-   no request and uses no quota. Only a validated answer is cached. The cache holds answers, not prompts.
+   no request and uses no quota. Only the answer of a successful call is cached (the judge validates it every time it reads it). The cache holds answers, not
+   prompts.
 6. **Data routing.** A call declares which kinds of data its prompt contains: `LISTING_TEXT` (title, tags, bullet points, description,
    brand, search terms of a client's listing: not public until the seller publishes) and `PERSONALIZATION` (text a buyer types or the
    personalization instructions, ADR-016: personal data). A provider receives a call only if it allows **every** kind in it.
@@ -129,4 +130,24 @@ The shipped limits are deliberately below these numbers (Groq 25/min and 900/day
 
 ## Results
 
-Not measured yet. See the section written after the measurement.
+**Not measured with a model.** The implementation was written without a key for any provider (none is set in the environment of the
+session), and no real model was called: every test uses a stub provider. What is known, and what is not:
+
+| Measurement | Before (the judge off, the code of `main`) | After (the judge on) |
+|---|---|---|
+| `eval-listing`, 27 labelled cases (`eval/listing/baseline.json`): trademark rules, true positives / false positives / false negatives | `catalog_exact` 2/0/0, `catalog_fuzzy` 1/0/0, `catalog_phrase` 1/0/0 (precision and recall 1.0 for the 4 trademark cases) | **not run** |
+| `eval-listing`: false-alarm rate of colour or plain words | **not measurable**: the set uses the fictional DEMO catalog and has no case where a catalog mark is an ordinary word | **not run** |
+| `backtest`: recall of claimed rows, unclaimed rows flagged | **not run**: no labelled claim file is in the repository (ADR-032 keeps real data out) | **not run** |
+
+What the tests prove instead (stub model, no network): a `likely_descriptive` answer lowers a MEDIUM catalog finding to LOW and keeps it
+with the label and reason, through `POST /api/v1/trademark-checks`, storage, `GET` and the cache; HIGH, LOW, watchlist and context
+findings are never sent; a wrong JSON answer, `likely_mark_use` and `unsure` change nothing; an exhausted day or a failing provider
+leaves the rules' result and makes it `INCOMPLETE` and uncached; personalization text never reaches a provider that may not see it;
+with the judge off the result is the same object and the fingerprint component is absent.
+
+**Decision: the judge stays off by default** (`listing-guard.llm.enabled=false`, `judge.enabled=false`). This is not a finding that
+recall fell: it is that recall has not been shown not to fall, and the default catch line of ADR-032 (MEDIUM) is exactly the level the
+judge lowers, so a wrong `likely_descriptive` on a claimed listing is a lost catch. The maintainer measures with
+`backtest --llm-judge` on a real labelled file and `eval-listing --llm-judge`, then writes the figures here. The rule: if recall of
+claimed rows falls by even one row, the default stays off and this section says so; if it does not fall, the false-alarm figure
+(unclaimed rows flagged, before and after) says whether it is worth turning on.
