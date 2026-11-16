@@ -130,9 +130,8 @@ number of ordinary checks, and a listing whose result is stored costs nothing. `
 - The first run of a scope shows no new risk. Until a second run exists, a seller who wants to see "what the new catalog added" must run once with
   the catalog before it, which is not possible once it is replaced; the feature starts to pay from the second run.
 - The English and Vietnamese sentences are for the maintainer to review (the legal wording of "risk" and the disclaimer especially).
-- Migration numbering: **V40** is used because the unmerged branch `feature/edit-mode-and-history` already holds V39 (`check_history`). Whichever
-  branch merges second keeps its number only if Flyway runs out of order there; the maintainer should renumber if both merge. ADR-033 is on that branch and not on `main`;
-  this ADR does not depend on it.
+- Migration numbering: **V40** follows V39 (`check_history`, [ADR-033](ADR-033-edit-mode-and-check-history.md)). This ADR does not depend on
+  ADR-033: the re-audit keeps its own trace and does not read the check history.
 
 ## Open questions
 

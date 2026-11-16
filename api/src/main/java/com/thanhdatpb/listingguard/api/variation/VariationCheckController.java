@@ -44,9 +44,12 @@ public class VariationCheckController {
     private static final String PROBLEM = "application/problem+json";
 
     private final VariationCheckService service;
+    private final com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history;
 
-    public VariationCheckController(VariationCheckService service) {
+    public VariationCheckController(VariationCheckService service,
+                                   com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history) {
         this.service = service;
+        this.history = history;
     }
 
     @PostMapping
@@ -103,7 +106,10 @@ public class VariationCheckController {
                                             @ExampleObject(name = "quota-exceeded", value = PROBLEM_QUOTA_EXCEEDED)}))})
     public VariationCheckResult check(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
                                       @Valid @RequestBody VariationCheckRequest request) {
-        return service.check(client.id(), request);
+        VariationCheckResult result = service.check(client.id(), request);
+        history.api(client, com.thanhdatpb.listingguard.api.plan.Pack.VARIATION_CHECKS.id(), result.checkId(), result.marketplace(),
+                1, null);
+        return result;
     }
 
     @GetMapping("/{id}")

@@ -32,13 +32,19 @@ API's results and never substitutes its own pass/fail decision.
    catalog was not searched at all and the result is `INCOMPLETE`.
 4. If the seller provided a parent and children or Etsy variation properties and children, call `check_variations` with those
    values in the corresponding shape.
-5. If checking text the buyer typed for a custom product before production, call `screen_personalization` with `marketplace`
+5. When the seller is revising an existing listing and provides both versions, call `check_listing_edit` with the marketplace,
+   `before` and `after`. Include `beforeVariations` and `afterVariations` when both variation families are available. Report the
+   returned `newFindings`, `modifiedFindings` and `remainingFindings` exactly; a `modifiedFindings` entry with no `after` finding
+   was resolved. Never invent the earlier version. If the seller opens a saved check in the console, ask them to paste the old
+   listing again because the text is not retained.
+6. If checking text the buyer typed for a custom product before production, call `screen_personalization` with `marketplace`
    and `values`. Send each text exactly as entered; include `print_profile` only when known and declared. Show the character
    findings and trademark status separately.
 
 Call only applicable checks, but do not omit a requested check because another pack returned no findings. These tools are
 `check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`,
-`get_capabilities`, and `get_watchlist`; their names and parameters are defined by the MCP server's `ToolCatalog`.
+`get_capabilities`, `get_watchlist`, and `check_listing_edit`; their names and parameters are defined by the MCP server's
+`ToolCatalog`.
 
 ## Reporting results
 

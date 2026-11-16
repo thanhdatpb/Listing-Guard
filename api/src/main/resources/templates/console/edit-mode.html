@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{edit.title}"></title>
+    <link rel="stylesheet" th:href="@{/console/editor.css}">
+    <th:block th:replace="~{console/layout :: htmx}"></th:block>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('check')}"></header>
+<main class="layout">
+    <section class="editor">
+        <h1 th:text="#{edit.heading}"></h1>
+        <p class="muted" th:text="#{edit.intro}"></p>
+        <p class="muted small" th:text="#{edit.history.note}"></p>
+        <p class="error" role="alert" th:if="${error == 'edit.error.required'}" th:text="#{edit.error.required}"></p>
+        <p class="error" role="alert" th:if="${error == 'edit.error.object'}" th:text="#{edit.error.object}"></p>
+        <p class="error" role="alert" th:if="${error == 'edit.error.invalid'}" th:text="#{edit.error.invalid}"></p>
+        <form method="post" th:action="@{/console/check/edit}">
+            <label for="marketplace" th:text="#{edit.marketplace}"></label>
+            <select id="marketplace" name="marketplace">
+                <option value="ETSY" th:selected="${marketplace == 'ETSY'}" th:text="#{edit.marketplace.etsy}"></option>
+                <option value="AMAZON" th:selected="${marketplace == 'AMAZON'}" th:text="#{edit.marketplace.amazon}"></option>
+            </select>
+            <div class="edit-columns">
+                <div class="field">
+                    <label for="before" th:text="#{edit.before}"></label>
+                    <textarea id="before" name="before" rows="18" required th:text="${before}"></textarea>
+                </div>
+                <div class="field">
+                    <label for="after" th:text="#{edit.after}"></label>
+                    <textarea id="after" name="after" rows="18" required th:text="${after}"></textarea>
+                </div>
+            </div>
+            <button type="submit" th:text="#{edit.compare}"></button>
+        </form>
+        <section th:if="${result != null}" aria-live="polite">
+            <h2 th:text="#{edit.changed.fields}"></h2>
+            <ul><li th:each="field : ${result.changedFields()}" th:text="${field}"></li></ul>
+            <section>
+                <h2 th:text="#{edit.group.new}"></h2>
+                <article th:each="item : ${result.newFindings()}" class="finding">
+                    <p th:text="${item.after().get('message')}"></p>
+                    <div th:replace="~{console/feedback :: widget(${item.feedbackTarget()})}"></div>
+                </article>
+            </section>
+            <section>
+                <h2 th:text="#{edit.group.modified}"></h2>
+                <article th:each="item : ${result.modifiedFindings()}" class="finding">
+                    <p th:if="${item.before() != null}" th:text="${item.before().get('message')}"></p>
+                    <p th:if="${item.after() != null}" th:text="${item.after().get('message')}"></p>
+                    <div th:replace="~{console/feedback :: widget(${item.feedbackTarget()})}"></div>
+                </article>
+            </section>
+            <section>
+                <h2 th:text="#{edit.group.remaining}"></h2>
+                <article th:each="item : ${result.remainingFindings()}" class="finding">
+                    <p th:text="${item.after().get('message')}"></p>
+                    <div th:replace="~{console/feedback :: widget(${item.feedbackTarget()})}"></div>
+                </article>
+            </section>
+        </section>
+    </section>
+</main>
+</body>
+</html>

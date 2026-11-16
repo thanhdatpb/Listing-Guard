@@ -383,6 +383,30 @@ standard input of the marketplace above, normalized the same way) and one more o
 With a product type, a catalog mark whose Nice classes do not include one of the product type's is reported one level lower
 and the finding says so. See [the integration guide](integration-guide.md#trademark-checks).
 
+## Listing edit comparison
+
+`POST /api/v1/listing-edits` checks an existing marketplace listing before and after a proposed edit. `before` and `after`
+use the same marketplace-specific listing object described above. Variation families are optional and use the same `parent`,
+`variation_properties` and `children` fields as [Variation checks](#variation-checks). Each side is checked for variations only
+when it has a parent or child.
+
+| Field | Type | Notes |
+|---|---|---|
+| `marketplace` | string | `ETSY` or `AMAZON`, case-insensitive. |
+| `before` | object | The marketplace listing before the edit. |
+| `after` | object | The marketplace listing after the edit. |
+| `before_variations` | object | Optional variation family before the edit. |
+| `after_variations` | object | Optional variation family after the edit. |
+
+```json listing-edit-example
+{"marketplace":"ETSY","before":{"title":"Soft cotton shirt","tags":["cotton","shirt"]},"after":{"title":"Soft cotton shirt - team edition","tags":["cotton","shirt","team edition"]}}
+```
+
+The response groups findings as `newFindings`, `modifiedFindings` (including findings resolved by the edit) and
+`remainingFindings`, and lists the changed field paths. Each feedback target points to the stored finding used by the existing
+feedback flow. The listing itself is not added to history or stored by this endpoint; its pack checks retain their existing hashes,
+bounded evidence and retention behavior.
+
 ## Checked by a test
 
 The two listing examples above are read out of this file by a test and run through the normalizers (the Amazon example

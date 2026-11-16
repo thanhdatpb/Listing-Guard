@@ -42,7 +42,7 @@ class McpTransportsTest {
 
     private static final ObjectMapper M = ToolResults.newMapper();
     private static final List<String> TOOLS = List.of("check_listing", "check_trademark", "check_variations",
-            "screen_personalization", "get_limits", "get_usage", "get_capabilities", "get_watchlist");
+            "check_listing_edit", "screen_personalization", "get_limits", "get_usage", "get_capabilities", "get_watchlist");
 
     private static McpServerConfig httpConfig(ApiStub stub) {
         return new McpServerConfig(ApiStub.KEY, stub.baseUri(), Duration.ofSeconds(5), TransportKind.HTTP,

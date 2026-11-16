@@ -397,7 +397,14 @@ It never edits a listing, never publishes, and does no SEO.
   the banner and the editor's trademark panel repeats it.
   **Watchlist page (ADR-031, V38)** (`api/.../console/watchlist/`, `templates/console/watchlist.html`, `static/console/watchlist.css`): menu
   "Watchlist"; every account reads and exports, only an `ADMIN` account writes (a role on `account`, never in the session); see the
-  **Client trademark watchlist** bullet. **Bulk check (ADR-029, V36)** (`api/.../console/bulk/`, `templates/console/bulk*.html`, `static/console/bulk.{css,js}`, English and
+  **Client trademark watchlist** bullet. **Edit mode and check history (ADR-033, Proposed; V39)** (`api/.../edit/`, `api/.../history/`,
+  `console/ConsoleHistoryController`, `templates/console/{edit-mode,history,history-result}.html`, [docs/edit-mode.md](docs/edit-mode.md)):
+  additive `POST /api/v1/listing-edits` composes existing listing-rules, trademark catalog + client watchlist and optional variation
+  services on both versions, preserving per-input cache, plan and quota behavior; findings carry ADR-034 feedback targets. The console
+  editor shows before/after and new/modified/remaining findings. History is scoped to the signed-in account's client, filters and
+  paginates saved pack results, and stores event references (actor, result, time, marketplace, row count, optional SKU) only; listing
+  text is never stored. A history result cannot restore the prior listing: edit mode leaves Before blank and asks the seller to paste it.
+  SDK, read-only MCP `check_listing_edit`, agent skill, OpenAPI and integration docs are updated. **Bulk check (ADR-029, V36)** (`api/.../console/bulk/`, `templates/console/bulk*.html`, `static/console/bulk.{css,js}`, English and
   Vietnamese like the rest of the console: every sentence is a message key, ADR-028; `BulkText` and the pure classes take
   `ConsoleMessages`): `GET /console/bulk`, `POST /console/bulk/prepare` and `POST /console/bulk/run` (multipart). A seller pastes
   rows copied from a Google Sheet (tab "Paste from Sheet") or uploads a CSV/TSV (tab "Upload a file"), confirms what each column is, and gets
@@ -460,7 +467,7 @@ It never edits a listing, never publishes, and does no SEO.
 - Current scope: Etsy and Amazon rule engines, the image checker (ADR-008: the core and the endpoint, off by default and without the bounded decode service), the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
   endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, the `hf-convert` job (ADR-030), the console bulk check (ADR-029), the client trademark watchlist (ADR-031), policy ingest + retrieval, and the optional console (magic-link by default, or Cloudflare Access per ADR-027) with a plan/usage
-  dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
+  dashboard, the Check listing editor with edit comparison, the client-scoped check history and an API keys page (no saved listing text; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12c.yaml`): simple input format (`title`, `brand`,
   `bullet_points`, `description`, `search_terms`, `product_type`, `item_highlights`, `customization`, ...), US store (English word
@@ -588,8 +595,7 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     reminder, `HealthReport.reaudit` with `openapi.json`, tests, `docs/reaudit.md`). Open questions the maintainer decides are at the end of the
     ADR (comparing the first run with the catalog before the served one, a changed watchlist note counting as new, a scheduled run that reads a
     Sheet, an e-mail reminder, variation checks for adapter files, the scope, TSDR-dead marks). Not planned: storing a file or a listing text,
-    an endpoint, MCP tool or SDK method, applying a fix. **V39 is taken by the unmerged `feature/edit-mode-and-history`** (`check_history`):
-    renumber one of the two migrations when the second branch merges.
+    an endpoint, MCP tool or SDK method, applying a fix. V40 follows V39 (`check_history`, ADR-033); the next migration is V41.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).

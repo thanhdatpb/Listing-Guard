@@ -1597,6 +1597,12 @@ Likewise `LISTING_GUARD_DEV_API_KEY` (the public development key in the compose 
 refuses to start. Without any key the service starts, logs a warning and answers every request with `401` until
 the operator creates one.
 
+## Edit mode and history
+
+To compare a proposed edit with the current listing, send both versions to [`POST /api/v1/listing-edits`](edit-mode.md). The
+console also provides Edit mode and a client-scoped [check history](edit-mode.md#console). History stores result references and
+optional SKU metadata, never listing text.
+
 ## Not covered yet
 
 Mapping a client's own listing format to the standard input format (that is done on the client's side),

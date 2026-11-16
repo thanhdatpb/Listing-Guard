@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{history.result.title}"></title>
+    <link rel="stylesheet" th:href="@{/console/console.css}">
+    <th:block th:replace="~{console/layout :: htmx}"></th:block>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('history')}"></header>
+<main class="layout">
+    <h1 th:text="#{history.result.heading}"></h1>
+    <dl>
+        <dt th:text="#{history.col.marketplace}"></dt><dd th:text="${marketplace}"></dd>
+        <dt th:text="#{history.pack}"></dt><dd th:text="${pack}"></dd>
+        <dt th:text="#{history.id}"></dt><dd th:text="${checkId}"></dd>
+        <dt th:text="#{history.col.status}"></dt><dd th:text="${status}"></dd>
+    </dl>
+    <p><a th:href="@{/console/check/edit(marketplace=${marketplace})}" th:text="#{history.edit}"></a></p>
+    <section th:if="${findings.isEmpty()}"><p class="muted" th:text="#{history.no.findings}"></p></section>
+    <article th:each="finding : ${findings}" class="finding">
+        <h2 th:text="${finding.ruleId()}"></h2>
+        <p><span th:text="${finding.level()}"></span> <span th:text="${finding.field()}"></span></p>
+        <p th:text="${finding.message()}"></p>
+        <div th:replace="~{console/feedback :: widget(${finding.target()})}"></div>
+    </article>
+    <p><a th:href="@{/console/history}" th:text="#{history.back}"></a></p>
+</main>
+</body>
+</html>
