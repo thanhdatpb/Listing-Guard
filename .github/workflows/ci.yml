@@ -27,13 +27,19 @@ jobs:
           java-version: "21"
           cache: maven
 
-      # includes the API compatibility check of ADR-022 (contract-tools: ContractCompatibilityTest)
+      # includes the API compatibility check of ADR-022 (contract-tools: ContractCompatibilityTest) and the labelled listing
+      # evaluation of ADR-032 (api: ListingEvalGateTest), which fails when a verified rule's precision falls below
+      # eval/listing/baseline.json
       - name: Build and test
         run: ./mvnw -B verify
 
       - name: API compatibility report
         if: always() && hashFiles('contract-tools/target/contract/compatibility-report.md') != ''
         run: cat contract-tools/target/contract/compatibility-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Labelled listing evaluation report (eval-listing)
+        if: always() && hashFiles('api/target/eval-listing/report.md') != ''
+        run: cat api/target/eval-listing/report.md >> "$GITHUB_STEP_SUMMARY"
 
       # The release-client workflow builds the SDK's Javadoc and sources jars; build them here too, so a Javadoc error is
       # found before a tag is pushed.

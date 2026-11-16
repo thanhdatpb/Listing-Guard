@@ -1,0 +1,19 @@
+# Synthetic sample case (ADR-032): self-written, not taken from a real listing; the DEMO marks are invented.
+id: etsy-02-title-too-long
+marketplace: ETSY
+note: "The title is longer than the ruleset's maximum and has more words than its recommended count."
+listing:
+  title: "Handmade Stoneware Coffee Mug with Hand Painted Cobalt Blue Glaze, Dishwasher Safe Kitchenware, Large Housewarming Present for Tea Lovers and Bakers"
+  description: A stoneware mug thrown on the wheel and finished with a blue glaze. Holds about 350 ml.
+  tags: [ceramic mug, coffee mug, blue glaze, stoneware, kitchen gift]
+  price: 28.00
+  quantity: 4
+  who_made: i_did
+  when_made: made_to_order
+  category: Home & Living > Kitchen & Dining > Drinkware > Mugs
+expected:
+  - rule: title_length
+    field: title
+  - rule: title_word_count
+    field: title
+trademark_risk: LOW

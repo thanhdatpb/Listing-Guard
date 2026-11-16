@@ -1,7 +1,7 @@
 # Unreleased changes
 
 Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: the console in English and Vietnamese
-(ADR-028) and the console bulk check (ADR-029). They change no API response, request, status or header; the bulk check adds one
+(ADR-028), the console bulk check (ADR-029) and the value backtest with the labelled evaluation (ADR-032). They change no API response, request, status or header; the bulk check adds one
 additive migration, V36 (see its section).
 
 Every pull request that changes the API runs the compatibility check (`./mvnw -B -pl contract-tools verify`, ADR-022) and copies the
@@ -9,6 +9,23 @@ additive and non-breaking lines of `contract-tools/target/contract/compatibility
 change. When the next version is cut, move this file to `docs/releases/v<version>.md` and start a new one.
 
 ## What is new
+
+### Value backtest and labelled evaluation (ADR-032)
+
+Two one-shot jobs in the `tools` compose profile, and a CI gate. **No API response, request, status, header, migration, ruleset or
+`analysisVersion` changes**: `docs/api/openapi.json` is unchanged, so the ADR-022 compatibility report has no new line for it.
+
+- **`backtest`**: runs the rule check and the trademark scan (with the catalog the deployment serves) over a labelled CSV (claimed
+  yes/no, issue type, mark), with the batch-check mapping format, and writes `eval/backtest/out/<UTC timestamp>/report.md`
+  (Vietnamese) and `report.json`: recall of claimed listings with counts, by issue type; one reason per miss (not in the catalog,
+  spelling variant, not in the text, not covered, ...); the share of unclaimed listings that are flagged (an upper-bound estimate of
+  false alarms); per-rule counts. It stores nothing, charges nothing and needs no client; the reports hold row ids, rule ids and
+  short evidence, never a listing's text. Guide with a one-page template for a manager: [backtest.md](../backtest.md).
+- **`eval-listing`** and **`eval/listing/`**: 27 self-written synthetic cases (the trademark part with the DEMO catalog) scored per
+  rule (TP, FP, FN, precision, recall) against `eval/listing/baseline.json`. `ListingEvalGateTest` runs it in every `./mvnw verify`
+  (no Docker) and **fails when the precision of a `verified` rule falls below the baseline**; CI adds its report to the job summary.
+- `BatchCsvReader` and `BatchMapping.Bound.read` become public for reuse, `TrademarkCheckService.input` becomes public and
+  `TrademarkScanner.catalog()` is added (read-only); the batch job and every check are unchanged.
 
 ### Console bulk check (ADR-029)
 
