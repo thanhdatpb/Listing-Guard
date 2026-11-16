@@ -16,20 +16,21 @@ class ConsoleHomeAndStatsTest {
     @Test
     void theChartStartsAtZeroAndTheTallestBarFillsTheScale() {
         WeeklyChart chart = WeeklyChart.of(List.of(
-                new WeeklyChart.Week("2026-W45", "02/11", false, 10, 4),
+                new WeeklyChart.Week("2026-W45", "02/11", false, 12, 10),
                 new WeeklyChart.Week("2026-W46", "09/11", false, 0, 0),
                 new WeeklyChart.Week("2026-W47", "16/11", true, 5, 1)));
 
-        assertThat(chart.max()).isEqualTo(10);
+        assertThat(chart.max()).as("the scale follows the listings held back, the one thing drawn").isEqualTo(10);
         assertThat(chart.columns()).hasSize(3);
         WeeklyChart.Column first = chart.columns().get(0);
-        assertThat(first.checked().y()).isEqualTo(WeeklyChart.TOP);
-        assertThat(first.checked().y() + first.checked().height()).isEqualTo(chart.baseline());
-        assertThat(first.withError().height()).isLessThan(first.checked().height()).isPositive();
-        assertThat(chart.columns().get(1).checked().height()).isZero();
+        assertThat(first.bar().y()).as("the tallest bar fills the scale").isEqualTo(WeeklyChart.TOP);
+        assertThat(first.bar().y() + first.bar().height()).isEqualTo(chart.baseline());
+        assertThat(first.bar().height()).isPositive();
+        assertThat(chart.columns().get(1).bar().height()).isZero();
+        assertThat(chart.columns().get(2).bar().height()).isLessThan(first.bar().height()).isPositive();
         assertThat(chart.ticks()).extracting(WeeklyChart.Tick::value).containsExactly(0L, 5L, 10L);
         for (WeeklyChart.Column column : chart.columns()) {
-            assertThat(column.withError().x() + column.withError().width()).isLessThanOrEqualTo(chart.width());
+            assertThat(column.bar().x() + column.bar().width()).isLessThanOrEqualTo(chart.width());
         }
     }
 
@@ -37,7 +38,7 @@ class ConsoleHomeAndStatsTest {
     void anEmptyChartHasAScaleAndNoBar() {
         WeeklyChart chart = WeeklyChart.of(List.of(new WeeklyChart.Week("2026-W47", "16/11", true, 0, 0)));
         assertThat(chart.max()).isEqualTo(2);
-        assertThat(chart.columns().get(0).checked().height()).isZero();
+        assertThat(chart.columns().get(0).bar().height()).isZero();
         assertThat(WeeklyChart.niceCeiling(7)).isEqualTo(10);
         assertThat(WeeklyChart.niceCeiling(15)).isEqualTo(20);
         assertThat(WeeklyChart.niceCeiling(120)).isEqualTo(200);

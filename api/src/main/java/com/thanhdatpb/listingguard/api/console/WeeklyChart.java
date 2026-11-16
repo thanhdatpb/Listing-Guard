@@ -4,9 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The weekly bar chart of the console home page (ADR-034), as coordinates the template writes into an inline SVG: no script and no
- * chart library. Each week has two bars side by side, the listings checked and the listings with an {@code ERROR}, on one scale that
- * starts at zero. The page puts the same numbers in a table under the chart, so the chart is never the only place they are.
+ * The weekly bar chart of the console home page (ADR-034, ADR-041), as coordinates the template writes into an inline SVG: no script and
+ * no chart library. Each week has one bar, the listings with an {@code ERROR} that the checks held back, on a scale that starts at zero;
+ * the current week is drawn in the brand color and the weeks before it in the pale one (the template picks the class). The page puts
+ * the numbers of both counts, the listings checked too, in a table under the chart, so the chart is never the only place they are.
  */
 public record WeeklyChart(int width, int height, int left, int baseline, long max, List<Column> columns, List<Tick> ticks) {
 
@@ -18,7 +19,7 @@ public record WeeklyChart(int width, int height, int left, int baseline, long ma
     public record Bar(int x, int y, int width, int height) {
     }
 
-    public record Column(Week week, Bar checked, Bar withError, int labelX) {
+    public record Column(Week week, Bar bar, int labelX) {
     }
 
     /** A line of the scale: its height and the count it stands for. */
@@ -35,20 +36,19 @@ public record WeeklyChart(int width, int height, int left, int baseline, long ma
     public static WeeklyChart of(List<Week> weeks) {
         long max = 0;
         for (Week week : weeks) {
-            max = Math.max(max, Math.max(week.checked(), week.withError()));
+            max = Math.max(max, week.withError());
         }
         long scale = niceCeiling(max);
         int baseline = HEIGHT - BOTTOM;
         int plotHeight = baseline - TOP;
         int plotWidth = WIDTH - LEFT - RIGHT;
         int slot = weeks.isEmpty() ? plotWidth : plotWidth / weeks.size();
-        int barWidth = Math.max(4, (int) Math.round(slot * 0.32));
+        int barWidth = Math.max(8, (int) Math.round(slot * 0.5));
         List<Column> columns = new ArrayList<>();
         for (int i = 0; i < weeks.size(); i++) {
             Week week = weeks.get(i);
-            int start = LEFT + i * slot + (slot - 2 * barWidth - 2) / 2;
-            columns.add(new Column(week, bar(start, barWidth, week.checked(), scale, baseline, plotHeight),
-                    bar(start + barWidth + 2, barWidth, week.withError(), scale, baseline, plotHeight), LEFT + i * slot + slot / 2));
+            int start = LEFT + i * slot + (slot - barWidth) / 2;
+            columns.add(new Column(week, bar(start, barWidth, week.withError(), scale, baseline, plotHeight), LEFT + i * slot + slot / 2));
         }
         List<Tick> ticks = new ArrayList<>();
         for (int step = 0; step <= 2; step++) {
