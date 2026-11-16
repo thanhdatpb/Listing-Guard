@@ -58,3 +58,27 @@ table.report td.n, table.report th.n { text-align: right; font-variant-numeric: 
 dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 1rem 0; }
 dl.facts dt { color: var(--muted); }
 dl.facts dd { margin: 0; overflow-wrap: anywhere; }
+
+/* The home page (ADR-034): the week's cards, the server-drawn SVG chart, the empty state and the shortcuts. */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+.card { padding: 0.9rem 1rem; border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 8px; background: var(--card); }
+.card.error { border-top-color: var(--error); }
+.card.warning { border-top-color: var(--warning); }
+.card .card-label { margin: 0; font-weight: 600; }
+.card .card-value { margin: 0.25rem 0; font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.card ul.card-note { margin: 0; padding-left: 1.1rem; }
+.empty-state { margin: 1rem 0; padding: 1rem 1.25rem; border: 1px dashed var(--line); border-radius: 8px; background: var(--card); }
+.empty-state ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+.empty-state li { margin: 0.4rem 0; }
+svg.chart { display: block; width: 100%; max-width: 48rem; height: auto; }
+svg.chart .ticks line { stroke: var(--line); stroke-width: 1; }
+svg.chart text { fill: var(--muted); font-size: 12px; font-family: inherit; }
+svg.chart .bar.checked { fill: var(--accent); }
+svg.chart .bar.with-error { fill: var(--error); }
+svg.chart .partial .bar { opacity: 0.55; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: center; }
+.legend .key { display: inline-block; width: 0.9rem; height: 0.9rem; border-radius: 2px; vertical-align: middle; }
+.legend .key.checked { background: var(--accent); }
+.legend .key.with-error { background: var(--error); }
+ol.top-rules li { margin: 0.3rem 0; }
+ul.shortcuts { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0; list-style: none; }
