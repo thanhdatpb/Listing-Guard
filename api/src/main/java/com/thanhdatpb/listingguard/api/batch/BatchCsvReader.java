@@ -24,14 +24,14 @@ import java.util.List;
  * <p>Every row carries the line of the file where it starts (the header of a file with no skipped lines is line 1), so a
  * report can point at it even when an earlier row has quoted line breaks.
  */
-final class BatchCsvReader implements AutoCloseable {
+public final class BatchCsvReader implements AutoCloseable {
 
     /** One data row: where it starts in the file and its cells, as written. */
-    record Row(int line, String[] cells) {
+    public record Row(int line, String[] cells) {
     }
 
     /** The file itself is damaged (bad bytes, an unclosed quote): no row after this point can be trusted. */
-    static final class FormatException extends RuntimeException {
+    public static final class FormatException extends RuntimeException {
         FormatException(String message, Throwable cause) {
             super(message, cause);
         }
@@ -62,7 +62,7 @@ final class BatchCsvReader implements AutoCloseable {
      *
      * @throws BatchConfigException if the file cannot be read, has no header row, or is damaged before its first row ends
      */
-    static BatchCsvReader open(Path file, BatchMapping.Csv settings) {
+    public static BatchCsvReader open(Path file, BatchMapping.Csv settings) {
         BufferedReader reader = null;
         try {
             reader = new BufferedReader(new InputStreamReader(Files.newInputStream(file),
@@ -106,11 +106,11 @@ final class BatchCsvReader implements AutoCloseable {
     }
 
     /** The header names, trimmed. */
-    List<String> header() {
+    public List<String> header() {
         return header;
     }
 
-    int headerLine() {
+    public int headerLine() {
         return headerLine;
     }
 
@@ -119,7 +119,7 @@ final class BatchCsvReader implements AutoCloseable {
      *
      * @throws FormatException if the file is damaged from here on
      */
-    Row next() {
+    public Row next() {
         try {
             if (!rows.hasNext()) {
                 return null;
@@ -135,7 +135,7 @@ final class BatchCsvReader implements AutoCloseable {
     }
 
     /** True when at least one more row follows. */
-    boolean hasNext() {
+    public boolean hasNext() {
         try {
             return rows.hasNext();
         } catch (RuntimeException e) {
