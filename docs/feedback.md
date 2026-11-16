@@ -44,13 +44,21 @@ For the current ISO week (Monday, UTC, to now):
 
 - **Listings checked**: stored listing-rules results (a listing checked again unchanged counts once).
 - **Held back by an ERROR**: results with at least one `ERROR` finding.
-- **Trademark holds (HIGH)**: retained trademark results with at least one `HIGH` finding, split by source (catalog mark or context
-  rule; the watchlist shows "not available yet"). `HIGH` is the default hold level of `batch-check`.
+- **Trademark holds (HIGH)**: retained trademark results with at least one `HIGH` finding, split by source (the client's own watchlist,
+  a catalog mark, or a context rule; a result held by two sources is counted under both). `HIGH` is the default hold level of `batch-check`.
 - **Reported false positives**: *False positive* verdicts of the week out of all verdicts of the week.
 
-Under the cards: a chart of the last eight weeks (listings checked and listings with an `ERROR`, drawn on the server as SVG, with the same
-numbers in a table), the five rules most often marked *False positive* in those weeks, shortcuts (Bulk check, Check listing, Statistics,
-Report, API keys) and the plan and usage. A client with no result and no verdict in eight weeks sees three steps to start instead.
+Under the figures ([ADR-041](adr/ADR-041-console-work-pages.md)):
+
+- **Cần xử lý** (needs attention): the latest five results of the client with an `ERROR` or a `HIGH` trademark risk, each with the SKU a
+  bulk row gave (or the rule id), the finding's own message, the marketplace and the time. It is the one block that prints text of the
+  client's own results (the same text the History page prints); the statistics and the report still read none.
+- **Dữ liệu kiểm tra**: the trademark catalog in use and the date of its data, the enabled watchlist marks, the latest re-audit and the
+  rulesets in force (and the LLM requests today, when the LLM is on).
+- A chart of the last eight weeks (the listings held back by an `ERROR`, drawn on the server as SVG; the listings checked are in the table
+  under it), the five listing rules with the most findings with the false positives reported on each (a dash when the report cannot say),
+  and the plan and usage. The re-audit reminder (ADR-035) is a warning banner at the top.
+- A client with no result and no verdict in eight weeks sees three steps to start instead, and a button to the bulk check.
 
 ## The Statistics page (`/console/stats`)
 

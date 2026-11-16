@@ -405,7 +405,7 @@ It never edits a listing, never publishes, and does no SEO.
   paginates saved pack results, and stores event references (actor, result, time, marketplace, row count, optional SKU) only; listing
   text is never stored. A history result cannot restore the prior listing: edit mode leaves Before blank and asks the seller to paste it.
   SDK, read-only MCP `check_listing_edit`, agent skill, OpenAPI and integration docs are updated. **LLM rewrite suggestions (ADR-037, Proposed; V42)** (`api/.../rewrite/`,
-  `console/editor/ConsoleRewriteController`, `templates/console/rewrite{,-page}.html`, `static/console/rewrite.{js,css}`,
+  `console/editor/ConsoleRewriteController`, `templates/console/rewrite{,-page}.html`, `static/console/rewrite.js`,
   [docs/llm.md](docs/llm.md)): **off by default** (`listing-guard.llm.rewrite.enabled=false`) and is usable only when the shared ADR-036 `LlmClient` is on with a provider whose listing-text flag is true
   (`LlmClient.canServe(LISTING_TEXT)`): with the switch off there is no bean of the package and no route, with no such provider there is no
   button (`rewriteAvailable` from `ConsoleRewriteAdvice`). A press of "Gợi ý sửa" (editor, and each bulk row with an ERROR or a
@@ -458,8 +458,9 @@ It never edits a listing, never publishes, and does no SEO.
   note and times, **never a text of the listing**. `FindingFeedbackService` is the only writer and `FeedbackStatsQueries` the only place that
   counts verdicts (statistics page and endpoint, home page, health report). htmx 2.0.4 comes from the WebJar (`api/pom.xml` `htmx.version`
   equals `ConsoleVendorResources.HTMX_VERSION`, a test holds it), is served at `/console/vendor/htmx.min.js` and is the only script added; the
-  widget is a plain POST form that works without it. `GET /console` is the home page (week cards, a server-drawn SVG chart of eight
-  weeks, rules most often marked false positive, shortcuts, an empty state) and `GET /console/stats[.csv]` the statistics. API:
+  widget is a plain POST form that works without it. `GET /console` is the home page (ADR-041: four week figures with the trademark
+  holds by source, "Cần xử lý" (the latest results with an ERROR or a HIGH risk), "Dữ liệu kiểm tra" (catalog and its date, watchlist, latest
+  re-audit, rulesets), a server-drawn SVG chart of eight weeks, the most frequent rules with their false positives, an empty state) and `GET /console/stats[.csv]` the statistics. API:
   `POST /api/v1/feedback` and `GET /api/v1/feedback/stats` (no plan pack, no quota; problems `invalid-feedback`, `finding-not-found`);
   `HealthReport.feedback`. The MCP server and the SDK have no method for them.
   **Periodic re-audit (ADR-035, Proposed; V40)** (`api/.../console/reaudit/`, `templates/console/reaudit*.html`; docs/reaudit.md): menu
@@ -1050,9 +1051,15 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `--variant`; the shell is `app-`), with a state shown by a word and a shape (red only for a problem: `--danger` text, `--accent` the diamond
   mark), and its text from message keys in both bundles. No gradient, no emoji, no card with a colored edge on one side. Dark is
   `prefers-color-scheme` only. Never edit `static/brand/` by hand: change `docs/design/` and run `scripts/sync-brand-assets.sh`
-  (`BrandTokensInSyncTest` fails a copy that differs). The old page sheets (`editor.css`, `console.css`, `bulk.css`, `rewrite.css`,
-  `watchlist.css`) are being retired page by page; `editor.css` keeps aliases of its old color names to tokens (`--accent` there is gone: the
-  token `--accent` is red). A test that scans a page for `<img>`, `<svg>` or `<script>` strips the sidebar first (`ConsoleTestSupport.withoutShell`).
+  (`BrandTokensInSyncTest` fails a copy that differs). **The work pages (ADR-041)** (home, Check listing, bulk check, edit mode, rewrite, feedback)
+  are on the components: a page that prints a finding builds a `FindingCard` through the bean `findingCards` (`FindingCards`: editor, bulk row,
+  edit comparison; `FindingSources` adds the source line from the active ruleset) and includes `console/findings :: card(${card})`, never its own
+  markup; the listing as checked is `ListingView` (`findings :: listing`) and the readiness a `<progress>` whose maximum is the readiness
+  setting. A fragment argument may not call a bean: evaluate it with `th:with` first. The bulk detail opens by `:target`, no script. Old sheets:
+  `console.css` is the sheet of the pages not moved yet (API keys, statistics, report, re-audit, watchlist, history) and goes with them;
+  `editor.css` and `bulk.css` hold the layout of their page only; `rewrite.css` and the alias block are gone, and `ConsolePageCssTest` holds
+  every sheet to no color code and no color name of its own. `ConsoleWorkPagesAccessibilityIntegrationTest` holds the captions, `aria-hidden`
+  icons, `aria-pressed` and live regions. A test that scans a page for `<img>`, `<svg>` or `<script>` strips the sidebar first (`ConsoleTestSupport.withoutShell`).
 
 ## Git
 

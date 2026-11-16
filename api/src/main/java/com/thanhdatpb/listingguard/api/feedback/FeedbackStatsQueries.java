@@ -61,6 +61,13 @@ public class FeedbackStatsQueries {
 
     private static final String SOURCE_OF_TRADEMARK = "CASE WHEN f.matched_mark IS NULL THEN 'RULE' ELSE 'CATALOG' END";
 
+    /**
+     * The source of a trademark finding for the holds of the home page: the client's own watchlist (rule {@code watchlist_match},
+     * ADR-031) is told apart from the catalog, whose marks it shares the {@code matched_mark} column with.
+     */
+    private static final String SOURCE_OF_HOLD = "CASE WHEN f.rule_id = 'watchlist_match' THEN 'WATCHLIST' "
+            + "WHEN f.matched_mark IS NULL THEN 'RULE' ELSE 'CATALOG' END";
+
     private static final String VERDICT_COUNTS = "count(*) FILTER (WHERE v.verdict = 'CORRECT') AS correct, "
             + "count(*) FILTER (WHERE v.verdict = 'FALSE_POSITIVE') AS false_positive, "
             + "count(*) FILTER (WHERE v.verdict = 'NOT_USEFUL') AS not_useful";
@@ -149,12 +156,13 @@ public class FeedbackStatsQueries {
     }
 
     /**
-     * Retained trademark results of the period with at least one {@code HIGH} finding of each source (the level at which
-     * {@code batch-check} holds a row by default). A result held by two sources is counted under both.
+     * Retained trademark results of the period with at least one {@code HIGH} finding of each source ({@code CATALOG},
+     * {@code WATCHLIST} or {@code RULE}, the level at which {@code batch-check} holds a row by default). A result held by two
+     * sources is counted under both.
      */
     public List<SourceHoldRow> trademarkHoldsBySource(Scope scope) {
         Clause where = resultClause(scope, true, "f.risk = 'HIGH'");
-        return query("SELECT " + SOURCE_OF_TRADEMARK + " AS source, count(DISTINCT c.id) AS n FROM trademark_check c "
+        return query("SELECT " + SOURCE_OF_HOLD + " AS source, count(DISTINCT c.id) AS n FROM trademark_check c "
                         + "JOIN trademark_check_finding f ON f.check_id = c.id WHERE " + where.sql() + " GROUP BY 1 ORDER BY 1",
                 where.args(), (rs, i) -> new SourceHoldRow(rs.getString("source"), rs.getLong("n")));
     }

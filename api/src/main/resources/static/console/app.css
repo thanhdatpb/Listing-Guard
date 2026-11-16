@@ -265,12 +265,14 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 .lg-card--raised { box-shadow: var(--shadow-card); }
 .lg-card__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
 .lg-card__title { font-size: 18px; line-height: 26px; font-weight: 600; }
-.lg-stat__label { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink-muted); }
-.lg-stat__value { margin-top: var(--space-1); font-size: 34px; line-height: 42px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.lg-stat__label { margin: 0; font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink-muted); }
+.lg-stat__value { margin: var(--space-1) 0 0; font-size: 34px; line-height: 42px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .lg-stat__value--error { color: var(--danger); }
 .lg-stat__value--trademark { color: var(--warning); }
 .lg-stat__value--clean { color: var(--success); }
-.lg-stat__note { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.lg-stat__note { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+/* A short list inside a figure or a row: one fact a line, no bullet. */
+.lg-stat__list { padding: 0; list-style: none; }
 
 /* ---------- status pill ---------- */
 
@@ -290,8 +292,8 @@ body:has(> .app-side) { padding-left: var(--side-width); }
   font-weight: 600;
   white-space: nowrap;
 }
-.lg-pill--error, .lg-pill--trademark, .lg-pill--clean { padding-left: 8px; }
-.lg-pill--error::before, .lg-pill--trademark::before, .lg-pill--clean::before {
+.lg-pill--error, .lg-pill--trademark, .lg-pill--warn, .lg-pill--clean { padding-left: 8px; }
+.lg-pill--error::before, .lg-pill--trademark::before, .lg-pill--warn::before, .lg-pill--clean::before {
   content: "";
   flex: none;
   width: 10px;
@@ -300,8 +302,9 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 }
 .lg-pill--error { background: var(--danger-subtle); color: var(--danger); }
 .lg-pill--error::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-.lg-pill--trademark { background: var(--warning-subtle); color: var(--warning); }
-.lg-pill--trademark::before { clip-path: polygon(50% 4%, 100% 94%, 0 94%); }
+/* A trademark risk and a rule WARNING are the same state: a triangle on the warning ground. */
+.lg-pill--trademark, .lg-pill--warn { background: var(--warning-subtle); color: var(--warning); }
+.lg-pill--trademark::before, .lg-pill--warn::before { clip-path: polygon(50% 4%, 100% 94%, 0 94%); }
 .lg-pill--clean { background: var(--success-subtle); color: var(--success); }
 .lg-pill--clean::before { clip-path: polygon(0 55%, 14% 41%, 38% 63%, 86% 14%, 100% 28%, 38% 92%); }
 .lg-pill--brand { background: var(--brand-subtle); color: var(--brand-text); }
@@ -321,6 +324,8 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 .lg-mark--inline { margin-right: var(--space-2); vertical-align: 0.05em; }
 /* The part of a text that a finding points at. */
 .lg-highlight { padding: 0 3px; border-radius: 4px; background: var(--warning-subtle); color: var(--ink); box-shadow: inset 0 -2px 0 var(--warning); }
+/* The same for the text an ERROR points at: the ground is the error ground, and the underline keeps it visible without the color. */
+.lg-highlight--error { background: var(--danger-subtle); box-shadow: inset 0 -2px 0 var(--danger); }
 
 /* ---------- table ---------- */
 
@@ -349,6 +354,7 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 
 .lg-field { display: block; margin: 0 0 var(--space-4); }
 .lg-field__label { display: block; margin-bottom: 6px; color: var(--ink-soft); font-size: 13px; line-height: 18px; font-weight: 600; }
+.lg-field--narrow { max-width: 22rem; }
 .lg-field__hint { margin-top: 6px; color: var(--ink-muted); font-size: 13px; line-height: 18px; }
 .lg-field__error { margin-top: 6px; color: var(--danger); font-size: 13px; line-height: 18px; font-weight: 600; }
 
@@ -415,7 +421,14 @@ body:has(> .app-side) { padding-left: var(--side-width); }
   line-height: 18px;
 }
 .lg-chip--neutral { border-color: transparent; background: var(--hover); color: var(--ink-soft); }
-.lg-chip--flag { border-color: transparent; background: var(--warning-subtle); color: var(--warning); font-weight: 600; }
+/* A flagged chip carries a shape as well as a ground (a triangle for a trademark or warning flag, a diamond for an ERROR), and the
+   markup adds a word for a screen reader. */
+.lg-chip--flag, .lg-chip--error { border-color: transparent; font-weight: 600; }
+.lg-chip--flag { background: var(--warning-subtle); color: var(--warning); }
+.lg-chip--error { background: var(--danger-subtle); color: var(--danger); }
+.lg-chip--flag::before, .lg-chip--error::before { content: ""; flex: none; width: 9px; height: 9px; background: currentColor; }
+.lg-chip--flag::before { clip-path: polygon(50% 4%, 100% 94%, 0 94%); }
+.lg-chip--error::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 
 /* ---------- banner ---------- */
 
@@ -433,6 +446,15 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 }
 .lg-banner--info { background: var(--brand-subtle); color: var(--brand-text); }
 .lg-banner--warning { background: var(--warning-subtle); color: var(--warning); font-weight: 600; }
+/* The answer to something the seller did: done (success) or refused (error). Put it in a region with role="status" or role="alert". */
+.lg-banner--success { background: var(--success-subtle); color: var(--success); font-weight: 600; }
+.lg-banner--error { background: var(--danger-subtle); color: var(--danger); font-weight: 600; }
+.lg-banner__title { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; }
+.lg-banner__body { flex: 1 1 18rem; min-width: 0; }
+.lg-banner__body > * { margin: 0; font-weight: 400; }
+.lg-banner__body > .lg-banner__title { font-weight: 600; }
+.lg-banner__body ul { padding-left: calc(var(--space-4) + var(--space-1)); }
+.lg-banner__body > * + * { margin-top: var(--space-1); }
 /* The notice of a demonstration catalog: it stays at the top of every console page while the page scrolls. */
 .lg-banner--sticky { position: sticky; top: 0; z-index: 10; justify-content: center; border-radius: 0; border-bottom: 1px solid var(--warning); text-align: center; }
 
@@ -489,6 +511,8 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 .lg-empty { padding: var(--space-8) var(--space-6); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--surface-1); text-align: center; }
 .lg-empty__title { font-size: 18px; line-height: 26px; font-weight: 600; }
 .lg-empty__text { max-width: 36rem; margin: var(--space-2) auto var(--space-4); color: var(--ink-muted); }
+.lg-empty__steps { max-width: 36rem; margin: 0 auto var(--space-4); padding-left: calc(var(--space-4) + var(--space-1)); text-align: left; }
+.lg-empty__steps li { margin: var(--space-2) 0; }
 
 /* ---------- page header and layout helpers ---------- */
 
@@ -496,6 +520,9 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 .lg-page__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-6); }
 .lg-page__crumb { margin-bottom: var(--space-1); font-size: 13px; line-height: 18px; color: var(--ink-muted); }
 .lg-page__sub { margin-top: var(--space-1); color: var(--ink-muted); font-size: 14px; line-height: 22px; }
+/* Space between two blocks of a page. */
+.lg-section { margin-bottom: var(--space-4); }
+.lg-card__foot { margin: var(--space-3) 0 0; }
 .lg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .lg-stack > * + * { margin-top: var(--space-4); }
 .lg-grid { display: grid; gap: var(--space-4); }
@@ -503,6 +530,137 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 @media (max-width: 860px) {
   .lg-page { padding: 20px var(--space-4) var(--space-8); }
 }
+
+/* ---------- work pages: split layout, code, disclosure, key-value list ---------- */
+
+/* Two columns that stack on a narrow screen: the listing on the left, what was found on the right. */
+.lg-split { display: grid; gap: var(--space-4); align-items: start; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+.lg-split--even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lg-split--wide { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.lg-split > * { min-width: 0; }
+@media (max-width: 960px) {
+  .lg-split, .lg-split--even, .lg-split--wide { grid-template-columns: 1fr; }
+}
+
+/* A rule id, a SKU, a version: always code, always English as the API gave it. */
+.lg-code { font-family: var(--font-mono); font-size: 12.5px; line-height: 20px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.lg-section-title { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
+.lg-small { font-size: 13px; line-height: 18px; }
+.lg-disclosure > summary { cursor: pointer; color: var(--brand-text); font-size: 13px; line-height: 18px; font-weight: 600; }
+.lg-disclosure[open] > summary { margin-bottom: var(--space-2); }
+
+/* A short list of "label, then the value" rows: the data a check ran on, a page's facts. */
+.lg-kv { margin: 0; padding: 0; list-style: none; }
+.lg-kv__item { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--line-soft); }
+.lg-kv__item:first-child { padding-top: 0; border-top: 0; }
+.lg-kv__label { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.lg-kv__value { font-weight: 600; overflow-wrap: anywhere; }
+.lg-kv__main { flex: 1 1 auto; min-width: 0; }
+
+/* A list of things to deal with: the red diamond, then a code and a state, then what is wrong. */
+.lg-feed { margin: 0; padding: 0; list-style: none; }
+.lg-feed__item { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--line-soft); }
+.lg-feed__item:first-child { padding-top: 0; border-top: 0; }
+.lg-feed__item .lg-mark { margin-top: 8px; }
+.lg-feed__body { flex: 1 1 auto; min-width: 0; }
+.lg-feed__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.lg-feed__text { margin: 0; overflow-wrap: anywhere; }
+.lg-feed__meta { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+
+/* ---------- the weekly chart (drawn on the server as SVG) ---------- */
+
+/* The current week is the brand color, the weeks before it the pale brand ground with a brand outline, so a bar is seen without
+   depending on the pale fill. Every bar carries its number. */
+.lg-chart { display: block; width: 100%; max-width: 44rem; height: auto; }
+.lg-chart__axis { stroke: var(--border); stroke-width: 1; }
+.lg-chart__bar { fill: var(--brand-subtle); stroke: var(--brand); stroke-width: 1; }
+.lg-chart__bar--now { fill: var(--brand); }
+.lg-chart__bar--partial { stroke-dasharray: 4 3; }
+.lg-chart__label, .lg-chart__value { fill: var(--ink-muted); font-size: 12px; font-family: var(--font-sans); }
+.lg-chart__value { fill: var(--ink-soft); }
+
+/* ---------- a finding: the card of one thing the checks found ---------- */
+
+/* The head holds the level pill and the rule id (code); then the message, what the rule looks at, where it comes from, and a pale block
+   for the suggestion. The red diamond marks a problem to fix (an ERROR or a HIGH risk), a few per screen. */
+.lg-finding { display: flex; align-items: flex-start; gap: var(--space-3); padding: calc(var(--space-4) + var(--space-1)); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-1); }
+.lg-finding > .lg-mark { margin-top: 8px; }
+.lg-finding__body { flex: 1 1 auto; min-width: 0; }
+.lg-finding__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.lg-finding__title { margin: var(--space-2) 0 0; font-size: 16px; line-height: 24px; font-weight: 600; overflow-wrap: anywhere; }
+.lg-finding__text { margin: 6px 0 0; overflow-wrap: anywhere; }
+.lg-finding__meta { margin: var(--space-2) 0 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.lg-finding__evidence { margin: 6px 0 0; font-size: 14px; line-height: 22px; overflow-wrap: anywhere; }
+.lg-finding__hint { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-0); }
+.lg-finding__hint > * { margin: 0; }
+.lg-finding__hint > * + * { margin-top: var(--space-1); }
+.lg-finding__hint-label { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.lg-finding__hint-value { font-weight: 600; overflow-wrap: anywhere; }
+.lg-finding__llm { margin: var(--space-3) 0 0; font-size: 13px; line-height: 20px; color: var(--ink-muted); }
+.lg-finding__llm > .lg-pill { margin-right: var(--space-2); }
+.lg-finding__actions { margin-top: var(--space-3); }
+.lg-findings { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-3); }
+.lg-group__title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-3); font-size: 15px; line-height: 24px; font-weight: 600; }
+
+/* ---------- the feedback buttons of a finding ---------- */
+
+/* Three buttons, one of them pressed (aria-pressed). A pressed button shows a check as well as the pale brand ground. */
+.lg-feedback { margin: var(--space-3) 0 0; }
+.lg-feedback__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--space-3); }
+.lg-feedback__label { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.lg-feedback__buttons { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.lg-btn[aria-pressed="true"] { border-color: var(--brand); background: var(--brand-subtle); color: var(--brand-text); }
+.lg-btn[aria-pressed="true"]::before { content: ""; flex: none; width: 10px; height: 10px; background: currentColor; clip-path: polygon(0 55%, 14% 41%, 38% 63%, 86% 14%, 100% 28%, 38% 92%); }
+.lg-feedback__note { margin-top: var(--space-2); }
+.lg-feedback__note .lg-textarea { min-height: 64px; margin-top: 6px; }
+.lg-feedback__status { min-height: 1.2em; margin: 6px 0 0; font-size: 13px; line-height: 18px; }
+.lg-feedback__saved { color: var(--success); }
+.lg-feedback__error { color: var(--danger); font-weight: 600; }
+
+/* ---------- the listing as it was checked ---------- */
+
+/* Title, tags and the other text of a listing, read only. The words a finding points at are marked (lg-highlight), the tags a finding
+   points at are flagged chips, and the readiness is a meter under them. */
+.lg-listing__field { margin: 0 0 18px; }
+.lg-listing__label { display: block; margin-bottom: 6px; color: var(--ink-soft); font-size: 13px; line-height: 18px; font-weight: 600; }
+.lg-listing__count { color: var(--ink-muted); font-weight: 400; }
+.lg-listing__title { margin: 0; font-size: 16px; line-height: 26px; overflow-wrap: anywhere; }
+.lg-listing__chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.lg-listing__text { margin: 0; color: var(--ink-muted); white-space: pre-line; overflow-wrap: anywhere; }
+.lg-meter { margin-top: calc(var(--space-4) + var(--space-1)); padding-top: var(--space-4); border-top: 1px solid var(--line-soft); }
+.lg-meter__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.lg-meter__label { font-weight: 600; }
+.lg-meter__value { font-weight: 700; font-variant-numeric: tabular-nums; }
+.lg-meter .lg-progress { margin-top: var(--space-2); }
+.lg-meter__note { margin: var(--space-2) 0 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+
+/* ---------- a proposal of the rewrite feature ---------- */
+
+.lg-candidate { margin: 0; }
+.lg-rewrite__result { margin-top: var(--space-3); }
+.lg-rewrite-panel { margin: 0; }
+.lg-candidate__copy { margin: var(--space-2) 0 0; }
+.lg-candidate__change { padding: var(--space-3) 0; border-top: 1px solid var(--line-soft); }
+.lg-candidate__change:first-of-type { padding-top: 0; border-top: 0; }
+.lg-candidate__line { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; }
+.lg-candidate__tag { min-width: 5.5rem; flex: none; color: var(--ink-muted); font-size: 13px; line-height: 24px; }
+.lg-candidate__text { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+.lg-candidate__new { font-weight: 600; }
+
+/* ---------- the result table of a bulk check ---------- */
+
+/* A row of the table and the detail that opens under it. The detail row is shown when its link is the target of the address
+   (no script), and the page script may open and close it too. */
+.lg-detail-row { display: none; }
+.lg-detail-row:target, .lg-detail-row[data-open="true"] { display: table-row; }
+.lg-detail-row[hidden] { display: none; }
+.lg-detail-row > td { padding: var(--space-4); background: var(--surface-2); }
+.lg-table tr[hidden] { display: none; }
+.lg-table td.lg-main { min-width: 16rem; }
+.lg-main__line { display: flex; align-items: flex-start; gap: var(--space-2); overflow-wrap: anywhere; }
+.lg-main__line > .lg-mark { margin-top: 7px; }
+.lg-table td.lg-sku { white-space: nowrap; }
+.lg-counts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 
 /* ---------- sign-in and confirmation pages ---------- */
 

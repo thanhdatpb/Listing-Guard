@@ -5,25 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{feedback.page.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/editor.css}">
-    <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
 <body>
 <!-- The answer of POST /console/feedback when the browser runs no script (ADR-034): what was saved, or why not, and the way back.
      With htmx the page never sees this; it gets the widget fragment instead. -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('')}"></header>
-<main class="page">
+<main class="lg-page">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{feedback.page.heading}"></h1>
-    <div class="notice applied" id="feedback-result" role="status" th:if="${feedbackError == null}">
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{feedback.page.heading}"></h1>
+        </div>
+    </div>
+    <div class="lg-banner lg-banner--success lg-section" id="feedback-result" role="status" th:if="${feedbackError == null}">
         <p th:text="#{feedback.page.saved(${#messages.msg('feedback.verdict.' + feedbackSavedVerdict)})}"></p>
     </div>
-    <div class="notice refused" id="feedback-result" role="alert" th:if="${feedbackError != null}">
+    <div class="lg-banner lg-banner--error lg-section" id="feedback-result" role="alert" th:if="${feedbackError != null}">
         <p th:text="${feedbackError}"></p>
     </div>
-    <p class="muted" th:text="#{feedback.page.back}"></p>
-    <p><a th:href="@{/console}" th:text="#{feedback.page.home}"></a></p>
+    <p class="lg-text-muted" th:text="#{feedback.page.back}"></p>
+    <p><a class="lg-btn" th:href="@{/console}" th:text="#{feedback.page.home}"></a></p>
 </main>
 </body>
 </html>

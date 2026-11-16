@@ -207,9 +207,9 @@ class ConsoleLocalizationIntegrationTest {
         String english = section(html(in(checkPost(user, form), "en")), "rule-findings");
         String vietnamese = section(html(in(checkPost(user, form), "vi")), "rule-findings");
 
-        assertThat(english).contains("<code>title_length</code>").contains("What this rule checks:")
+        assertThat(english).contains("<code class=\"lg-code\">title_length</code>").contains("What this rule checks:")
                 .contains("Checks that the title is not longer than the title limit in the ruleset.");
-        assertThat(vietnamese).contains("<code>title_length</code>").contains("Quy tắc này kiểm tra:")
+        assertThat(vietnamese).contains("<code class=\"lg-code\">title_length</code>").contains("Quy tắc này kiểm tra:")
                 .contains("Kiểm tra tiêu đề không dài quá giới hạn tiêu đề trong bộ quy tắc.");
         // the API's own sentence about this listing: the same text, whatever the language of the page
         assertThat(english).contains("Tiêu đề dài 150 ký tự");
@@ -223,7 +223,7 @@ class ConsoleLocalizationIntegrationTest {
 
         String findings = section(html(in(checkPost(user, etsyForm("a".repeat(150))), "vi")), "rule-findings");
 
-        assertThat(findings).containsOnlyOnce("<code>title_length</code>");
+        assertThat(findings).containsOnlyOnce("<code class=\"lg-code\">title_length</code>");
         assertThat(findings).doesNotContain("rule.title_length");
     }
 

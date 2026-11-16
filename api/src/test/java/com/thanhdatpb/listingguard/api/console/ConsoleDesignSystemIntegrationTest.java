@@ -187,7 +187,8 @@ class ConsoleDesignSystemIntegrationTest {
         String keys = body(mvc.perform(get("/console/api-keys").with(signedIn(user))).andReturn());
 
         assertThat(editor).contains("/console/editor.css").contains("/console/editor.js");
-        assertThat(keys).contains("/console/editor.css").contains("/console/console.css");
+        assertThat(keys).contains("/console/console.css").doesNotContain("/console/editor.css");
+        assertThat(editor).doesNotContain("/console/console.css").doesNotContain("/console/bulk.css");
         assertThat(editor.indexOf("/brand/app.css")).isLessThan(editor.indexOf("/console/editor.css"));
         assertThat(keys.indexOf("/brand/app.css")).isLessThan(keys.indexOf("/console/console.css"));
         assertThat(editor).doesNotContain("style=\"");

@@ -5,6 +5,7 @@ import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetLimitsService;
+import com.thanhdatpb.listingguard.ruleengine.readiness.ReadinessScorer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -41,10 +42,12 @@ public class ConsoleEditorController {
     private final ConsoleMessages messages;
     private final ConsoleFeedbackSupport feedback;
     private final com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history;
+    private final ReadinessScorer readiness;
 
     public ConsoleEditorController(PlanService plans, RulesetLimitsService rulesetLimits, EditorCheckService checks,
                                    ConsoleMessages messages, ConsoleFeedbackSupport feedback,
-                                   com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history) {
+                                   com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history, ReadinessScorer readiness) {
+        this.readiness = readiness;
         this.plans = plans;
         this.rulesetLimits = rulesetLimits;
         this.checks = checks;
@@ -87,6 +90,11 @@ public class ConsoleEditorController {
         });
         populate(model, user, selected, form, Map.of());
         model.addAttribute("result", result);
+        // the listing as checked gets the limits the form already shows; the readiness is out of the setting of its formula (ADR-014)
+        EditorLimits limits = (EditorLimits) model.getAttribute("limits");
+        model.addAttribute("listingView", result.listing().withLimits(limits.titleMax(),
+                selected.isEtsy() ? limits.tagCountMax() : limits.bulletCountMax()));
+        model.addAttribute("readinessMax", readiness.config().baseScore());
         feedback.populate(model, user, result.targets());
         model.addAttribute("otherOpen", result.requiredFieldsFinding() || form.hasOtherFields());
         return VIEW;

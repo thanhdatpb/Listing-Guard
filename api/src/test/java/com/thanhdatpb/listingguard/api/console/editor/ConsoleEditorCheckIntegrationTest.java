@@ -99,18 +99,18 @@ class ConsoleEditorCheckIntegrationTest {
 
         String readiness = section(html, "readiness-panel");
         String trademark = section(html, "trademark-panel");
-        assertThat(readiness).contains("Ready").containsPattern("<p class=\"big\">\\d+</p>");
-        assertThat(trademark).contains("<p class=\"big\">HIGH</p>").contains(trademarkRulesets.ruleset().disclaimer());
-        // one container, readiness first and the trademark panel straight after it, both above any finding
-        int verdicts = html.indexOf("class=\"verdicts\"");
+        assertThat(readiness).contains("Ready").containsPattern("class=\"lg-meter__value\">\\d+/\\d+</span>");
+        assertThat(trademark).contains("lg-pill--trademark\">HIGH</span>").contains(trademarkRulesets.ruleset().disclaimer());
+        // the listing card holds the readiness, the trademark panel comes straight after it, both above any finding
+        int listing = html.indexOf("id=\"listing-card\"");
         int readinessAt = html.indexOf("id=\"readiness-panel\"");
         int trademarkAt = html.indexOf("id=\"trademark-panel\"");
-        assertThat(verdicts).isNotNegative().isLessThan(readinessAt);
+        assertThat(listing).isNotNegative().isLessThan(readinessAt);
         assertThat(readinessAt).isLessThan(trademarkAt);
-        assertThat(html.substring(readinessAt, trademarkAt)).doesNotContain("<section class=\"findings\"");
+        assertThat(html.substring(readinessAt, trademarkAt)).doesNotContain("id=\"rule-findings\"");
         assertThat(trademarkAt).isLessThan(html.indexOf("id=\"findings-heading\""));
         // the evidence of the trademark finding is marked
-        assertThat(html).contains("<mark>Zorvex</mark>");
+        assertThat(html).contains("<mark class=\"lg-highlight\">Zorvex</mark>");
     }
 
     @Test
@@ -123,7 +123,7 @@ class ConsoleEditorCheckIntegrationTest {
         String findings = section(html, "rule-findings");
         assertThat(findings.indexOf("<span>Errors</span>")).isNotNegative()
                 .isLessThan(findings.indexOf("<span>Warnings</span>"));
-        assertThat(findings).contains("<mark>a very very long tag name</mark>").contains("Suggested fix:")
+        assertThat(findings).contains("<mark class=\"lg-highlight lg-highlight--error\">a very very long tag name</mark>").contains("Suggested fix:")
                 .contains("Proposed value:");
         assertThat(section(html, "readiness-panel")).contains("Not ready");
     }
@@ -136,7 +136,7 @@ class ConsoleEditorCheckIntegrationTest {
 
         String html = press(free, etsyForm("Free plan mug " + unique()));
 
-        assertThat(section(html, "readiness-panel")).containsPattern("<p class=\"big\">\\d+</p>");
+        assertThat(section(html, "readiness-panel")).containsPattern("class=\"lg-meter__value\">\\d+/\\d+</span>");
         String trademark = section(html, "trademark-panel");
         assertThat(trademark).contains("Trademark not checked").contains("does not include the trademark check")
                 .contains("FREE").contains(trademarkRulesets.ruleset().disclaimer());
@@ -166,7 +166,7 @@ class ConsoleEditorCheckIntegrationTest {
         String html = press(seller, etsyForm("No quota mug " + unique()));
 
         String readiness = section(html, "readiness-panel");
-        assertThat(readiness).contains("<p class=\"big\">Not scored</p>").contains("2026-12-01").doesNotContain("Ready");
+        assertThat(readiness).contains("class=\"lg-meter__value\">Not scored</span>").contains("2026-12-01").doesNotContain("Ready");
         assertThat(section(html, "trademark-panel")).contains("Trademark not checked").contains("2026-12-01");
         assertThat(html).doesNotContain("id=\"rule-findings\"");
         assertThat(PlanTestSupport.countOf(jdbc, "listing_check", seller.clientId())).isZero();
@@ -259,7 +259,7 @@ class ConsoleEditorCheckIntegrationTest {
 
         String html = press(user(PlanCode.SELLER), form);
 
-        assertThat(section(html, "readiness-panel")).containsPattern("<p class=\"big\">\\d+</p>");
+        assertThat(section(html, "readiness-panel")).containsPattern("class=\"lg-meter__value\">\\d+/\\d+</span>");
         assertThat(section(html, "trademark-panel")).contains("Risk level");
     }
 }

@@ -1,4 +1,4 @@
-/* The watchlist page (ADR-031). The colors and the base layout come from editor.css and console.css. */
+/* The watchlist page (ADR-031). The colors are the tokens; the base layout comes from console.css. */
 .table-wrap {
     overflow-x: auto;
 }

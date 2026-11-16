@@ -5,65 +5,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{edit.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/editor.css}">
     <th:block th:replace="~{console/layout :: htmx}"></th:block>
 </head>
 <body>
+<!-- Edit mode (ADR-033, ADR-041): the listing before and after a change side by side, then what the change did to the findings: new ones,
+     changed or resolved ones, and the ones that remain, each as the same finding card the check pages use. Listing text is never saved. -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('check')}"></header>
-<main class="layout">
+<main class="lg-page" id="edit-mode">
     <span id="main" tabindex="-1"></span>
-    <section class="editor">
-        <h1 th:text="#{edit.heading}"></h1>
-        <p class="muted" th:text="#{edit.intro}"></p>
-        <p class="muted small" th:text="#{edit.history.note}"></p>
-        <p class="error" role="alert" th:if="${error == 'edit.error.required'}" th:text="#{edit.error.required}"></p>
-        <p class="error" role="alert" th:if="${error == 'edit.error.object'}" th:text="#{edit.error.object}"></p>
-        <p class="error" role="alert" th:if="${error == 'edit.error.invalid'}" th:text="#{edit.error.invalid}"></p>
-        <form method="post" th:action="@{/console/check/edit}">
-            <label for="marketplace" th:text="#{edit.marketplace}"></label>
-            <select id="marketplace" name="marketplace">
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{edit.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{edit.intro}"></p>
+        </div>
+    </div>
+    <p class="lg-text-muted lg-small" th:text="#{edit.history.note}"></p>
+    <div class="lg-banner lg-banner--error lg-section" role="alert" th:if="${error == 'edit.error.required'}"><p th:text="#{edit.error.required}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" role="alert" th:if="${error == 'edit.error.object'}"><p th:text="#{edit.error.object}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" role="alert" th:if="${error == 'edit.error.invalid'}"><p th:text="#{edit.error.invalid}"></p></div>
+
+    <form class="lg-card lg-section" method="post" th:action="@{/console/check/edit}">
+        <div class="lg-field lg-field--narrow">
+            <label class="lg-field__label" for="marketplace" th:text="#{edit.marketplace}"></label>
+            <select class="lg-select" id="marketplace" name="marketplace">
                 <option value="ETSY" th:selected="${marketplace == 'ETSY'}" th:text="#{edit.marketplace.etsy}"></option>
                 <option value="AMAZON" th:selected="${marketplace == 'AMAZON'}" th:text="#{edit.marketplace.amazon}"></option>
             </select>
-            <div class="edit-columns">
-                <div class="field">
-                    <label for="before" th:text="#{edit.before}"></label>
-                    <textarea id="before" name="before" rows="18" required th:text="${before}"></textarea>
-                </div>
-                <div class="field">
-                    <label for="after" th:text="#{edit.after}"></label>
-                    <textarea id="after" name="after" rows="18" required th:text="${after}"></textarea>
-                </div>
+        </div>
+        <div class="lg-split lg-split--even">
+            <div class="lg-field">
+                <label class="lg-field__label" for="before" th:text="#{edit.before}"></label>
+                <textarea class="lg-textarea lg-textarea--mono" id="before" name="before" rows="18" required th:text="${before}"></textarea>
             </div>
-            <button type="submit" th:text="#{edit.compare}"></button>
-        </form>
-        <section th:if="${result != null}" aria-live="polite">
-            <h2 th:text="#{edit.changed.fields}"></h2>
-            <ul><li th:each="field : ${result.changedFields()}" th:text="${field}"></li></ul>
-            <section>
-                <h2 th:text="#{edit.group.new}"></h2>
-                <article th:each="item : ${result.newFindings()}" class="finding">
-                    <p th:text="${item.after().get('message')}"></p>
-                    <div th:replace="~{console/feedback :: widget(${item.feedbackTarget()})}"></div>
-                </article>
-            </section>
-            <section>
-                <h2 th:text="#{edit.group.modified}"></h2>
-                <article th:each="item : ${result.modifiedFindings()}" class="finding">
-                    <p th:if="${item.before() != null}" th:text="${item.before().get('message')}"></p>
-                    <p th:if="${item.after() != null}" th:text="${item.after().get('message')}"></p>
-                    <div th:replace="~{console/feedback :: widget(${item.feedbackTarget()})}"></div>
-                </article>
-            </section>
-            <section>
-                <h2 th:text="#{edit.group.remaining}"></h2>
-                <article th:each="item : ${result.remainingFindings()}" class="finding">
-                    <p th:text="${item.after().get('message')}"></p>
-                    <div th:replace="~{console/feedback :: widget(${item.feedbackTarget()})}"></div>
-                </article>
-            </section>
+            <div class="lg-field">
+                <label class="lg-field__label" for="after" th:text="#{edit.after}"></label>
+                <textarea class="lg-textarea lg-textarea--mono" id="after" name="after" rows="18" required th:text="${after}"></textarea>
+            </div>
+        </div>
+        <div class="lg-actions">
+            <button type="submit" class="lg-btn lg-btn--primary" th:text="#{edit.compare}"></button>
+        </div>
+    </form>
+
+    <section class="lg-stack" id="edit-result" th:if="${result != null}" aria-live="polite" aria-labelledby="edit-changed-heading">
+        <div class="lg-card">
+            <h2 id="edit-changed-heading" class="lg-card__title" th:text="#{edit.changed.fields}"></h2>
+            <ul class="lg-listing__chips">
+                <li class="lg-chip lg-chip--neutral" th:each="field : ${result.changedFields()}"><code class="lg-code" th:text="${field}"></code></li>
+            </ul>
+        </div>
+
+        <section class="lg-group" id="edit-new" aria-labelledby="edit-new-heading">
+            <h2 id="edit-new-heading" class="lg-group__title">
+                <span class="lg-mark" aria-hidden="true"></span>
+                <span th:text="#{edit.group.new}"></span>
+                <span class="lg-pill" th:text="${result.newFindings().size()}"></span>
+            </h2>
+            <div class="lg-findings">
+                <th:block th:each="item : ${result.newFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}"><article th:replace="~{console/findings :: card(${card})}"></article></th:block>
+            </div>
         </section>
+
+        <section class="lg-group" id="edit-modified" aria-labelledby="edit-modified-heading">
+            <h2 id="edit-modified-heading" class="lg-group__title">
+                <span th:text="#{edit.group.modified}"></span>
+                <span class="lg-pill lg-pill--clean" th:text="${result.modifiedFindings().size()}"></span>
+            </h2>
+            <div class="lg-findings">
+                <th:block th:each="item : ${result.modifiedFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}"><article th:replace="~{console/findings :: card(${card})}"></article></th:block>
+            </div>
+        </section>
+
+        <section class="lg-group" id="edit-remaining" aria-labelledby="edit-remaining-heading">
+            <h2 id="edit-remaining-heading" class="lg-group__title">
+                <span th:text="#{edit.group.remaining}"></span>
+                <span class="lg-pill" th:text="${result.remainingFindings().size()}"></span>
+            </h2>
+            <div class="lg-findings">
+                <th:block th:each="item : ${result.remainingFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}"><article th:replace="~{console/findings :: card(${card})}"></article></th:block>
+            </div>
+        </section>
+        <p class="lg-small lg-text-muted" th:text="#{finding.legal}"></p>
     </section>
 </main>
 </body>

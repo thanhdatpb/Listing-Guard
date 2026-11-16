@@ -145,20 +145,20 @@ class ConsoleFeedbackIntegrationTest {
         UUID checkId = checkInEditor(user, client);
 
         String first = html(mvc.perform(press(user, checkId, 0, "CORRECT", null, true)).andExpect(status().isOk()));
-        assertThat(first.trim()).startsWith("<form").contains("value=\"CORRECT\" class=\"fb correct\" aria-pressed=\"true\"")
-                .contains("class=\"fb-saved\"").doesNotContain("<html");
+        assertThat(first.trim()).startsWith("<form").contains("value=\"CORRECT\" class=\"lg-btn lg-btn--small\" aria-pressed=\"true\"")
+                .contains("class=\"lg-feedback__saved\"").doesNotContain("<html");
 
         String second = html(mvc.perform(press(user, checkId, 0, "FALSE_POSITIVE", "  a word of the product  ", true))
                 .andExpect(status().isOk()));
-        assertThat(second).contains("value=\"FALSE_POSITIVE\" class=\"fb false-positive\" aria-pressed=\"true\"")
-                .contains("value=\"CORRECT\" class=\"fb correct\" aria-pressed=\"false\"").contains("a word of the product");
+        assertThat(second).contains("value=\"FALSE_POSITIVE\" class=\"lg-btn lg-btn--small\" aria-pressed=\"true\"")
+                .contains("value=\"CORRECT\" class=\"lg-btn lg-btn--small\" aria-pressed=\"false\"").contains("a word of the product");
 
         assertThat(rows(client)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT verdict FROM finding_verdict WHERE client_id = ?", String.class, client.id()))
                 .isEqualTo("FALSE_POSITIVE");
         // the editor shows the reader's own verdict when the same listing is checked again (the stored result is reused)
         String again = html(mvc.perform(checkPost(user, etsyForm(TITLE))).andExpect(status().isOk()));
-        assertThat(again).contains("value=\"FALSE_POSITIVE\" class=\"fb false-positive\" aria-pressed=\"true\"");
+        assertThat(again).contains("value=\"FALSE_POSITIVE\" class=\"lg-btn lg-btn--small\" aria-pressed=\"true\"");
     }
 
     @Test
@@ -197,7 +197,7 @@ class ConsoleFeedbackIntegrationTest {
 
         String widget = html(mvc.perform(press(user, checkId, 0, "CORRECT", note, true)).andExpect(status().isBadRequest()));
 
-        assertThat(widget).contains("class=\"fb-error\"").contains(String.valueOf(FindingFeedbackService.MAX_NOTE_CHARS + 5))
+        assertThat(widget).contains("class=\"lg-feedback__error\"").contains(String.valueOf(FindingFeedbackService.MAX_NOTE_CHARS + 5))
                 .contains(note).doesNotContain("aria-pressed=\"true\"");
         assertThat(rows(client)).isZero();
     }
@@ -221,10 +221,15 @@ class ConsoleFeedbackIntegrationTest {
 
         String page = html(mvc.perform(get("/console").with(signedIn(user))).andExpect(status().isOk()));
 
-        assertThat(withoutShell(page)).doesNotContain("<svg");
+        assertThat(page).doesNotContain("class=\"lg-chart\"").doesNotContain("id=\"home-chart\"");
         assertThat(page).contains("id=\"home-empty\"").contains("href=\"/console/check\"").contains("href=\"/console/bulk\"")
-                .contains("id=\"home-shortcuts\"").contains("href=\"/console/stats\"").contains("id=\"home-plan\"")
-                .doesNotContain("id=\"home-cards\"");
+                .contains("id=\"home-plan\"").doesNotContain("id=\"home-cards\"").doesNotContain("id=\"home-attention\"")
+                .doesNotContain("id=\"home-data\"");
+        // the empty state is an invitation: its one brand button goes to the bulk check, and the header button is the plain one
+        String empty = between(page, "id=\"home-empty\"", "</section>");
+        assertThat(empty).contains("class=\"lg-empty__steps\"").containsPattern("class=\"lg-btn lg-btn--primary\"[^>]*href=\"/console/bulk\"");
+        assertThat(countOf(withoutShell(page), "lg-btn--primary")).as("one brand button on the screen").isEqualTo(1);
+        assertThat(page).containsPattern("class=\"lg-btn\"[^>]*href=\"/console/check\"");
         assertThat(page).doesNotContain("<script");
     }
 
@@ -242,12 +247,34 @@ class ConsoleFeedbackIntegrationTest {
 
         String page = html(mvc.perform(get("/console").with(signedIn(user))).andExpect(status().isOk()));
 
-        assertThat(page).doesNotContain("id=\"home-empty\"").contains("id=\"home-cards\"").contains("<svg").contains("<rect")
-                .doesNotContain("<script");
-        assertThat(between(page, "id=\"card-checked\"", "</div>")).contains("class=\"card-value\">1<");
-        assertThat(between(page, "id=\"card-error\"", "</div>")).contains("class=\"card-value\">" + withError + "<");
+        assertThat(page).doesNotContain("id=\"home-empty\"").contains("id=\"home-cards\"").contains("class=\"lg-chart\"")
+                .contains("<rect").doesNotContain("<script");
+        assertThat(between(page, "id=\"card-checked\"", "</div>")).contains("class=\"lg-stat__value\">1<");
+        assertThat(between(page, "id=\"card-error\"", "</div>")).contains("class=\"lg-stat__value\">" + withError + "<");
         assertThat(between(page, "id=\"card-feedback\"", "</div>")).contains("1 of 2 verdicts");
         assertThat(between(page, "id=\"home-top\"", "</section>")).contains(rule);
+    }
+
+    @Test
+    void theHomePageListsTheLatestErrorOfThisClientAndWhatTheChecksRunOn() throws Exception {
+        TestClient client = client();
+        ConsoleUser user = member(client);
+        TestClient other = client();
+        ConsoleUser stranger = member(other);
+        checkInEditor(user, client);
+        checkInEditor(stranger, other);
+        String rule = jdbc.queryForObject("SELECT f.rule_id FROM finding f JOIN listing_check c ON c.id = f.check_id "
+                + "WHERE c.client_id = ? AND f.severity = 'ERROR' ORDER BY f.id LIMIT 1", String.class, client.id());
+
+        String page = html(mvc.perform(get("/console").with(signedIn(user))).andExpect(status().isOk()));
+
+        String attention = between(page, "id=\"home-attention\"", "</section>");
+        assertThat(attention).contains("class=\"lg-mark\"").contains("lg-pill lg-pill--error").contains("ETSY").contains(rule);
+        assertThat(countOf(attention, "class=\"lg-feed__item\"")).as("only this client's results").isEqualTo(1);
+        String data = between(page, "id=\"home-data\"", "</section>");
+        assertThat(data).contains("id=\"data-catalog\"").contains("id=\"data-watchlist\"").contains("0 marks enabled")
+                .contains("Not run yet").containsPattern("etsy-20\\d\\d-\\d\\d");
+        assertThat(page).contains("id=\"home-top\"").contains("class=\"lg-pill lg-pill--clean\"");
     }
 
     @Test
@@ -270,6 +297,14 @@ class ConsoleFeedbackIntegrationTest {
         mvc.perform(get("/console/stats").param("from", "2026-11-16").param("to", "2026-11-01").with(signedIn(user)))
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/console/stats")).andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login"));
+    }
+
+    private static int countOf(String html, String text) {
+        int count = 0;
+        for (int at = html.indexOf(text); at >= 0; at = html.indexOf(text, at + text.length())) {
+            count++;
+        }
+        return count;
     }
 
     private static String between(String html, String start, String end) {

@@ -152,7 +152,7 @@ class ConsoleBulkFileIntegrationTest {
         String result = upload(user, "AMAZON", "flat.tsv", tsv, 200);
 
         assertThat(resultRows(result)).extracting(ResultRow::sku).containsExactly("P-1", "C-1");
-        assertThat(result).contains("amazon-flat-file").contains("chưa kiểm tra biến thể").doesNotContain("<h4>Biến thể</h4>");
+        assertThat(result).contains("amazon-flat-file").contains("chưa kiểm tra biến thể").doesNotContain("<h4 class=\"lg-group__title\">Biến thể</h4>");
         assertThat(PlanTestSupport.countOf(jdbc, "variation_check", user.clientId())).as("no family was sent to the check").isZero();
     }
 

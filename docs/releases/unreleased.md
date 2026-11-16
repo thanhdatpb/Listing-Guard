@@ -2,7 +2,7 @@
 
 Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: edit mode and check history (ADR-033), finding feedback (ADR-034), the console in English
 and Vietnamese (ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030), the value backtest with the labelled
-evaluation (ADR-032), the client trademark watchlist (ADR-031) the periodic re-audit of active listings (ADR-035) and the console's visual identity (ADR-040). Finding feedback,
+evaluation (ADR-032), the client trademark watchlist (ADR-031) the periodic re-audit of active listings (ADR-035), the console's visual identity (ADR-040) and the work pages on it (ADR-041). Finding feedback,
 the watchlist, edit mode and the re-audit touch the API, and only additively (see their sections); the bulk check adds migration V36,
 finding feedback V37, the watchlist V38, check history V39, the re-audit V40, the LLM usage counter V41 (ADR-036, off by default) and the rewrite suggestions V42 (ADR-037, off by default, console only), all additive. The other changes touch no API response,
 request, status, header or migration.
@@ -32,6 +32,31 @@ system setting, and one page shell. Sellers see it on every page; no page was re
 - **No API, migration or setting changes.** The new Vietnamese words (group names, skip link, menu) are in the message files and need the
   same native read as the rest of ADR-028's Vietnamese. The home page's cards (colored top edge) and a few other old rules still break the
   brief until their pages move to the components.
+
+### The work pages on the design system (ADR-041)
+
+The pages a seller uses every day now follow the mockups of the design pack: the home page, Check listing, the bulk check, edit mode, the
+rewrite suggestions and the feedback buttons. Light and dark, Vietnamese and English. Guide for sellers: [bulk-check.md](../bulk-check.md),
+[edit-mode.md](../edit-mode.md); screenshots in `docs/images/console/`.
+
+- **Home.** The week in four figures (listings checked, held back by an `ERROR`, trademark holds by source: watchlist, catalog, context
+  rule, and the reported false-positive rate); **Cần xử lý**, the latest results with an `ERROR` or a high trademark risk, each with its SKU;
+  **Dữ liệu kiểm tra** (the catalog and the date of its data, the enabled watchlist marks, the latest re-audit, the rulesets); the chart of
+  eight weeks (one series now, the listings held back by an `ERROR`; the listings checked stay in the table under it); the most frequent
+  rules with their false positives; the re-audit reminder as a warning banner. With no data it is an invitation with one button to the bulk
+  check. The shortcuts block is gone (the sidebar has every page).
+- **One finding card everywhere.** Level pill and rule id, the message, what the rule checks, the evidence, the suggestion in a pale block,
+  the source of the threshold and how well it is backed, the LLM label (ADR-036), and the three feedback buttons. Check listing shows the
+  listing as checked on the right with the words a finding points at marked, flagged tags and the readiness as a progress bar; the bulk
+  check opens the same two columns under a row ("Chi tiết", no script); edit mode shows **Mới**, **Đã sửa** and **Còn lại** as cards.
+- **Bulk check.** Input card with "Dán từ Sheet | Tải file", the columns it understood as chips, "Sửa ánh xạ" and "Kiểm tra N dòng"; the
+  result has summary pills (a row with a trademark finding is counted apart), "Sao chép cột kết quả" and "Tải CSV". "Đạt" stays "Đạt".
+- **Rewrite suggestions** are cards with a copy button; "Không có gợi ý an toàn" is the empty state.
+- **What changed behind it.** The home page reads one finding message and a SKU of the signed-in client's own results (the same text the
+  History page shows; the health report and the statistics still read none). `trademarkHoldsBySource` separates the watchlist from the
+  catalog. `rewrite.css` and the old color aliases are gone; the page sheets hold no color of their own.
+- **No API, migration or setting changes.** No endpoint, schema, OpenAPI, SDK or MCP change; compatibility report: none.
+- **Open:** the Vietnamese copy of the new texts needs a native read; the differences from the mockups are listed in ADR-041.
 
 ### LLM rewrite suggestions verified by rules (ADR-037)
 

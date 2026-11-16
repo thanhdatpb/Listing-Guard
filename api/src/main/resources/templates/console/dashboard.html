@@ -5,175 +5,263 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{dashboard.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/editor.css}">
-    <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
 <body>
-<!-- The console home page (ADR-034): the week's numbers of the signed-in account's client, a chart drawn as SVG on the server (no
-     script, no chart library, the same numbers in a table under it), the rules most often marked false positive, shortcuts, and the
-     plan at the foot. Every value goes through th:text and every sentence is a message (ADR-028). -->
+<!-- The console home page (ADR-034, ADR-041): the week of the signed-in account's client in four figures, what needs attention, what the
+     checks run on, a chart drawn as SVG on the server (no script, no chart library, the same numbers in a table under it) and the
+     rules that found the most. Every value goes through th:text and every sentence is a message (ADR-028). -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('dashboard')}"></header>
-<main class="page wide">
+<main class="lg-page" id="home">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{dashboard.heading}"></h1>
-    <p class="muted">
-        <span th:text="#{common.signedin(${email})}"></span>
-        <span th:text="#{home.week(${#temporals.format(home.weekFrom, 'dd/MM/yyyy')}, ${#temporals.format(home.today, 'dd/MM/yyyy')})}"></span>
-    </p>
+    <div class="lg-page__head">
+        <div>
+            <p class="lg-page__crumb" th:text="#{home.week(${#temporals.format(home.weekFrom, 'dd/MM/yyyy')}, ${#temporals.format(home.today, 'dd/MM/yyyy')})}"></p>
+            <h1 th:text="#{dashboard.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{home.sub}"></p>
+        </div>
+        <div class="lg-actions">
+            <!-- One brand button on a screen: with no data yet it is the empty state's button, so this one is plain. -->
+            <a class="lg-btn" th:classappend="${!home.empty} ? 'lg-btn--primary'" th:href="@{/console/check}">
+                <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg>
+                <th:block th:text="#{nav.check}"></th:block>
+            </a>
+        </div>
+    </div>
 
-    <!-- The catalog changed since a scope was last re-audited (ADR-035): say so and link to the page. -->
-    <section class="notice" id="reaudit-notice" role="status" aria-labelledby="reaudit-notice-heading" th:if="${reauditNotice != null}">
-        <h2 id="reaudit-notice-heading" th:text="#{home.reaudit.heading}"></h2>
-        <p th:text="#{home.reaudit.text(${reauditNotice.catalogVersion})}"></p>
-        <ul>
-            <li th:each="item : ${reauditNotice.stale}">
-                <span th:text="${item.marketplace}"></span>
-                <span th:text="${item.account.isEmpty()} ? #{reaudit.account.none} : ${item.account}"></span>:
-                <span th:text="#{home.reaudit.last(${#strings.substring(#strings.toString(item.startedAt), 0, 10)}, ${item.catalogVersion == null} ? #{reaudit.catalog.none} : ${item.catalogVersion})}"></span>
-            </li>
-        </ul>
-        <p th:if="${reauditNotice.more > 0}" th:text="#{home.reaudit.more(${#strings.toString(reauditNotice.more)})}"></p>
-        <p><a class="button" th:href="@{/console/reaudit}" th:text="#{home.reaudit.link}"></a></p>
+    <!-- The catalog changed since a scope was last re-audited (ADR-035): said as a warning, with the way to the page. -->
+    <section class="lg-banner lg-banner--warning lg-section" id="reaudit-notice" role="status" aria-labelledby="reaudit-notice-heading"
+             th:if="${reauditNotice != null}">
+        <div class="lg-banner__body">
+            <h2 id="reaudit-notice-heading" class="lg-banner__title" th:text="#{home.reaudit.heading}"></h2>
+            <p th:text="#{home.reaudit.text(${reauditNotice.catalogVersion})}"></p>
+            <ul>
+                <li th:each="item : ${reauditNotice.stale}">
+                    <span th:text="${item.marketplace}"></span>
+                    <span th:text="${item.account.isEmpty()} ? #{reaudit.account.none} : ${item.account}"></span>:
+                    <span th:text="#{home.reaudit.last(${#strings.substring(#strings.toString(item.startedAt), 0, 10)}, ${item.catalogVersion == null} ? #{reaudit.catalog.none} : ${item.catalogVersion})}"></span>
+                </li>
+            </ul>
+            <p th:if="${reauditNotice.more > 0}" th:text="#{home.reaudit.more(${#strings.toString(reauditNotice.more)})}"></p>
+        </div>
+        <a class="lg-btn lg-btn--small" th:href="@{/console/reaudit}" th:text="#{home.reaudit.link}"></a>
     </section>
 
     <!-- No result and no verdict in eight weeks: how to start, not a page of zeros. -->
-    <section class="empty-state" id="home-empty" th:if="${home.empty}" aria-labelledby="empty-heading">
-        <h2 id="empty-heading" th:text="#{home.empty.heading}"></h2>
-        <p th:text="#{home.empty.intro}"></p>
-        <ol>
+    <section class="lg-empty lg-section" id="home-empty" th:if="${home.empty}" aria-labelledby="empty-heading">
+        <h2 id="empty-heading" class="lg-empty__title" th:text="#{home.empty.heading}"></h2>
+        <p class="lg-empty__text" th:text="#{home.empty.intro}"></p>
+        <ol class="lg-empty__steps">
             <li><span th:text="#{home.empty.step1}"></span>
                 <a th:href="@{/console/check}" th:text="#{nav.check}"></a> &middot; <a th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a></li>
             <li th:text="#{home.empty.step2}"></li>
             <li th:text="#{home.empty.step3}"></li>
         </ol>
+        <a class="lg-btn lg-btn--primary" th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a>
     </section>
 
     <th:block th:unless="${home.empty}">
-        <section id="home-cards" aria-labelledby="cards-heading">
-            <h2 id="cards-heading" class="visually-hidden" th:text="#{home.cards.heading}"></h2>
-            <div class="cards">
-                <div class="card" id="card-checked">
-                    <p class="card-label" th:text="#{home.card.checked}"></p>
-                    <p class="card-value" th:text="${home.checked}"></p>
-                    <p class="card-note small muted" th:text="#{home.card.checked.note}"></p>
+        <section class="lg-section" id="home-cards" aria-labelledby="cards-heading">
+            <h2 id="cards-heading" class="lg-sr-only" th:text="#{home.cards.heading}"></h2>
+            <div class="lg-grid lg-grid--stats">
+                <div class="lg-card lg-stat" id="card-checked">
+                    <p class="lg-stat__label" th:text="#{home.card.checked}"></p>
+                    <p class="lg-stat__value" th:text="${home.checked}"></p>
+                    <p class="lg-stat__note" th:text="#{home.card.checked.note}"></p>
                 </div>
-                <div class="card error" id="card-error">
-                    <p class="card-label" th:text="#{home.card.error}"></p>
-                    <p class="card-value" th:text="${home.withError}"></p>
-                    <p class="card-note small muted" th:if="${home.errorRate != null}"
+                <div class="lg-card lg-stat" id="card-error">
+                    <p class="lg-stat__label" th:text="#{home.card.error}"></p>
+                    <p class="lg-stat__value" th:text="${home.withError}"></p>
+                    <p class="lg-stat__note" th:if="${home.errorRate != null}"
                        th:text="#{home.card.error.note(${#numbers.formatPercent(home.errorRate, 1, 0)})}"></p>
-                    <p class="card-note small muted" th:if="${home.errorRate == null}" th:text="#{home.card.none}"></p>
+                    <p class="lg-stat__note" th:if="${home.errorRate == null}" th:text="#{home.card.none}"></p>
                 </div>
-                <div class="card warning" id="card-trademark">
-                    <p class="card-label" th:text="#{home.card.trademark}"></p>
-                    <p class="card-value" th:text="${home.trademarkHolds}"></p>
-                    <ul class="card-note small muted">
+                <div class="lg-card lg-stat" id="card-trademark">
+                    <p class="lg-stat__label" th:text="#{home.card.trademark}"></p>
+                    <p class="lg-stat__value lg-stat__value--trademark" th:text="${home.trademarkHolds}"></p>
+                    <ul class="lg-stat__note lg-stat__list">
+                        <li th:text="#{home.card.trademark.watchlist(${#strings.toString(home.holdsWatchlist)})}"></li>
                         <li th:text="#{home.card.trademark.catalog(${#strings.toString(home.holdsCatalog)})}"></li>
                         <li th:text="#{home.card.trademark.rule(${#strings.toString(home.holdsRule)})}"></li>
-                        <li th:text="#{home.card.trademark.watchlist}"></li>
                     </ul>
                 </div>
-                <div class="card" id="card-llm" th:if="${home.llm.enabled}">
-                    <p class="card-label" th:text="#{home.card.llm}"></p>
-                    <p class="card-value"><span th:text="${home.llm.used}"></span> / <span th:text="${home.llm.limit}"></span></p>
-                    <ul class="card-note small muted">
-                        <li th:each="p : ${home.llm.providers}" th:text="${p.id} + ': ' + ${p.used} + ' / ' + ${p.limit}"></li>
-                    </ul>
-                    <p class="card-note small muted" th:text="#{home.card.llm.note}"></p>
-                </div>
-                <div class="card" id="card-feedback">
-                    <p class="card-label" th:text="#{home.card.feedback}"></p>
-                    <p class="card-value" th:text="${home.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(home.falsePositiveRate, 1, 0)}"></p>
-                    <p class="card-note small muted" th:if="${home.verdicts > 0}"
+                <div class="lg-card lg-stat" id="card-feedback">
+                    <p class="lg-stat__label" th:text="#{home.card.feedback}"></p>
+                    <p class="lg-stat__value" th:text="${home.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(home.falsePositiveRate, 1, 0)}"></p>
+                    <p class="lg-stat__note" th:if="${home.verdicts > 0}"
                        th:text="#{home.card.feedback.note(${#strings.toString(home.falsePositives)}, ${#strings.toString(home.verdicts)})}"></p>
-                    <p class="card-note small muted" th:if="${home.verdicts == 0}" th:text="#{home.card.feedback.none}"></p>
+                    <p class="lg-stat__note" th:if="${home.verdicts == 0}" th:text="#{home.card.feedback.none}"></p>
                 </div>
             </div>
         </section>
 
-        <section id="home-chart" aria-labelledby="chart-heading">
-            <h2 id="chart-heading" th:text="#{home.chart.heading}"></h2>
-            <p class="legend small">
-                <span class="key checked" aria-hidden="true"></span> <span th:text="#{home.chart.checked}"></span>
-                <span class="key with-error" aria-hidden="true"></span> <span th:text="#{home.chart.error}"></span>
-            </p>
-            <svg class="chart" role="img" th:attr="viewBox='0 0 ' + ${home.chart.width} + ' ' + ${home.chart.height},aria-labelledby='chart-heading'"
-                 xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
-                <g class="ticks">
-                    <th:block th:each="tick : ${home.chart.ticks}">
-                        <line th:attr="x1=${home.chart.left},x2=${home.chart.width - 8},y1=${tick.y},y2=${tick.y}"></line>
-                        <text class="tick" text-anchor="end" th:attr="x=${home.chart.left - 6},y=${tick.y + 4}" th:text="${tick.value}"></text>
-                    </th:block>
-                </g>
-                <g th:each="column : ${home.chart.columns}" th:classappend="${column.week.partial} ? 'partial'">
-                    <rect class="bar checked" th:attr="x=${column.checked.x},y=${column.checked.y},width=${column.checked.width},height=${column.checked.height}">
-                        <title th:text="#{home.chart.bar.checked(${column.week.isoWeek}, ${#strings.toString(column.week.checked)})}"></title>
-                    </rect>
-                    <rect class="bar with-error" th:attr="x=${column.withError.x},y=${column.withError.y},width=${column.withError.width},height=${column.withError.height}">
-                        <title th:text="#{home.chart.bar.error(${column.week.isoWeek}, ${#strings.toString(column.week.withError)})}"></title>
-                    </rect>
-                    <text class="label" text-anchor="middle" th:attr="x=${column.labelX},y=${home.chart.baseline + 18}" th:text="${column.week.label}"></text>
-                </g>
-            </svg>
-            <p class="small muted" th:text="#{home.chart.note}"></p>
-            <details class="chart-data">
-                <summary class="small" th:text="#{home.chart.table}"></summary>
-                <div class="report-scroll">
-                    <table class="report" id="chart-table">
+        <div class="lg-split lg-split--wide lg-section">
+            <section class="lg-card" id="home-attention" aria-labelledby="attention-heading">
+                <div class="lg-card__head">
+                    <h2 id="attention-heading" class="lg-card__title" th:text="#{home.attention.heading}"></h2>
+                    <a class="lg-small" th:href="@{/console/history}" th:text="#{home.attention.all}"></a>
+                </div>
+                <p class="lg-text-muted" th:if="${home.attention.isEmpty()}" th:text="#{home.attention.none}"></p>
+                <ul class="lg-feed" th:unless="${home.attention.isEmpty()}">
+                    <li class="lg-feed__item" th:each="item : ${home.attention}">
+                        <span class="lg-mark" aria-hidden="true"></span>
+                        <div class="lg-feed__body">
+                            <div class="lg-feed__top">
+                                <code class="lg-code" th:text="${item.sku != null} ? ${item.sku} : ${item.ruleId}"></code>
+                                <span class="lg-pill" th:classappend="'lg-pill--' + ${item.css()}"
+                                      th:text="${item.css() == 'error'} ? #{home.attention.error} : #{home.attention.trademark}"></span>
+                            </div>
+                            <p class="lg-feed__text" th:text="${item.message}"></p>
+                            <p class="lg-feed__meta"
+                               th:text="#{home.attention.meta(${item.marketplace}, ${#temporals.format(item.checkedAt, 'dd/MM HH:mm')})}"></p>
+                        </div>
+                    </li>
+                </ul>
+            </section>
+
+            <section class="lg-card" id="home-data" aria-labelledby="data-heading">
+                <div class="lg-card__head">
+                    <h2 id="data-heading" class="lg-card__title" th:text="#{home.data.heading}"></h2>
+                </div>
+                <ul class="lg-kv">
+                    <li class="lg-kv__item" id="data-catalog">
+                        <div class="lg-kv__main">
+                            <div class="lg-kv__label" th:text="#{home.data.catalog}"></div>
+                            <div class="lg-kv__value" th:if="${home.data.catalogSource != null and home.data.catalogDate != null}"
+                                 th:text="#{home.data.catalog.value(${home.data.catalogSource}, ${#temporals.format(home.data.catalogDate, 'dd/MM/yyyy')})}"></div>
+                            <div class="lg-code" th:if="${home.data.catalogVersion != null}" th:text="${home.data.catalogVersion}"></div>
+                        </div>
+                        <span class="lg-pill lg-pill--clean" th:if="${home.data.catalogState == 'READY'}" th:text="#{home.data.catalog.ready}"></span>
+                        <span class="lg-pill" th:if="${home.data.catalogState == 'DISABLED'}" th:text="#{home.data.catalog.disabled}"></span>
+                        <span class="lg-pill lg-pill--error" th:if="${home.data.catalogState == 'REFUSED'}" th:text="#{home.data.catalog.refused}"></span>
+                    </li>
+                    <li class="lg-kv__item" id="data-watchlist">
+                        <div class="lg-kv__main">
+                            <div class="lg-kv__label" th:text="#{home.data.watchlist}"></div>
+                            <div class="lg-kv__value" th:text="#{home.data.watchlist.value(${#strings.toString(home.data.watchlistEntries)})}"></div>
+                        </div>
+                        <a class="lg-small" th:href="@{/console/watchlist}" th:text="#{home.data.manage}"></a>
+                    </li>
+                    <li class="lg-kv__item" id="data-reaudit">
+                        <div class="lg-kv__main">
+                            <div class="lg-kv__label" th:text="#{home.data.reaudit}"></div>
+                            <div class="lg-kv__value" th:if="${home.data.lastReauditAt != null}"
+                                 th:text="#{home.data.reaudit.value(${#temporals.format(home.data.lastReauditAt, 'dd/MM')}, ${#strings.toString(home.data.lastReauditNew)})}"></div>
+                            <div class="lg-kv__value" th:if="${home.data.lastReauditAt == null}" th:text="#{home.data.reaudit.never}"></div>
+                        </div>
+                        <a class="lg-small" th:href="@{/console/reaudit}" th:text="#{home.data.open}"></a>
+                    </li>
+                    <li class="lg-kv__item" id="data-rulesets">
+                        <div class="lg-kv__main">
+                            <div class="lg-kv__label" th:text="#{home.data.rulesets}"></div>
+                            <div class="lg-code">
+                                <th:block th:each="ruleset, it : ${home.data.rulesets}"><span th:text="${ruleset.version}"></span><span th:unless="${it.last}"> &middot; </span></th:block>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="lg-kv__item" id="card-llm" th:if="${home.llm.enabled}">
+                        <div class="lg-kv__main">
+                            <div class="lg-kv__label" th:text="#{home.card.llm}"></div>
+                            <div class="lg-kv__value"><span th:text="${home.llm.used}"></span> / <span th:text="${home.llm.limit}"></span></div>
+                            <ul class="lg-small lg-text-muted lg-stat__list">
+                                <li th:each="p : ${home.llm.providers}" th:text="${p.id} + ': ' + ${p.used} + ' / ' + ${p.limit}"></li>
+                            </ul>
+                            <p class="lg-small lg-text-muted" th:text="#{home.card.llm.note}"></p>
+                        </div>
+                    </li>
+                </ul>
+            </section>
+        </div>
+
+        <div class="lg-split lg-split--wide lg-section">
+            <section class="lg-card" id="home-chart" aria-labelledby="chart-heading">
+                <div class="lg-card__head">
+                    <h2 id="chart-heading" class="lg-card__title" th:text="#{home.chart.heading}"></h2>
+                    <span class="lg-small lg-text-muted" th:text="#{home.chart.range}"></span>
+                </div>
+                <svg class="lg-chart" role="img" th:attr="viewBox='0 0 ' + ${home.chart.width} + ' ' + ${home.chart.height},aria-labelledby='chart-heading'"
+                     xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" focusable="false">
+                    <g th:each="tick : ${home.chart.ticks}">
+                        <line class="lg-chart__axis" th:attr="x1=${home.chart.left},x2=${home.chart.width - 8},y1=${tick.y},y2=${tick.y}"></line>
+                        <text class="lg-chart__label" text-anchor="end" th:attr="x=${home.chart.left - 6},y=${tick.y + 4}" th:text="${tick.value}"></text>
+                    </g>
+                    <g th:each="column, it : ${home.chart.columns}">
+                        <rect class="lg-chart__bar" rx="4" th:classappend="${it.last} ? 'lg-chart__bar--now'"
+                              th:attr="x=${column.bar.x},y=${column.bar.y},width=${column.bar.width},height=${column.bar.height}">
+                            <title th:text="#{home.chart.bar.error(${column.week.isoWeek}, ${#strings.toString(column.week.withError)})}"></title>
+                        </rect>
+                        <text class="lg-chart__value" text-anchor="middle" th:attr="x=${column.labelX},y=${column.bar.y - 6}" th:text="${column.week.withError}"></text>
+                        <text class="lg-chart__label" text-anchor="middle" th:attr="x=${column.labelX},y=${home.chart.baseline + 18}" th:text="${column.week.label}"></text>
+                    </g>
+                </svg>
+                <p class="lg-small lg-text-muted" th:text="#{home.chart.note}"></p>
+                <details class="lg-disclosure">
+                    <summary th:text="#{home.chart.table}"></summary>
+                    <div class="lg-table-wrap">
+                        <table class="lg-table" id="chart-table">
+                            <caption class="lg-sr-only" th:text="#{home.chart.table}"></caption>
+                            <thead>
+                            <tr>
+                                <th scope="col" th:text="#{home.chart.col.week}"></th>
+                                <th scope="col" class="lg-num" th:text="#{home.chart.checked}"></th>
+                                <th scope="col" class="lg-num" th:text="#{home.chart.error}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="column : ${home.chart.columns}">
+                                <td><span th:text="${column.week.isoWeek}"></span><span class="lg-text-muted lg-small" th:if="${column.week.partial}"> <span th:text="#{home.chart.partial}"></span></span></td>
+                                <td class="lg-num" th:text="${column.week.checked}"></td>
+                                <td class="lg-num" th:text="${column.week.withError}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            </section>
+
+            <section class="lg-card" id="home-top" aria-labelledby="top-heading">
+                <div class="lg-card__head">
+                    <h2 id="top-heading" class="lg-card__title" th:text="#{home.top.heading}"></h2>
+                </div>
+                <p class="lg-text-muted" th:if="${home.topRules.isEmpty()}" th:text="#{home.top.none}"></p>
+                <div class="lg-table-wrap" th:unless="${home.topRules.isEmpty()}">
+                    <table class="lg-table">
+                        <caption class="lg-sr-only" th:text="#{home.top.caption}"></caption>
                         <thead>
                         <tr>
-                            <th scope="col" th:text="#{home.chart.col.week}"></th>
-                            <th scope="col" class="n" th:text="#{home.chart.checked}"></th>
-                            <th scope="col" class="n" th:text="#{home.chart.error}"></th>
+                            <th scope="col" th:text="#{home.top.col.rule}"></th>
+                            <th scope="col" class="lg-num" th:text="#{home.top.col.times}"></th>
+                            <th scope="col" class="lg-num" th:text="#{home.top.col.fp}"></th>
                         </tr>
                         </thead>
                         <tbody>
-                        <tr th:each="column : ${home.chart.columns}">
-                            <td><span th:text="${column.week.isoWeek}"></span><span class="muted small" th:if="${column.week.partial}"> <span th:text="#{home.chart.partial}"></span></span></td>
-                            <td class="n" th:text="${column.week.checked}"></td>
-                            <td class="n" th:text="${column.week.withError}"></td>
+                        <tr th:each="rule : ${home.topRules}">
+                            <td><code class="lg-code" th:text="${rule.ruleId}"></code></td>
+                            <td class="lg-num" th:text="${rule.findings}"></td>
+                            <td class="lg-num" th:text="${rule.falsePositives == null} ? '&mdash;' : ${rule.falsePositives}"></td>
                         </tr>
                         </tbody>
                     </table>
                 </div>
-            </details>
-        </section>
-
-        <section id="home-top" aria-labelledby="top-heading">
-            <h2 id="top-heading" th:text="#{home.top.heading}"></h2>
-            <p class="muted" th:if="${home.topFalsePositives.isEmpty()}" th:text="#{home.top.none}"></p>
-            <ol class="top-rules" th:unless="${home.topFalsePositives.isEmpty()}">
-                <li th:each="item : ${home.topFalsePositives}">
-                    <code th:text="${item.ruleId}"></code> <span class="muted small" th:text="${item.pack}"></span>
-                    <span th:text="#{home.top.item(${#strings.toString(item.falsePositives)}, ${#strings.toString(item.verdicts)})}"></span>
-                </li>
-            </ol>
-            <p class="small"><a th:href="@{/console/stats}" th:text="#{home.top.more}"></a></p>
-        </section>
+                <p class="lg-small lg-card__foot"><a th:href="@{/console/stats}" th:text="#{home.top.more}"></a></p>
+            </section>
+        </div>
     </th:block>
 
-    <section id="home-shortcuts" aria-labelledby="shortcuts-heading">
-        <h2 id="shortcuts-heading" th:text="#{home.shortcuts.heading}"></h2>
-        <ul class="shortcuts">
-            <li><a class="button" th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a></li>
-            <li><a class="button" th:href="@{/console/check}" th:text="#{nav.check}"></a></li>
-            <li><a class="button" th:href="@{/console/history}" th:text="#{nav.history}"></a></li>
-            <li><a class="button" th:href="@{/console/stats}" th:text="#{nav.stats}"></a></li>
-            <li><a class="button" th:href="@{/console/report}" th:text="#{nav.report}"></a></li>
-            <li><a class="button" th:href="@{/console/api-keys}" th:text="#{nav.keys}"></a></li>
+    <!-- The plan and the month's usage, with or without data. -->
+    <section class="lg-card" id="home-plan" aria-labelledby="plan-heading">
+        <div class="lg-card__head">
+            <h2 id="plan-heading" class="lg-card__title" th:text="#{dashboard.plan.heading}"></h2>
+        </div>
+        <ul class="lg-kv">
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{dashboard.plan(${usage.plan})}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{dashboard.usage(${#strings.toString(usage.used)})}"></span></li>
+            <li class="lg-kv__item" th:if="${usage.enforced and usage.monthlyQuota != null}"><span class="lg-kv__label"
+                th:text="#{dashboard.quota(${#strings.toString(usage.monthlyQuota)}, ${#strings.toString(usage.remaining)})}"></span></li>
+            <li class="lg-kv__item" th:if="${usage.enforced and usage.monthlyQuota == null}"><span class="lg-kv__label" th:text="#{dashboard.quota.unlimited}"></span></li>
+            <li class="lg-kv__item" th:unless="${usage.enforced}"><span class="lg-kv__label" th:text="#{dashboard.notenforced}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label"><span th:text="#{dashboard.reset}"></span> <time th:text="${usage.resetAt}"></time></span></li>
         </ul>
-    </section>
-
-    <section id="home-plan" aria-labelledby="plan-heading">
-        <h2 id="plan-heading" th:text="#{dashboard.plan.heading}"></h2>
-        <p th:text="#{dashboard.plan(${usage.plan})}"></p>
-        <p th:text="#{dashboard.usage(${#strings.toString(usage.used)})}"></p>
-        <p th:if="${usage.enforced and usage.monthlyQuota != null}"
-           th:text="#{dashboard.quota(${#strings.toString(usage.monthlyQuota)}, ${#strings.toString(usage.remaining)})}"></p>
-        <p th:if="${usage.enforced and usage.monthlyQuota == null}" th:text="#{dashboard.quota.unlimited}"></p>
-        <p th:unless="${usage.enforced}" th:text="#{dashboard.notenforced}"></p>
-        <p><span th:text="#{dashboard.reset}"></span> <time th:text="${usage.resetAt}"></time></p>
     </section>
 </main>
 </body>

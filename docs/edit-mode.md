@@ -34,8 +34,14 @@ the target points to its retained before result; for new, changed and remaining 
 
 ## Console
 
-The editor's **Edit mode** opens two columns for the `Trước` and `Sau` marketplace JSON. Results are grouped as **Mới**, **Đã sửa**
-and **Còn lại**. The existing feedback widget appears on findings in all three groups.
+The editor's **Edit mode** opens two columns for the `Trước` and `Sau` marketplace JSON. Under them the changed fields are chips, and
+the findings are grouped as **Mới** (marked with the red diamond), **Đã sửa** (a success pill) and **Còn lại**. Every finding is the same
+finding card as on Check listing and the bulk check (ADR-041): the level pill and the rule id, the message, what the rule checks, the
+suggestion, where the threshold comes from, and the feedback buttons of ADR-034 in all three groups. A finding that is gone after the
+edit says "Đã sửa" and has no red diamond; a finding that changed shows what it said before.
+
+![Edit mode, light](images/console/edit-mode-light.png)
+![Edit mode, dark](images/console/edit-mode-dark.png)
 
 The **Lịch sử kiểm tra** page lists stored results for the signed-in account's client, with date, marketplace, checker, row count,
 SKU when a bulk row provides one, error count, trademark count and whether feedback exists. Filters cover date, status, marketplace
