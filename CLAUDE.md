@@ -496,13 +496,13 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     that needs a background run, variation attributes for adapter files, a mapping shared by the members of a client, a decimal
     comma). Not planned: storing a pasted table or its result, applying a fix, writing to a Sheet or a marketplace, a console page for
     images, personalization or the health report in bulk.
-18. Finding feedback and value dashboard (ADR-034, Proposed): done as one PR (`feature/finding-feedback-and-stats`: ADR, V37, `api/.../feedback/`,
+17. Finding feedback and value dashboard (ADR-034, Proposed): done as one PR (`feature/finding-feedback-and-stats`: ADR, V37, `api/.../feedback/`,
     the console widget, home page and Statistics page, two endpoints, the health report section, `docs/feedback.md`). Open questions the
     maintainer decides are at the end of the ADR (members seeing each other's verdicts, checking a note against the finding's value, a
     plan pack for the statistics, SDK and MCP read access). The history page, the edit mode and the watchlist are not on `main`: their
     shortcuts and the `WATCHLIST` source come with them.
 
-17. Value backtest and labelled evaluation (ADR-032, Proposed): done as one PR (`feature/value-backtest`: ADR, `api/.../evaluation/`,
+18. Value backtest and labelled evaluation (ADR-032, Proposed): done as one PR (`feature/value-backtest`: ADR, `api/.../evaluation/`,
     the `backtest` and `eval-listing` jobs and compose services, 27 sample cases, the baseline, the CI summary step, `docs/backtest.md`).
     Open questions the maintainer decides are at the end of the ADR (the default catch lines, more issue types, a review of the sample
     labels, gating recall). Not planned: an endpoint, a console page or an MCP tool for either job, storing a claim file.
