@@ -154,7 +154,19 @@ listed in the pull request that introduced this ADR.
 
 ## Open questions
 
-1. Screenshots: the docs list an image of the sign-in page and the home page in both schemes (`docs/images/console/`). They need a headless
-   browser and a running console; see the pull request for what was possible.
+1. Screenshots: `docs/images/console/` holds the sign-in page and the home page (the empty state: a new account has no data) in light and dark, taken
+   with headless Chromium from the rendered pages served next to the real `/brand/` files. They are a view of the shell, not of a
+   busy home page; replace the home pair when a deployment has data worth showing.
 2. The Vietnamese copy of the new keys (group names, skip link) needs a native read, like the rest of ADR-028's Vietnamese.
 3. When the last page is moved, drop the `lg-` prefix? Decide then.
+
+## Results
+
+Rendered and photographed (1280 px and 600 px, light and dark): the sign-in card matches `docs/design/screens/0-login`; every page keeps its content
+inside the sidebar; the 860 px bar opens with the keyboard (Tab to the menu checkbox, Space); the skip link shows on the first Tab. Not measured:
+Safari and Firefox (only Chromium was run), a screen reader, and any page other than the sign-in, home, bulk check and API keys pages.
+
+![Sign-in, light](../images/console/login-light.png)
+![Sign-in, dark](../images/console/login-dark.png)
+![Home, light](../images/console/home-light.png)
+![Home, dark](../images/console/home-dark.png)
