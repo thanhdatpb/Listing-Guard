@@ -57,6 +57,14 @@
                         <li th:text="#{home.card.trademark.watchlist}"></li>
                     </ul>
                 </div>
+                <div class="card" id="card-llm" th:if="${home.llm.enabled}">
+                    <p class="card-label" th:text="#{home.card.llm}"></p>
+                    <p class="card-value"><span th:text="${home.llm.used}"></span> / <span th:text="${home.llm.limit}"></span></p>
+                    <ul class="card-note small muted">
+                        <li th:each="p : ${home.llm.providers}" th:text="${p.id} + ': ' + ${p.used} + ' / ' + ${p.limit}"></li>
+                    </ul>
+                    <p class="card-note small muted" th:text="#{home.card.llm.note}"></p>
+                </div>
                 <div class="card" id="card-feedback">
                     <p class="card-label" th:text="#{home.card.feedback}"></p>
                     <p class="card-value" th:text="${home.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(home.falsePositiveRate, 1, 0)}"></p>
