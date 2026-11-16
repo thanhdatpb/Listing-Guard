@@ -59,6 +59,14 @@ public final class TrademarkScanner {
         return ruleset;
     }
 
+    /**
+     * The catalog this scanner reads. For callers that explain a result after the scan (the backtest of ADR-032 asks it
+     * whether a labelled mark is in the catalog at all); asking it never changes what {@link #scan} finds.
+     */
+    public TrademarkCatalog catalog() {
+        return catalog;
+    }
+
     /** The fingerprint of this scanner's ruleset and algorithms plus the components only the caller knows. */
     public AnalysisFingerprint fingerprint(Map<String, String> externalComponents) {
         return AnalysisFingerprint.of(ruleset, AlgorithmVersions.CURRENT, externalComponents);

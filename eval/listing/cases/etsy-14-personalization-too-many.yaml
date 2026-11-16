@@ -1,0 +1,17 @@
+# Synthetic sample case (ADR-032): self-written, not taken from a real listing; the DEMO marks are invented.
+id: etsy-14-personalization-too-many
+marketplace: ETSY
+note: "Six personalization questions, one more than the ruleset allows."
+listing:
+  title: Personalized Ceramic Coffee Mug with Blue Glaze
+  description: A stoneware mug thrown on the wheel and finished with a blue glaze. Holds about 350 ml.
+  tags: [ceramic mug, coffee mug, blue glaze, stoneware, kitchen gift]
+  price: 28.00
+  quantity: 4
+  who_made: i_did
+  when_made: made_to_order
+  category: Home & Living > Kitchen & Dining > Drinkware > Mugs
+  personalization: {questions: [{type: DROPDOWN, question_text: "Choice 1", required: false, options: [Small, Large]}, {type: DROPDOWN, question_text: "Choice 2", required: false, options: [Small, Large]}, {type: DROPDOWN, question_text: "Choice 3", required: false, options: [Small, Large]}, {type: DROPDOWN, question_text: "Choice 4", required: false, options: [Small, Large]}, {type: DROPDOWN, question_text: "Choice 5", required: false, options: [Small, Large]}, {type: DROPDOWN, question_text: "Choice 6", required: false, options: [Small, Large]}]}
+expected:
+  - rule: personalization_question_count
+trademark_risk: LOW

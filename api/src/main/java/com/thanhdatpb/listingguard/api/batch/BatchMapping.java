@@ -91,14 +91,14 @@ public final class BatchMapping {
     }
 
     /** One problem with the data of one row; the batch records it and goes on. The message is Vietnamese (it is reported). */
-    static final class RowException extends RuntimeException {
+    public static final class RowException extends RuntimeException {
         RowException(String message) {
             super(message, null, false, false);
         }
     }
 
     /** What one data row gives: the id that names it, its label when the batch has one, and the listing JSON. */
-    record RowData(String id, Boolean label, ObjectNode listing) {
+    public record RowData(String id, Boolean label, ObjectNode listing) {
     }
 
     private static final int HEADER_NAMES_SHOWN = 40;
@@ -272,7 +272,7 @@ public final class BatchMapping {
         }
 
         /** The id of a row whose data could not be read, so the report can still name it; null when there is none. */
-        String idOrNull(String[] cells) {
+        public String idOrNull(String[] cells) {
             if (idIndex >= cells.length) {
                 return null;
             }
@@ -285,7 +285,7 @@ public final class BatchMapping {
          *                      an unreadable label. A blank cell is not an error: the field is absent, and the rules
          *                      say whether that is a problem.
          */
-        RowData read(String[] cells) {
+        public RowData read(String[] cells) {
             if (cells.length != columnCount) {
                 throw new RowException("Dòng có " + cells.length + " ô nhưng header có " + columnCount
                         + " cột (thiếu cột, hoặc dấu phân cách nằm trong một giá trị không có dấu nháy).");

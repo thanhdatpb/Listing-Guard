@@ -1,0 +1,17 @@
+# Synthetic sample case (ADR-032): self-written, not taken from a real listing; the DEMO marks are invented.
+id: amazon-05-search-terms-too-long
+marketplace: AMAZON
+note: "The search terms are longer than the ruleset's byte limit."
+listing:
+  title: "Northfield Pottery Stoneware Coffee Mug, Blue Glaze, 12 oz"
+  brand: Northfield Pottery
+  bullet_points: ["Stoneware mug thrown on the wheel", "Holds about 350 ml", "Dishwasher safe"]
+  description: A stoneware mug finished with a blue glaze.
+  product_type: DRINKING_CUP
+  price: 28.00
+  quantity: 4
+  search_terms: "stoneware coffee mug ceramic tea cup kitchen gift stoneware coffee mug ceramic tea cup kitchen gift stoneware coffee mug ceramic tea cup kitchen gift stoneware coffee mug ceramic tea cup kitchen gift stoneware coffee mug ceramic tea cup kitchen gift stoneware coffee mug ceramic tea cup kitchen gift"
+expected:
+  - rule: search_terms_length
+    field: search_terms
+trademark_risk: LOW

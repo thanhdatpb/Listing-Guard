@@ -1,0 +1,17 @@
+# Synthetic sample case (ADR-032): self-written, not taken from a real listing; the DEMO marks are invented.
+id: etsy-05-too-many-tags
+marketplace: ETSY
+note: "The listing has more tags than the ruleset allows."
+listing:
+  title: Handmade Ceramic Coffee Mug with Blue Glaze
+  description: A stoneware mug thrown on the wheel and finished with a blue glaze. Holds about 350 ml.
+  price: 28.00
+  quantity: 4
+  who_made: i_did
+  when_made: made_to_order
+  category: Home & Living > Kitchen & Dining > Drinkware > Mugs
+  tags: [mug, cup, coffee, tea, ceramic, stoneware, blue, glaze, handmade, kitchen, gift, pottery, wheel thrown, drinkware]
+expected:
+  - rule: tag_count
+    field: tags
+trademark_risk: LOW
