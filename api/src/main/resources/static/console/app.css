@@ -8,7 +8,7 @@
    - A component is a class with the "lg-" prefix (BEM: lg-card, lg-card__head, lg-btn--primary), so it cannot meet the class names of
      the pages that were written before it. The shell of the page has the "app-" prefix.
 
-   Load order on a console page: /brand/tokens.css, then this file, then the page's own older sheet (editor.css, console.css, ...). */
+   Load order on a console page: /brand/tokens.css, then this file, then the page's own sheet when it has one (editor.css, bulk.css). */
 
 :root {
   color-scheme: light dark;
@@ -729,3 +729,12 @@ button.lg-switch:focus-visible { outline: 2px solid var(--brand); outline-offset
 .lg-fold[open] > summary { margin-bottom: var(--space-3); }
 .lg-chips-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); padding: 0; list-style: none; }
 .lg-table td.lg-main { min-width: 14rem; }
+
+/* The button that does what cannot be undone: red text and a red outline all round, never a red ground; the brand button is for what starts. */
+.lg-btn--destructive { border-color: var(--danger); color: var(--danger); }
+.lg-btn--destructive:hover { background: var(--danger-subtle); border-color: var(--danger); color: var(--danger); }
+/* A hidden control stays hidden whatever display its class gives it. */
+.lg-btn[hidden] { display: none; }
+/* A secret in a banner: the read-only field and the copy button on one line, the field taking what is left. */
+.lg-secret { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+.lg-secret__field { flex: 1 1 18rem; width: auto; min-width: 0; font-family: var(--font-mono); font-size: 13px; }

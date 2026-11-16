@@ -5,72 +5,92 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{keys.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/console.css}">
     <script th:src="@{/console/keys.js}" defer></script>
 </head>
 <body>
+<!-- The API keys of the client (ADR-020, ADR-042): the table of active keys, the key just issued (shown once, in a warning banner), and the
+     form that makes another. The secret is in the response of the POST that made it and nowhere else. Every value goes through th:text;
+     every sentence is a message (ADR-028). The script only copies the field. -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('keys')}"></header>
-<main class="page">
+<main class="lg-page" id="keys-page">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{keys.heading}"></h1>
-    <p class="muted">
-        <span th:text="#{common.signedin(${email})}"></span>
-        <span th:text="#{keys.intro.before}"></span> <code>X-API-Key</code> <span th:text="#{keys.intro.after}"></span>
-    </p>
-
-    <div class="notice applied" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
-    <div class="notice refused" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
-
-    <section class="secret-box" id="new-key" th:if="${issued != null}" aria-labelledby="new-key-heading">
-        <h2 id="new-key-heading" th:text="#{keys.new.heading}"></h2>
-        <p class="warning-text" th:text="#{keys.new.warning}"></p>
-        <div class="secret-row">
-            <label for="new-secret" class="visually-hidden" th:text="#{keys.new.label}"></label>
-            <input type="text" id="new-secret" readonly autocomplete="off" spellcheck="false" th:value="${issued.secret}">
-            <button type="button" id="copy-secret" data-copy-from="new-secret" hidden th:text="#{keys.copy}"
-                    th:attr="data-i18n-select=#{js.keys.select},data-i18n-copied=#{js.keys.copied},data-i18n-failed=#{js.keys.failed}"></button>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{keys.heading}"></h1>
+            <p class="lg-page__sub">
+                <span th:text="#{keys.intro.before}"></span> <code class="lg-code">X-API-Key</code> <span th:text="#{keys.intro.after}"></span>
+            </p>
         </div>
-        <p class="copy-status" id="copy-status" role="status" aria-live="polite"></p>
-        <p class="muted small"><span th:text="#{keys.new.keyid}"></span> <code th:text="${issued.keyId}"></code><span th:text="#{keys.new.keyid.after}"></span></p>
+    </div>
+
+    <div class="lg-banner lg-banner--success lg-section" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
+
+    <!-- The key that was just issued: said once, with the way to copy it. The warning is the banner, not a border on a box. -->
+    <section class="lg-banner lg-banner--warning lg-section" id="new-key" th:if="${issued != null}" aria-labelledby="new-key-heading">
+        <div class="lg-banner__body">
+            <h2 id="new-key-heading" class="lg-banner__title" th:text="#{keys.new.heading}"></h2>
+            <p th:text="#{keys.new.warning}"></p>
+            <div class="lg-secret">
+                <label for="new-secret" class="lg-sr-only" th:text="#{keys.new.label}"></label>
+                <input class="lg-input lg-secret__field" type="text" id="new-secret" readonly autocomplete="off" spellcheck="false" th:value="${issued.secret}">
+                <button type="button" class="lg-btn lg-btn--primary" id="copy-secret" data-copy-from="new-secret" hidden
+                        th:attr="data-i18n-select=#{js.keys.select},data-i18n-copied=#{js.keys.copied},data-i18n-failed=#{js.keys.failed}">
+                    <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-copy"/></svg>
+                    <th:block th:text="#{keys.copy}"></th:block>
+                </button>
+            </div>
+            <p id="copy-status" role="status" aria-live="polite"></p>
+            <p class="lg-small"><span th:text="#{keys.new.keyid}"></span> <code class="lg-code" th:text="${issued.keyId}"></code><span th:text="#{keys.new.keyid.after}"></span></p>
+        </div>
     </section>
 
-    <h2 id="keys-heading">
-        <span th:text="#{keys.active.heading}"></span>
-        <span class="muted" id="key-count" th:text="#{keys.count(${#strings.toString(activeCount)}, ${#strings.toString(maxActiveKeys)})}"></span>
-    </h2>
-    <p id="no-keys" th:if="${keys.isEmpty()}" th:text="#{keys.none}"></p>
-    <table class="keys" id="keys-table" th:unless="${keys.isEmpty()}" aria-labelledby="keys-heading">
-        <thead>
-        <tr>
-            <th scope="col" th:text="#{keys.col.keyid}"></th>
-            <th scope="col" th:text="#{keys.col.label}"></th>
-            <th scope="col" th:text="#{keys.col.created}"></th>
-            <th scope="col" th:text="#{keys.col.lastused}"></th>
-            <th scope="col"><span class="visually-hidden" th:text="#{keys.col.action}"></span></th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="key : ${keys}">
-            <td><code th:text="${key.keyId}"></code></td>
-            <td class="label"><span th:if="${key.label != null}" th:text="${key.label}"></span><span class="muted" th:if="${key.label == null}" th:text="#{keys.nolabel}"></span></td>
-            <td><time th:text="${key.created}"></time></td>
-            <td><time th:if="${key.lastUsed != null}" th:text="${key.lastUsed}"></time><span class="muted" th:if="${key.lastUsed == null}" th:text="#{keys.never}"></span></td>
-            <td><a class="button danger" th:href="@{/console/api-keys/{id}/revoke(id=${key.keyId})}" th:aria-label="#{keys.revoke.aria(${key.keyId})}" th:text="#{keys.revoke}"></a></td>
-        </tr>
-        </tbody>
-    </table>
-
-    <h2 th:text="#{keys.create.heading}"></h2>
-    <p id="limit-message" th:unless="${canCreate}" th:text="#{keys.limit.message(${#strings.toString(maxActiveKeys)})}"></p>
-    <form id="create-form" method="post" th:action="@{/console/api-keys}" th:if="${canCreate}">
-        <div class="field">
-            <label for="label"><span th:text="#{keys.label.label}"></span> <span class="muted" th:text="#{keys.label.optional(${#strings.toString(maxLabelLength)})}"></span></label>
-            <input type="text" id="label" name="label" autocomplete="off" th:attr="maxlength=${maxLabelLength}" th:value="${label}">
-            <p class="hint" th:text="#{keys.label.hint}"></p>
+    <section class="lg-section" aria-labelledby="keys-heading">
+        <h2 id="keys-heading" class="lg-section-title lg-section">
+            <span th:text="#{keys.active.heading}"></span>
+            <span class="lg-text-muted lg-small" id="key-count" th:text="#{keys.count(${#strings.toString(activeCount)}, ${#strings.toString(maxActiveKeys)})}"></span>
+        </h2>
+        <div class="lg-empty" id="no-keys" th:if="${keys.isEmpty()}"><p class="lg-empty__text" th:text="#{keys.none}"></p></div>
+        <div class="lg-table-wrap" th:unless="${keys.isEmpty()}">
+            <table class="lg-table lg-table--scroll" id="keys-table">
+                <caption class="lg-sr-only" th:text="#{keys.active.heading}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{keys.col.keyid}"></th>
+                    <th scope="col" th:text="#{keys.col.label}"></th>
+                    <th scope="col" th:text="#{keys.col.created}"></th>
+                    <th scope="col" th:text="#{keys.col.lastused}"></th>
+                    <th scope="col"><span class="lg-sr-only" th:text="#{keys.col.action}"></span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="key : ${keys}">
+                    <td><code class="lg-code" th:text="${key.keyId}"></code></td>
+                    <td class="lg-wrap"><strong th:if="${key.label != null}" th:text="${key.label}"></strong><span class="lg-text-muted" th:if="${key.label == null}" th:text="#{keys.nolabel}"></span></td>
+                    <td class="lg-nowrap"><time th:text="${key.created}"></time></td>
+                    <td class="lg-nowrap"><time th:if="${key.lastUsed != null}" th:text="${key.lastUsed}"></time><span class="lg-text-muted" th:if="${key.lastUsed == null}" th:text="#{keys.never}"></span></td>
+                    <td class="lg-nowrap"><a class="lg-btn lg-btn--small lg-btn--destructive" th:href="@{/console/api-keys/{id}/revoke(id=${key.keyId})}" th:aria-label="#{keys.revoke.aria(${key.keyId})}" th:text="#{keys.revoke}"></a></td>
+                </tr>
+                </tbody>
+            </table>
         </div>
-        <button type="submit" class="primary" th:text="#{keys.create.submit}"></button>
-    </form>
+    </section>
+
+    <section class="lg-card lg-section" aria-labelledby="create-heading">
+        <h2 id="create-heading" class="lg-card__title" th:text="#{keys.create.heading}"></h2>
+        <p class="lg-text-muted" id="limit-message" th:unless="${canCreate}" th:text="#{keys.limit.message(${#strings.toString(maxActiveKeys)})}"></p>
+        <form id="create-form" class="lg-form" method="post" th:action="@{/console/api-keys}" th:if="${canCreate}">
+            <div class="lg-field">
+                <label class="lg-field__label" for="label"><span th:text="#{keys.label.label}"></span> <span class="lg-text-muted" th:text="#{keys.label.optional(${#strings.toString(maxLabelLength)})}"></span></label>
+                <input class="lg-input" type="text" id="label" name="label" autocomplete="off" aria-describedby="label-hint" th:attr="maxlength=${maxLabelLength}" th:value="${label}">
+                <p class="lg-field__hint" id="label-hint" th:text="#{keys.label.hint}"></p>
+            </div>
+            <div class="lg-actions">
+                <button type="submit" class="lg-btn" th:classappend="${issued == null} ? 'lg-btn--primary'" th:text="#{keys.create.submit}"></button>
+            </div>
+        </form>
+    </section>
 </main>
 </body>
 </html>

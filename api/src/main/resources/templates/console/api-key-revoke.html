@@ -5,29 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{revoke.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
 <body>
+<!-- The confirmation of a revoke (ADR-020, ADR-042): what the key is, what happens when it is revoked, and the one button that does it.
+     The button is the danger button, never the brand one; the way back is as near as the way on. -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('keys')}"></header>
-<main class="page">
+<main class="lg-page" id="revoke-page">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{revoke.heading}"></h1>
-    <dl class="facts">
-        <dt th:text="#{keys.col.keyid}"></dt>
-        <dd><code th:text="${key.keyId}"></code></dd>
-        <dt th:text="#{keys.col.label}"></dt>
-        <dd><span th:if="${key.label != null}" th:text="${key.label}"></span><span class="muted" th:if="${key.label == null}" th:text="#{keys.nolabel}"></span></dd>
-        <dt th:text="#{keys.col.created}"></dt>
-        <dd th:text="${key.created}"></dd>
-        <dt th:text="#{keys.col.lastused}"></dt>
-        <dd><span th:if="${key.lastUsed != null}" th:text="${key.lastUsed}"></span><span class="muted" th:if="${key.lastUsed == null}" th:text="#{keys.never}"></span></dd>
-    </dl>
-    <p class="warning-text" th:text="#{revoke.warning}"></p>
+    <div class="lg-page__head">
+        <div>
+            <p class="lg-page__crumb"><a th:href="@{/console/api-keys}" th:text="#{revoke.back}"></a></p>
+            <h1 th:text="#{revoke.heading}"></h1>
+        </div>
+    </div>
+
+    <div class="lg-banner lg-banner--warning lg-section" id="revoke-warning" role="note"><p th:text="#{revoke.warning}"></p></div>
+
+    <section class="lg-card lg-section" id="revoke-key" th:attr="aria-label=#{revoke.key.aria}">
+        <ul class="lg-kv">
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{keys.col.keyid}"></span><code class="lg-code" th:text="${key.keyId}"></code></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{keys.col.label}"></span>
+                <span class="lg-kv__value"><span th:if="${key.label != null}" th:text="${key.label}"></span><span class="lg-text-muted" th:if="${key.label == null}" th:text="#{keys.nolabel}"></span></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{keys.col.created}"></span><span class="lg-kv__value" th:text="${key.created}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{keys.col.lastused}"></span>
+                <span class="lg-kv__value"><span th:if="${key.lastUsed != null}" th:text="${key.lastUsed}"></span><span class="lg-text-muted" th:if="${key.lastUsed == null}" th:text="#{keys.never}"></span></span></li>
+        </ul>
+    </section>
+
     <form method="post" th:action="@{/console/api-keys/{id}/revoke(id=${key.keyId})}">
-        <div class="confirm-actions">
-            <button type="submit" class="danger" th:text="#{revoke.submit}"></button>
-            <a th:href="@{/console/api-keys}" th:text="#{revoke.cancel}"></a>
+        <div class="lg-actions">
+            <button type="submit" class="lg-btn lg-btn--destructive" th:text="#{revoke.submit}"></button>
+            <a class="lg-btn" th:href="@{/console/api-keys}" th:text="#{revoke.cancel}"></a>
         </div>
     </form>
 </main>
