@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- The finding card and the listing as it was checked (ADR-041). This file is never served on its own: the editor, the bulk check and
+     the edit mode include the fragments below. A card is built by FindingCards from each page's own finding record, so one piece of
+     markup serves them all; the listing is built by ListingView. Every value is printed with th:text, so a listing's text is never
+     markup (the segments of a highlighted text sit on one line on purpose: a line break between them would show as a space). No text is
+     written here (ADR-028): every sentence is a message. -->
+
+<!-- One finding: the level pill and the rule id in the head, the message, what the rule checks, the evidence, the suggestion in a pale
+     block, where the threshold comes from, and the feedback buttons. The red diamond marks a problem to fix (an ERROR or a HIGH risk). -->
+<article class="lg-finding" th:fragment="card(card)">
+    <span class="lg-mark" aria-hidden="true" th:if="${card.problem}"></span>
+    <div class="lg-finding__body">
+        <div class="lg-finding__head">
+            <span class="lg-pill" th:classappend="${card.pillTone != ''} ? 'lg-pill--' + ${card.pillTone}" th:text="${card.pillLabel}"></span>
+            <code class="lg-code" th:text="${card.ruleId}"></code>
+        </div>
+        <h4 class="lg-finding__title" th:text="${card.message}"></h4>
+        <p class="lg-finding__meta" th:if="${card.field != null or card.detail != null}">
+            <th:block th:if="${card.field != null}"><span th:text="#{editor.finding.on}"></span> <code class="lg-code" th:text="${card.field}"></code></th:block>
+            <th:block th:if="${card.detail != null}"><span th:if="${card.field != null}"> &middot; </span><span th:text="${card.detail}"></span></th:block>
+        </p>
+        <p class="lg-finding__text" th:if="${card.explanation != null}"><span class="lg-text-muted" th:text="#{editor.finding.explains}"></span> <span th:text="${card.explanation}"></span></p>
+        <p class="lg-finding__evidence" th:if="${card.evidence != null}"><span class="lg-text-muted" th:text="#{editor.finding.evidence}"></span> <span class="ev"><span th:if="${card.evidence.cutBefore}">&hellip;</span><span th:text="${card.evidence.before}"></span><mark class="lg-highlight" th:classappend="${card.error} ? 'lg-highlight--error'" th:text="${card.evidence.match}"></mark><span th:text="${card.evidence.after}"></span><span th:if="${card.evidence.cutAfter}">&hellip;</span></span></p>
+        <p class="lg-finding__meta" th:if="${card.before != null}"><span th:text="#{finding.before(${card.before})}"></span></p>
+        <div class="lg-finding__hint" th:if="${card.suggestion != null or card.fix != null}">
+            <p class="lg-finding__hint-label" th:if="${card.suggestion != null}" th:text="#{finding.suggestion}"></p>
+            <p class="lg-finding__hint-value" th:if="${card.suggestion != null}" th:text="${card.suggestion}"></p>
+            <th:block th:if="${card.fix != null}">
+                <p class="lg-finding__hint-label"><strong th:text="${card.fixId != null} ? #{editor.fix.label} : #{bulk.item.fix}"></strong> <span th:text="${card.fix.description}"></span></p>
+                <p th:if="${card.fix.proposedValue != null}"><span class="lg-finding__hint-label" th:text="${card.fixId != null} ? #{editor.fix.proposed} : #{bulk.item.fix.value}"></span>
+                    <code class="lg-finding__hint-value" th:text="${card.fix.proposedValue}"></code></p>
+                <p class="lg-finding__hint-label" th:if="${card.fix.proposedValue == null}" th:text="${card.fixId != null} ? #{editor.fix.remove} : #{bulk.item.fix.remove}"></p>
+            </th:block>
+        </div>
+        <p class="lg-finding__llm" th:if="${card.llmReason != null}"><span class="lg-pill lg-pill--brand" th:text="#{console.llm.label}"></span><span th:if="${!card.llmReason.isEmpty()}" th:text="${card.llmReason}"></span>
+            <span th:text="#{console.llm.opinion}"></span></p>
+        <p class="lg-finding__meta" th:if="${card.sourceLine != null}" th:text="${card.sourceLine}"></p>
+        <!-- The editor's one button that changes a field: the button and its hidden values belong to the editor form (form attribute), so the
+             page sends what is typed in the fields now. Pressing it only fills the field; it never checks again. -->
+        <div class="lg-finding__actions" th:if="${card.fixId != null}">
+            <input type="hidden" form="editor-form" th:name="'fix.' + ${card.fixId} + '.field'" th:value="${card.field}">
+            <input type="hidden" form="editor-form" th:name="'fix.' + ${card.fixId} + '.value'" th:value="${card.value}">
+            <input type="hidden" form="editor-form" th:name="'fix.' + ${card.fixId} + '.action'" th:value="${card.fix.action}">
+            <input type="hidden" form="editor-form" th:name="'fix.' + ${card.fixId} + '.proposed'"
+                   th:value="${card.fix.proposedValue}" th:if="${card.fix.proposedValue != null}">
+            <button type="submit" form="editor-form" name="apply" class="lg-btn lg-btn--small"
+                    th:value="${card.fixId}" th:formaction="@{/console/check/apply}"
+                    th:aria-label="#{editor.fix.apply.aria(${card.field})}" th:text="#{editor.fix.apply}"></button>
+        </div>
+        <form th:replace="~{console/feedback :: widget(${card.target})}"></form>
+    </div>
+</article>
+
+<!-- A list of cards. -->
+<div class="lg-findings" th:fragment="cards(cards)">
+    <th:block th:each="card : ${cards}"><article th:replace="~{console/findings :: card(${card})}"></article></th:block>
+</div>
+
+<!-- The listing as it was checked: the title with the marked words, the tags as chips (a flagged one is told by a shape, a word for a
+     screen reader and its ground) or the bullet points, and the start of the description. -->
+<div class="lg-listing" th:fragment="listing(view)">
+    <div class="lg-listing__field">
+        <span class="lg-listing__label"><span th:text="#{listing.title}"></span>
+            <span class="lg-listing__count">&middot; <span th:text="${view.titleMax != null} ? #{listing.title.count.of(${#strings.toString(view.titleChars)}, ${#strings.toString(view.titleMax)})} : #{listing.title.count(${#strings.toString(view.titleChars)})}"></span></span></span>
+        <p class="lg-listing__title" th:if="${view.titleChars > 0}"><th:block th:each="segment : ${view.title}"><mark class="lg-highlight" th:classappend="${segment.tone == 'error'} ? 'lg-highlight--error'" th:if="${!segment.tone.isEmpty()}" th:text="${segment.text}"></mark><span th:if="${segment.tone.isEmpty()}" th:text="${segment.text}"></span></th:block></p>
+        <p class="lg-listing__text" th:if="${view.titleChars == 0}" th:text="#{listing.empty}"></p>
+    </div>
+    <div class="lg-listing__field" th:if="${!view.items.isEmpty()}">
+        <span class="lg-listing__label"><span th:text="${view.itemsKind == 'tags'} ? #{listing.tags} : #{listing.bullets}"></span>
+            <span class="lg-listing__count">&middot; <span th:text="${view.itemsMax != null} ? #{listing.items.count.of(${#strings.toString(view.items.size())}, ${#strings.toString(view.itemsMax)})} : #{listing.items.count(${#strings.toString(view.items.size())})}"></span></span></span>
+        <ul class="lg-listing__chips" th:if="${view.itemsKind == 'tags'}">
+            <li class="lg-chip" th:each="item : ${view.items}"
+                th:classappend="${item.flag == 'error'} ? 'lg-chip--error' : (${item.flag == 'flag'} ? 'lg-chip--flag' : 'lg-chip--neutral')"><span class="lg-sr-only" th:if="${!item.flag.isEmpty()}" th:text="#{listing.flagged}"></span><span th:text="${item.text}"></span></li>
+        </ul>
+        <ul class="lg-listing__bullets" th:if="${view.itemsKind == 'bullets'}">
+            <li th:each="item : ${view.items}"><span class="lg-sr-only" th:if="${!item.flag.isEmpty()}" th:text="#{listing.flagged}"></span><th:block th:each="segment : ${item.segments}"><mark class="lg-highlight" th:classappend="${segment.tone == 'error'} ? 'lg-highlight--error'" th:if="${!segment.tone.isEmpty()}" th:text="${segment.text}"></mark><span th:if="${segment.tone.isEmpty()}" th:text="${segment.text}"></span></th:block></li>
+        </ul>
+    </div>
+    <div class="lg-listing__field" th:if="${!view.description.isEmpty()}">
+        <span class="lg-listing__label" th:text="#{listing.description}"></span>
+        <p class="lg-listing__text" th:text="${view.description}"></p>
+    </div>
+</div>
+
+<!-- The readiness as a meter: the number, a native progress bar (a screen reader reads its value), the headline and what the score
+     counts. score is null when there is none (never a zero); max is the readiness setting, not a number of this page. -->
+<div class="lg-meter__body" th:fragment="meter(score, big, max, headline, note, headingId)">
+    <div class="lg-meter__head">
+        <span class="lg-meter__label" th:id="${headingId}" th:text="#{listing.readiness}"></span>
+        <span class="lg-meter__value" th:text="${score != null} ? #{listing.score(${#strings.toString(score)}, ${#strings.toString(max)})} : ${big}"></span>
+    </div>
+    <progress class="lg-progress" th:if="${score != null}" th:value="${score}" th:max="${max}" th:aria-label="#{listing.readiness}"></progress>
+    <p class="lg-meter__note"><strong th:text="${headline}"></strong> <span th:text="${note}"></span></p>
+</div>
+</body>
+</html>
