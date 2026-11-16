@@ -58,6 +58,14 @@ public final class ConsoleTestSupport {
         return request;
     }
 
+    /**
+     * The page without the shell the layout adds (ADR-040): the sidebar carries the logo (an {@code <img>}) and the icon sprite (an
+     * {@code <svg>}), which a test about the content of a page must not trip over.
+     */
+    public static String withoutShell(String html) {
+        return html.replaceAll("(?s)<header class=\"app-side\".*?</header>", "");
+    }
+
     /** The inner HTML of the {@code <section>} with this id. */
     public static String section(String html, String id) {
         Matcher matcher = Pattern.compile("<section[^>]*id=\"" + id + "\"[^>]*>(.*?)</section>", Pattern.DOTALL).matcher(html);

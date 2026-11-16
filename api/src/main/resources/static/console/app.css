@@ -1,0 +1,521 @@
+/* Listing Guard console: the base style sheet (ADR-040). Plain CSS, no build step, no script.
+
+   Rules, held by tests (ConsoleAppCssTest, ConsoleContrastTest):
+   - Every color, space, radius and shadow is a variable of /brand/tokens.css. This file writes no color code of its own (no hex, no
+     rgb(), no hsl()); a shade the tokens lack is derived below from tokens with color-mix().
+   - Dark follows the system (prefers-color-scheme) through the tokens; nothing here switches a scheme.
+   - No gradient, no emoji, no one-sided colored border on a card, no red except for a problem (red is --danger, --accent only marks).
+   - A component is a class with the "lg-" prefix (BEM: lg-card, lg-card__head, lg-btn--primary), so it cannot meet the class names of
+     the pages that were written before it. The shell of the page has the "app-" prefix.
+
+   Load order on a console page: /brand/tokens.css, then this file, then the page's own older sheet (editor.css, console.css, ...). */
+
+:root {
+  color-scheme: light dark;
+  --side-width: 240px;
+  /* Shades the tokens do not name, derived from them so both schemes follow. Pairs of text and ground that use them are checked for
+     contrast by ConsoleContrastTest; keep the two lists together. */
+  --hover: color-mix(in srgb, var(--border) 55%, var(--surface-1));
+  --surface-2: color-mix(in srgb, var(--border) 25%, var(--surface-1));
+  --line-soft: color-mix(in srgb, var(--border) 60%, var(--surface-1));
+  --ink-soft: color-mix(in srgb, var(--ink) 75%, var(--ink-muted));
+  --border-strong: color-mix(in srgb, var(--ink-muted) 70%, var(--surface-1));
+}
+
+/* ---------- reset and base ---------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--surface-0);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+/* Paragraphs and lists keep the browser's margins: the pages written before this sheet rely on them. */
+h1, h2, h3, h4, figure, blockquote { margin: 0 0 var(--space-1); }
+h1 { font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 18px; line-height: 26px; font-weight: 600; }
+h3 { font-size: 15px; line-height: 24px; font-weight: 600; }
+img, svg { max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+code, kbd, samp, pre { font-family: var(--font-mono); font-size: 13px; line-height: 20px; }
+a { color: var(--brand-text); text-underline-offset: 2px; }
+a:hover { color: var(--brand-strong); }
+hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-6) 0; }
+table { border-collapse: collapse; }
+::placeholder { color: var(--ink-muted); opacity: 1; }
+::selection { background: var(--brand-subtle); color: var(--brand-text); }
+
+/* A focus ring everyone can see, on every control and in both schemes. */
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+main:focus { outline: none; }
+
+.lg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.lg-text-muted { color: var(--ink-muted); }
+.lg-text-soft { color: var(--ink-soft); }
+.lg-mono { font-family: var(--font-mono); font-size: 13px; line-height: 20px; }
+.lg-num { text-align: right; font-variant-numeric: tabular-nums; }
+/* The one icon set: strokes that take the color of the text around them. Decorative (aria-hidden); the words carry the meaning. */
+.lg-icon { flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- the page shell: the sidebar and its small-screen bar ---------- */
+
+/* A page that has the sidebar leaves its room; a page without one (sign-in) does not. */
+body:has(> .app-side) { padding-left: var(--side-width); }
+
+.app-skip {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-300%);
+}
+.app-skip:focus { transform: none; color: var(--on-brand); }
+
+.app-side {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 20;
+  width: var(--side-width);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 14px;
+  overflow-y: auto;
+  background: var(--surface-1);
+  border-right: 1px solid var(--border);
+}
+.app-side__brand { display: block; margin: var(--space-1) var(--space-2) var(--space-6); }
+.app-side__logo { display: block; height: 28px; width: auto; }
+.app-side__toggle, .app-side__menu { display: none; }
+.app-side__panel { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+
+.app-nav { display: flex; flex-direction: column; gap: var(--space-1); }
+.app-nav__label {
+  margin: 18px 10px 6px;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.app-nav__label:first-child { margin-top: 0; }
+.app-nav__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.app-nav__link:hover { background: var(--hover); color: var(--ink); }
+.app-nav__link[aria-current="page"] { background: var(--brand-subtle); color: var(--brand-text); font-weight: 600; }
+.app-nav__icon { order: -1; width: 18px; height: 18px; }
+
+.app-side__foot {
+  margin-top: auto;
+  padding-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.app-account { display: flex; align-items: center; gap: 10px; padding: 0 10px; min-width: 0; }
+.app-account__avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+}
+.app-account__who { min-width: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.app-account__who > * { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-account__client { color: var(--ink); font-weight: 600; }
+.app-side__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); padding: 0 10px; font-size: 13px; }
+.app-side__actions .lang { display: flex; gap: var(--space-1); color: var(--ink-muted); }
+.app-side__actions .lang a[aria-current="true"] { color: var(--ink); font-weight: 600; text-decoration: none; }
+.app-side__actions form { margin: 0; }
+
+/* Below 860px the sidebar becomes a bar on top. The menu is a checkbox with a label: it opens and closes with no script, and the
+   checkbox keeps the keyboard (Tab to it, Space to toggle). */
+@media (max-width: 860px) {
+  body:has(> .app-side) { padding-left: 0; }
+  .app-side {
+    position: static;
+    inset: auto;
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: var(--space-2) var(--space-4);
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .app-side__brand { margin: 0; }
+  .app-side__toggle {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .app-side__menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-left: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .app-side__menu:hover { background: var(--hover); }
+  .app-side__toggle:focus-visible + .app-side__menu { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .app-side__toggle:checked + .app-side__menu { background: var(--brand-subtle); color: var(--brand-text); }
+  .app-side__panel { display: none; flex: 1 0 100%; padding: var(--space-3) 0 var(--space-2); }
+  .app-side__toggle:checked ~ .app-side__panel { display: flex; }
+  .app-side__foot { margin-top: var(--space-4); }
+}
+
+@media print {
+  .app-side, .app-skip { display: none; }
+  body:has(> .app-side) { padding-left: 0; }
+}
+
+/* ---------- button ---------- */
+
+.lg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.lg-btn:hover { background: var(--hover); color: var(--ink); }
+.lg-btn--primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+.lg-btn--primary:hover { background: var(--brand-strong); border-color: var(--brand-strong); color: var(--on-brand); }
+.lg-btn--small { min-height: 32px; padding: 0 var(--space-3); font-size: 13px; }
+.lg-btn--block { display: flex; width: 100%; }
+.lg-btn--link { min-height: 0; padding: 0; border: 0; background: none; color: var(--brand-text); font-weight: 500; text-decoration: underline; }
+.lg-btn--link:hover { background: none; color: var(--brand-strong); }
+/* Icon only: the button must carry aria-label, the icon is aria-hidden. */
+.lg-btn--icon { width: 40px; padding: 0; }
+.lg-btn--icon.lg-btn--small { width: 32px; }
+.lg-btn:disabled, .lg-btn[aria-disabled="true"] {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--ink-muted);
+  cursor: not-allowed;
+}
+.lg-btn__icon { width: 16px; height: 16px; }
+
+/* ---------- card ---------- */
+
+.lg-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: calc(var(--space-4) + var(--space-1));
+}
+/* Only a card that floats on the page ground has a shadow. */
+.lg-card--raised { box-shadow: var(--shadow-card); }
+.lg-card__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.lg-card__title { font-size: 18px; line-height: 26px; font-weight: 600; }
+.lg-stat__label { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink-muted); }
+.lg-stat__value { margin-top: var(--space-1); font-size: 34px; line-height: 42px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.lg-stat__value--error { color: var(--danger); }
+.lg-stat__value--trademark { color: var(--warning); }
+.lg-stat__value--clean { color: var(--success); }
+.lg-stat__note { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+
+/* ---------- status pill ---------- */
+
+/* Three states, each with a word and a shape (diamond, triangle, check) so the color is never the only signal. The shape is drawn here
+   and is decorative; the word is the pill's text. Neutral is a count or a label, with no state. */
+.lg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  background: var(--hover);
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.lg-pill--error, .lg-pill--trademark, .lg-pill--clean { padding-left: 8px; }
+.lg-pill--error::before, .lg-pill--trademark::before, .lg-pill--clean::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+}
+.lg-pill--error { background: var(--danger-subtle); color: var(--danger); }
+.lg-pill--error::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.lg-pill--trademark { background: var(--warning-subtle); color: var(--warning); }
+.lg-pill--trademark::before { clip-path: polygon(50% 4%, 100% 94%, 0 94%); }
+.lg-pill--clean { background: var(--success-subtle); color: var(--success); }
+.lg-pill--clean::before { clip-path: polygon(0 55%, 14% 41%, 38% 63%, 86% 14%, 100% 28%, 38% 92%); }
+.lg-pill--brand { background: var(--brand-subtle); color: var(--brand-text); }
+
+/* ---------- the red diamond that marks a problem ---------- */
+
+/* Use it on a result line, a few per screen: where everything is red, red means nothing (brand.md). Decorative: the line says the
+   problem in words. */
+.lg-mark {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.lg-mark--inline { margin-right: var(--space-2); vertical-align: 0.05em; }
+/* The part of a text that a finding points at. */
+.lg-highlight { padding: 0 3px; border-radius: 4px; background: var(--warning-subtle); color: var(--ink); box-shadow: inset 0 -2px 0 var(--warning); }
+
+/* ---------- table ---------- */
+
+/* The wrapper scrolls sideways on a narrow screen instead of squeezing the columns. */
+.lg-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-1); }
+.lg-table { width: 100%; font-size: 14px; line-height: 20px; }
+.lg-table--scroll { min-width: 40rem; }
+.lg-table th {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+.lg-table td { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.lg-table tbody tr:last-child td { border-bottom: 0; }
+.lg-table tbody tr:hover td { background: var(--surface-2); }
+.lg-table tbody tr[aria-selected="true"] td { background: var(--brand-subtle); color: var(--brand-text); }
+.lg-table th.lg-num, .lg-table td.lg-num { text-align: right; }
+
+/* ---------- form controls ---------- */
+
+.lg-field { display: block; margin: 0 0 var(--space-4); }
+.lg-field__label { display: block; margin-bottom: 6px; color: var(--ink-soft); font-size: 13px; line-height: 18px; font-weight: 600; }
+.lg-field__hint { margin-top: 6px; color: var(--ink-muted); font-size: 13px; line-height: 18px; }
+.lg-field__error { margin-top: 6px; color: var(--danger); font-size: 13px; line-height: 18px; font-weight: 600; }
+
+.lg-input, .lg-select, .lg-textarea {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 20px;
+}
+.lg-select { padding-right: var(--space-2); }
+.lg-input:hover, .lg-select:hover, .lg-textarea:hover { border-color: var(--ink-muted); }
+.lg-input:focus-visible, .lg-select:focus-visible, .lg-textarea:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
+.lg-input[aria-invalid="true"], .lg-select[aria-invalid="true"], .lg-textarea[aria-invalid="true"] { border-color: var(--danger); }
+.lg-input:disabled, .lg-select:disabled, .lg-textarea:disabled { background: var(--surface-2); color: var(--ink-muted); cursor: not-allowed; }
+.lg-textarea { min-height: 132px; resize: vertical; }
+/* What a seller pastes from a sheet, and an id or a key: fixed width letters, no wrapping, so columns stay in line. */
+.lg-textarea--mono { font-family: var(--font-mono); font-size: 13px; line-height: 20px; white-space: pre; overflow: auto; }
+
+/* ---------- segmented tabs ---------- */
+
+/* A group of two to four views of one page. Links (aria-current="page") or buttons (aria-selected="true"). */
+.lg-seg { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-0); }
+.lg-seg__item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.lg-seg__item:hover { color: var(--ink); }
+.lg-seg__item[aria-selected="true"], .lg-seg__item[aria-current="page"] {
+  background: var(--surface-1);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+/* ---------- chip ---------- */
+
+.lg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 18px;
+}
+.lg-chip--neutral { border-color: transparent; background: var(--hover); color: var(--ink-soft); }
+.lg-chip--flag { border-color: transparent; background: var(--warning-subtle); color: var(--warning); font-weight: 600; }
+
+/* ---------- banner ---------- */
+
+.lg-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+  font-size: 14px;
+  line-height: 22px;
+}
+.lg-banner--info { background: var(--brand-subtle); color: var(--brand-text); }
+.lg-banner--warning { background: var(--warning-subtle); color: var(--warning); font-weight: 600; }
+/* The notice of a demonstration catalog: it stays at the top of every console page while the page scrolls. */
+.lg-banner--sticky { position: sticky; top: 0; z-index: 10; justify-content: center; border-radius: 0; border-bottom: 1px solid var(--warning); text-align: center; }
+
+/* ---------- file drop ---------- */
+
+.lg-drop {
+  display: block;
+  padding: var(--space-6);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  text-align: center;
+  cursor: pointer;
+}
+.lg-drop:hover, .lg-drop[data-dragging="true"] { border-color: var(--brand); background: var(--brand-subtle); color: var(--brand-text); }
+.lg-drop:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.lg-drop__title { display: block; color: var(--ink); font-weight: 600; }
+.lg-drop__hint { display: block; margin-top: var(--space-1); font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.lg-drop input[type="file"] { max-width: 100%; margin-top: var(--space-3); }
+
+/* ---------- progress ---------- */
+
+/* A native <progress>, so a screen reader reads its value. */
+.lg-progress { display: block; width: 100%; height: 8px; appearance: none; border: 0; border-radius: var(--radius-full); overflow: hidden; background: var(--hover); color: var(--brand); }
+.lg-progress::-webkit-progress-bar { background: var(--hover); }
+.lg-progress::-webkit-progress-value { background: var(--brand); border-radius: var(--radius-full); }
+.lg-progress::-moz-progress-bar { background: var(--brand); border-radius: var(--radius-full); }
+
+/* ---------- toggle ---------- */
+
+/* <label class="lg-toggle"><input type="checkbox" role="switch"><span class="lg-toggle__track" aria-hidden="true"></span>Text</label> */
+.lg-toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+.lg-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.lg-toggle__track { position: relative; flex: none; width: 36px; height: 20px; border-radius: var(--radius-full); background: var(--border-strong); }
+.lg-toggle__track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+}
+.lg-toggle input:checked + .lg-toggle__track { background: var(--brand); }
+.lg-toggle input:checked + .lg-toggle__track::after { left: 18px; background: var(--on-brand); }
+.lg-toggle input:focus-visible + .lg-toggle__track { outline: 2px solid var(--brand); outline-offset: 2px; }
+.lg-toggle input:disabled + .lg-toggle__track { opacity: 0.5; }
+
+/* ---------- empty state ---------- */
+
+/* An invitation, not an apology: what the page is for and the one thing to do first. */
+.lg-empty { padding: var(--space-8) var(--space-6); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--surface-1); text-align: center; }
+.lg-empty__title { font-size: 18px; line-height: 26px; font-weight: 600; }
+.lg-empty__text { max-width: 36rem; margin: var(--space-2) auto var(--space-4); color: var(--ink-muted); }
+
+/* ---------- page header and layout helpers ---------- */
+
+.lg-page { max-width: 80rem; margin: 0 auto; padding: 28px 36px 48px; }
+.lg-page__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-6); }
+.lg-page__crumb { margin-bottom: var(--space-1); font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.lg-page__sub { margin-top: var(--space-1); color: var(--ink-muted); font-size: 14px; line-height: 22px; }
+.lg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.lg-stack > * + * { margin-top: var(--space-4); }
+.lg-grid { display: grid; gap: var(--space-4); }
+.lg-grid--stats { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+@media (max-width: 860px) {
+  .lg-page { padding: 20px var(--space-4) var(--space-8); }
+}
+
+/* ---------- sign-in and confirmation pages ---------- */
+
+/* The page is a column so that the demo banner, when there is one, takes its height and the card is centered in what is left. */
+body:has(> .lg-auth) { display: flex; flex-direction: column; min-height: 100vh; }
+.lg-auth { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; padding: var(--space-6); }
+.lg-auth__card { width: 100%; max-width: 420px; padding: 36px var(--space-8); }
+.lg-auth__logo { display: block; height: 30px; width: auto; margin-bottom: 28px; }
+.lg-auth__title { font-size: 24px; line-height: 32px; font-weight: 700; letter-spacing: -0.01em; }
+.lg-auth__lead { margin: 6px 0 var(--space-6); color: var(--ink-muted); font-size: 14px; line-height: 22px; }
+.lg-auth__note { margin-top: var(--space-4); color: var(--ink-muted); font-size: 13px; line-height: 20px; }
+.lg-auth__message { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--brand-subtle); color: var(--brand-text); font-size: 14px; line-height: 22px; }
+.lg-auth__error { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--danger-subtle); color: var(--danger); font-size: 14px; line-height: 22px; font-weight: 600; }
+.lg-auth__foot { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line-soft); display: flex; justify-content: flex-end; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.lg-auth__foot .lang { display: flex; gap: var(--space-1); }
+.lg-auth__foot .lang a[aria-current="true"] { color: var(--ink); font-weight: 600; text-decoration: none; }

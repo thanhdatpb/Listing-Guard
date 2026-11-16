@@ -4,6 +4,7 @@ import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.checkPo
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.etsyForm;
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.signedIn;
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.userOf;
+import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.withoutShell;
 import static com.thanhdatpb.listingguard.api.plan.PlanTestSupport.NOVEMBER_15;
 import static com.thanhdatpb.listingguard.api.plan.PlanTestSupport.unique;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -141,7 +142,7 @@ class ConsoleEditorPreviewIntegrationTest {
 
     @Test
     void thePanelNeverUsesAMarketplaceLogoBrandColorOrDomain() throws Exception {
-        String html = page("ETSY") + page("AMAZON");
+        String html = withoutShell(page("ETSY") + page("AMAZON"));
         String css = mvc.perform(get("/console/editor.css").with(signedIn(user()))).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString().toLowerCase();
 

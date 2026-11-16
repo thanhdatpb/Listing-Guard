@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{history.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
     <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
 <body>
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('history')}"></header>
 <main class="layout">
+    <span id="main" tabindex="-1"></span>
     <h1 th:text="#{history.heading}"></h1>
     <p class="muted" th:text="#{history.intro}"></p>
     <form method="get" th:action="@{/console/history}" class="filters">

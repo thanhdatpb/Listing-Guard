@@ -4,6 +4,7 @@ import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.checkPo
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.etsyForm;
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.signedIn;
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.userOf;
+import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.withoutShell;
 import static com.thanhdatpb.listingguard.api.plan.PlanTestSupport.newClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -220,9 +221,10 @@ class ConsoleFeedbackIntegrationTest {
 
         String page = html(mvc.perform(get("/console").with(signedIn(user))).andExpect(status().isOk()));
 
+        assertThat(withoutShell(page)).doesNotContain("<svg");
         assertThat(page).contains("id=\"home-empty\"").contains("href=\"/console/check\"").contains("href=\"/console/bulk\"")
                 .contains("id=\"home-shortcuts\"").contains("href=\"/console/stats\"").contains("id=\"home-plan\"")
-                .doesNotContain("id=\"home-cards\"").doesNotContain("<svg");
+                .doesNotContain("id=\"home-cards\"");
         assertThat(page).doesNotContain("<script");
     }
 

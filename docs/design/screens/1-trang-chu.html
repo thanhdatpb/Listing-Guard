@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="vi">
+<!-- Mockup tham chiếu, dữ liệu mẫu. Nguồn: canvas "Listing Guard Console – Giao diện". Không copy chữ vào template: mọi câu đi qua messages*.properties (ADR-028). -->
+<head>
+<meta charset="utf-8">
+<title>Trang chủ</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1f3fbf}a:hover{color:#17309a}
+*{box-sizing:border-box}
+.app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:900px;font-family:'Be Vietnam Pro',system-ui,sans-serif;color:#111111;background:#f7f7f5;font-size:15px;line-height:24px}
+.side{background:#ffffff;border-right:1px solid #e3e2de;padding:20px 14px;display:flex;flex-direction:column;gap:4px}
+.logo{display:block;height:28px;margin:4px 8px 24px}
+.nav{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;color:#3d3d3a;text-decoration:none;font-size:14px;font-weight:500}
+.nav:hover{background:#f1f1ee;color:#111111}
+.nav.on{background:#eaeefc;color:#1a36a8;font-weight:600}
+.nav svg{flex:none}
+.navlabel{font-size:12px;color:#5b5b57;font-weight:600;margin:18px 10px 6px}
+.me{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-top:1px solid #e3e2de;font-size:13px;color:#5b5b57}
+.av{width:32px;height:32px;border-radius:9999px;background:#eaeefc;color:#1a36a8;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.main{padding:28px 36px 48px;min-width:0}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.crumb{font-size:13px;color:#5b5b57;margin:0 0 4px}
+h1{margin:0;font-size:28px;line-height:36px;font-weight:700;letter-spacing:-0.01em}
+.sub{margin:4px 0 0;color:#5b5b57;font-size:14px}
+h2{margin:0;font-size:17px;line-height:26px;font-weight:600}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:10px;border:1px solid #d4d3ce;background:#ffffff;color:#111111;font:600 14px 'Be Vietnam Pro',sans-serif;cursor:pointer}
+.btn:hover{background:#f1f1ee}
+.btn.pri{background:#1f3fbf;border-color:#1f3fbf;color:#ffffff}
+.btn.pri:hover{background:#17309a}
+.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.card{background:#ffffff;border:1px solid #e3e2de;border-radius:14px;padding:20px}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
+.kpi .lab{font-size:13px;color:#5b5b57;font-weight:500}
+.kpi .num{font-size:34px;line-height:42px;font-weight:700;letter-spacing:-0.02em;margin-top:6px}
+.kpi .delta{font-size:13px;color:#5b5b57;margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:9999px;font-size:12px;font-weight:600;white-space:nowrap}
+.p-err{background:#fcebe7;color:#a62e1a}
+.p-tm{background:#fdf1dc;color:#8a5100}
+.p-ok{background:#e5f4ea;color:#1a6e3f}
+.p-neu{background:#f1f1ee;color:#3d3d3a}
+.tw{overflow-x:auto;border:1px solid #e3e2de;border-radius:12px;background:#ffffff}
+table{width:100%;border-collapse:collapse;font-size:14px;line-height:20px}
+th{text-align:left;font-size:12px;font-weight:600;color:#5b5b57;padding:10px 14px;border-bottom:1px solid #e3e2de;background:#fbfbfa;white-space:nowrap}
+td{padding:12px 14px;border-bottom:1px solid #efeeea;vertical-align:top}
+tr:last-child td{border-bottom:0}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:#3d3d3a}
+.muted{color:#5b5b57}
+.small{font-size:13px}
+.row{display:flex;align-items:center;gap:10px}
+.list{display:flex;flex-direction:column}
+.li{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid #efeeea}
+.li:first-child{border-top:0;padding-top:0}
+.grow{flex:1;min-width:0}
+.mark{background:#fdf1dc;color:#111111;border-radius:4px;padding:0 3px;box-shadow:inset 0 -2px 0 #e0a43a}
+.field label{display:block;font-size:13px;font-weight:600;color:#3d3d3a;margin-bottom:6px}
+.in{width:100%;border:1px solid #d4d3ce;border-radius:10px;padding:10px 12px;font:14px 'Be Vietnam Pro',sans-serif;background:#ffffff;color:#111111}
+textarea.in{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:20px;min-height:132px;resize:vertical}
+.seg{display:inline-flex;background:#f1f1ee;border-radius:10px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;height:32px;padding:0 14px;border-radius:8px;font:600 13px 'Be Vietnam Pro',sans-serif;color:#5b5b57;cursor:pointer}
+.seg button.on{background:#ffffff;color:#111111;box-shadow:0 1px 2px rgba(17,17,17,.08)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid #e3e2de;border-radius:8px;font-size:13px;background:#ffffff}
+.tag{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;background:#f1f1ee;font-size:13px;margin:0 6px 6px 0}
+.tag.flag{background:#fdf1dc;color:#8a5100;font-weight:600}
+.banner{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:12px;background:#eaeefc;color:#1a36a8;margin-bottom:16px;flex-wrap:wrap}
+.drop{border:1.5px dashed #c9c8c2;border-radius:14px;padding:28px;text-align:center;background:#fbfbfa}
+.bar{height:8px;border-radius:9999px;background:#efeeea;overflow:hidden}
+.bar span{display:block;height:100%;background:#1f3fbf;border-radius:9999px}
+.fb{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.toggle{width:36px;height:20px;border-radius:9999px;background:#1f3fbf;position:relative;display:inline-block}
+.toggle::after{content:'';position:absolute;top:2px;left:18px;width:16px;height:16px;border-radius:9999px;background:#ffffff}
+.toggle.off{background:#c9c8c2}.toggle.off::after{left:2px}
+@media (max-width:860px){.app{grid-template-columns:1fr}.side{border-right:0;border-bottom:1px solid #e3e2de;flex-direction:row;flex-wrap:wrap;align-items:center}.navlabel,.me{display:none}.logo{margin:0 12px 0 4px}.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}.main{padding:20px 16px}}
+</style>
+<div class="app"><nav class="side" aria-label="Điều hướng chính"><img class="logo" src="../logo/lockup-horizontal.svg" alt="Listing Guard"><div class="navlabel">Làm việc</div><a href="#" class="nav on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span>Trang chủ</span></a><a href="#" class="nav"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/></svg><span>Kiểm tra hàng loạt</span></a><a href="#" class="nav"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>Lịch sử</span></a><a href="#" class="nav"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Watchlist</span></a><a href="#" class="nav"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 0 1-14 5"/><path d="M4 12a8 8 0 0 1 14-5"/><path d="M18 3v4h-4M6 21v-4h4"/></svg><span>Rà định kỳ</span></a><div class="navlabel">Quản lý</div><a href="#" class="nav"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Thống kê</span></a><a href="#" class="nav"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></svg><span>API keys</span></a><div class="me"><span class="av">HC</span><span>HappyC · Seller<br><span class="small">Project Global</span></span></div></nav><main class="main"><div class="head"><div><p class="crumb">Tuần 9–15/11/2026</p><h1>Trang chủ</h1><p class="sub">Những gì Listing Guard đã chặn trước khi listing lên sàn.</p></div>
+<div class="actions"><button class="btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>Xuất báo cáo</button><button class="btn pri"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/></svg>Kiểm tra listing</button></div></div>
+<div class="grid4">
+<div class="card kpi"><div class="lab">Listing đã kiểm</div><div class="num">312</div><div class="delta">+48 so với tuần trước</div></div>
+<div class="card kpi"><div class="lab">Lỗi chặn trước khi đăng</div><div class="num">47</div><div class="delta">Trên 38 listing</div></div>
+<div class="card kpi"><div class="lab">Rủi ro trademark</div><div class="num" style="color:#8a5100">6</div><div class="delta">4 từ watchlist, 2 từ catalog</div></div>
+<div class="card kpi"><div class="lab">Tỷ lệ báo nhầm</div><div class="num">7%</div><div class="delta">Từ 41 phản hồi của seller</div></div>
+</div>
+<div class="grid2">
+<div class="card"><div class="cardhead"><h2>Cần xử lý</h2><a href="#" class="small">Xem tất cả</a></div><div class="list"><div class="li"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="flex:none;margin-top:7px"><path d="M5 0L10 5L5 10L0 5Z" fill="#e0412b"/></svg><div class="grow"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="code">GL-1042</span><span class="pill p-tm">Trademark</span></div><div>"DODGERS" trùng nhãn đã đăng ký, class 25</div><div class="small muted">Account Global 2</div></div></div><div class="li"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="flex:none;margin-top:7px"><path d="M5 0L10 5L5 10L0 5Z" fill="#e0412b"/></svg><div class="grow"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="code">HP-2211</span><span class="pill p-err">Lỗi</span></div><div>Title dài 152 ký tự, tối đa 140</div><div class="small muted">Account Happy 1</div></div></div><div class="li"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="flex:none;margin-top:7px"><path d="M5 0L10 5L5 10L0 5Z" fill="#e0412b"/></svg><div class="grow"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="code">HP-2210</span><span class="pill p-err">Lỗi</span></div><div>Tag trùng lặp: "mug" và "Mug"</div><div class="small muted">Account Happy 1</div></div></div><div class="li"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="flex:none;margin-top:7px"><path d="M5 0L10 5L5 10L0 5Z" fill="#e0412b"/></svg><div class="grow"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="code">GL-0877</span><span class="pill p-tm">Rà định kỳ</span></div><div>Listing đang bán dính nhãn mới nộp tháng 8</div><div class="small muted">Account Global 1</div></div></div></div></div>
+<div class="card" style="display:flex;flex-direction:column;gap:18px">
+<div><div class="cardhead" style="margin-bottom:8px"><h2>Dữ liệu kiểm tra</h2></div>
+<div class="li" style="padding-top:0;border:0"><div class="grow"><div class="small muted">Catalog trademark</div><div style="font-weight:600">USPTO · dữ liệu đến 30/09/2026</div></div><span class="pill p-ok">Đang dùng</span></div>
+<div class="li"><div class="grow"><div class="small muted">Watchlist HappyC</div><div style="font-weight:600">48 nhãn đang bật</div></div><a href="#" class="small">Quản lý</a></div>
+<div class="li"><div class="grow"><div class="small muted">Rà định kỳ gần nhất</div><div style="font-weight:600">02/11 · 3 rủi ro mới</div></div><a href="#" class="small">Mở</a></div>
+<div class="li"><div class="grow"><div class="small muted">Bộ quy tắc</div><div class="code">etsy-2026-12 · amazon-2026-12c</div></div></div></div></div>
+</div>
+<div class="grid2">
+<div class="card"><div class="cardhead"><h2>Lỗi chặn được theo tuần</h2><span class="small muted">6 tuần gần nhất</span></div><svg width="100%" height="172" viewBox="0 0 480 172" role="img" aria-label="Số lỗi chặn được theo tuần, tuần này 47"><rect x="24" y="64" width="44" height="76" rx="6" fill="#b9c5f2"/><text x="46" y="162" text-anchor="middle" font-size="12" fill="#5b5b57" font-family="Be Vietnam Pro, sans-serif">T41</text><text x="46" y="56" text-anchor="middle" font-size="12" fill="#3d3d3a" font-family="Be Vietnam Pro, sans-serif">38</text><rect x="100" y="36" width="44" height="104" rx="6" fill="#b9c5f2"/><text x="122" y="162" text-anchor="middle" font-size="12" fill="#5b5b57" font-family="Be Vietnam Pro, sans-serif">T42</text><text x="122" y="28" text-anchor="middle" font-size="12" fill="#3d3d3a" font-family="Be Vietnam Pro, sans-serif">52</text><rect x="176" y="58" width="44" height="82" rx="6" fill="#b9c5f2"/><text x="198" y="162" text-anchor="middle" font-size="12" fill="#5b5b57" font-family="Be Vietnam Pro, sans-serif">T43</text><text x="198" y="50" text-anchor="middle" font-size="12" fill="#3d3d3a" font-family="Be Vietnam Pro, sans-serif">41</text><rect x="252" y="20" width="44" height="120" rx="6" fill="#b9c5f2"/><text x="274" y="162" text-anchor="middle" font-size="12" fill="#5b5b57" font-family="Be Vietnam Pro, sans-serif">T44</text><text x="274" y="12" text-anchor="middle" font-size="12" fill="#3d3d3a" font-family="Be Vietnam Pro, sans-serif">60</text><rect x="328" y="30" width="44" height="110" rx="6" fill="#b9c5f2"/><text x="350" y="162" text-anchor="middle" font-size="12" fill="#5b5b57" font-family="Be Vietnam Pro, sans-serif">T45</text><text x="350" y="22" text-anchor="middle" font-size="12" fill="#3d3d3a" font-family="Be Vietnam Pro, sans-serif">55</text><rect x="404" y="46" width="44" height="94" rx="6" fill="#1f3fbf"/><text x="426" y="162" text-anchor="middle" font-size="12" fill="#5b5b57" font-family="Be Vietnam Pro, sans-serif">T46</text><text x="426" y="38" text-anchor="middle" font-size="12" fill="#3d3d3a" font-family="Be Vietnam Pro, sans-serif">47</text><line x1="12" y1="140.5" x2="470" y2="140.5" stroke="#e3e2de"/></svg></div>
+<div class="card"><div class="cardhead"><h2>Quy tắc hay gặp</h2></div><div class="tw" style="border:0"><table><thead><tr><th>Rule</th><th>Lần</th><th>Báo nhầm</th></tr></thead><tbody><tr><td class="code">trademark.catalog_match</td><td>6</td><td>1</td></tr><tr><td class="code">tags.duplicate</td><td>14</td><td>0</td></tr><tr><td class="code">title.max_length</td><td>11</td><td>0</td></tr><tr><td class="code">tags.max_length</td><td>9</td><td>2</td></tr><tr><td class="code">description.contact_info</td><td>4</td><td>1</td></tr></tbody></table></div></div>
+</div></main></div>
+</body>
+</html>

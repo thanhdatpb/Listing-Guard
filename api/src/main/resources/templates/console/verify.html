@@ -4,20 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{verify.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
 </head>
 <body>
 <div th:replace="~{console/layout :: demoBanner}"></div>
-<main>
-    <div th:replace="~{console/layout :: languageSwitch}"></div>
-    <h1 th:text="#{verify.heading}"></h1>
-    <div th:if="${valid}">
-        <p th:text="#{verify.valid}"></p>
-        <form method="post" th:action="@{/login/verify}">
-            <input type="hidden" name="token" th:value="${token}">
-            <button type="submit" th:text="#{verify.submit}"></button>
-        </form>
+<!-- The confirmation of a sign-in link (ADR-040): the same card as the sign-in page. The link only shows this page; the POST below
+     signs in, with its CSRF field, as before. -->
+<main class="lg-auth">
+    <div class="lg-card lg-card--raised lg-auth__card">
+        <picture th:replace="~{console/layout :: logo('lg-auth__logo')}"></picture>
+        <h1 class="lg-auth__title" th:text="#{verify.heading}"></h1>
+        <div th:if="${valid}">
+            <p class="lg-auth__lead" th:text="#{verify.valid}"></p>
+            <form method="post" th:action="@{/login/verify}">
+                <input type="hidden" name="token" th:value="${token}">
+                <button type="submit" class="lg-btn lg-btn--primary lg-btn--block" th:text="#{verify.submit}"></button>
+            </form>
+        </div>
+        <p class="lg-auth__error" th:unless="${valid}" role="alert" th:text="#{verify.invalid}"></p>
+        <div class="lg-auth__foot">
+            <div th:replace="~{console/layout :: languageSwitch}"></div>
+        </div>
     </div>
-    <p th:unless="${valid}" role="alert" th:text="#{verify.invalid}"></p>
 </main>
 </body>
 </html>

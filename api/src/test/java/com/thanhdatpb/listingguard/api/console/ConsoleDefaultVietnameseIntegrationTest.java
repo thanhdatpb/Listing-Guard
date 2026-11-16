@@ -66,7 +66,7 @@ class ConsoleDefaultVietnameseIntegrationTest {
         String editor = body(mvc.perform(get("/console/check").with(signedIn(user))).andExpect(status().isOk()).andReturn());
 
         assertThat(login).contains("<html lang=\"vi\"").contains("Đăng nhập Listing Guard");
-        assertThat(dashboard).contains("<html lang=\"vi\"").contains("Tổng quan").contains("Khóa API").doesNotContain("Sign out");
+        assertThat(dashboard).contains("<html lang=\"vi\"").contains("Trang chủ").contains("Khóa API").doesNotContain("Sign out");
         assertThat(editor).contains("Kiểm tra listing").contains("Mô phỏng").doesNotContain("Simulation");
     }
 
