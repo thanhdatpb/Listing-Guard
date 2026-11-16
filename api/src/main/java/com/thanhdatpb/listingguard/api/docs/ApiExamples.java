@@ -272,17 +272,21 @@ public final class ApiExamples {
               "productType": null,
               "rulesetVersion": "trademark-risk-2026-11b",
               "catalogVersion": "synthetic-2026-11-0123456789ab",
+              "catalogStatus": "SERVED",
               "analysisVersion": "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
               "cached": false,
               "completeness": "COMPLETE",
               "riskLevel": "HIGH",
               "failedRuleIds": [],
+              "skippedRuleIds": [],
               "disclaimer": "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
               "createdAt": "2026-10-30T09:15:30.123456Z",
               "expiresAt": "2026-11-29T09:15:30.123456Z",
+              "watchlist": null,
               "findings": [
                 {
                   "ruleId": "catalog_exact",
+                  "source": "CATALOG",
                   "risk": "HIGH",
                   "field": "title",
                   "start": 0,
@@ -296,11 +300,13 @@ public final class ApiExamples {
                   "sourceIds": ["S-001", "S-002"],
                   "sourceLinks": [],
                   "riskAdjustments": [],
+                  "watchlistEntry": null,
                   "message": "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
                   "suggestion": "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                 },
                 {
                   "ruleId": "geo_sport_combination",
+                  "source": "CONTEXT",
                   "risk": "MEDIUM",
                   "field": "title",
                   "start": 13,
@@ -314,11 +320,13 @@ public final class ApiExamples {
                   "sourceIds": [],
                   "sourceLinks": [],
                   "riskAdjustments": [],
+                  "watchlistEntry": null,
                   "message": "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
                   "suggestion": "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                 },
                 {
                   "ruleId": "pure_color_description",
+                  "source": "CONTEXT",
                   "risk": "LOW",
                   "field": "tags[1]",
                   "start": 0,
@@ -332,6 +340,7 @@ public final class ApiExamples {
                   "sourceIds": [],
                   "sourceLinks": [],
                   "riskAdjustments": [],
+                  "watchlistEntry": null,
                   "message": "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
                   "suggestion": "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
                 }
@@ -346,17 +355,21 @@ public final class ApiExamples {
               "productType": null,
               "rulesetVersion": "trademark-risk-2026-11b",
               "catalogVersion": "synthetic-2026-11-0123456789ab",
+              "catalogStatus": "SERVED",
               "analysisVersion": "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
               "cached": true,
               "completeness": "COMPLETE",
               "riskLevel": "HIGH",
               "failedRuleIds": [],
+              "skippedRuleIds": [],
               "disclaimer": "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
               "createdAt": "2026-10-30T09:15:30.123456Z",
               "expiresAt": "2026-11-29T09:15:30.123456Z",
+              "watchlist": null,
               "findings": [
                 {
                   "ruleId": "catalog_exact",
+                  "source": "CATALOG",
                   "risk": "HIGH",
                   "field": "title",
                   "start": 0,
@@ -370,11 +383,13 @@ public final class ApiExamples {
                   "sourceIds": ["S-001", "S-002"],
                   "sourceLinks": [],
                   "riskAdjustments": [],
+                  "watchlistEntry": null,
                   "message": "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu.",
                   "suggestion": "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                 },
                 {
                   "ruleId": "geo_sport_combination",
+                  "source": "CONTEXT",
                   "risk": "MEDIUM",
                   "field": "title",
                   "start": 13,
@@ -388,11 +403,13 @@ public final class ApiExamples {
                   "sourceIds": [],
                   "sourceLinks": [],
                   "riskAdjustments": [],
+                  "watchlistEntry": null,
                   "message": "title có địa danh 'northvale' đi cùng từ thể thao 'baseball' (cách nhau 1 từ, ngưỡng 3 từ). Tổ hợp này có thể gợi đến một đội thể thao.",
                   "suggestion": "Xem lại cách mô tả sản phẩm ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                 },
                 {
                   "ruleId": "pure_color_description",
+                  "source": "CONTEXT",
                   "risk": "LOW",
                   "field": "tags[1]",
                   "start": 0,
@@ -406,6 +423,7 @@ public final class ApiExamples {
                   "sourceIds": [],
                   "sourceLinks": [],
                   "riskAdjustments": [],
+                  "watchlistEntry": null,
                   "message": "Cụm 'royal blue white pinstripe' ở tags[1] chỉ gồm 4 từ chỉ màu và hoa văn. Không phát hiện tham chiếu nhãn hiệu nào trong cụm này.",
                   "suggestion": "Thông tin này chỉ có ý nghĩa tham khảo cho riêng cụm đó, không phải kết luận pháp lý về cả listing."
                 }
@@ -433,17 +451,21 @@ public final class ApiExamples {
               "productType": "mug",
               "rulesetVersion": "trademark-risk-2026-11b",
               "catalogVersion": "synthetic-2026-11-0123456789ab",
+              "catalogStatus": "SERVED",
               "analysisVersion": "9f2c0e7a4b1d5c3e8a6f0b2d4c6e8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f",
               "cached": false,
               "completeness": "COMPLETE",
               "riskLevel": "MEDIUM",
               "failedRuleIds": [],
+              "skippedRuleIds": [],
               "disclaimer": "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
               "createdAt": "2026-11-11T09:15:30.123456Z",
               "expiresAt": "2026-12-11T09:15:30.123456Z",
+              "watchlist": null,
               "findings": [
                 {
                   "ruleId": "catalog_exact",
+                  "source": "CATALOG",
                   "risk": "MEDIUM",
                   "field": "title",
                   "start": 0,
@@ -464,6 +486,7 @@ public final class ApiExamples {
                       "note": "Nhãn hiệu 'ZORVEX' đăng ký ở nhóm Nice 25, 35, không nhóm nào nằm trong các nhóm 21 của loại sản phẩm 'mug', nên mức rủi ro hạ từ HIGH xuống MEDIUM. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                     }
                   ],
+                  "watchlistEntry": null,
                   "message": "Từ 'Zorvex' ở title trùng với nhãn hiệu 'ZORVEX' trong danh mục tham chiếu. Nhãn hiệu 'ZORVEX' đăng ký ở nhóm Nice 25, 35, không nhóm nào nằm trong các nhóm 21 của loại sản phẩm 'mug', nên mức rủi ro hạ từ HIGH xuống MEDIUM. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
                   "suggestion": "Xem lại việc dùng 'ZORVEX' ở title. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
                 }
@@ -481,6 +504,126 @@ public final class ApiExamples {
               "known": ["apparel", "mug", "poster", "sticker", "phone_case", "jewelry", "bag", "furniture_decor", "fabric", "toy"],
               "code": "unknown-product-type",
               "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11"
+            }
+            """;
+
+    /** A check of a client with a watchlist on a deployment that serves no catalog (ADR-031). Synthetic names. */
+    public static final String TRADEMARK_RESULT_WATCHLIST_ONLY = """
+            {
+              "checkId": "5d1e7c2a-9b40-4f63-8e21-3c7a9d0b4f12",
+              "marketplace": "ETSY",
+              "productType": null,
+              "rulesetVersion": "trademark-risk-2026-11b",
+              "catalogVersion": "none",
+              "catalogStatus": "NOT_CONFIGURED",
+              "analysisVersion": "3c5e7a9b1d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c",
+              "cached": false,
+              "completeness": "INCOMPLETE",
+              "riskLevel": "HIGH",
+              "failedRuleIds": [],
+              "skippedRuleIds": ["catalog_exact", "catalog_phrase", "catalog_fuzzy", "color_name_contains_mark", "pure_color_description"],
+              "disclaimer": "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+              "createdAt": "2026-11-16T09:15:30.123456Z",
+              "expiresAt": "2026-12-16T09:15:30.123456Z",
+              "watchlist": {"revision": 3, "version": "8a1f3c5e7b9d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a", "entries": 2},
+              "findings": [
+                {
+                  "ruleId": "watchlist_match",
+                  "source": "WATCHLIST",
+                  "risk": "HIGH",
+                  "field": "title",
+                  "start": 0,
+                  "end": 15,
+                  "snippet": "Brimwick Otters",
+                  "mark": "Brimwick Otters",
+                  "matchType": "PHRASE",
+                  "score": 1.0,
+                  "insideColorPhrase": false,
+                  "otherRuleIds": [],
+                  "sourceIds": ["uspto:12345678"],
+                  "sourceLinks": [{"sourceId": "uspto:12345678", "label": "USPTO TSDR", "url": "https://tsdr.uspto.gov/#caseNumber=12345678&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch"}],
+                  "riskAdjustments": [],
+                  "watchlistEntry": {"entryId": "6f2a9c4e-1b3d-4e58-a7c9-0d2e4f6a8b1c", "mark": "Brimwick Otters", "matchedAlias": null, "niceClasses": [25], "serialNumber": "12345678", "note": "từng bị claim"},
+                  "message": "Cụm 'Brimwick Otters' ở title trùng với mục 'Brimwick Otters' trong watchlist của khách hàng. Ghi chú trong watchlist: từng bị claim",
+                  "suggestion": "Xem lại việc dùng 'Brimwick Otters' ở title: mục này do chính khách hàng đưa vào watchlist. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."
+                }
+              ]
+            }
+            """;
+
+    public static final String TRADEMARK_WATCHLIST = """
+            {
+              "revision": 3,
+              "version": "8a1f3c5e7b9d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a",
+              "updatedAt": "2026-11-16T08:02:11.512000Z",
+              "entries": [
+                {
+                  "id": "6f2a9c4e-1b3d-4e58-a7c9-0d2e4f6a8b1c",
+                  "mark": "Brimwick Otters",
+                  "aliases": ["Otterz", "BWO"],
+                  "niceClasses": [25],
+                  "serialNumber": "12345678",
+                  "note": "từng bị claim",
+                  "enabled": true,
+                  "addedBy": "console:2b7d9f1a-3c5e-4a6b-8d0f-1e3a5c7b9d2f",
+                  "addedAt": "2026-11-10T03:40:00.000000Z",
+                  "updatedBy": "api-key:k1a2b3c4",
+                  "updatedAt": "2026-11-16T08:02:11.512000Z"
+                },
+                {
+                  "id": "0c4e8a2b-6d1f-4b39-9e5a-7f3c1d9b5e20",
+                  "mark": "Paddle Hard Brimwick Never Quits",
+                  "aliases": [],
+                  "niceClasses": [],
+                  "serialNumber": null,
+                  "note": null,
+                  "enabled": true,
+                  "addedBy": "api-key:k1a2b3c4",
+                  "addedAt": "2026-11-16T08:02:11.512000Z",
+                  "updatedBy": "api-key:k1a2b3c4",
+                  "updatedAt": "2026-11-16T08:02:11.512000Z"
+                }
+              ],
+              "limits": {"maxEntries": 500, "maxAliases": 20, "maxTextChars": 100, "maxNoteChars": 500, "maxTokens": 12}
+            }
+            """;
+
+    public static final String TRADEMARK_WATCHLIST_REQUEST = """
+            {
+              "entries": [
+                {"mark": "Brimwick Otters", "aliases": ["Otterz", "BWO"], "niceClasses": [25], "serialNumber": "12345678",
+                 "note": "từng bị claim", "enabled": true},
+                {"mark": "Paddle Hard Brimwick Never Quits"}
+              ]
+            }
+            """;
+
+    public static final String PROBLEM_WATCHLIST_INVALID = """
+            {
+              "type": "urn:listing-guard:problem:invalid-request",
+              "title": "Bad Request",
+              "status": 400,
+              "detail": "The watchlist is not valid; see errors.",
+              "instance": "/api/v1/trademark-watchlist",
+              "code": "invalid-request",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+              "errors": [
+                {"field": "entries[1].mark", "message": "'brimwick-otters' is the same as entries[0].mark after normalization (case, accents and punctuation are ignored)."},
+                {"field": "entries[2].serialNumber", "message": "A serial number is eight digits."}
+              ]
+            }
+            """;
+
+    public static final String PROBLEM_WATCHLIST_REVISION_MISMATCH = """
+            {
+              "type": "urn:listing-guard:problem:watchlist-revision-mismatch",
+              "title": "Precondition Failed",
+              "status": 412,
+              "detail": "The watchlist is at revision 4, not 3: it changed since it was read. Read it again and apply the change to the current list.",
+              "instance": "/api/v1/trademark-watchlist",
+              "code": "watchlist-revision-mismatch",
+              "requestId": "7f0c2f3e-6a52-4a58-9c6e-0d7f2c1d9a11",
+              "currentRevision": 4
             }
             """;
 

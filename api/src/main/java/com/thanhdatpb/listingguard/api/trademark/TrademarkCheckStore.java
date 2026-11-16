@@ -3,12 +3,14 @@ package com.thanhdatpb.listingguard.api.trademark;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thanhdatpb.listingguard.api.trademark.watchlist.WatchlistService;
 import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.Evidence;
 import com.thanhdatpb.listingguard.trademark.MatchType;
 import com.thanhdatpb.listingguard.trademark.RiskLevel;
 import com.thanhdatpb.listingguard.trademark.TrademarkFinding;
 import com.thanhdatpb.listingguard.trademark.TrademarkResult;
+import com.thanhdatpb.listingguard.trademark.watchlist.WatchlistMatch;
 import java.sql.Array;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -48,13 +50,13 @@ public class TrademarkCheckStore {
     private static final String SELECT = """
             SELECT c.id, c.marketplace_code, c.product_type, r.version AS ruleset_version, v.version AS catalog_version,
                    c.analysis_version, c.completeness, c.risk_level, c.failed_rule_ids, c.disclaimer, c.created_at,
-                   c.expires_at,
+                   c.expires_at, c.skipped_rule_ids, c.watchlist_revision, c.watchlist_version, c.watchlist_entries,
                    f.rule_id, f.risk, f.field, f.span_start, f.span_end, f.snippet, f.matched_mark, f.match_type,
                    f.score, f.inside_color_phrase, f.other_rule_ids, f.source_ids, f.source_links, f.risk_adjustments,
-                   f.message, f.suggestion
+                   f.watchlist_entry, f.message, f.suggestion
             FROM trademark_check c
             JOIN ruleset_version r ON r.id = c.ruleset_version_id
-            JOIN trademark_catalog_version v ON v.id = c.catalog_version_id
+            LEFT JOIN trademark_catalog_version v ON v.id = c.catalog_version_id
             LEFT JOIN trademark_check_finding f ON f.check_id = c.id
             """;
 
@@ -65,8 +67,8 @@ public class TrademarkCheckStore {
     private static final String INSERT_FINDING = """
             INSERT INTO trademark_check_finding (check_id, position, rule_id, risk, field, span_start, span_end, snippet,
                 matched_mark, match_type, score, inside_color_phrase, other_rule_ids, source_ids, source_links,
-                risk_adjustments, message, suggestion)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)""";
+                risk_adjustments, message, suggestion, watchlist_entry)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?::jsonb)""";
 
     /** Writes and reads the two JSON columns of a finding; the views are plain records of strings and levels. */
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -107,6 +109,15 @@ public class TrademarkCheckStore {
      * @return the id of the new check
      */
     public UUID insert(Identity identity, long catalogVersionId, TrademarkResult result, String productType) {
+        return insert(identity, Long.valueOf(catalogVersionId), result, productType, WatchlistService.Active.NONE);
+    }
+
+    /**
+     * The same for a check that may have run without a catalog ({@code catalogVersionId} null) and with the client's watchlist
+     * (ADR-031); {@link WatchlistService.Active#NONE} stores no watchlist.
+     */
+    public UUID insert(Identity identity, Long catalogVersionId, TrademarkResult result, String productType,
+                       WatchlistService.Active watchlist) {
         if (result.completeness() == Completeness.COMPLETE) {
             jdbc.update("DELETE FROM trademark_check c WHERE " + IDENTITY_FILTER + " AND c.expires_at <= now()",
                     identity.clientId(), identity.marketplace(), identity.packId(), identity.inputHash(),
@@ -117,8 +128,9 @@ public class TrademarkCheckStore {
         jdbc.update("""
                 INSERT INTO trademark_check (id, client_id, marketplace_code, pack_id, input_hash, ruleset_version_id,
                     catalog_version_id, analysis_version, completeness, risk_level, failed_rule_ids, disclaimer,
-                    product_type, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now() + make_interval(secs => ?))""",
+                    product_type, skipped_rule_ids, watchlist_revision, watchlist_version, watchlist_entries, created_at,
+                    expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now() + make_interval(secs => ?))""",
                 ps -> {
                     ps.setObject(1, id);
                     ps.setObject(2, identity.clientId());
@@ -126,14 +138,28 @@ public class TrademarkCheckStore {
                     ps.setString(4, identity.packId());
                     ps.setString(5, identity.inputHash());
                     ps.setLong(6, identity.rulesetVersionId());
-                    ps.setLong(7, catalogVersionId);
+                    if (catalogVersionId == null) {
+                        ps.setNull(7, Types.BIGINT);
+                    } else {
+                        ps.setLong(7, catalogVersionId);
+                    }
                     ps.setString(8, identity.analysisVersion());
                     ps.setString(9, result.completeness().name());
                     ps.setString(10, result.riskLevel().name());
                     ps.setArray(11, ps.getConnection().createArrayOf("text", result.failedRuleIds().toArray()));
                     ps.setString(12, result.disclaimer());
                     ps.setString(13, productType);
-                    ps.setDouble(14, retentionSeconds);
+                    ps.setArray(14, ps.getConnection().createArrayOf("text", result.skippedRuleIds().toArray()));
+                    if (watchlist.watchlist().isEmpty()) {
+                        ps.setNull(15, Types.BIGINT);
+                        ps.setNull(16, Types.CHAR);
+                        ps.setNull(17, Types.INTEGER);
+                    } else {
+                        ps.setLong(15, watchlist.revision());
+                        ps.setString(16, watchlist.watchlist().contentHash());
+                        ps.setInt(17, watchlist.watchlist().entries().size());
+                    }
+                    ps.setDouble(18, retentionSeconds);
                 });
         List<TrademarkFinding> findings = result.findings();
         if (!findings.isEmpty()) {
@@ -167,6 +193,7 @@ public class TrademarkCheckStore {
                                     adjustment.to(), adjustment.note())).toList()));
                     ps.setString(17, finding.message());
                     ps.setString(18, finding.suggestion());
+                    ps.setString(19, evidence.watchlist() == null ? null : json(watchlistView(evidence.watchlist())));
                 }
 
                 @Override
@@ -210,22 +237,29 @@ public class TrademarkCheckStore {
     }
 
     private static TrademarkCheckResult header(ResultSet rs, boolean cached) throws SQLException {
+        String catalogVersion = rs.getString("catalog_version");
+        long watchlistRevision = rs.getLong("watchlist_revision");
+        TrademarkCheckResult.WatchlistUsageView watchlist = rs.wasNull() ? null : new TrademarkCheckResult.WatchlistUsageView(
+                watchlistRevision, rs.getString("watchlist_version").trim(), rs.getInt("watchlist_entries"));
         return new TrademarkCheckResult(rs.getObject("id", UUID.class), rs.getString("marketplace_code"),
-                rs.getString("product_type"), rs.getString("ruleset_version"), rs.getString("catalog_version"),
+                rs.getString("product_type"), rs.getString("ruleset_version"),
+                catalogVersion == null ? TrademarkCheckResult.NO_CATALOG : catalogVersion,
+                catalogVersion == null ? TrademarkCheckResult.CatalogStatus.NOT_CONFIGURED : TrademarkCheckResult.CatalogStatus.SERVED,
                 rs.getString("analysis_version").trim(),
                 cached, Completeness.valueOf(rs.getString("completeness")), RiskLevel.valueOf(rs.getString("risk_level")),
-                strings(rs.getArray("failed_rule_ids")), rs.getString("disclaimer"),
+                strings(rs.getArray("failed_rule_ids")), strings(rs.getArray("skipped_rule_ids")), rs.getString("disclaimer"),
                 rs.getObject("created_at", OffsetDateTime.class).toInstant(),
-                rs.getObject("expires_at", OffsetDateTime.class).toInstant(), List.of());
+                rs.getObject("expires_at", OffsetDateTime.class).toInstant(), watchlist, List.of());
     }
 
     private static TrademarkCheckResult withFindings(TrademarkCheckResult result,
                                                      List<TrademarkCheckResult.FindingView> findings) {
-        return new TrademarkCheckResult(result.checkId(), result.marketplace(), result.productType(),
-                result.rulesetVersion(), result.catalogVersion(), result.analysisVersion(), result.cached(),
-                result.completeness(),
-                result.riskLevel(), result.failedRuleIds(), result.disclaimer(), result.createdAt(), result.expiresAt(),
-                List.copyOf(findings));
+        return result.withFindings(List.copyOf(findings));
+    }
+
+    private static TrademarkCheckResult.WatchlistEntryView watchlistView(WatchlistMatch match) {
+        return new TrademarkCheckResult.WatchlistEntryView(UUID.fromString(match.entryId()), match.mark(), match.matchedAlias(),
+                match.niceClasses(), match.serialNumber(), match.note());
     }
 
     private static TrademarkCheckResult.FindingView finding(ResultSet rs) throws SQLException {
@@ -239,7 +273,18 @@ public class TrademarkCheckStore {
                 readJson(rs.getString("source_links"), new TypeReference<List<TrademarkCheckResult.SourceLinkView>>() { }),
                 readJson(rs.getString("risk_adjustments"),
                         new TypeReference<List<TrademarkCheckResult.RiskAdjustmentView>>() { }),
-                rs.getString("message"), rs.getString("suggestion"));
+                watchlistEntry(rs.getString("watchlist_entry")), rs.getString("message"), rs.getString("suggestion"));
+    }
+
+    private static TrademarkCheckResult.WatchlistEntryView watchlistEntry(String text) {
+        if (text == null) {
+            return null;
+        }
+        try {
+            return JSON.readValue(text, TrademarkCheckResult.WatchlistEntryView.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("A stored trademark finding has a watchlist entry that cannot be read", e);
+        }
     }
 
     private static String json(Object value) {

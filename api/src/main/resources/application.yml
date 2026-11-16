@@ -67,6 +67,16 @@ listing-guard:
   trademark:
     # The trademark ruleset (ADR-009), registered for each marketplace below as pack `trademark-risk` (ADR-010).
     ruleset: classpath:rulesets/trademark-risk-2026-11b.yaml
+    watchlist:
+      # Each client's own list of marks (ADR-031), scanned by every trademark check next to the catalog. The settings file holds
+      # the minimum level of a watchlist finding (HIGH) and its messages; it is versioned and immutable like a ruleset. Point this
+      # at a file of your own to choose another minimum. The limits bound one client's list.
+      settings: classpath:watchlist/trademark-watchlist-2026-11.yaml
+      max-entries: 500
+      max-aliases: 20
+      max-text-chars: 100
+      max-note-chars: 500
+      max-tokens: 12
     marketplaces:
       - ETSY
       - AMAZON

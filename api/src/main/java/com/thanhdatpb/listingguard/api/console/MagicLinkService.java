@@ -105,7 +105,8 @@ public class MagicLinkService {
             ConsoleAccount account = accounts.findByEmail(email).orElseGet(() -> {
                 String clientName = "web-" + UUID.randomUUID().toString().replace("-", "").substring(0, 24);
                 Client client = clients.saveAndFlush(new Client(clientName));
-                return accounts.saveAndFlush(new ConsoleAccount(email, client.getId()));
+                // the account owns the client made for it, so it administers it (ADR-031)
+                return accounts.saveAndFlush(new ConsoleAccount(email, client.getId(), ConsoleRole.ADMIN));
             });
             return new ConsoleUser(account.getEmail(), account.getClientId());
         }));

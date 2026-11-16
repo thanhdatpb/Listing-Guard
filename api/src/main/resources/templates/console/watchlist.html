@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{watchlist.title}"></title>
+    <link rel="stylesheet" th:href="@{/console/editor.css}">
+    <link rel="stylesheet" th:href="@{/console/console.css}">
+    <link rel="stylesheet" th:href="@{/console/watchlist.css}">
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('watchlist')}"></header>
+<main class="page">
+    <h1 th:text="#{watchlist.heading}"></h1>
+    <p class="muted">
+        <span th:text="#{common.signedin(${email})}"></span>
+        <span th:text="#{watchlist.intro}"></span>
+    </p>
+    <p class="muted" id="minimum" th:if="${minimumRisk != null}" th:text="#{watchlist.minimum(${minimumRisk})}"></p>
+
+    <div class="notice applied" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
+    <div class="notice refused" id="plan-refused" role="alert" th:if="${planRefused != null}"><p th:text="${planRefused}"></p></div>
+    <div class="notice refused" id="errors" role="alert" th:if="${errors != null and !errors.isEmpty()}">
+        <p th:text="#{watchlist.errors.heading}"></p>
+        <ul><li th:each="error : ${errors}" th:text="${error}"></li></ul>
+    </div>
+    <div class="notice refused" id="import-error" role="alert" th:if="${importError != null}"><p th:text="${importError}"></p></div>
+    <p class="notice" id="readonly" th:if="${planRefused == null and !admin}" th:text="#{watchlist.readonly}"></p>
+
+    <th:block th:if="${planRefused == null}">
+    <section th:if="${preview != null}" id="preview" aria-labelledby="preview-heading">
+        <h2 id="preview-heading" th:text="#{watchlist.preview.heading}"></h2>
+        <p class="muted" th:text="#{watchlist.preview.intro}"></p>
+        <ul class="warning-text" id="preview-problems" th:unless="${previewProblems.isEmpty()}">
+            <li th:each="problem : ${previewProblems}" th:text="${problem}"></li>
+        </ul>
+        <div class="table-wrap">
+        <table class="keys watchlist" id="preview-table">
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{watchlist.preview.col.line}"></th>
+                <th scope="col" th:text="#{watchlist.preview.col.mark}"></th>
+                <th scope="col" th:text="#{watchlist.preview.col.outcome}"></th>
+                <th scope="col" th:text="#{watchlist.preview.col.problems}"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="row : ${preview}" th:attr="data-outcome=${row.outcome}">
+                <td th:text="${row.line}"></td>
+                <td th:text="${row.mark}"></td>
+                <td th:text="${row.outcomeText}"></td>
+                <td><ul class="plain"><li th:each="problem : ${row.problems}" th:text="${problem}"></li></ul></td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+        <form id="apply-form" method="post" th:action="@{/console/watchlist/import}" th:if="${previewCanApply}">
+            <input type="hidden" name="data" th:value="${previewData}">
+            <input type="hidden" name="delimiter" th:value="${previewDelimiter}">
+            <input type="hidden" name="revision" th:value="${revision}">
+            <button type="submit" class="primary" th:text="#{watchlist.preview.apply}"></button>
+            <a th:href="@{/console/watchlist}" th:text="#{watchlist.preview.cancel}"></a>
+        </form>
+        <p class="warning-text" id="preview-cannot" th:unless="${previewCanApply}" th:text="#{watchlist.preview.cannot}"></p>
+    </section>
+
+    <h2 id="list-heading">
+        <span th:text="#{watchlist.list.heading}"></span>
+        <span class="muted" id="entry-count"
+              th:text="#{watchlist.count(${#strings.toString(rows.size())}, ${#strings.toString(enabledCount)}, ${#strings.toString(limits.maxEntries)})}"></span>
+    </h2>
+    <p><a id="export" th:href="@{/console/watchlist/export.csv}" th:text="#{watchlist.export}"></a></p>
+    <p id="no-entries" th:if="${rows.isEmpty()}" th:text="#{watchlist.none}"></p>
+    <div class="table-wrap" th:unless="${rows.isEmpty()}">
+    <table class="keys watchlist" id="entries-table" aria-labelledby="list-heading">
+        <thead>
+        <tr>
+            <th scope="col" th:text="#{watchlist.col.mark}"></th>
+            <th scope="col" th:text="#{watchlist.col.aliases}"></th>
+            <th scope="col" th:text="#{watchlist.col.classes}"></th>
+            <th scope="col" th:text="#{watchlist.col.serial}"></th>
+            <th scope="col" th:text="#{watchlist.col.note}"></th>
+            <th scope="col" th:text="#{watchlist.col.status}"></th>
+            <th scope="col" th:text="#{watchlist.col.changed}"></th>
+            <th scope="col" th:if="${admin}"><span class="visually-hidden" th:text="#{watchlist.col.action}"></span></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="row : ${rows}" th:classappend="${row.enabled} ? '' : 'disabled'">
+            <td class="label" th:text="${row.mark}"></td>
+            <td th:text="${row.aliases}"></td>
+            <td th:text="${row.classes}"></td>
+            <td><code th:if="${row.serialNumber != null}" th:text="${row.serialNumber}"></code></td>
+            <td th:text="${row.note}"></td>
+            <td th:text="${row.enabled} ? #{watchlist.status.enabled} : #{watchlist.status.disabled}"></td>
+            <td class="small">
+                <span th:text="#{watchlist.added(${row.addedBy}, ${row.added})}"></span><br>
+                <span class="muted" th:text="#{watchlist.updated(${row.updatedBy}, ${row.updated})}"></span>
+            </td>
+            <td th:if="${admin}" class="actions">
+                <a class="button" th:href="@{/console/watchlist(edit=${row.id})} + '#entry-form'" th:text="#{watchlist.edit}"
+                   th:aria-label="#{watchlist.edit.aria(${row.mark})}"></a>
+                <form class="inline" method="post" th:action="@{/console/watchlist/entries/{id}/toggle(id=${row.id})}">
+                    <input type="hidden" name="revision" th:value="${revision}">
+                    <button type="submit" th:text="${row.enabled} ? #{watchlist.disable} : #{watchlist.enable}"
+                            th:aria-label="${row.enabled} ? #{watchlist.disable.aria(${row.mark})} : #{watchlist.enable.aria(${row.mark})}"></button>
+                </form>
+                <form class="inline" method="post" th:action="@{/console/watchlist/entries/{id}/delete(id=${row.id})}">
+                    <input type="hidden" name="revision" th:value="${revision}">
+                    <button type="submit" class="danger" th:text="#{watchlist.delete}"
+                            th:aria-label="#{watchlist.delete.aria(${row.mark})}"></button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+
+    <th:block th:if="${admin}">
+    <h2 id="entry-form" th:text="${form.id == null} ? #{watchlist.form.add.heading} : #{watchlist.form.edit.heading}"></h2>
+    <form id="save-form" method="post" th:action="@{/console/watchlist/entries}">
+        <input type="hidden" name="revision" th:value="${revision}">
+        <input type="hidden" name="id" th:if="${form.id != null}" th:value="${form.id}">
+        <div class="field">
+            <label for="mark" th:text="#{watchlist.form.mark}"></label>
+            <input type="text" id="mark" name="mark" required autocomplete="off" th:value="${form.mark}"
+                   th:attr="maxlength=${limits.maxTextChars}">
+            <p class="hint" th:text="#{watchlist.form.mark.hint}"></p>
+        </div>
+        <div class="field">
+            <label for="aliases"><span th:text="#{watchlist.form.aliases}"></span> <span class="muted" th:text="#{watchlist.optional}"></span></label>
+            <input type="text" id="aliases" name="aliases" autocomplete="off" th:value="${form.aliases}">
+            <p class="hint" th:text="#{watchlist.form.aliases.hint(${#strings.toString(limits.maxAliases)})}"></p>
+        </div>
+        <div class="field">
+            <label for="classes"><span th:text="#{watchlist.form.classes}"></span> <span class="muted" th:text="#{watchlist.optional}"></span></label>
+            <input type="text" id="classes" name="classes" autocomplete="off" inputmode="numeric" th:value="${form.classes}">
+            <p class="hint" th:text="#{watchlist.form.classes.hint}"></p>
+        </div>
+        <div class="field">
+            <label for="serialNumber"><span th:text="#{watchlist.form.serial}"></span> <span class="muted" th:text="#{watchlist.optional}"></span></label>
+            <input type="text" id="serialNumber" name="serialNumber" autocomplete="off" inputmode="numeric" maxlength="8"
+                   th:value="${form.serialNumber}">
+            <p class="hint" th:text="#{watchlist.form.serial.hint}"></p>
+        </div>
+        <div class="field">
+            <label for="note"><span th:text="#{watchlist.form.note}"></span> <span class="muted" th:text="#{watchlist.optional}"></span></label>
+            <input type="text" id="note" name="note" autocomplete="off" th:value="${form.note}"
+                   th:attr="maxlength=${limits.maxNoteChars}">
+            <p class="hint" th:text="#{watchlist.form.note.hint}"></p>
+        </div>
+        <button type="submit" class="primary" th:text="${form.id == null} ? #{watchlist.form.add.submit} : #{watchlist.form.save.submit}"></button>
+        <a th:if="${form.id != null}" th:href="@{/console/watchlist}" th:text="#{watchlist.form.cancel}"></a>
+    </form>
+
+    <h2 id="import-heading" th:text="#{watchlist.import.heading}"></h2>
+    <p class="muted" th:text="#{watchlist.import.intro}"></p>
+    <form id="import-form" method="post" enctype="multipart/form-data" th:action="@{/console/watchlist/import/preview}">
+        <div class="field">
+            <label for="pasted" th:text="#{watchlist.import.paste}"></label>
+            <textarea id="pasted" name="pasted" rows="6" spellcheck="false"></textarea>
+            <p class="hint" th:text="#{watchlist.import.paste.hint}"></p>
+        </div>
+        <div class="field">
+            <label for="file" th:text="#{watchlist.import.file}"></label>
+            <input type="file" id="file" name="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
+            <p class="hint" th:text="#{watchlist.import.file.hint}"></p>
+        </div>
+        <button type="submit" th:text="#{watchlist.import.submit}"></button>
+    </form>
+    </th:block>
+    </th:block>
+</main>
+</body>
+</html>

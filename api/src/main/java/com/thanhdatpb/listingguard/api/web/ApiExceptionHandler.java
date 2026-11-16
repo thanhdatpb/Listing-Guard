@@ -15,6 +15,7 @@ import com.thanhdatpb.listingguard.api.report.ReportPeriodTooLongException;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckNotFoundException;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
+import com.thanhdatpb.listingguard.api.trademark.watchlist.WatchlistService;
 import com.thanhdatpb.listingguard.api.personalization.PersonalizationScreeningNotFoundException;
 import com.thanhdatpb.listingguard.api.variation.VariationCheckNotFoundException;
 import com.thanhdatpb.listingguard.personalization.config.UnknownPrintProfileException;
@@ -157,6 +158,24 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(TrademarkUnavailableException.class)
     public ProblemDetail trademarkNotConfigured(TrademarkUnavailableException e) {
         return Problems.of(HttpStatus.SERVICE_UNAVAILABLE, "trademark-not-configured", e.getMessage());
+    }
+
+    /** A submitted watchlist has problems (ADR-031): every one is listed, with the path of its field; nothing was stored. */
+    @ExceptionHandler(WatchlistService.InvalidWatchlistException.class)
+    public ProblemDetail invalidWatchlist(WatchlistService.InvalidWatchlistException e) {
+        ProblemDetail problem = Problems.of(HttpStatus.BAD_REQUEST, "invalid-request", e.getMessage());
+        problem.setProperty("errors", e.problems().stream()
+                .map(p -> Map.of("field", p.field(), "message", p.message())).toList());
+        return problem;
+    }
+
+    /** The watchlist changed since the revision of {@code If-Match} (ADR-031); the current revision is in the answer. */
+    @ExceptionHandler(WatchlistService.RevisionMismatchException.class)
+    public ProblemDetail watchlistRevisionMismatch(WatchlistService.RevisionMismatchException e) {
+        ProblemDetail problem = Problems.of(HttpStatus.PRECONDITION_FAILED, WatchlistService.RevisionMismatchException.CODE,
+                e.getMessage());
+        problem.setProperty("currentRevision", e.currentRevision());
+        return problem;
     }
 
     /** The client's plan does not include the pack of the endpoint (ADR-013). Retrying does not help. */

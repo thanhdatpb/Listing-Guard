@@ -2,6 +2,8 @@ package com.thanhdatpb.listingguard.api.console;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -26,12 +28,30 @@ public class ConsoleAccount {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    /** ADR-031: only an ADMIN changes the client's shared settings from the console. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private ConsoleRole role = ConsoleRole.MEMBER;
+
     protected ConsoleAccount() {
     }
 
     public ConsoleAccount(String email, UUID clientId) {
+        this(email, clientId, ConsoleRole.MEMBER);
+    }
+
+    public ConsoleAccount(String email, UUID clientId, ConsoleRole role) {
         this.email = email;
         this.clientId = clientId;
+        this.role = role;
+    }
+
+    public ConsoleRole getRole() {
+        return role;
+    }
+
+    public void setRole(ConsoleRole role) {
+        this.role = role;
     }
 
     public UUID getId() {

@@ -4,6 +4,7 @@ import com.thanhdatpb.listingguard.trademark.AnalysisFingerprint;
 import com.thanhdatpb.listingguard.trademark.TrademarkScanner;
 import com.thanhdatpb.listingguard.trademark.catalog.load.NormalizationIdentity;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -60,6 +61,13 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
     }
 
     /**
+     * What a check needs when no catalog is served but the client has a watchlist (ADR-031): a scanner that runs only the
+     * rules that need no catalog, and its fingerprint for the marketplace.
+     */
+    public record Unserved(TrademarkScanner scanner, AnalysisFingerprint fingerprint) {
+    }
+
+    /**
      * One evaluation, replaced as a whole.
      *
      * @param activationId the activation it came from when following the log; null otherwise or when none exists
@@ -76,6 +84,7 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
     private final TrademarkRulesets rulesets;
 
     private volatile Snapshot snapshot = new Snapshot(new Status(State.DISABLED, "not evaluated"), null, null);
+    private volatile TrademarkScanner withoutCatalog;
 
     /** Serves the configured version; does not follow the activation log. */
     public TrademarkCatalogRuntime(TrademarkProperties properties, JdbcTemplate jdbc, TransactionTemplate transactions,
@@ -253,22 +262,65 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
      * @throws IllegalArgumentException      if trademark checks are not configured for the marketplace
      */
     public Serving serving(String marketplace) {
+        return serving(marketplace, Map.of());
+    }
+
+    /**
+     * The same, with the components only the caller knows added to the fingerprint (the client's watchlist, ADR-031). With no
+     * extra component the fingerprint is exactly that of {@link #serving(String)}.
+     *
+     * @throws TrademarkUnavailableException unless the status is READY
+     */
+    public Serving serving(String marketplace, Map<String, String> extraComponents) {
         Ready current = requireReady(snapshot);
-        return new Serving(current.scanner(), fingerprint(current, marketplace), current.catalogVersionId(),
+        return new Serving(current.scanner(), fingerprint(current, marketplace, extraComponents), current.catalogVersionId(),
                 current.catalogVersion());
     }
 
+    /** Whether a catalog is served now. */
+    public boolean ready() {
+        return snapshot.ready() != null;
+    }
+
+    /**
+     * A scan without a catalog, for a client whose watchlist is the only source while the catalog is not served (ADR-031). Its
+     * results are INCOMPLETE, so they are never cached; the fingerprint names no catalog.
+     *
+     * @throws IllegalArgumentException if trademark checks are not configured for the marketplace
+     */
+    public Unserved withoutCatalog(String marketplace, Map<String, String> extraComponents) {
+        TrademarkScanner scanner = withoutCatalog;
+        if (scanner == null) {
+            scanner = TrademarkScanner.withoutCatalog(rulesets.ruleset());
+            withoutCatalog = scanner;
+        }
+        Map<String, String> components = new HashMap<>(extraComponents);
+        components.put("catalog_version", "none");
+        components.put("marketplace", marketplaceCode(marketplace).toLowerCase(Locale.ROOT));
+        return new Unserved(scanner, scanner.fingerprint(components));
+    }
+
     private AnalysisFingerprint fingerprint(Ready current, String marketplace) {
+        return fingerprint(current, marketplace, Map.of());
+    }
+
+    private AnalysisFingerprint fingerprint(Ready current, String marketplace, Map<String, String> extraComponents) {
+        String code = marketplaceCode(marketplace);
+        Map<String, String> components = new HashMap<>(extraComponents);
+        components.put("catalog_version", current.catalogVersion());
+        components.put("catalog_file_sha256", current.fileSha256());
+        components.put("pg_major", current.postgresMajor());
+        components.put("pg_trgm_extversion", current.trigramVersion());
+        components.put("marketplace", code.toLowerCase(Locale.ROOT));
+        return current.scanner().fingerprint(components);
+    }
+
+    private String marketplaceCode(String marketplace) {
         String code = marketplace.trim().toUpperCase(Locale.ROOT);
         if (properties.marketplaces().stream().noneMatch(m -> m.trim().toUpperCase(Locale.ROOT).equals(code))) {
             throw new IllegalArgumentException("Trademark checks are not configured for marketplace " + marketplace);
         }
-        return current.scanner().fingerprint(Map.of(
-                "catalog_version", current.catalogVersion(),
-                "catalog_file_sha256", current.fileSha256(),
-                "pg_major", current.postgresMajor(),
-                "pg_trgm_extversion", current.trigramVersion(),
-                "marketplace", code.toLowerCase(Locale.ROOT)));
+        return code;
     }
 
     private static Ready requireReady(Snapshot current) {

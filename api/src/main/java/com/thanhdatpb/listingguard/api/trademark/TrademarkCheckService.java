@@ -6,11 +6,14 @@ import com.thanhdatpb.listingguard.api.listing.Normalizer;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.trademark.tsdr.TsdrStatusOverlay;
+import com.thanhdatpb.listingguard.api.trademark.watchlist.WatchlistService;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.trademark.CanonicalInput;
 import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.TrademarkCheckInput;
 import com.thanhdatpb.listingguard.trademark.TrademarkResult;
+import com.thanhdatpb.listingguard.trademark.TrademarkScanner;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +38,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  * row and its findings are deleted and the new result inserted in one transaction. Two requests that replace the same
  * row at the same time are settled by the unique index: the one that loses rolls back and answers from the winner's
  * row; any other integrity failure is not a cache hit and is raised as it is.
+ *
+ * <p>The client's watchlist (ADR-031) is scanned in the same check. While it has an enabled entry, its hash, the watchlist
+ * settings and the matcher version are part of the fingerprint, so a change of the list misses the cache; a client without one
+ * keeps the fingerprint it always had. When no catalog is served and the client has a watchlist, the check runs the watchlist
+ * and the rules that need no catalog and answers an INCOMPLETE result with {@code catalogStatus} NOT_CONFIGURED; without a
+ * watchlist it is refused as before ({@link TrademarkUnavailableException}).
  */
 @Service
 public class TrademarkCheckService {
@@ -48,6 +57,7 @@ public class TrademarkCheckService {
     private final TransactionTemplate transactions;
     private final PlanService plans;
     private final TsdrStatusOverlay tsdrStatus;
+    private final WatchlistService watchlists;
 
     /** A service whose answers never carry a TSDR status (the overlay is off). */
     public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
@@ -56,10 +66,18 @@ public class TrademarkCheckService {
         this(normalizers, runtime, rulesets, store, transactions, plans, null);
     }
 
-    @Autowired
+    /** A service with a TSDR overlay and no watchlist. */
     public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
                                  TrademarkRulesets rulesets, TrademarkCheckStore store, TransactionTemplate transactions,
                                  PlanService plans, TsdrStatusOverlay tsdrStatus) {
+        this(normalizers, runtime, rulesets, store, transactions, plans, tsdrStatus, null);
+    }
+
+    @Autowired
+    public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
+                                 TrademarkRulesets rulesets, TrademarkCheckStore store, TransactionTemplate transactions,
+                                 PlanService plans, TsdrStatusOverlay tsdrStatus, WatchlistService watchlists) {
+        this.watchlists = watchlists;
         this.tsdrStatus = tsdrStatus;
         this.normalizers = normalizers;
         this.runtime = runtime;
@@ -101,12 +119,28 @@ public class TrademarkCheckService {
         String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
         // an undeclared product type is the client's mistake: refuse it, never scan as if none had been named
         String productType = productType(requestedProductType);
-        TrademarkCatalogRuntime.Serving serving = runtime.serving(marketplace);
+        WatchlistService.Active watchlist = watchlists == null ? WatchlistService.Active.NONE : watchlists.active(clientId);
+        Map<String, String> watchlistComponents = watchlist.watchlist().fingerprintComponents();
+        TrademarkScanner scanner;
+        String fingerprint;
+        Long catalogVersionId;
+        if (runtime.ready() || watchlist.watchlist().isEmpty()) {
+            // without a watchlist an unserved catalog is refused here, exactly as before ADR-031
+            TrademarkCatalogRuntime.Serving serving = runtime.serving(marketplace, watchlistComponents);
+            scanner = serving.scanner();
+            fingerprint = serving.fingerprint().value();
+            catalogVersionId = serving.catalogVersionId();
+        } else {
+            TrademarkCatalogRuntime.Unserved unserved = runtime.withoutCatalog(marketplace, watchlistComponents);
+            scanner = unserved.scanner();
+            fingerprint = unserved.fingerprint().value();
+            catalogVersionId = null;
+        }
 
         TrademarkCheckInput input = input(listing, productType);
         TrademarkCheckStore.Identity identity = new TrademarkCheckStore.Identity(clientId, marketplace,
-                serving.scanner().ruleset().packId(), CanonicalInput.of(input).hash(),
-                rulesets.rulesetVersionId(marketplace), serving.fingerprint().value());
+                scanner.ruleset().packId(), CanonicalInput.of(input).hash(),
+                rulesets.rulesetVersionId(marketplace), fingerprint);
 
         Optional<TrademarkCheckResult> cached = store.findCached(identity);
         if (cached.isPresent()) {
@@ -116,13 +150,13 @@ public class TrademarkCheckService {
         // a cached answer costs nothing and was returned above; a new result is stored, and a complete one is counted
         // (ADR-013). An INCOMPLETE result is stored for GET and never reused, so the client is not charged for it.
         plans.requireQuota(admission);
-        TrademarkResult result = serving.scanner().scan(input);
+        TrademarkResult result = scanner.scan(input, watchlist.watchlist());
         try {
             return transactions.execute(status -> {
                 if (result.completeness() == Completeness.COMPLETE) {
                     plans.charge(admission);
                 }
-                UUID id = store.insert(identity, serving.catalogVersionId(), result, productType);
+                UUID id = store.insert(identity, catalogVersionId, result, productType, watchlist);
                 return store.find(clientId, id).orElseThrow();
             });
         } catch (DataIntegrityViolationException e) {
@@ -141,6 +175,14 @@ public class TrademarkCheckService {
      */
     public TrademarkCheckResult get(UUID clientId, UUID id) {
         return withTsdrStatus(store.find(clientId, id).orElseThrow(() -> new TrademarkCheckNotFoundException(id)));
+    }
+
+    /**
+     * Whether a trademark check of this client can be answered now: a catalog is served, or the client has a watchlist that
+     * the check can run without one (ADR-031). The batch job and the console use it before they call {@link #check}.
+     */
+    public boolean available(UUID clientId) {
+        return runtime.ready() || (watchlists != null && !watchlists.active(clientId).watchlist().isEmpty());
     }
 
     private TrademarkCheckResult withTsdrStatus(TrademarkCheckResult result) {
