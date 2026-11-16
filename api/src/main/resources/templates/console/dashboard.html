@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{dashboard.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
     <link rel="stylesheet" th:href="@{/console/editor.css}">
     <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
@@ -14,6 +15,7 @@
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('dashboard')}"></header>
 <main class="page wide">
+    <span id="main" tabindex="-1"></span>
     <h1 th:text="#{dashboard.heading}"></h1>
     <p class="muted">
         <span th:text="#{common.signedin(${email})}"></span>

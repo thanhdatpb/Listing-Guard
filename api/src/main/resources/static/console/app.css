@@ -19,7 +19,7 @@
   --surface-2: color-mix(in srgb, var(--border) 25%, var(--surface-1));
   --line-soft: color-mix(in srgb, var(--border) 60%, var(--surface-1));
   --ink-soft: color-mix(in srgb, var(--ink) 75%, var(--ink-muted));
-  --border-strong: color-mix(in srgb, var(--ink-muted) 65%, var(--surface-1));
+  --border-strong: color-mix(in srgb, var(--ink-muted) 70%, var(--surface-1));
 }
 
 /* ---------- reset and base ---------- */
@@ -36,11 +36,11 @@ body {
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
 }
-h1, h2, h3, h4, p, figure, blockquote, dl, dd { margin: 0; }
+/* Paragraphs and lists keep the browser's margins: the pages written before this sheet rely on them. */
+h1, h2, h3, h4, figure, blockquote { margin: 0 0 var(--space-1); }
 h1 { font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: -0.01em; }
 h2 { font-size: 18px; line-height: 26px; font-weight: 600; }
 h3 { font-size: 15px; line-height: 24px; font-weight: 600; }
-ul, ol { margin: 0; padding-left: 1.25rem; }
 img, svg { max-width: 100%; }
 button, input, select, textarea { font: inherit; color: inherit; }
 code, kbd, samp, pre { font-family: var(--font-mono); font-size: 13px; line-height: 20px; }
@@ -70,6 +70,8 @@ main:focus { outline: none; }
 .lg-text-soft { color: var(--ink-soft); }
 .lg-mono { font-family: var(--font-mono); font-size: 13px; line-height: 20px; }
 .lg-num { text-align: right; font-variant-numeric: tabular-nums; }
+/* The one icon set: strokes that take the color of the text around them. Decorative (aria-hidden); the words carry the meaning. */
+.lg-icon { flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- the page shell: the sidebar and its small-screen bar ---------- */
 
@@ -131,7 +133,7 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 }
 .app-nav__link:hover { background: var(--hover); color: var(--ink); }
 .app-nav__link[aria-current="page"] { background: var(--brand-subtle); color: var(--brand-text); font-weight: 600; }
-.app-nav__icon { flex: none; width: 18px; height: 18px; }
+.app-nav__icon { order: -1; width: 18px; height: 18px; }
 
 .app-side__foot {
   margin-top: auto;
@@ -249,7 +251,7 @@ body:has(> .app-side) { padding-left: var(--side-width); }
   color: var(--ink-muted);
   cursor: not-allowed;
 }
-.lg-btn__icon { flex: none; width: 16px; height: 16px; }
+.lg-btn__icon { width: 16px; height: 16px; }
 
 /* ---------- card ---------- */
 
@@ -504,7 +506,9 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 
 /* ---------- sign-in and confirmation pages ---------- */
 
-.lg-auth { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: var(--space-6); }
+/* The page is a column so that the demo banner, when there is one, takes its height and the card is centered in what is left. */
+body:has(> .lg-auth) { display: flex; flex-direction: column; min-height: 100vh; }
+.lg-auth { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; padding: var(--space-6); }
 .lg-auth__card { width: 100%; max-width: 420px; padding: 36px var(--space-8); }
 .lg-auth__logo { display: block; height: 30px; width: auto; margin-bottom: 28px; }
 .lg-auth__title { font-size: 24px; line-height: 32px; font-weight: 700; letter-spacing: -0.01em; }

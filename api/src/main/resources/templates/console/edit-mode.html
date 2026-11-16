@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{edit.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
     <link rel="stylesheet" th:href="@{/console/editor.css}">
     <th:block th:replace="~{console/layout :: htmx}"></th:block>
 </head>
@@ -11,6 +12,7 @@
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('check')}"></header>
 <main class="layout">
+    <span id="main" tabindex="-1"></span>
     <section class="editor">
         <h1 th:text="#{edit.heading}"></h1>
         <p class="muted" th:text="#{edit.intro}"></p>

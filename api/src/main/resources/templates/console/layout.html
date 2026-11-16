@@ -2,17 +2,34 @@
 <html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <body>
 <!-- Parts every console page shares. This file is never served on its own; the pages include the fragments below.
-     The banner styles itself inline on purpose: the sign-in pages are public and cannot load the console style sheets, which
-     sit behind the sign-in, and the banner must look the same on every page. Fixed colors with enough contrast on their own, so
-     the light and dark schemes of the other pages do not change it.
+     "head" links the brand tokens and app.css (ADR-040): both are public files (/brand/** and /console/app.css), so the sign-in pages use
+     them too, before anyone is signed in. "nav" is the sidebar of a signed-in page, "logo" the lockup in its light or dark file.
      No text is written in a template (ADR-028): every sentence is a key of messages.properties and messages_vi.properties. -->
+
+<!-- What every console page puts in its head after the title: icons, the colors of the browser bar, the design tokens and app.css. The
+     address of each file carries the hash of the build (BrandAssets), so a long cache never serves an old file. The two theme colors
+     are the page ground (--surface-0) of each scheme; BrandTokensInSyncTest holds them equal to tokens.css. -->
+<th:block th:fragment="head">
+    <link rel="icon" th:href="@{/brand/favicon.ico(v=${assetVersion})}" sizes="48x48">
+    <link rel="icon" type="image/svg+xml" th:href="@{/brand/logo/symbol.svg(v=${assetVersion})}" sizes="any">
+    <link rel="apple-touch-icon" th:href="@{/brand/icons/icon-180.png(v=${assetVersion})}">
+    <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+    <link rel="stylesheet" th:href="@{/brand/tokens.css(v=${assetVersion})}">
+    <link rel="stylesheet" th:href="@{/console/app.css(v=${assetVersion})}">
+</th:block>
+
+<!-- The lockup (symbol and wordmark): the cobalt file, or the reverse file when the system is dark. cssClass sizes it. -->
+<picture th:fragment="logo(cssClass)">
+    <source media="(prefers-color-scheme: dark)" th:srcset="@{/brand/logo/lockup-horizontal-reverse.svg(v=${assetVersion})}">
+    <img th:src="@{/brand/logo/lockup-horizontal.svg(v=${assetVersion})}" th:alt="#{brand.name}" th:class="${cssClass}">
+</picture>
 
 <!-- The notice of a demonstration catalog, one text for the banner and for the trademark panel of the editor. -->
 <span th:fragment="demoText" th:text="#{demo.banner}"></span>
 
 <!-- Shown on every console page while the configured trademark catalog version starts with "demo-" (ConsoleModelAdvice). -->
-<div th:fragment="demoBanner" th:if="${demoCatalog}" id="demo-banner" role="note"
-     style="position:sticky;top:0;z-index:10;padding:0.6rem 1rem;background:#fde68a;color:#1b1f23;border-bottom:2px solid #8a5a00;font:600 0.9rem/1.4 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center">
+<div th:fragment="demoBanner" th:if="${demoCatalog}" id="demo-banner" role="note" class="lg-banner lg-banner--warning lg-banner--sticky">
     <span th:replace="~{console/layout :: demoText}"></span>
 </div>
 
@@ -33,23 +50,62 @@
     <script th:src="@{/console/vendor/htmx.min.js}" defer></script>
 </th:block>
 
-<!-- The bar of a signed-in page: where to go, the language, and sign out. "active" is dashboard, check, bulk, reaudit, stats, report, watchlist or keys. -->
-<header class="bar" th:fragment="nav(active)">
-    <nav th:aria-label="#{nav.aria}">
-        <a th:href="@{/console}" th:text="#{nav.dashboard}" th:aria-current="${active == 'dashboard'} ? 'page'"></a>
-        <a th:href="@{/console/check}" th:text="#{nav.check}" th:aria-current="${active == 'check'} ? 'page'"></a>
-        <a th:href="@{/console/bulk}" th:text="#{nav.bulk}" th:aria-current="${active == 'bulk'} ? 'page'"></a>
-        <a th:href="@{/console/reaudit}" th:text="#{nav.reaudit}" th:aria-current="${active == 'reaudit'} ? 'page'"></a>
-        <a th:href="@{/console/history}" th:text="#{nav.history}" th:aria-current="${active == 'history'} ? 'page'"></a>
-        <a th:href="@{/console/stats}" th:text="#{nav.stats}" th:aria-current="${active == 'stats'} ? 'page'"></a>
-        <a th:href="@{/console/report}" th:text="#{nav.report}" th:aria-current="${active == 'report'} ? 'page'"></a>
-        <a th:href="@{/console/watchlist}" th:text="#{nav.watchlist}" th:aria-current="${active == 'watchlist'} ? 'page'"></a>
-        <a th:href="@{/console/api-keys}" th:text="#{nav.keys}" th:aria-current="${active == 'keys'} ? 'page'"></a>
-    </nav>
-    <div th:replace="~{console/layout :: languageSwitch}"></div>
-    <form method="post" th:action="@{/logout}">
-        <button type="submit" class="link" th:text="#{nav.signout}"></button>
-    </form>
+<!-- The sidebar of a signed-in page (a bar on top below 860px, see app.css): the skip link, the lockup, the two groups of pages, then
+     the account, the language and sign out. "active" is dashboard, check, bulk, history, reaudit, watchlist, stats, report or keys.
+     The icons are one set of strokes, drawn once in the sprite below and used with <use>; they are decorative, the words are the links.
+     The label comes first in the markup and the icon first on screen (CSS order), so the text sits directly inside the link. -->
+<header class="app-side" th:fragment="nav(active)">
+    <a class="app-skip" href="#main" th:text="#{nav.skip}"></a>
+    <svg class="lg-sr-only" aria-hidden="true" focusable="false">
+        <symbol id="lg-i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></symbol>
+        <symbol id="lg-i-check" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+        <symbol id="lg-i-bulk" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/></symbol>
+        <symbol id="lg-i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
+        <symbol id="lg-i-reaudit" viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-14 5"/><path d="M4 12a8 8 0 0 1 14-5"/><path d="M18 3v4h-4M6 21v-4h4"/></symbol>
+        <symbol id="lg-i-watchlist" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="lg-i-stats" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+        <symbol id="lg-i-report" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
+        <symbol id="lg-i-keys" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></symbol>
+        <symbol id="lg-i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    </svg>
+    <a class="app-side__brand" th:href="@{/console}">
+        <picture th:replace="~{console/layout :: logo('app-side__logo')}"></picture>
+    </a>
+    <input type="checkbox" id="app-menu" class="app-side__toggle">
+    <label class="app-side__menu" for="app-menu">
+        <svg class="lg-icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#lg-i-menu"/></svg>
+        <span class="lg-sr-only" th:text="#{nav.menu}"></span>
+    </label>
+    <div class="app-side__panel">
+        <nav class="app-nav" th:aria-label="#{nav.aria}">
+            <p class="app-nav__label" th:text="#{nav.group.work}"></p>
+                <a class="app-nav__link" th:href="@{/console}" th:aria-current="${active == 'dashboard'} ? 'page'"><th:block th:text="#{nav.dashboard}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-home"/></svg></a>
+                <a class="app-nav__link" th:href="@{/console/check}" th:aria-current="${active == 'check'} ? 'page'"><th:block th:text="#{nav.check}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
+                <a class="app-nav__link" th:href="@{/console/bulk}" th:aria-current="${active == 'bulk'} ? 'page'"><th:block th:text="#{nav.bulk}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg></a>
+                <a class="app-nav__link" th:href="@{/console/history}" th:aria-current="${active == 'history'} ? 'page'"><th:block th:text="#{nav.history}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-history"/></svg></a>
+                <a class="app-nav__link" th:href="@{/console/reaudit}" th:aria-current="${active == 'reaudit'} ? 'page'"><th:block th:text="#{nav.reaudit}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-reaudit"/></svg></a>
+                <a class="app-nav__link" th:href="@{/console/watchlist}" th:aria-current="${active == 'watchlist'} ? 'page'"><th:block th:text="#{nav.watchlist}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-watchlist"/></svg></a>
+            <p class="app-nav__label" th:text="#{nav.group.manage}"></p>
+                <a class="app-nav__link" th:href="@{/console/stats}" th:aria-current="${active == 'stats'} ? 'page'"><th:block th:text="#{nav.stats}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-stats"/></svg></a>
+                <a class="app-nav__link" th:href="@{/console/report}" th:aria-current="${active == 'report'} ? 'page'"><th:block th:text="#{nav.report}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-report"/></svg></a>
+                <a class="app-nav__link" th:href="@{/console/api-keys}" th:aria-current="${active == 'keys'} ? 'page'"><th:block th:text="#{nav.keys}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-keys"/></svg></a>
+        </nav>
+        <div class="app-side__foot">
+            <div class="app-account" th:if="${consoleAccount != null}">
+                <span class="app-account__avatar" aria-hidden="true" th:text="${consoleAccount.initial}"></span>
+                <span class="app-account__who">
+                    <span class="app-account__client" th:if="${!#strings.isEmpty(consoleAccount.client)}" th:text="${consoleAccount.client}"></span>
+                    <span th:text="${consoleAccount.email}" th:title="${consoleAccount.email}"></span>
+                </span>
+            </div>
+            <div class="app-side__actions">
+                <div th:replace="~{console/layout :: languageSwitch}"></div>
+                <form method="post" th:action="@{/logout}">
+                    <button type="submit" class="lg-btn lg-btn--link" th:text="#{nav.signout}"></button>
+                </form>
+            </div>
+        </div>
+    </div>
 </header>
 </body>
 </html>
