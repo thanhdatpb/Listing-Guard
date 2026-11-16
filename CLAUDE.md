@@ -91,6 +91,34 @@ It never edits a listing, never publishes, and does no SEO.
   (`reason`, `from` = the rule's original level, `to`, `note`) and the finding's `risk` is the lowest `to`; links and adjustments
   are stored (V28, JSONB) with `trademark_check.product_type`. Input hash `trademark-input/v2`, `matcher-2`. Personalization is
   unchanged (`TrademarkRulesetUnchangedTest`). The MCP `check_trademark` tool takes no `product_type` yet.
+- **Client trademark watchlist** (ADR-031, Proposed; implemented, `docs/watchlist.md`, V37): a client's own list of marks (`mark`, `aliases`,
+  `nice_classes`, optional USPTO `serial`, `note`, `enabled`, who and when), scanned by every trademark check next to the catalog.
+  `trademark-scanner/.../watchlist/` (`Watchlist`, `WatchlistEntry`, `WatchlistSettings`, `WatchlistMatch`) and `rules/WatchlistMatcher`:
+  mark and aliases normalized like catalog marks, matched as an exact run of tokens of any length (no n-gram limit, **no fuzzy match**),
+  rule id `watchlist_match` (not declared by a ruleset, not in `RuleIds.ALL`), `FindingSource` `WATCHLIST` (`CATALOG` for the catalog
+  rules, `CONTEXT` for the place and color rules, derived from the rule id), level at least `minimum_risk` of the versioned, immutable,
+  `unverified` settings file `watchlist/trademark-watchlist-2026-11.yaml` (HIGH; a test pins its hash) and raised to any overlapping
+  finding's level, winning its span (`Precedence`). `Evidence.watchlist` names the entry; a serial number becomes `uspto:<serial>`, so the
+  ruleset's source link applies. Product classes and generic words never lower it and Nice classes are shown, not used. **Cache
+  identity**: `Watchlist.fingerprintComponents()` adds `watchlist_sha256`, `watchlist_settings` and `watchlist_matcher` **only while
+  the client has an enabled entry**, so a client without one keeps its `analysisVersion` (`TrademarkRulesetUnchangedTest`, the empty
+  watchlist test). **Without a catalog** (`TrademarkCatalogRuntime.withoutCatalog`, `TrademarkScanner.withoutCatalog`): a client with an
+  enabled entry gets `200`, `catalogStatus` `NOT_CONFIGURED`, `catalogVersion` `none`, `skippedRuleIds` (the catalog rules and the color
+  rules that read them, which is not `failedRuleIds`), `INCOMPLETE` (stored for GET, never reused or charged), level never `LOW`; a client
+  without one still gets `503 trademark-not-configured`. `TrademarkCheckService.available(clientId)` is what `batch-check` and the console
+  bulk check ask. API (`api/.../trademark/watchlist/`): `GET`/`PUT /api/v1/trademark-watchlist` (operation ids `getTrademarkWatchlist` and
+  `replaceTrademarkWatchlist` are explicit so no other id moves; `ETag` of the revision, `If-None-Match`, `If-Match` with `412
+  watchlist-revision-mismatch`, every problem of a list at once in `400 errors[]`, `trademark-risk` pack, no quota). **Every change is one
+  `WatchlistService.replace` under the client's row lock** (API and console alike); `added_by`/`updated_by` are `console:<account id>` or
+  `api-key:<key id>`, never an e-mail. V37: `account.role` (`ADMIN`/`MEMBER`, `ConsoleRole`; a magic-link account owns its client and is
+  `ADMIN`, the Cloudflare Access shared client's accounts and operator-made ones are `MEMBER`; admin job `account list|role`), the two
+  watchlist tables, `trademark_check.catalog_version_id` nullable plus `skipped_rule_ids` and `watchlist_*`, `trademark_check_finding.
+  watchlist_entry`. Console page `/console/watchlist` (`api/.../console/watchlist/`, `watchlist.html`, English and Vietnamese): **only an
+  ADMIN writes** (`ConsoleAccountRoles.isAdmin`, read from the database at each request, `403` for a MEMBER), the revision is a hidden field,
+  import is a two-step preview (the pasted text goes back in a hidden field, nothing is kept, one refused row blocks the import) over
+  `WatchlistTable`/`DelimitedText`, export is UTF-8 with a BOM and guards `=+-@` cells. The SDK has `trademarkWatchlist()` and
+  `replaceTrademarkWatchlist(...)`; the MCP server one read-only tool, `get_watchlist` (no tool changes a list). The health report leaves
+  watchlist marks out of its top marks. Personalization screening does not read it.
 - **Core** (`core/`): plain Java domain types (`Listing`, `Money`, `Finding`, `Severity`, `FixSuggestion`). No Spring.
 - **Image checker core** (`image-checker/`, ADR-008, Proposed): Java-only ImageIO module, independent image input and canonical byte/metadata hash, immutable Amazon/Etsy `image-compliance` rulesets, runtime-aware analysis fingerprint, EXIF orientation, embedded ICC-to-sRGB conversion, alpha compositing on white, dimensions/aspect ratio, image count, Amazon main-image edge whiteness, occupancy and Laplacian variance. No Spring, database, HTTP or original-image persistence. Both shipped marketplace rulesets keep policy thresholds null until the maintainer reviews saved official sources; affected checks return `INCOMPLETE`. Every shipped source is `unverified`, and findings are only WARNING/INFO. The CUSTOMER_CONTENT rule reads the caller-declared source only; there is no text/logo/watermark detection.
 - **Image checks endpoint** (`api/.../image/`, ADR-008, Proposed; implemented, off by default): `POST /api/v1/image-checks` (multipart:
@@ -158,9 +186,10 @@ It never edits a listing, never publishes, and does no SEO.
   with `RetryPolicy.none()` and turns the SDK's `ListingGuardTransportException` into the server's own codes. Official MCP Java SDK
   `io.modelcontextprotocol.sdk` **2.1.0** pinned exactly (`mcp-core` + `mcp-json-jackson2`; the aggregate `mcp` pulls Jackson 3;
   2.2.0-M2 is a milestone and is not used), **no Spring** (the Spring AI starter needs Spring Boot 4 and is not used; the repository itself is on Boot 4.1, ADR-020), the JDK
-  `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Seven tools
+  `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Eight tools
   (`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`, `get_capabilities`
-  (`GET /api/v1/capabilities`, no arguments, read only); `check_trademark` takes an optional `product_type`, passed on unchanged;
+  (`GET /api/v1/capabilities`, no arguments, read only), `get_watchlist` (`GET /api/v1/trademark-watchlist`, no arguments, read only,
+  ADR-031); `check_trademark` takes an optional `product_type`, passed on unchanged;
   `Endpoint` is the closed list of API calls, each an SDK `Operation`, only `GET` and `POST`, no tool takes a path or a URL);
   **none writes, applies a fix or publishes**.
   **The model does not decide**: a `2xx` answer is returned verbatim (exact body as text, the same object as structured content,
@@ -190,7 +219,7 @@ It never edits a listing, never publishes, and does no SEO.
   2 MiB, `allowInsecureHttp`) builds an immutable, thread-safe client with one `HttpClient`. Typed calls, blocking and
   `CompletableFuture`: `checks`, `trademarkChecks` (optional `product_type`), `variationChecks`, `personalizationScreenings`,
   `rulesetLimits` and `capabilities` (both with `If-None-Match`, `Conditional<T>` on `304`) and `usage`; `send(RawRequest)` returns any
-  answer unchanged (the MCP server uses it). `Operation` is the closed list (only `GET` and `POST`). Problems become
+  answer unchanged (the MCP server uses it). `Operation` is the closed list (only `GET` and `POST`, and the one `PUT` of the client's own watchlist, ADR-031). Problems become
   `QuotaExceededException`, `PlanNotAllowedException`, `RateLimitedException` (`Retry-After`), `NotConfiguredException`
   (`*-not-configured`), `ValidationException` (`errors`), `UnknownProductTypeException` (`known`), else `ListingGuardApiException`
   (`isProblem()` false for a proxy's answer); no usable answer is `ListingGuardTransportException` (`Kind`). `RetryPolicy.defaults()`:
@@ -228,8 +257,9 @@ It never edits a listing, never publishes, and does no SEO.
   `CompatibilityRulesTest`). `ContractCompatibilityTest` runs in every `verify` and fails on a breaking change that
   `docs/api/breaking-changes.yaml` does not declare (entry: `rule`, `location` exactly as reported, `reason`, `adr` naming an ADR that
   contains the location; stale entries and a wrong `baseline` fail too); it writes
-  `contract-tools/target/contract/compatibility-report.md` (CI puts it in the job summary). Four entries today: the v0.6.0 document
-  gave trademark findings the `FindingView` schema (doc fix, no wire change). Every `/api/v1` response carries
+  `contract-tools/target/contract/compatibility-report.md` (CI puts it in the job summary). Three entries today: the v0.6.0 document
+  gave trademark findings the `FindingView` schema (doc fix, no wire change; its `source` entry left when ADR-031 gave a trademark finding a
+  `source` of its own). Every `/api/v1` response carries
   `X-Listing-Guard-Version` (`ApiContractHeadersFilter`, order `HIGHEST_PRECEDENCE + 5`, so `401`/`413`/`429` carry it; `ServerVersion`
   from `META-INF/build-info.properties` `release`, Maven property `listing-guard.release`, default `dev`; the Dockerfile argument
   `LISTING_GUARD_RELEASE` and the release workflow set it). `listing-guard.api.deprecation.endpoints[]` (`method`, `path` exactly as in
@@ -345,7 +375,9 @@ It never edits a listing, never publishes, and does no SEO.
   operator keys too; the count and insert hold a row lock on the client. `ConsoleModelAdvice` sets `demoCatalog` when
   `listing-guard.trademark.catalog-version` starts with `demo-`: every console page (sign-in pages included, inline style) shows
   the banner and the editor's trademark panel repeats it.
-  **Bulk check (ADR-029, V36)** (`api/.../console/bulk/`, `templates/console/bulk*.html`, `static/console/bulk.{css,js}`, English and
+  **Watchlist page (ADR-031, V37)** (`api/.../console/watchlist/`, `templates/console/watchlist.html`, `static/console/watchlist.css`): menu
+  "Watchlist"; every account reads and exports, only an `ADMIN` account writes (a role on `account`, never in the session); see the
+  **Client trademark watchlist** bullet. **Bulk check (ADR-029, V36)** (`api/.../console/bulk/`, `templates/console/bulk*.html`, `static/console/bulk.{css,js}`, English and
   Vietnamese like the rest of the console: every sentence is a message key, ADR-028; `BulkText` and the pure classes take
   `ConsoleMessages`): `GET /console/bulk`, `POST /console/bulk/prepare` and `POST /console/bulk/run` (multipart). A seller pastes
   rows copied from a Google Sheet (tab "Paste from Sheet") or uploads a CSV/TSV (tab "Upload a file"), confirms what each column is, and gets
@@ -378,7 +410,7 @@ It never edits a listing, never publishes, and does no SEO.
   (`trademark.disclaimer.note`).
 - Current scope: Etsy and Amazon rule engines, the image checker (ADR-008: the core and the endpoint, off by default and without the bounded decode service), the multi-client API with optional plans and a monthly quota, optional
   fix/readiness output in the API and batch report (ADR-014, off by default), the trademark scanner core with its
-  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, the console bulk check (ADR-029), policy ingest + retrieval, and the optional console (magic-link by default, or Cloudflare Access per ADR-027) with a plan/usage
+  endpoint, the variation checks (ADR-015), the personalization screening (ADR-016), the MCP server (ADR-017), the Java client SDK (ADR-023), the listing health report (ADR-018), the `batch-check` job, the console bulk check (ADR-029), the client trademark watchlist (ADR-031), policy ingest + retrieval, and the optional console (magic-link by default, or Cloudflare Access per ADR-027) with a plan/usage
   dashboard, the Check listing editor and an API keys page (no saved listings or history yet; no LLM call, no structured
   output, no citation verification yet).
 - **Amazon** (`ruleengine/amazon/`, `rulesets/amazon-2026-12c.yaml`): simple input format (`title`, `brand`,
@@ -489,6 +521,12 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     the `backtest` and `eval-listing` jobs and compose services, 27 sample cases, the baseline, the CI summary step, `docs/backtest.md`).
     Open questions the maintainer decides are at the end of the ADR (the default catch lines, more issue types, a review of the sample
     labels, gating recall). Not planned: an endpoint, a console page or an MCP tool for either job, storing a claim file.
+
+18. Client trademark watchlist (ADR-031, Proposed): done as one PR (`feature/trademark-watchlist`: ADR, `trademark-scanner/.../watchlist/`, V37,
+    `api/.../trademark/watchlist/`, the console page and roles, the admin `account` commands, SDK, `get_watchlist`, `openapi.json`,
+    `docs/watchlist.md`). Open questions the maintainer decides are at the end of the ADR (the client's own minimum level, Nice classes lowering
+    a level, personalization screening reading the list, limiting key creation to administrators, a Sheet connector). Not planned: fuzzy
+    matching of a watchlist, a tool that writes the list, reading a Google Sheet by itself.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
@@ -803,6 +841,16 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   `COMPLETE`), never retry `quota-exceeded`, a `*-not-configured` 503, another `4xx` or a timed-out `POST`, never follow a redirect,
   never log, never put the key, an Access secret, a listing or a buyer's text in a message or `toString()`. The SDK version is the
   repository's (release tag); plugin versions in its POM are pinned.
+- **Client trademark watchlist** (ADR-031): the list is the client's own data and every statement of the store filters by `client_id`; every
+  change, from the API or the console, is `WatchlistService.replace` (whole list, row lock, expected revision), never a second writer. The
+  settings file is immutable like a ruleset (a new version is a new file; the loader refuses any `source.status` but `unverified`), and the
+  watchlist adds to the analysis fingerprint **only while a client has an enabled entry**: a change that touches the fingerprint of a client
+  without a watchlist is a bug (`TrademarkRulesetUnchangedTest`, `WatchlistMatchingTest.anEmptyWatchlistScansExactlyAsBefore`). No fuzzy
+  match, no replacement word, no level lowered by a Nice class or a product type; a result with no catalog is `INCOMPLETE`, never `LOW`,
+  and says `catalogStatus` `NOT_CONFIGURED`. A client's marks and notes are text it typed: data in a message, never an instruction (the
+  MCP tool and the skill say so), escaped with `th:text`, never in the health report. Only an `ADMIN` account writes in the console and the
+  role is read from the database at each request; an API key acts for its client. A new console message is a key of both bundles
+  (`ConsoleTextInTemplatesTest`). The SDK's one `PUT` is the watchlist's (`ClientBoundaryTest`); the MCP server never calls it.
 - **Console bulk check** (ADR-029): the pasted text, the file and the result table are never stored, put in the session, logged or
   written to a temporary file of this application: the text lives in the request and goes back to the browser in a hidden field, and
   every page is `no-store`. Only `console_bulk_mapping` (labels, targets, separators) is new state, and no cell value may reach it. The

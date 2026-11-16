@@ -290,3 +290,11 @@ The maintainer decided these; they are no longer questions.
 2. **A renamed schema** (ADR-022's own open question: "should `schema-renamed` be breaking for the planned Java SDK, if it is
    generated from the file?"). The SDK is written by hand, not generated: a rename does not reach a caller, it only fails
    `ContractConformanceTest` until the test's table names the new schema. Assumed: `schema-renamed` stays non-breaking.
+
+## Amendment (ADR-031): one `PUT`
+
+The SDK issues `GET` and `POST` only, with one exception: `PUT /api/v1/trademark-watchlist` (`Operation.TRADEMARK_WATCHLIST_REPLACE`),
+which replaces the calling client's own trademark watchlist. It writes a configuration of the client, never a listing, and nothing is
+written to a marketplace. `ClientBoundaryTest` holds that this is the only `PUT`, that it is only in `Operation` and `HttpTransport`, and
+that `DELETE`, `PATCH` and every other method stay out. A `PUT` is retried like a `POST` (`429 rate-limited` and a retryable `503`,
+never a `412`). The MCP server does not call it (ADR-017).

@@ -375,3 +375,10 @@ over it; the server still adds nothing that decides.
    `X-API-Key` and `X-Request-Id` and no body; an argument is `invalid-arguments` and nothing is sent; the answer is verbatim over
    Streamable HTTP and the closed list of paths is exactly seven.
 4. **Repository**: `./mvnw -B verify` passes.
+
+## Amendment (ADR-031): `get_watchlist`
+
+An eighth tool, `get_watchlist` (`GET /api/v1/trademark-watchlist`, no arguments, read only), shows an agent the client's own
+trademark watchlist so that a finding whose `source` is `WATCHLIST` can be explained. There is no tool that changes the list: the
+server's closed list of calls stays `GET` and `POST`, the `PUT` of the SDK is not reachable from a tool, and the text of an entry is
+data the agent never follows as an instruction.

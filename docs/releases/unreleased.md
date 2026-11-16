@@ -1,14 +1,49 @@
 # Unreleased changes
 
 Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: the console in English and Vietnamese
-(ADR-028), the console bulk check (ADR-029) and the value backtest with the labelled evaluation (ADR-032). They change no API response, request, status or header; the bulk check adds one
-additive migration, V36 (see its section).
+(ADR-028), the console bulk check (ADR-029), the value backtest with the labelled evaluation (ADR-032) and the client trademark
+watchlist (ADR-031). Only the watchlist changes the API, and only additively (see its section); the bulk check adds one additive
+migration, V36, and the watchlist another, V37.
 
 Every pull request that changes the API runs the compatibility check (`./mvnw -B -pl contract-tools verify`, ADR-022) and copies the
 additive and non-breaking lines of `contract-tools/target/contract/compatibility-report.md` here, with a short section for the
 change. When the next version is cut, move this file to `docs/releases/v<version>.md` and start a new one.
 
 ## What is new
+
+### Client trademark watchlist (ADR-031)
+
+A client keeps its own list of names to watch (team names, nicknames, slogans, marks it received a claim for) and every trademark check
+looks for them next to the catalog. Guide: [watchlist.md](../watchlist.md).
+
+- **Findings.** A match is a finding with rule `watchlist_match` and `source` `WATCHLIST` (catalog findings are `CATALOG`, the place and
+  color rules `CONTEXT`), at least `HIGH` by default (a versioned settings file, `trademark-watchlist-2026-11`, `unverified`), with the entry in
+  `watchlistEntry` (mark, the alias that matched, classes, serial number, note). Marks and aliases are normalized like catalog marks, matched
+  as an exact run of words of any length, with no fuzzy match.
+- **No catalog.** A client with an enabled entry gets `200` instead of `503 trademark-not-configured`: `catalogStatus` `NOT_CONFIGURED`,
+  `catalogVersion` `none`, `skippedRuleIds`, `INCOMPLETE` (stored, never reused or charged), and a level that is never `LOW`. A client
+  without an entry gets the `503` as before. `batch-check`, the editor and the bulk check follow.
+- **Cache.** While a client has an enabled entry, the hash of its entries, the settings and the matcher version are part of its
+  `analysisVersion`; a client without one keeps the `analysisVersion` it had. Editing a list makes the next checks of that client new analyses.
+- **API.** `GET` and `PUT /api/v1/trademark-watchlist` (`ETag`, `If-None-Match`, `If-Match`, `412 watchlist-revision-mismatch`, every problem of a
+  list at once in `400 errors[]`). The Java SDK adds `trademarkWatchlist()` and `replaceTrademarkWatchlist(...)` (the one `PUT` of the SDK,
+  an amendment of ADR-023), the MCP server one read-only tool, `get_watchlist` (an amendment of ADR-017; no tool changes a list).
+- **Console.** A **Watchlist** page: list, add, edit, switch off, delete, import by pasting from a Google Sheet or uploading a CSV (with a preview
+  and a confirmation), CSV export; in English and Vietnamese. **Only an `ADMIN` account changes the list.** **V37 adds `account.role`:** an account
+  that is the only account of a `web-…` client becomes `ADMIN`, every other existing account (the shared Cloudflare Access client, accounts an
+  operator made) is a `MEMBER`; promote one with `docker compose run --rm admin account role <email> ADMIN` (`account list <client>` shows them).
+- **Migration V37** is additive (see [watchlist.md](../watchlist.md)); `trademark_check.catalog_version_id` becomes nullable.
+- **Compatibility report (ADR-022), additive:** `operation-added` at `GET /api/v1/trademark-watchlist` and `PUT /api/v1/trademark-watchlist`;
+  `problem-code-added` at `problem watchlist-revision-mismatch`; `response-property-added` at `schema TrademarkCheckResult.catalogStatus`,
+  `.skippedRuleIds` and `.watchlist`, and at `schema TrademarkCheckFindingView.watchlistEntry`; `response-enum-value-added` at
+  `schema TrademarkCheckFindingView.source` (`CATALOG`, `CONTEXT`, `WATCHLIST`). No existing operation id moved. The v0.6.0 document had
+  typed this `source` as the `/checks` finding's `RULE`/`LLM`, which a trademark finding never sent; the report lists those two values as
+  non-breaking removals and **the `breaking-changes.yaml` exception for `source` is gone** (three doc-fix exceptions remain until the baseline moves).
+- **Not changed:** the trademark ruleset (`trademark-risk-2026-11b`), the catalog and its import, personalization screening, the health report's
+  shape (it leaves watchlist marks out of its top marks).
+- **For the maintainer to decide** (ADR-031, open questions): the client's own minimum level, Nice classes lowering a level, personalization
+  screening reading the list, limiting key creation to administrators, and reading a Google Sheet directly. The Vietnamese texts have not been
+  reviewed by a native reader.
 
 ### Value backtest and labelled evaluation (ADR-032)
 

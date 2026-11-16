@@ -25,6 +25,7 @@ Listing Guard suggests and reports. It never edits or publishes a listing and do
 |---|---|---|---|
 | `POST /api/v1/checks` | Deterministic Etsy and Amazon listing rules | Ready | Each rule carries `verified`, `secondary` or `unverified` sourcing |
 | `POST /api/v1/trademark-checks` | Explainable mark matches against the configured versioned catalog | Requires a `READY` catalog | Reference warning, not a legal conclusion; trademark rules and product classes are unverified |
+| `GET`/`PUT /api/v1/trademark-watchlist` | A client's own list of marks (team names, nicknames, slogans), scanned by every trademark check; works with no catalog ([guide](docs/watchlist.md)) | Ready | The client's own data; findings are marked `WATCHLIST`, `INCOMPLETE` without a catalog |
 | `POST /api/v1/variation-checks` | Checks parent/child variation structure, combinations and SKUs | Ready | No rule is verified; findings are WARNING or INFO, never ERROR |
 | `POST /api/v1/personalization-screenings` | Screens buyer-entered text against a print profile and the trademark catalog | Ready | Profile values are placeholders; text is personal data and is not stored or repeated |
 | `POST /api/v1/image-checks` | Checks image properties for Etsy or Amazon | Off by default | Shipped marketplace thresholds are unset; results are INCOMPLETE and images are not recognized for marks or text |
