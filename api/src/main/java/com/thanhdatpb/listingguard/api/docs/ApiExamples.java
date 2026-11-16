@@ -1204,6 +1204,15 @@ public final class ApiExamples {
                     {"pack": "trademark-risk", "ruleId": "catalog_exact", "falsePositives": 1, "verdicts": 3, "falsePositiveRate": 0.3333}
                   ]
                 }
+              },
+              "reaudit": {
+                "runs": 3,
+                "clients": 1,
+                "listingsChecked": 540,
+                "findings": 41,
+                "newFindings": 6,
+                "servedCatalog": "uspto-2026-11-0123456789ab",
+                "scopesToReaudit": 2
               }
             }
             """;

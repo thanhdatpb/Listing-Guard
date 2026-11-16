@@ -5,15 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
+import com.thanhdatpb.listingguard.api.llm.LlmClient;
+import com.thanhdatpb.listingguard.api.llm.LlmDataClass;
+import com.thanhdatpb.listingguard.api.llm.LlmUnavailableException;
 import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
 import com.thanhdatpb.listingguard.api.rewrite.ListingEvaluator.Evaluation;
 import com.thanhdatpb.listingguard.api.rewrite.RewriteOutcome.Status;
 import com.thanhdatpb.listingguard.api.rewrite.RewritePrompt.Problem;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
 import com.thanhdatpb.listingguard.core.finding.Finding;
-import com.thanhdatpb.listingguard.rag.llm.LlmException;
-import com.thanhdatpb.listingguard.rag.llm.LlmProvider;
-import com.thanhdatpb.listingguard.rag.llm.LlmResponse;
 import com.thanhdatpb.listingguard.trademark.TrademarkFinding;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,7 +28,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -53,16 +52,19 @@ public class ListingRewriter {
     private static final int MAX_REPEAT = 2;
     private static final int MAX_VALUE_CHARS = 200;
 
-    private final ObjectProvider<LlmProvider> provider;
+    /** What the prompt contains (ADR-036 item 6): only a provider whose listing-text flag is on may receive it. */
+    static final Set<LlmDataClass> DATA = Set.of(LlmDataClass.LISTING_TEXT);
+
+    private final LlmClient client;
     private final ListingEvaluator evaluator;
     private final RewriteRunStore runs;
     private final RewriteRateLimit limit;
     private final RewriteProperties properties;
     private final ObjectMapper mapper;
 
-    public ListingRewriter(ObjectProvider<LlmProvider> provider, ListingEvaluator evaluator, RewriteRunStore runs,
+    public ListingRewriter(LlmClient client, ListingEvaluator evaluator, RewriteRunStore runs,
                            RewriteRateLimit limit, RewriteProperties properties, ObjectMapper mapper) {
-        this.provider = provider;
+        this.client = client;
         this.evaluator = evaluator;
         this.runs = runs;
         this.limit = limit;
@@ -70,9 +72,12 @@ public class ListingRewriter {
         this.mapper = mapper;
     }
 
-    /** True when a provider is configured (ADR-036); without one the console shows no button. */
+    /**
+     * True when the shared LLM client of ADR-036 is on and at least one provider may receive listing text; otherwise the console
+     * shows no button and nothing is sent.
+     */
     public boolean available() {
-        return provider.getIfAvailable() != null;
+        return client.canServe(DATA);
     }
 
     /** Whether a listing of this size may be sent: a larger one gets no button. */
@@ -87,8 +92,7 @@ public class ListingRewriter {
      */
     public RewriteOutcome suggest(UUID clientId, UUID account, String marketplace, ObjectNode listing, FeedbackTarget anchor) {
         String title = listing.path("title").asText("").strip();
-        LlmProvider model = provider.getIfAvailable();
-        if (model == null || !fits(listing.toString())) {
+        if (!available() || !fits(listing.toString())) {
             return RewriteOutcome.of(Status.UNAVAILABLE, title);
         }
         List<IndexedTag> tags = tags(listing);
@@ -100,10 +104,11 @@ public class ListingRewriter {
             if (!limit.tryAcquire(clientId)) {
                 return RewriteOutcome.of(Status.RATE_LIMITED, title);
             }
-            List<RewritePrompt.Raw> raw = ask(model, marketplace, title, tags, base);
-            if (raw == null) {
+            Answer answer = ask(marketplace, title, tags, base);
+            if (answer == null) {
                 return RewriteOutcome.of(Status.UNAVAILABLE, title);
             }
+            List<RewritePrompt.Raw> raw = answer.candidates();
             List<RewriteCandidate> safe = new ArrayList<>();
             Set<String> seen = new HashSet<>();
             for (RewritePrompt.Raw candidate : raw) {
@@ -111,7 +116,7 @@ public class ListingRewriter {
                         safe.size() + 1, seen);
                 checked.ifPresent(safe::add);
             }
-            UUID run = runs.record(clientId, account, marketplace, model.modelId(), safe.size(), anchor);
+            UUID run = runs.record(clientId, account, marketplace, answer.model(), safe.size(), anchor);
             return new RewriteOutcome(safe.isEmpty() ? Status.NONE_SAFE : Status.SUGGESTIONS, safe, run, title);
         } catch (PlanNotAllowedException | TrademarkUnavailableException e) {
             // a pack the plan lacks or a catalog that is not served: the candidates cannot be verified, so none is shown
@@ -120,19 +125,25 @@ public class ListingRewriter {
         }
     }
 
-    private List<RewritePrompt.Raw> ask(LlmProvider model, String marketplace, String title, List<IndexedTag> tags, Evaluation base) {
+    /** What the model proposed and the model that answered (from the cache or a provider, ADR-036), before any check. */
+    private record Answer(List<RewritePrompt.Raw> candidates, String model) {
+    }
+
+    /** One call through the shared client, or null when it could not run or its answer is not the JSON the schema describes. */
+    private Answer ask(String marketplace, String title, List<IndexedTag> tags, Evaluation base) {
         List<String> tagTexts = tags.stream().map(IndexedTag::text).toList();
         try {
-            LlmResponse response = model.complete(RewritePrompt.request(mapper, properties, marketplace, title, tagTexts,
-                    problems(base)));
-            List<RewritePrompt.Raw> parsed = RewritePrompt.parse(mapper, response.text());
+            LlmClient.Result result = client.complete(new LlmClient.Call("rewrite_suggestion",
+                    RewritePrompt.request(mapper, properties, marketplace, title, tagTexts, problems(base)), DATA));
+            List<RewritePrompt.Raw> parsed = RewritePrompt.parse(mapper, result.text());
             if (parsed == null) {
                 log.info("Rewrite suggestions: the model's answer was not the expected JSON");
+                return null;
             }
-            return parsed;
-        } catch (LlmException e) {
-            // the message never carries listing text (LlmException contract), the kind is enough to diagnose
-            log.info("Rewrite suggestions: the model call failed ({})", e.kind());
+            return new Answer(parsed, result.model());
+        } catch (LlmUnavailableException e) {
+            // the message never carries listing text (ADR-036); the reason is enough to diagnose
+            log.info("Rewrite suggestions: the model could not be asked ({})", e.reason());
             return null;
         }
     }

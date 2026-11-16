@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.CheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
+import com.thanhdatpb.listingguard.api.console.ConsoleLlmLabel;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Detail;
@@ -306,7 +307,8 @@ public class BulkCheckService {
                 String level = finding.risk().name().toLowerCase(Locale.ROOT);
                 items.add(new Item(level, BulkText.level(messages, level), finding.ruleId(), finding.field(), finding.message(),
                         finding.suggestion(), finding.mark() == null ? null : messages.get("bulk.item.catalogmark", finding.mark()),
-                        messages.ruleExplanation(finding.ruleId()), null, null,
+                        withLlmLabel(messages.ruleExplanation(finding.ruleId()),
+                                ConsoleLlmLabel.sentence(messages, ConsoleLlmLabel.reason(finding.riskAdjustments()))), null, null,
                         FeedbackTarget.trademark(result.checkId(), index)));
             }
             boolean complete = result.completeness() == Completeness.COMPLETE;
@@ -477,6 +479,14 @@ public class BulkCheckService {
                     messages.ruleExplanation(finding.ruleId()), null, null,
                     checkId == null ? null : FeedbackTarget.variation(checkId, index)));
         }
+    }
+
+    /** The explanation of a rule and, when a language model called the word descriptive (ADR-036), its label and reason. */
+    private static String withLlmLabel(String explanation, String label) {
+        if (label == null) {
+            return explanation;
+        }
+        return explanation == null || explanation.isBlank() ? label : explanation + " " + label;
     }
 
     private static boolean present(String text) {

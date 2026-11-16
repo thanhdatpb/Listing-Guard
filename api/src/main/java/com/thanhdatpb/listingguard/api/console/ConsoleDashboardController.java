@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console;
 
+import com.thanhdatpb.listingguard.api.console.reaudit.ReauditService;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,10 +21,12 @@ public class ConsoleDashboardController {
 
     private final PlanService plans;
     private final ConsoleHomeService home;
+    private final ReauditService reaudit;
 
-    public ConsoleDashboardController(PlanService plans, ConsoleHomeService home) {
+    public ConsoleDashboardController(PlanService plans, ConsoleHomeService home, ReauditService reaudit) {
         this.plans = plans;
         this.home = home;
+        this.reaudit = reaudit;
     }
 
     @GetMapping({"/console", "/console/"})
@@ -32,6 +35,8 @@ public class ConsoleDashboardController {
         model.addAttribute("email", user.email());
         model.addAttribute("usage", plans.usage(user.clientId()));
         model.addAttribute("home", home.home(user.clientId()));
+        // the catalog changed since a scope was last re-audited (ADR-035)
+        model.addAttribute("reauditNotice", reaudit.notice(user.clientId()).orElse(null));
         return "console/dashboard";
     }
 }

@@ -13,7 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * Stores one row per finished run of the rewrite button and records that the seller copied a suggestion (ADR-037, V40). The row has
+ * Stores one row per finished run of the rewrite button and records that the seller copied a suggestion (ADR-037, V42). The row has
  * counts and an address only: no title, tag, prompt, answer or note. The finding the run started from is resolved by the same
  * client-scoped lookup as a verdict of ADR-034, and its rule id and level are copied, so a finding of another client is never read.
  */

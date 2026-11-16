@@ -20,6 +20,21 @@
         <span th:text="#{home.week(${#temporals.format(home.weekFrom, 'dd/MM/yyyy')}, ${#temporals.format(home.today, 'dd/MM/yyyy')})}"></span>
     </p>
 
+    <!-- The catalog changed since a scope was last re-audited (ADR-035): say so and link to the page. -->
+    <section class="notice" id="reaudit-notice" role="status" aria-labelledby="reaudit-notice-heading" th:if="${reauditNotice != null}">
+        <h2 id="reaudit-notice-heading" th:text="#{home.reaudit.heading}"></h2>
+        <p th:text="#{home.reaudit.text(${reauditNotice.catalogVersion})}"></p>
+        <ul>
+            <li th:each="item : ${reauditNotice.stale}">
+                <span th:text="${item.marketplace}"></span>
+                <span th:text="${item.account.isEmpty()} ? #{reaudit.account.none} : ${item.account}"></span>:
+                <span th:text="#{home.reaudit.last(${#strings.substring(#strings.toString(item.startedAt), 0, 10)}, ${item.catalogVersion == null} ? #{reaudit.catalog.none} : ${item.catalogVersion})}"></span>
+            </li>
+        </ul>
+        <p th:if="${reauditNotice.more > 0}" th:text="#{home.reaudit.more(${#strings.toString(reauditNotice.more)})}"></p>
+        <p><a class="button" th:href="@{/console/reaudit}" th:text="#{home.reaudit.link}"></a></p>
+    </section>
+
     <!-- No result and no verdict in eight weeks: how to start, not a page of zeros. -->
     <section class="empty-state" id="home-empty" th:if="${home.empty}" aria-labelledby="empty-heading">
         <h2 id="empty-heading" th:text="#{home.empty.heading}"></h2>
@@ -56,6 +71,14 @@
                         <li th:text="#{home.card.trademark.rule(${#strings.toString(home.holdsRule)})}"></li>
                         <li th:text="#{home.card.trademark.watchlist}"></li>
                     </ul>
+                </div>
+                <div class="card" id="card-llm" th:if="${home.llm.enabled}">
+                    <p class="card-label" th:text="#{home.card.llm}"></p>
+                    <p class="card-value"><span th:text="${home.llm.used}"></span> / <span th:text="${home.llm.limit}"></span></p>
+                    <ul class="card-note small muted">
+                        <li th:each="p : ${home.llm.providers}" th:text="${p.id} + ': ' + ${p.used} + ' / ' + ${p.limit}"></li>
+                    </ul>
+                    <p class="card-note small muted" th:text="#{home.card.llm.note}"></p>
                 </div>
                 <div class="card" id="card-feedback">
                     <p class="card-label" th:text="#{home.card.feedback}"></p>

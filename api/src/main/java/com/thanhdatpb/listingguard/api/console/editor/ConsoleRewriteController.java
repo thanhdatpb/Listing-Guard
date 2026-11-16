@@ -36,7 +36,7 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>{@code POST /console/rewrite/used} records that the seller copied a suggestion of a run of their client, for the use-rate.
  */
 @Controller
-@ConditionalOnProperty(prefix = "listing-guard", name = {"console.enabled", "llm.rewrite.enabled"}, havingValue = "true")
+@ConditionalOnProperty(name = {"listing-guard.console.enabled", "listing-guard.llm.rewrite.enabled"}, havingValue = "true")
 public class ConsoleRewriteController {
 
     static final String PAGE = "console/rewrite-page";

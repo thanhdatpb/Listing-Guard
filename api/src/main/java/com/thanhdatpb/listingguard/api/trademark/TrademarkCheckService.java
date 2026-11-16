@@ -6,6 +6,7 @@ import com.thanhdatpb.listingguard.api.listing.Normalizer;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.trademark.tsdr.TsdrStatusOverlay;
+import com.thanhdatpb.listingguard.api.trademark.judge.TrademarkContextJudge;
 import com.thanhdatpb.listingguard.api.trademark.watchlist.WatchlistService;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.trademark.CanonicalInput;
@@ -58,6 +59,7 @@ public class TrademarkCheckService {
     private final PlanService plans;
     private final TsdrStatusOverlay tsdrStatus;
     private final WatchlistService watchlists;
+    private final TrademarkContextJudge judge;
 
     /** A service whose answers never carry a TSDR status (the overlay is off). */
     public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
@@ -73,10 +75,19 @@ public class TrademarkCheckService {
         this(normalizers, runtime, rulesets, store, transactions, plans, tsdrStatus, null);
     }
 
-    @Autowired
+    /** A service whose answers are never judged by a language model: the checks of before ADR-036. */
     public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
                                  TrademarkRulesets rulesets, TrademarkCheckStore store, TransactionTemplate transactions,
                                  PlanService plans, TsdrStatusOverlay tsdrStatus, WatchlistService watchlists) {
+        this(normalizers, runtime, rulesets, store, transactions, plans, tsdrStatus, watchlists, TrademarkContextJudge.off());
+    }
+
+    @Autowired
+    public TrademarkCheckService(NormalizerRegistry normalizers, TrademarkCatalogRuntime runtime,
+                                 TrademarkRulesets rulesets, TrademarkCheckStore store, TransactionTemplate transactions,
+                                 PlanService plans, TsdrStatusOverlay tsdrStatus, WatchlistService watchlists,
+                                 TrademarkContextJudge judge) {
+        this.judge = judge;
         this.watchlists = watchlists;
         this.tsdrStatus = tsdrStatus;
         this.normalizers = normalizers;
@@ -120,7 +131,11 @@ public class TrademarkCheckService {
         // an undeclared product type is the client's mistake: refuse it, never scan as if none had been named
         String productType = productType(requestedProductType);
         WatchlistService.Active watchlist = watchlists == null ? WatchlistService.Active.NONE : watchlists.active(clientId);
-        Prepared prepared = prepare(marketplace, watchlist);
+        // the watchlist and, when the LLM judge is on (ADR-036), its prompt and models are part of the analysis version; with both
+        // absent the map is empty and the fingerprint is the one a check always had
+        Map<String, String> components = new java.util.TreeMap<>(watchlist.watchlist().fingerprintComponents());
+        components.putAll(judge.fingerprintComponents());
+        Prepared prepared = prepare(marketplace, watchlist, components);
         TrademarkScanner scanner = prepared.scanner();
         String fingerprint = prepared.fingerprint();
         Long catalogVersionId = prepared.catalogVersionId();
@@ -138,7 +153,7 @@ public class TrademarkCheckService {
         // a cached answer costs nothing and was returned above; a new result is stored, and a complete one is counted
         // (ADR-013). An INCOMPLETE result is stored for GET and never reused, so the client is not charged for it.
         plans.requireQuota(admission);
-        TrademarkResult result = scanner.scan(input, watchlist.watchlist());
+        TrademarkResult result = judge.judge(input, scanner.scan(input, watchlist.watchlist()), scanner.catalog());
         try {
             return transactions.execute(status -> {
                 if (result.completeness() == Completeness.COMPLETE) {
@@ -161,8 +176,7 @@ public class TrademarkCheckService {
     private record Prepared(TrademarkScanner scanner, String fingerprint, Long catalogVersionId) {
     }
 
-    private Prepared prepare(String marketplace, WatchlistService.Active watchlist) {
-        Map<String, String> watchlistComponents = watchlist.watchlist().fingerprintComponents();
+    private Prepared prepare(String marketplace, WatchlistService.Active watchlist, Map<String, String> watchlistComponents) {
         if (runtime.ready() || watchlist.watchlist().isEmpty()) {
             // without a watchlist an unserved catalog is refused here, exactly as before ADR-031
             // a client without a watchlist asks exactly as before (the one-argument form), so its fingerprint cannot move
@@ -177,7 +191,9 @@ public class TrademarkCheckService {
     /**
      * Scans a listing with the served catalog and the client's active watchlist and returns the outcome without storing,
      * caching or counting anything (ADR-037): the verification of a rewrite suggestion, which is not a listing of the seller.
-     * Same normalizer, scanner and watchlist as {@link #check}; only the plan's pack is required, no quota is used.
+     * Same normalizer, scanner and watchlist as {@link #check}; only the plan's pack is required, no quota is used. The LLM judge of
+     * ADR-036 is deliberately not asked: it can only lower a finding, so the plain scan is at least as strict as what the seller sees,
+     * and a verification must not spend a model call per candidate.
      *
      * @throws TrademarkUnavailableException if no catalog is served and the client has no watchlist
      * @throws com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException if the client's plan has no {@code trademark-risk} pack
@@ -188,7 +204,8 @@ public class TrademarkCheckService {
         Listing listing = normalizer.normalize(request.listing());
         String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
         WatchlistService.Active watchlist = watchlists == null ? WatchlistService.Active.NONE : watchlists.active(clientId);
-        return prepare(marketplace, watchlist).scanner().scan(input(listing, null), watchlist.watchlist());
+        return prepare(marketplace, watchlist, watchlist.watchlist().fingerprintComponents()).scanner()
+                .scan(input(listing, null), watchlist.watchlist());
     }
 
     /**

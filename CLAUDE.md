@@ -404,17 +404,17 @@ It never edits a listing, never publishes, and does no SEO.
   editor shows before/after and new/modified/remaining findings. History is scoped to the signed-in account's client, filters and
   paginates saved pack results, and stores event references (actor, result, time, marketplace, row count, optional SKU) only; listing
   text is never stored. A history result cannot restore the prior listing: edit mode leaves Before blank and asks the seller to paste it.
-  SDK, read-only MCP `check_listing_edit`, agent skill, OpenAPI and integration docs are updated. **LLM rewrite suggestions (ADR-037, Proposed; V40)** (`api/.../rewrite/`,
+  SDK, read-only MCP `check_listing_edit`, agent skill, OpenAPI and integration docs are updated. **LLM rewrite suggestions (ADR-037, Proposed; V42)** (`api/.../rewrite/`,
   `console/editor/ConsoleRewriteController`, `templates/console/rewrite{,-page}.html`, `static/console/rewrite.{js,css}`,
-  [docs/llm.md](docs/llm.md)): **off by default** (`listing-guard.llm.rewrite.enabled=false`) and needs an `LlmProvider` bean (ADR-036 is
-  not in the repository: only `ScriptedLlmProvider` and tests' `StubLlm` exist); with either missing there is no bean of the package, no
-  route and no button (`rewriteAvailable` from `ConsoleRewriteAdvice`). A press of "Gợi ý sửa" (editor, and each bulk row with an ERROR or a
+  [docs/llm.md](docs/llm.md)): **off by default** (`listing-guard.llm.rewrite.enabled=false`) and is usable only when the shared ADR-036 `LlmClient` is on with a provider whose listing-text flag is true
+  (`LlmClient.canServe(LISTING_TEXT)`): with the switch off there is no bean of the package and no route, with no such provider there is no
+  button (`rewriteAvailable` from `ConsoleRewriteAdvice`). A press of "Gợi ý sửa" (editor, and each bulk row with an ERROR or a
   trademark finding; the row carries its listing as `BulkResult.Row.rewriteListing`, printed only while the feature is on) sends the title,
-  tags and findings (never the description or other fields) through `ListingRewriter`, up to 3 candidates. **The model proposes, the
-  checks decide:** each candidate is verified through `CheckService.evaluate` and `TrademarkCheckService.evaluate` (no storing, no cache, no
-  quota): every rule ran, no ERROR, trademark complete and no signature the original lacked (catalog or watchlist), fewer problems than
+  tags and findings (never the description or other fields) through `LlmClient.complete` (purpose `rewrite_suggestion`; ADR-036's failover,
+  quota, cache and audit), up to 3 candidates. **The model proposes, the checks decide:** each candidate is verified through
+  `CheckService.evaluate` and `TrademarkCheckService.evaluate` (no storing, no cache, no quota, no context judge): every rule ran, no ERROR, trademark complete and no signature the original lacked (catalog or watchlist), fewer problems than
   before, no more words, no stuffed word, exact tag value. Anything unverified is never shown; none passing is "Không có gợi ý an toàn".
-  Nothing applies a suggestion (copy button only; ADR-014 A2 still holds for rules). `rewrite_suggestion_run` (V40) keeps counts and the
+  Nothing applies a suggestion (copy button only; ADR-014 A2 still holds for rules). `rewrite_suggestion_run` (V42) keeps counts and the
   ADR-034 finding address, never text; `RewriteRunStore.markUsed` counts the first copy of a run for the use-rate on `/console/stats`.
   No HTTP API, SDK or MCP change. **Bulk check (ADR-029, V36)** (`api/.../console/bulk/`, `templates/console/bulk*.html`, `static/console/bulk.{css,js}`, English and
   Vietnamese like the rest of the console: every sentence is a message key, ADR-028; `BulkText` and the pure classes take
@@ -436,6 +436,20 @@ It never edits a listing, never publishes, and does no SEO.
   part is Warning (`Cảnh báo`); a part that did not run (no catalog, plan, quota) is said in the row and never becomes a silent `Đạt`; the trademark
   disclaimer is on the page and in each row's detail; a cell that starts like a formula gets a leading apostrophe in the pasted block
   and the CSV. No API endpoint, MCP tool or `openapi.json` change.
+  **Free-tier LLM providers and the trademark context judge (ADR-036, Proposed; V41; off by default)** (`api/.../llm/`,
+  `api/.../trademark/judge/`, `trademark-scanner/.../LlmJudgement`, `resources/llm/trademark-judge-2026-11.yaml`; docs/llm.md): `LlmClient`
+  walks an ordered list of OpenAI-compatible providers (Groq, Cloudflare Workers AI, Gemini; `listing-guard.llm.providers`), skips one
+  that is at its per-minute window, its day counter (`llm_usage`, reserved atomically) or a 60 s cool-down after a 429, fails over on
+  any failure, caches answers by the hash of model and prompt, and writes one audit line per call (no content). `listing-text-allowed`
+  and `personal-data-allowed` are `false` for every provider: a call declares its data kinds (`LISTING_TEXT`, `PERSONALIZATION`) and
+  only a provider allowed all of them receives it. The judge looks only at catalog findings at MEDIUM (not HIGH, LOW, watchlist or
+  context rules; at most 8 per check), sends the mark, classes, field and 160 characters each side, and accepts exactly
+  `{"verdict","reason"}` (anything else is `unsure`). `LlmJudgement` (no LLM) can only lower: `likely_descriptive` keeps the finding,
+  MEDIUM to LOW, adds the risk adjustment `llm_descriptive`; it never removes a finding or raises a level. A skipped step (no quota,
+  all failed) makes the result INCOMPLETE with `skippedRuleIds` `llm_context_judge`, not cached, not charged. With the judge active the
+  fingerprint gains `llm_judge` (prompt version and hash, models in order, settings); off, the fingerprint is the old one. Console: label
+  and reason on the editor and bulk items, "LLM requests today" on the home page. `backtest --llm-judge` and `eval-listing --llm-judge`
+  print before and after; the default catch line is MEDIUM, so recall can fall: measure before turning it on (ADR-036 Results).
   **Finding feedback, home page and statistics (ADR-034, Proposed; V37)** (`api/.../feedback/`, `console/ConsoleFeedback*`,
   `ConsoleHomeService`, `ConsoleStatsController`, `templates/console/{feedback,feedback-saved,stats,dashboard}.html`; docs/feedback.md): a
   verdict (`CORRECT`, `FALSE_POSITIVE`, `NOT_USEFUL`) and an optional note of at most 280 characters next to each stored finding of the
@@ -448,6 +462,23 @@ It never edits a listing, never publishes, and does no SEO.
   weeks, rules most often marked false positive, shortcuts, an empty state) and `GET /console/stats[.csv]` the statistics. API:
   `POST /api/v1/feedback` and `GET /api/v1/feedback/stats` (no plan pack, no quota; problems `invalid-feedback`, `finding-not-found`);
   `HealthReport.feedback`. The MCP server and the SDK have no method for them.
+  **Periodic re-audit (ADR-035, Proposed; V40)** (`api/.../console/reaudit/`, `templates/console/reaudit*.html`; docs/reaudit.md): menu
+  "Re-audit" ("Rà định kỳ"); `GET /console/reaudit` and `POST /console/reaudit/run` (multipart, the bulk check's size limits and request
+  allowance in `ApiSecurityConfig`). The seller uploads the export of the listings on sale; **only a file one built-in CSV input adapter
+  recognizes is accepted** (no column mapping, so runs stay comparable), with an optional free-text account or label (80 characters; a
+  scope is client + marketplace + label, never the console account). `ReauditService` calls `CheckService.checkDetailed` and
+  `TrademarkCheckService.check` (catalog and watchlist), no variation check; a *risk* is a rules `ERROR`/`WARNING` or a trademark `HIGH`/`MEDIUM`.
+  **New vs known** (`ReauditBaselines`): a catalog risk is new when the previous run of the scope used another catalog version that lacks the
+  mark (`PreviousCatalogMarks`: `trademark_entry` by `(catalog_version_id, normalized)`), used no catalog, or that version is gone (then all are
+  new, with a note); a watchlist risk is new when the watchlist version changed and the entry's `updated_at` is after the previous run started;
+  anything else is known; **the first run of a scope has nothing to compare with and lists everything as known**. `ReauditComparison` pairs rows
+  by SKU + ordinal and compares `ReauditHasher` hashes (canonical standard input, SHA-256): edited, new, dropped; a row without a SKU pairs only with an
+  identical row. Tables `reaudit_run` and `reaudit_run_row` (V40; `ReauditStore` is the only reader and writer; the newest `keep-runs` (20) runs of a
+  scope are kept) hold times, versions, SKUs, hashes and counts, **never a file, a title, a tag, a description, a finding, its message or a mark**.
+  The CSV (`ReauditExport`: SKU, account, rule, mark, level, group, line, field) holds no finding text and defuses formula cells. The home
+  page shows "Catalog đã cập nhật, nên rà lại" through `ReauditService.notice` (latest run of a scope vs `TrademarkCatalogRuntime.status()`), and
+  `HealthReport.reaudit` (`ReauditSummaryView`: counts, the catalog served, scopes due) is on the report API, job and console page. No endpoint,
+  MCP tool or SDK method; `BulkExport` helpers and `ConsoleBulkController.adapterFor` are public for it.
   **Localization (ADR-028, Proposed; implemented)**: every sentence the console prints is a key of `api/src/main/resources/messages.properties`
   (English, the base) and `messages_vi.properties`, read through Spring's `MessageSource` (`#{...}` in a template, `ConsoleMessages` in
   Java; `spring.messages.basename: messages,rules`, no fallback to the JVM's language). The language of a page: the `lang` link in the
@@ -586,6 +617,15 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     `docs/watchlist.md`). Open questions the maintainer decides are at the end of the ADR (the client's own minimum level, Nice classes lowering
     a level, personalization screening reading the list, limiting key creation to administrators, a Sheet connector). Not planned: fuzzy
     matching of a watchlist, a tool that writes the list, reading a Google Sheet by itself.
+20. Periodic re-audit (ADR-035, Proposed): done as one PR (`feature/periodic-reaudit`: ADR, V40, `api/.../console/reaudit/`, the page, the home
+    reminder, `HealthReport.reaudit` with `openapi.json`, tests, `docs/reaudit.md`). Open questions the maintainer decides are at the end of the
+    ADR (comparing the first run with the catalog before the served one, a changed watchlist note counting as new, a scheduled run that reads a
+    Sheet, an e-mail reminder, variation checks for adapter files, the scope, TSDR-dead marks). Not planned: storing a file or a listing text,
+    an endpoint, MCP tool or SDK method, applying a fix. V40 follows V39 (`check_history`, ADR-033); V41 is the LLM usage counter (ADR-036); the next migration is V42.
+21. Free-tier LLM providers and the trademark context judge (ADR-036, Proposed): done as one PR (`feature/llm-trademark-judge`: ADR, V41, `api/.../llm/`,
+    `api/.../trademark/judge/`, `LlmJudgement`, the prompt resource, console label and counter, `--llm-judge` for the two evaluation jobs,
+    `docs/llm.md`). Open questions are at the end of the ADR (the terms of Groq and Cloudflare for client text, a native read of the
+    Vietnamese copy, showing "LLM agrees"). The after-measurement needs a real key and is the maintainer's to run.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
@@ -941,6 +981,12 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   (never zero) and is "reported", never "accuracy". An API answer names a reviewer by kind and id, never an e-mail. `FeedbackSource`,
   `FeedbackVerdict` and the packs equal the `CHECK` constraints of V37 (`FeedbackModelTest`). A page that shows a stored finding adds the
   widget with `console/feedback :: widget(target)` and `ConsoleFeedbackSupport.populate`; a new text is a key of both bundles (ADR-028).
+- **Periodic re-audit** (ADR-035): the uploaded file, a listing's text, a finding's message and a mark are never stored, logged or put in the
+  session; `reaudit_run_row` keeps a SKU, an ordinal, a hash and counts, and **no health-report section, log line or API answer may add the SKU or a
+  hash**. A risk is never called known without proof: the first run of a scope, a catalog version that is gone and a watchlist entry that was
+  deleted since are said so, never silently "known". A row that was not judged (unreadable, quota, plan) is listed, never counted as clean, and is
+  never called edited, new or dropped. The page reads only files an input adapter recognizes; a table that needs a mapping goes to the bulk check.
+  A new text is a key of both bundles (ADR-028); the page and the CSV go through `th:text` and `BulkExport.cell`.
 - **MCP server** (ADR-017, ADR-023): `mcp-server` stays a client of the REST API and depends on exactly one module, `client` (a test
   reads its POM and its imports: no database, no Spring, no `core`, no `api`); it calls the API only through `ApiGateway` (an SDK raw
   call with `RetryPolicy.none()`). A new tool means a new `Endpoint` entry, a `ToolSpec` with a schema that

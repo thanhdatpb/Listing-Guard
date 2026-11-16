@@ -5,6 +5,7 @@ import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.CheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
+import com.thanhdatpb.listingguard.api.console.ConsoleLlmLabel;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import com.thanhdatpb.listingguard.api.plan.Pack;
@@ -216,7 +217,8 @@ public class EditorCheckService {
         String text = EditorEvidence.fieldText(listing, finding.field());
         return new EditorResult.TrademarkItem(finding.ruleId(), finding.risk().name(), finding.field(),
                 finding.matchType().name(), finding.mark(), finding.message(), finding.suggestion(),
-                EditorEvidence.ofSpan(text, finding.start(), finding.end(), finding.snippet()), target);
+                EditorEvidence.ofSpan(text, finding.start(), finding.end(), finding.snippet()), target,
+                ConsoleLlmLabel.reason(finding.riskAdjustments()));
     }
 
     private static EditorResult.Trademark panel(EditorResult.TrademarkKind kind, String big, String headline, String detail,

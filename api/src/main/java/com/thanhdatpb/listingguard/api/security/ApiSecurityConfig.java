@@ -76,8 +76,8 @@ public class ApiSecurityConfig {
                                                                    ConsoleProperties console, BulkProperties bulk,
                                                                    ObjectMapper mapper) {
         // the image endpoint takes a multipart body of its own, larger limit, but only while image checks are enabled: when
-        // they are off a large upload gets the ordinary 413 and is never staged (ADR-008). The two POSTs of the console's bulk
-        // check do the same, only while the console is on (ADR-029)
+        // they are off a large upload gets the ordinary 413 and is never staged (ADR-008). The POSTs of the console's bulk
+        // check and of its periodic re-audit do the same, only while the console is on (ADR-029, ADR-035)
         Map<String, Long> uploads = new LinkedHashMap<>();
         if (images.enabled()) {
             uploads.put("/api/v1/image-checks", images.maxRequestSize().toBytes());
@@ -85,6 +85,7 @@ public class ApiSecurityConfig {
         if (console.enabled()) {
             uploads.put("/console/bulk/prepare", bulk.requestLimitBytes());
             uploads.put("/console/bulk/run", bulk.requestLimitBytes());
+            uploads.put("/console/reaudit/run", bulk.requestLimitBytes());
         }
         return register(new BodyLimitFilter(properties.maxBodyBytes(), mapper, uploads), Ordered.HIGHEST_PRECEDENCE + 10);
     }

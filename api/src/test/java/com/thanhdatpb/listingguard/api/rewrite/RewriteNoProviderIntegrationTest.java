@@ -12,7 +12,7 @@ import com.thanhdatpb.listingguard.api.client.ClientRepository;
 import com.thanhdatpb.listingguard.api.console.ConsoleTestSupport;
 import com.thanhdatpb.listingguard.api.plan.PlanCode;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkReadyTestConfig;
-import com.thanhdatpb.listingguard.rag.llm.LlmProvider;
+import com.thanhdatpb.listingguard.api.llm.LlmClient;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * The setting is on but no {@code LlmProvider} is configured (ADR-036 not in place): the feature has nothing to ask, so the console shows
+ * The setting is on but the shared LLM client of ADR-036 is off (its default): the feature has nothing to ask, so the console shows
  * no button, and a press that somehow arrives is answered as unavailable without any text being sent anywhere.
  */
 @SpringBootTest(properties = {"listing-guard.console.enabled=true", "listing-guard.console.base-url=https://console.example.test",
@@ -48,7 +48,7 @@ class RewriteNoProviderIntegrationTest {
     void withoutAProviderThereIsNoButtonAndAPressIsUnavailable() throws Exception {
         var user = ConsoleTestSupport.userOf(newClient(provisioning, clients, PlanCode.PRO));
 
-        assertThat(context.getBeansOfType(LlmProvider.class)).isEmpty();
+        assertThat(context.getBean(LlmClient.class).enabled()).isFalse();
         assertThat(rewriter.available()).isFalse();
         String page = mvc.perform(checkPost(user, etsyForm(TOO_LONG))).andExpect(status().isOk()).andReturn().getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);

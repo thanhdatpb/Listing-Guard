@@ -227,6 +227,9 @@
                             <p class="meta small muted"><code th:text="${f.ruleId}"></code> <span th:text="#{editor.finding.on}"></span> <code th:text="${f.field}"></code>
                                 <th:block th:if="${f.mark != null}"> <span th:text="#{editor.trademark.matching}"></span> <code th:text="${f.mark}"></code></th:block></p>
                             <p class="explain small muted" th:if="${explanation != null}"><span th:text="#{editor.finding.explains}"></span> <span th:text="${explanation}"></span></p>
+                            <p class="llm small" th:if="${f.llmReason != null}"><strong th:text="#{console.llm.label}"></strong>
+                                <span th:if="${!f.llmReason.isEmpty()}" th:text="${f.llmReason}"></span>
+                                <span class="muted" th:text="#{console.llm.opinion}"></span></p>
                             <p class="evidence small" th:if="${f.evidence != null}"><span th:text="#{editor.finding.evidence}"></span>
                                 <th:block th:replace="~{console/editor-fragments :: evidence(${f.evidence})}"></th:block></p>
                             <p class="small" th:if="${f.suggestion != null}" th:text="${f.suggestion}"></p>

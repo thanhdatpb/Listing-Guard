@@ -21,11 +21,16 @@ public final class StubLlm implements LlmProvider {
 
     private volatile String answer = NONE;
     private volatile LlmException failure;
+    private volatile int generation;
     private final List<LlmRequest> requests = new CopyOnWriteArrayList<>();
 
+    /**
+     * The shared client caches answers by model id and request, so every change of the stub's behaviour is a new "model": a test never
+     * gets the answer an earlier test made the same request produce.
+     */
     @Override
     public String modelId() {
-        return "stub:v1";
+        return "stub:v" + generation;
     }
 
     @Override
@@ -42,14 +47,17 @@ public final class StubLlm implements LlmProvider {
     public void reply(String text) {
         failure = null;
         answer = text;
+        generation++;
     }
 
     public void fail(LlmException exception) {
         failure = exception;
+        generation++;
     }
 
     /** No candidates, no failure, no remembered request. */
     public void reset() {
+        generation++;
         failure = null;
         answer = NONE;
         requests.clear();

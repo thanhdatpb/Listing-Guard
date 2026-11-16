@@ -7,7 +7,8 @@
   `LlmProvider` port), [ADR-014](ADR-014-listing-workspace.md) (editor, verified fixes), [ADR-028](ADR-028-console-localization.md),
   [ADR-029](ADR-029-console-bulk-check.md), [ADR-031](ADR-031-client-trademark-watchlist.md),
   [ADR-033](ADR-033-edit-mode-and-check-history.md), [ADR-034](ADR-034-finding-feedback-and-value-dashboard.md),
-  ADR-036 (the LLM provider and its master switch; see "Open questions": it is not in the repository yet)
+  [ADR-036](ADR-036-free-tier-llm-providers-and-trademark-context-judge.md) (the shared `LlmClient`, its providers, data routing,
+  quota, cache and audit)
 - Acceptance convention: Keep Proposed until the PR implementing this ADR is approved and merged. Then set Status to
   Accepted and Date to the merge date.
 
@@ -27,10 +28,11 @@ the same checks that found the problem decide what the seller may see.
 
 ### Off by default, and needs the provider of ADR-036
 
-`listing-guard.llm.rewrite.enabled` defaults to `false`. The feature exists only when it is `true` **and** an
-`LlmProvider` bean (ADR-011 item 4, supplied by ADR-036) is configured. Otherwise there is no service, no route and
-no button on any console page, and no listing text is sent anywhere. The setting is a deployment property; there is no
-per-client switch in this ADR.
+`listing-guard.llm.rewrite.enabled` defaults to `false`. The feature exists only when it is `true`, and it is usable only when
+the shared client of ADR-036 is on (`listing-guard.llm.enabled=true`) **and** at least one of its providers may receive
+`LISTING_TEXT` (`listing-text-allowed=true`, ADR-036 item 6). With the switch off there is no service and no route; with the
+switch on but no such provider (`LlmClient.canServe` false) there is no button, a press is answered "unavailable", and no
+listing text is sent anywhere. The setting is a deployment property; there is no per-client switch in this ADR.
 
 This is the one place where Listing Guard shows text that no rule wrote, so it is an explicit, narrow exception to
 ADR-014 A2 ("no rule proposes a replacement word"): the text comes from a model, is labelled as such, passes the
@@ -45,7 +47,10 @@ button and no call.
 
 ### What the model is asked
 
-One call to `LlmProvider.complete` (temperature 0, no tools, no retry, bounded output tokens and timeout). The prompt
+One call through `LlmClient.complete` with purpose `rewrite_suggestion` and data class `LISTING_TEXT` (temperature 0, no
+tools, bounded output tokens and timeout; provider order, failover, per-provider quota, answer cache and the audit line are
+ADR-036's). The client caches any successful answer, so an unreadable answer is also repeated until it expires; the
+answer is verified every time, cached or not. The prompt
 carries the marketplace, the title, the tags and, for each finding the call is about, its rule id, field, offending
 value and message (which names the limit that was broken). It does **not** carry the description, brand, bullet points,
 search terms, price or any other field. The listing text is delimited as untrusted data, as in ADR-011.
@@ -65,7 +70,9 @@ still holds the old value) and judged by the checks the seller sees, not by anyt
    words than the original, no word repeated more than twice unless the original already did.
 2. **Listing rules**: the whole ruleset of the marketplace runs on the copy (the detailed path, so a rule that fails is
    known). The candidate is dropped when a rule failed to run or when any `ERROR` finding remains.
-3. **Trademark**: the trademark check runs on the copy against the served catalog and the client's active watchlist.
+3. **Trademark**: the trademark check runs on the copy against the served catalog and the client's active watchlist, without
+   the context judge of ADR-036 (the judge can only lower a finding, so the plain scan is at least as strict as what the seller
+   sees, and a verification does not spend a model call per candidate).
    The candidate is dropped when the check cannot run, is incomplete, or has any finding whose
    `(rule id, field kind, matched mark or normalized token)` signature is not already a finding of the original listing.
 4. **Progress**: the candidate must have strictly fewer `ERROR` plus trademark findings than the original, so a copy that
@@ -101,7 +108,7 @@ provider's own timeout bounds the call. A listing larger than a size cap is not 
 
 ### Measuring use (ADR-034)
 
-Each run that finishes writes one row to `rewrite_suggestion_run` (migration V40): client, account, marketplace, the ADR-034
+Each run that finishes writes one row to `rewrite_suggestion_run` (migration V42): client, account, marketplace, the ADR-034
 finding address it was started from (rule id and level copied through the same client-scoped lookup as feedback), the
 model id, how many candidates were safe, the time and, once the seller presses copy, the time and the number of the
 candidate they copied. No title, tag, prompt, answer or note is stored. The use-rate is runs with a copy divided by runs
@@ -137,8 +144,9 @@ editor or in bulk; both bundles hold every new key.
 
 ## Open questions
 
-- ADR-036 is not in the repository when this is written. This ADR consumes an `LlmProvider` bean and defines its own
-  switch; when ADR-036 defines a master switch or a budget, the condition of this feature should include it.
+- The free-tier limits of ADR-036 are shared with the trademark judge: a seller who presses the button spends a request that
+  the judge could have used. The hourly limit of this ADR is per client; the daily limits are per provider and are ADR-036's.
+  Whether rewrite suggestions need their own provider order or budget is not decided.
 - The Vietnamese and English sentences, and the sentence that a verified suggestion is not legal clearance, were written
   by Claude and need a native and legal read.
 - Whether title and tags are enough, or sellers also want bullet-point and description rewrites (more data would leave

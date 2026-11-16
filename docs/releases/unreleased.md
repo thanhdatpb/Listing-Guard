@@ -2,10 +2,10 @@
 
 Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: edit mode and check history (ADR-033), finding feedback (ADR-034), the console in English
 and Vietnamese (ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030), the value backtest with the labelled
-evaluation (ADR-032), the client trademark watchlist (ADR-031) and edit mode and check history (ADR-033). Finding feedback,
-the watchlist and edit mode touch the API, and only additively (see their sections); the bulk check adds migration V36, finding
-feedback V37, the watchlist V38, check history V39 and the LLM rewrite suggestions (ADR-037, off by default, console only) V40, all
-additive. The other changes touch no API response, request, status, header or migration.
+evaluation (ADR-032), the client trademark watchlist (ADR-031) and the periodic re-audit of active listings (ADR-035). Finding feedback,
+the watchlist, edit mode and the re-audit touch the API, and only additively (see their sections); the bulk check adds migration V36,
+finding feedback V37, the watchlist V38, check history V39, the re-audit V40, the LLM usage counter V41 (ADR-036, off by default) and the rewrite suggestions V42 (ADR-037, off by default, console only), all additive. The other changes touch no API response,
+request, status, header or migration.
 
 Every pull request that changes the API runs the compatibility check (`./mvnw -B -pl contract-tools verify`, ADR-022) and copies the
 additive and non-breaking lines of `contract-tools/target/contract/compatibility-report.md` here, with a short section for the
@@ -18,18 +18,46 @@ change. When the next version is cut, move this file to `docs/releases/v<version
 An optional console button, **Gợi ý sửa**, for a listing with an `ERROR` finding or a trademark finding: an AI model proposes up to three
 titles and replacement tags, and Listing Guard shows only the proposals that pass every check again. Guide: [llm.md](../llm.md).
 
-- **Off by default.** `listing-guard.llm.rewrite.enabled=false`, and it needs an `LlmProvider` (ADR-036, not in the repository yet). With
-  either missing there is no route and no button, and nothing leaves the system. **With it on, the title, tags and findings of a listing are
-  sent to the provider each time a seller presses the button**; the description and other fields are not.
+- **Off by default.** `listing-guard.llm.rewrite.enabled=false`, and it uses the shared LLM client of ADR-036: it needs
+  `LISTING_GUARD_LLM_ENABLED=true` and a provider with `..._LISTING_TEXT_ALLOWED=true`. Without the switch there is no route; without such
+  a provider there is no button; nothing leaves the system. **With it on, the title, tags and findings of a listing are sent to that
+  provider each time a seller presses the button**; the description and other fields are not. Its requests count against the same
+  per-provider free limits as the trademark judge (audit purpose `rewrite_suggestion`).
 - **The model proposes, the checks decide.** A proposal is shown only when every listing rule ran and none reports an `ERROR`, the trademark
   check (catalog and watchlist) is complete and finds nothing the original did not, it has fewer problems than before, no more words, no
   stuffed word, and a tag change names the exact current tag. None passing is **"Không có gợi ý an toàn"**. Nothing unverified is shown.
 - **Nothing is applied.** The editor and each bulk row only offer a copy button; ADR-014 A2 still holds for rules.
 - **Verification is free of side effects.** `CheckService.evaluate` and `TrademarkCheckService.evaluate` store nothing, cache nothing and use no quota.
-- **Use is measured (ADR-034).** **Migration V40** adds `rewrite_suggestion_run` (counts and the finding address, no text); **Statistics** shows
+- **Use is measured (ADR-034).** **Migration V42** adds `rewrite_suggestion_run` (counts and the finding address, no text); **Statistics** shows
   the share of runs whose suggestion was copied. At most 20 runs per client per hour (`max-per-hour`).
 - **Compatibility report (ADR-022):** none. No HTTP API, OpenAPI, SDK, MCP or agent-skill change.
 - **Open:** the Vietnamese and English texts, and the sentence that a verified suggestion is not legal clearance, need a native and legal read.
+### Periodic re-audit of active listings (ADR-035)
+
+New marks reach the USPTO register every day, so a listing that was safe when it was published can touch one today. The console has a new
+**Re-audit** page (`/console/reaudit`, "Rà định kỳ" in Vietnamese): upload the file of the listings you have on sale and the page checks every
+row again, splits the risks into **new** (caused by a catalog mark or a watchlist entry that the seller's previous audit did not have) and
+**known**, tells which listings were **edited, added or dropped** since that audit, and gives the list to fix as a CSV (SKU, account, rule,
+mark, risk level). Guide: [reaudit.md](../reaudit.md).
+
+- **File and scope.** Only a file that a built-in input adapter recognizes (Etsy listings export, Amazon flat file, experimental Shopify) is read,
+  so runs stay comparable; any other table goes to the bulk check. An optional account or label (a shop name) keeps audits apart: a run is
+  compared with the previous run of the same client, marketplace and label. **The first run of a scope has nothing to compare with**, so every
+  risk is listed as known and the page says so.
+- **What runs.** The listing rules and the trademark check (the catalog and the client's watchlist) through the services the API calls, so
+  plans, quota and the cache are theirs. No variation check (the adapters do not read variation attributes). A risk is a rules `ERROR` or
+  `WARNING`, or a trademark `HIGH` or `MEDIUM`.
+- **Reminder.** When the served catalog is not the one the latest run of a scope used, the home page says "Catalog đã cập nhật, nên rà lại"
+  with a link. The health report has a new section.
+- **Migration V40** (additive; follows V39 of check history): tables `reaudit_run` and `reaudit_run_row` keep times, the catalog and watchlist versions, SKUs, a hash of each row and counts.
+  **Not the file, a title, a tag, a description, a finding or a mark.** The newest 20 runs of a scope are kept
+  (`listing-guard.console.reaudit.keep-runs`).
+- **API, additive:** `HealthReport.reaudit` (runs, clients, listings checked, risks, new risks, the catalog served and the scopes due) on
+  `GET /api/v1/reports/summary`, the `health-report` job and `/console/report`. No new endpoint, MCP tool or SDK method.
+  - `response-property-added` at `schema HealthReport.reaudit`
+- **For the maintainer to decide** (ADR-035, open questions): comparing the first run with the catalog before the served one, whether a changed
+  watchlist note counts as new, a scheduled run that reads a Sheet, an e-mail reminder, variation checks for adapter files, the scope of an
+  audit, and leaving marks that TSDR reports dead out of the new group. The Vietnamese texts have not been reviewed by a native reader.
 
 ### Client trademark watchlist (ADR-031)
 
@@ -64,6 +92,30 @@ looks for them next to the catalog. Guide: [watchlist.md](../watchlist.md).
 - **For the maintainer to decide** (ADR-031, open questions): the client's own minimum level, Nice classes lowering a level, personalization
   screening reading the list, limiting key creation to administrators, and reading a Google Sheet directly. The Vietnamese texts have not been
   reviewed by a native reader.
+### Free-tier LLM providers and a trademark context judge (ADR-036; off by default; V41)
+
+A shared LLM client (Groq, Cloudflare Workers AI and Google Gemini through their OpenAI-compatible endpoints, in the order you
+set) and one use of it: for a **catalog finding at level MEDIUM** the judge sends the mark, its Nice classes, the field and a short
+span around the match and asks whether the word is probably a brand or a plain descriptive word ("Dodger blue" is a colour). A
+`likely_descriptive` answer keeps the finding, lowers it to LOW and adds the risk adjustment `llm_descriptive` with the model's
+reason; any other answer, or one that is not exactly the JSON schema, changes nothing. A finding is never removed, a level is never
+raised, and HIGH, LOW, watchlist and context-rule findings are never sent. See [docs/llm.md](../llm.md).
+
+- **Off.** `LISTING_GUARD_LLM_ENABLED` and `LISTING_GUARD_LLM_JUDGE_ENABLED` are `false`: no key is read, no request is made and a check
+  returns what it returned before, with the same `analysisVersion`. New migration **V41** (`llm_usage`: requests and tokens per UTC day
+  and provider, numbers only).
+- **Data routing.** Every provider has `listing-text-allowed` and `personal-data-allowed`, both `false` by default: a provider
+  receives nothing until you set its flag after reading its terms (Gemini free usage may be used by Google to improve its products).
+  Personalization text is never sent to a provider whose flag is `false`.
+- **Limits.** Per-minute and per-day limits per provider (conservative defaults, settings); failover on any failure; answers cached
+  by the hash of model and prompt. When no provider has quota the step is skipped: the result is `INCOMPLETE`
+  (`skippedRuleIds: ["llm_context_judge"]`), not cached and not charged.
+- **Console.** A lowered finding shows the label "LLM: có thể là từ mô tả" with the reason; the home page shows "LLM requests today:
+  used / limit".
+- **Measure before use.** `backtest --llm-judge` and `eval-listing --llm-judge` report before and after. The default catch line is
+  MEDIUM, so a demotion can lose a claimed listing; leave the judge off unless recall of claimed rows did not fall.
+- Upgrade: nothing to do (V41 is applied at start-up). To use it, follow docs/llm.md.
+
 ### Edit mode and check history (ADR-033)
 
 The console editor can compare a listing before and after a revision in two columns and separates findings into new, changed,

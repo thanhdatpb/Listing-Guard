@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thanhdatpb.listingguard.api.llm.LlmClient;
+import com.thanhdatpb.listingguard.api.llm.LlmDataClass;
 import com.thanhdatpb.listingguard.rag.llm.LlmRequest;
 import java.time.Clock;
 import java.time.Duration;
@@ -107,6 +109,21 @@ class RewriteUnitTest {
         assertThat(limit.tryAcquire(UUID.randomUUID())).as("another client").isTrue();
         clock.advance(Duration.ofMinutes(31));
         assertThat(limit.tryAcquire(client)).as("the first run left the window").isTrue();
+    }
+
+    @Test
+    void withoutAProviderThatMayReceiveListingTextTheFeatureIsUnavailableAndNothingIsAsked() {
+        LlmClient noListingText = org.mockito.Mockito.mock(LlmClient.class);
+        org.mockito.Mockito.when(noListingText.canServe(ListingRewriter.DATA)).thenReturn(false);
+        ListingRewriter rewriter = new ListingRewriter(noListingText, null, null, null, PROPERTIES, MAPPER);
+
+        RewriteOutcome outcome = rewriter.suggest(UUID.randomUUID(), null, "ETSY", MAPPER.createObjectNode().put("title", "A title"), null);
+
+        assertThat(rewriter.available()).isFalse();
+        assertThat(outcome.status()).isEqualTo(RewriteOutcome.Status.UNAVAILABLE);
+        org.mockito.Mockito.verify(noListingText, org.mockito.Mockito.never()).complete(org.mockito.ArgumentMatchers.any());
+        assertThat(ListingRewriter.DATA).containsExactly(LlmDataClass.LISTING_TEXT);
+        assertThat(LlmClient.disabled(Clock.systemUTC()).canServe(ListingRewriter.DATA)).isFalse();
     }
 
     @Test
