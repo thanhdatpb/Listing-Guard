@@ -240,6 +240,12 @@ listing-guard:
       snippet-chars: 160
       max-output-tokens: 600
       timeout: 20s
+    # LLM rewrite suggestions (ADR-037, docs/llm.md): the console's "Gợi ý sửa" button. Off by default, and it also needs enabled=true above
+    # and a provider with listing-text-allowed. When on, the title, tags and findings of a listing are sent to that provider each time a
+    # seller presses the button.
+    rewrite:
+      enabled: ${LISTING_GUARD_LLM_REWRITE_ENABLED:false}
+      max-per-hour: ${LISTING_GUARD_LLM_REWRITE_MAX_PER_HOUR:20}
     providers:
       - id: groq
         base-url: https://api.groq.com/openai/v1

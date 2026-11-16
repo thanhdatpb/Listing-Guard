@@ -58,6 +58,19 @@
                   th:href="@{/console/stats.csv(from=${from},to=${to},marketplace=${marketplaceSelected})}" th:text="#{stats.csv}"></a></p>
         </section>
 
+        <!-- ADR-037: the use of the rewrite suggestions, only while the feature is on -->
+        <section id="stats-rewrite" aria-labelledby="rewrite-stats-heading" th:if="${rewriteUsage != null}">
+            <h2 id="rewrite-stats-heading" th:text="#{stats.rewrite.heading}"></h2>
+            <dl class="facts">
+                <dt th:text="#{stats.rewrite.runs}"></dt><dd th:text="${rewriteUsage.runs}"></dd>
+                <dt th:text="#{stats.rewrite.safe}"></dt><dd th:text="${rewriteUsage.withSafe}"></dd>
+                <dt th:text="#{stats.rewrite.used}"></dt><dd th:text="${rewriteUsage.used}"></dd>
+                <dt th:text="#{stats.rewrite.rate}"></dt>
+                <dd th:text="${rewriteUsage.rate == null} ? '&mdash;' : ${#numbers.formatPercent(rewriteUsage.rate, 1, 1)}"></dd>
+            </dl>
+            <p class="muted small" th:text="#{stats.rewrite.note}"></p>
+        </section>
+
         <section id="stats-rules" aria-labelledby="rules-heading">
             <h2 id="rules-heading" th:text="#{stats.byrule.heading}"></h2>
             <p class="muted" th:if="${stats.byRule.isEmpty()}" th:text="#{stats.byrule.none}"></p>

@@ -210,7 +210,19 @@ public class BulkCheckService {
                 : new Detail(acc.rules, acc.trademark, variation(acc), null);
         BulkAssessment.Assessed assessed = BulkAssessment.of(messages, detail);
         return new Row(index, input.line(), input.sku(), assessed.status(), assessed.status().label(messages), assessed.findings(),
-                assessed.main(), assessed.summary(), detail);
+                assessed.main(), assessed.summary(), detail, rewriteListing(input, assessed.status(), detail));
+    }
+
+    /**
+     * The row's listing as JSON for the rewrite button (ADR-037), only when the row has something to rewrite (it is an ERROR row or has
+     * a trademark finding) and the text is not too large. It is carried in the response page only while the feature is on.
+     */
+    private static String rewriteListing(Input input, Status status, Detail detail) {
+        if (input.listing() == null || (status != Status.ERROR && detail.trademark().items().isEmpty())) {
+            return null;
+        }
+        String json = input.listing().toString();
+        return json.length() <= BulkResult.REWRITE_LISTING_MAX_CHARS ? json : null;
     }
 
     private static BulkResult.Variation variation(Acc acc) {

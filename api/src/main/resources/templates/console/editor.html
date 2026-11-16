@@ -7,6 +7,7 @@
     <link rel="stylesheet" th:href="@{/console/editor.css}">
     <script th:src="@{/console/editor.js}" defer></script>
     <th:block th:replace="~{console/layout :: htmx}"></th:block>
+    <th:block th:if="${rewriteAvailable}"><th:block th:replace="~{console/rewrite :: assets}"></th:block></th:block>
 </head>
 <body>
 <div th:replace="~{console/layout :: demoBanner}"></div>
@@ -237,6 +238,9 @@
                     </ul>
                 </div>
             </section>
+            <th:block th:if="${rewriteAvailable and result.needsRewrite()}">
+                <th:block th:replace="~{console/rewrite :: editorButton(${form}, ${result.rewriteAnchor()})}"></th:block>
+            </th:block>
         </th:block>
 
         <section class="preview" id="preview" aria-labelledby="preview-heading">

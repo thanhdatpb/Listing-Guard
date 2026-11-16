@@ -8,8 +8,10 @@ import com.thanhdatpb.listingguard.api.feedback.FeedbackStatsService;
 import com.thanhdatpb.listingguard.api.report.InvalidReportPeriodException;
 import com.thanhdatpb.listingguard.api.report.ReportPeriodTooLongException;
 import com.thanhdatpb.listingguard.api.report.ReportQuery;
+import com.thanhdatpb.listingguard.api.rewrite.RewriteRunStore;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -40,11 +42,14 @@ public class ConsoleStatsController {
     private final FeedbackStatsService stats;
     private final NormalizerRegistry normalizers;
     private final ConsoleMessages messages;
+    private final ObjectProvider<RewriteRunStore> rewriteRuns;
 
-    public ConsoleStatsController(FeedbackStatsService stats, NormalizerRegistry normalizers, ConsoleMessages messages) {
+    public ConsoleStatsController(FeedbackStatsService stats, NormalizerRegistry normalizers, ConsoleMessages messages,
+                                  ObjectProvider<RewriteRunStore> rewriteRuns) {
         this.stats = stats;
         this.normalizers = normalizers;
         this.messages = messages;
+        this.rewriteRuns = rewriteRuns;
     }
 
     @GetMapping("/console/stats")
@@ -63,6 +68,11 @@ public class ConsoleStatsController {
             model.addAttribute("to", query.to().toString());
             model.addAttribute("marketplaceSelected", query.marketplace() == null ? "" : query.marketplace());
             model.addAttribute("stats", stats.stats(user.clientId(), query));
+            // the use of the rewrite suggestions (ADR-037): only while that feature is on, for the same period
+            RewriteRunStore rewrite = rewriteRuns.getIfAvailable();
+            if (rewrite != null) {
+                model.addAttribute("rewriteUsage", rewrite.usage(user.clientId(), query.start(), query.endExclusive()));
+            }
         } catch (InvalidReportPeriodException | ReportPeriodTooLongException | UnknownMarketplaceException
                  | MarketplaceNotYetSupportedException e) {
             response.setStatus(HttpStatus.BAD_REQUEST.value());
