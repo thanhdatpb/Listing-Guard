@@ -1,10 +1,11 @@
 # Unreleased changes
 
-Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: finding feedback (ADR-034), the console in English
+Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: edit mode and check history (ADR-033), finding feedback (ADR-034), the console in English
 and Vietnamese (ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030), the value backtest with the labelled
-evaluation (ADR-032) and the client trademark watchlist (ADR-031). Finding feedback and the watchlist touch the API, and only
-additively (see their sections); the bulk check adds migration V36, finding feedback V37 and the watchlist V38, all additive. The other
-changes touch no API response, request, status, header or migration.
+evaluation (ADR-032), the client trademark watchlist (ADR-031) and edit mode and check history (ADR-033). Finding feedback,
+the watchlist and edit mode touch the API, and only additively (see their sections); the bulk check adds migration V36, finding
+feedback V37, the watchlist V38, check history V39 and the LLM usage counter V40 (ADR-036, off by default), all additive. The other changes touch no API response, request, status,
+header or migration.
 
 Every pull request that changes the API runs the compatibility check (`./mvnw -B -pl contract-tools verify`, ADR-022) and copies the
 additive and non-breaking lines of `contract-tools/target/contract/compatibility-report.md` here, with a short section for the
@@ -45,6 +46,49 @@ looks for them next to the catalog. Guide: [watchlist.md](../watchlist.md).
 - **For the maintainer to decide** (ADR-031, open questions): the client's own minimum level, Nice classes lowering a level, personalization
   screening reading the list, limiting key creation to administrators, and reading a Google Sheet directly. The Vietnamese texts have not been
   reviewed by a native reader.
+### Free-tier LLM providers and a trademark context judge (ADR-036; off by default; V40)
+
+A shared LLM client (Groq, Cloudflare Workers AI and Google Gemini through their OpenAI-compatible endpoints, in the order you
+set) and one use of it: for a **catalog finding at level MEDIUM** the judge sends the mark, its Nice classes, the field and a short
+span around the match and asks whether the word is probably a brand or a plain descriptive word ("Dodger blue" is a colour). A
+`likely_descriptive` answer keeps the finding, lowers it to LOW and adds the risk adjustment `llm_descriptive` with the model's
+reason; any other answer, or one that is not exactly the JSON schema, changes nothing. A finding is never removed, a level is never
+raised, and HIGH, LOW, watchlist and context-rule findings are never sent. See [docs/llm.md](../llm.md).
+
+- **Off.** `LISTING_GUARD_LLM_ENABLED` and `LISTING_GUARD_LLM_JUDGE_ENABLED` are `false`: no key is read, no request is made and a check
+  returns what it returned before, with the same `analysisVersion`. New migration **V40** (`llm_usage`: requests and tokens per UTC day
+  and provider, numbers only).
+- **Data routing.** Every provider has `listing-text-allowed` and `personal-data-allowed`, both `false` by default: a provider
+  receives nothing until you set its flag after reading its terms (Gemini free usage may be used by Google to improve its products).
+  Personalization text is never sent to a provider whose flag is `false`.
+- **Limits.** Per-minute and per-day limits per provider (conservative defaults, settings); failover on any failure; answers cached
+  by the hash of model and prompt. When no provider has quota the step is skipped: the result is `INCOMPLETE`
+  (`skippedRuleIds: ["llm_context_judge"]`), not cached and not charged.
+- **Console.** A lowered finding shows the label "LLM: có thể là từ mô tả" with the reason; the home page shows "LLM requests today:
+  used / limit".
+- **Measure before use.** `backtest --llm-judge` and `eval-listing --llm-judge` report before and after. The default catch line is
+  MEDIUM, so a demotion can lose a claimed listing; leave the judge off unless recall of claimed rows did not fall.
+- Upgrade: nothing to do (V40 is applied at start-up). To use it, follow docs/llm.md.
+
+### Edit mode and check history (ADR-033)
+
+The console editor can compare a listing before and after a revision in two columns and separates findings into new, changed,
+and remaining. Existing feedback controls target the stored finding on the side that produced it. A new history page lists the
+client's retained check results with filters and pagination, and opens those stored results. It never stores listing text; a
+seller reopening edit mode from history must paste the old listing into the blank **Before** field. Guide:
+[edit-mode.md](../edit-mode.md).
+
+- **API, additive:** `POST /api/v1/listing-edits` runs the existing listing, trademark (including the active catalog and the
+  client's watchlist), and optional variation packs on both versions. It returns changed fields and new, modified, and
+  remaining finding groups with feedback targets. Existing pack caches, plans, quotas and retention apply; comparison input
+  text is not stored.
+- **History, additive V39:** indexes client, checker, result id, marketplace, time, row count, optional SKU and counts only.
+  The page reads persisted check results and feedback, and every query is scoped to the signed-in client's id.
+- The Java SDK adds `checkListingEdit` and its async counterpart. MCP exposes read-only `check_listing_edit`; the agent skill
+  documents the tool and treats listing text as untrusted data.
+- **Compatibility report (ADR-022), additive:** `POST /api/v1/listing-edits` is reported as an operation added; its optional
+  `before_variations` and `after_variations` request fields are additive. The V39 history migration only adds data and indexes.
+
 ### Finding feedback and the weekly home page (ADR-034)
 
 Every finding of the console's *Check listing* and *Bulk check* pages now has three buttons, **Correct / Đúng**, **False positive / Báo

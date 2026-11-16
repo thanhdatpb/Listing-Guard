@@ -55,10 +55,12 @@ class InputSchemaDocumentTest {
             Map.entry("Personalization screening#2", "PersonalizationValue"),
             Map.entry("Image checks#1", "ImageCheckMetadata"),
             Map.entry("Image checks#2", "ImageCheckImage"),
-            Map.entry("Trademark checks#1", "TrademarkCheckRequest"));
+            Map.entry("Trademark checks#1", "TrademarkCheckRequest"),
+            Map.entry("Listing edit comparison#1", "ListingEditRequest"));
 
     /** Definitions the page describes in prose or in the Prices table rather than in a field table. */
-    private static final Set<String> PROSE_DEFINITIONS = Set.of("CheckRequest", "Marketplace", "Price", "EtsyPersonalization");
+    private static final Set<String> PROSE_DEFINITIONS = Set.of(
+            "CheckRequest", "Marketplace", "Price", "EtsyPersonalization", "ListingEditVariationFamily");
 
     /** The trademark table lists only the field next to the /checks envelope. */
     private static final Set<String> ENVELOPE = Set.of("marketplace", "listing");
@@ -70,7 +72,8 @@ class InputSchemaDocumentTest {
             "variation-amazon", "VariationCheckRequest",
             "variation-etsy", "VariationCheckRequest",
             "personalization-order", "PersonalizationScreeningRequest",
-            "image-metadata", "ImageCheckMetadata");
+            "image-metadata", "ImageCheckMetadata",
+            "listing-edit-example", "ListingEditRequest");
 
     private record Table(String key, Map<String, String> typesByField) {
     }

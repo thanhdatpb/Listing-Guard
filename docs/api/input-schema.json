@@ -169,6 +169,30 @@
         }
       ]
     },
+    "ListingEditRequest": {
+      "description": "POST /api/v1/listing-edits: compare the same marketplace listing schema before and after an edit. Variations are independently optional for each side.",
+      "type": "object",
+      "required": ["marketplace", "before", "after"],
+      "properties": {
+        "marketplace": {"$ref": "#/$defs/Marketplace"},
+        "before": {"type": "object", "description": "Marketplace listing before the edit."},
+        "after": {"type": "object", "description": "Marketplace listing after the edit."},
+        "before_variations": {"$ref": "#/$defs/ListingEditVariationFamily"},
+        "after_variations": {"$ref": "#/$defs/ListingEditVariationFamily"}
+      },
+      "allOf": [
+        {"if": {"required": ["marketplace"], "properties": {"marketplace": {"pattern": "^\\s*[Ee][Tt][Ss][Yy]\\s*$"}}}, "then": {"properties": {"before": {"$ref": "#/$defs/EtsyListing"}, "after": {"$ref": "#/$defs/EtsyListing"}}}},
+        {"if": {"required": ["marketplace"], "properties": {"marketplace": {"pattern": "^\\s*[Aa][Mm][Aa][Zz][Oo][Nn]\\s*$"}}}, "then": {"properties": {"before": {"$ref": "#/$defs/AmazonListing"}, "after": {"$ref": "#/$defs/AmazonListing"}}}}
+      ]
+    },
+    "ListingEditVariationFamily": {
+      "type": "object",
+      "properties": {
+        "parent": {"$ref": "#/$defs/VariationParent"},
+        "variation_properties": {"type": "array", "items": {"type": "string"}},
+        "children": {"type": "array", "items": {"$ref": "#/$defs/VariationChild"}}
+      }
+    },
     "VariationCheckRequest": {
       "description": "POST /api/v1/variation-checks: a parent and its children, at the top level of the body (not the /checks envelope).",
       "type": "object",

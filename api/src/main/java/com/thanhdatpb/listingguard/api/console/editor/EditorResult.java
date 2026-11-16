@@ -32,12 +32,20 @@ public record EditorResult(Readiness readiness, Trademark trademark, List<Group<
     }
 
     /** {@code score} is null whenever there is no number to show (INCOMPLETE, or the rules did not run). */
-    public record Readiness(ReadinessKind kind, Integer score, String big, String headline, String detail, String version) {
+    public record Readiness(ReadinessKind kind, Integer score, String big, String headline, String detail, String version,
+                            java.util.UUID checkId) {
+        public Readiness(ReadinessKind kind, Integer score, String big, String headline, String detail, String version) {
+            this(kind, score, big, headline, detail, version, null);
+        }
     }
 
     /** {@code riskLevel} is null when no level was established; {@code big} is what the panel prints large. */
     public record Trademark(TrademarkKind kind, String riskLevel, String big, String headline, String detail, String hint,
-                            String disclaimer, List<Group<TrademarkItem>> groups) {
+                            String disclaimer, List<Group<TrademarkItem>> groups, java.util.UUID checkId) {
+        public Trademark(TrademarkKind kind, String riskLevel, String big, String headline, String detail, String hint,
+                         String disclaimer, List<Group<TrademarkItem>> groups) {
+            this(kind, riskLevel, big, headline, detail, hint, disclaimer, groups, null);
+        }
     }
 
     public record Group<T>(String label, String css, List<T> items) {

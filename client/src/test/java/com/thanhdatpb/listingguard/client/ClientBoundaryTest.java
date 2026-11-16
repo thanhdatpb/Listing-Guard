@@ -13,7 +13,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * What the SDK can never do (ADR-023), checked on its own sources and POM: only {@code GET} and {@code POST} to the seven paths,
+ * What the SDK can never do (ADR-023), checked on its own sources and POM: only the documented API operations,
  * no Spring, no database, no logging framework and no other module of the repository.
  */
 class ClientBoundaryTest {
@@ -38,6 +38,7 @@ class ClientBoundaryTest {
                 "/api/v1/checks",
                 "/api/v1/trademark-checks",
                 "/api/v1/variation-checks",
+                "/api/v1/listing-edits",
                 "/api/v1/personalization-screenings",
                 "/api/v1/rulesets/{marketplace}/limits",
                 "/api/v1/usage",

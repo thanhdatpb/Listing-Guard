@@ -17,7 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** The daily counter on the real table (V39): one statement takes a request, so concurrent callers never pass the limit. */
+/** The daily counter on the real table (V40): one statement takes a request, so concurrent callers never pass the limit. */
 @SpringBootTest
 @Import(TestcontainersConfig.class)
 class JdbcLlmUsageStoreIntegrationTest {

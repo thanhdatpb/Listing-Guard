@@ -101,21 +101,21 @@ public class EditorCheckService {
         String only = messages.get("editor.readiness.only");
         if (view == null) {
             return new EditorResult.Readiness(EditorResult.ReadinessKind.INCOMPLETE, null, notScored, notScored,
-                    messages.get("editor.readiness.none") + " " + only, null);
+                    messages.get("editor.readiness.none") + " " + only, null, result.checkId());
         }
         if ("INCOMPLETE".equals(view.status()) || view.score() == null) {
             return new EditorResult.Readiness(EditorResult.ReadinessKind.INCOMPLETE, null, notScored, notScored,
-                    messages.get("editor.readiness.incomplete") + " " + only, view.version());
+                    messages.get("editor.readiness.incomplete") + " " + only, view.version(), result.checkId());
         }
         String big = String.valueOf(view.score());
         if (view.ready()) {
             return new EditorResult.Readiness(EditorResult.ReadinessKind.READY, view.score(), big,
                     messages.get("editor.readiness.ready.headline"),
-                    messages.get("editor.readiness.ready.detail") + " " + only, view.version());
+                    messages.get("editor.readiness.ready.detail") + " " + only, view.version(), result.checkId());
         }
         return new EditorResult.Readiness(EditorResult.ReadinessKind.NOT_READY, view.score(), big,
                 messages.get("editor.readiness.notready.headline"),
-                messages.get("editor.readiness.notready.detail") + " " + only, view.version());
+                messages.get("editor.readiness.notready.detail") + " " + only, view.version(), result.checkId());
     }
 
     private List<EditorResult.Group<EditorResult.RuleItem>> ruleGroups(CheckResult result) {
@@ -184,14 +184,14 @@ public class EditorCheckService {
                     result.findings().isEmpty()
                             ? messages.get("editor.trademark.none")
                             : messages.get("editor.trademark.review"),
-                    null, disclaimer, groups);
+                    null, disclaimer, groups, result.checkId());
         }
         String known = result.riskLevel() == RiskLevel.UNKNOWN ? messages.get("editor.trademark.unknown")
                 : result.riskLevel().name();
         return new EditorResult.Trademark(EditorResult.TrademarkKind.INCOMPLETE,
                 result.riskLevel() == RiskLevel.UNKNOWN ? null : result.riskLevel().name(), known,
                 messages.get("editor.trademark.incomplete.headline"), messages.get("editor.trademark.incomplete.detail"),
-                null, disclaimer, groups);
+                null, disclaimer, groups, result.checkId());
     }
 
     private List<EditorResult.Group<EditorResult.TrademarkItem>> trademarkGroups(TrademarkCheckResult result, Listing listing) {

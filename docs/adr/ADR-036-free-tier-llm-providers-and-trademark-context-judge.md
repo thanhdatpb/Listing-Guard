@@ -37,7 +37,7 @@ names, and the result may only get *quieter* for it.
    day counter is full, or while it cools down after an HTTP 429 (60 s). A timeout, 429, 5xx, any other HTTP error, an unreadable
    answer or a truncated answer moves on to the next provider; one request per provider, no retry on the same one. (Failing over on
    every failure goes beyond "429/5xx/timeout": a wrong key on the first provider must not leave the backup unused.)
-4. **Daily limit and completeness.** Request counts per UTC day and provider are in table `llm_usage` (V39), reserved atomically
+4. **Daily limit and completeness.** Request counts per UTC day and provider are in table `llm_usage` (V40), reserved atomically
    *before* the call (`INSERT .. ON CONFLICT .. WHERE requests < limit`), so two instances share the limit; the per-minute window is in
    memory. When no provider can take the call (all days exhausted, all failed, none eligible) the LLM step is **skipped**, not
    failed: the deterministic result stands and the check records it with `completeness = INCOMPLETE` and the id

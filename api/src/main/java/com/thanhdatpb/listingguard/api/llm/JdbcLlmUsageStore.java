@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** {@link LlmUsageStore} on table {@code llm_usage} (V39). One statement reserves a request, so two instances share the limit. */
+/** {@link LlmUsageStore} on table {@code llm_usage} (V40). One statement reserves a request, so two instances share the limit. */
 public class JdbcLlmUsageStore implements LlmUsageStore {
 
     private final JdbcTemplate jdbc;

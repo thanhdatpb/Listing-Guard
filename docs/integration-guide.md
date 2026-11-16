@@ -964,7 +964,8 @@ reason alone gives) and `note` (Vietnamese text). `risk` is the lowest `to`; an 
 | `reason` | When |
 |---|---|
 | `outside_product_classes` | The request named a `product_type`, the mark has Nice classes and none is the product type's. |
-| `common_word` | The mark is a word of the ruleset's `generic_words` list and the match is not an exact or phrase match in a brand field (`brand`, `shop_name`). A fuzzy match of such a mark is always capped. **`trademark-risk-2026-11b` lists no word, so this reason does not occur until the maintainer has reviewed the list.** |
+| `common_word` | The mark is a word of the ruleset's `generic_words` list and the match is not an exact or phrase match in a brand field (`brand`, `shop_name`). A fuzzy match of such a mark is always capped. **`trademark-risk-2026-11b` lists no word, so this reason does not occur until the maintainer has reviewed the list.** |
+| `llm_descriptive` | Only when the operator turned the LLM judge on (ADR-036, `docs/llm.md`): a language model read the sentence around a MEDIUM catalog match and thinks the word describes the product. `from` is the level the rule assigned, `to` is `LOW`; `note` starts with "LLM: có thể là từ mô tả." and gives the model's reason. The finding is kept; a model never raises a level. |
 
 ```json
 {"ruleId": "catalog_exact", "risk": "MEDIUM", "...": "...",
@@ -1590,6 +1591,12 @@ Likewise `LISTING_GUARD_DEV_API_KEY` (the public development key in the compose 
 `dev`) is only accepted with the `dev` profile; with any other profile, and always with `prod`, the service
 refuses to start. Without any key the service starts, logs a warning and answers every request with `401` until
 the operator creates one.
+
+## Edit mode and history
+
+To compare a proposed edit with the current listing, send both versions to [`POST /api/v1/listing-edits`](edit-mode.md). The
+console also provides Edit mode and a client-scoped [check history](edit-mode.md#console). History stores result references and
+optional SKU metadata, never listing text.
 
 ## Not covered yet
 

@@ -225,3 +225,10 @@ form.feedback .fb-note textarea { width: 100%; font: inherit; }
 form.feedback .fb-status { margin: 0.25rem 0 0; min-height: 1.2em; }
 form.feedback .fb-saved { color: var(--ok); }
 form.feedback .fb-error { color: var(--error); font-weight: 600; }
+.edit-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+.edit-columns textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; }
+@media (max-width: 760px) { .edit-columns { grid-template-columns: 1fr; } }
