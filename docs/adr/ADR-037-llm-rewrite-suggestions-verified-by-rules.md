@@ -46,8 +46,8 @@ button and no call.
 ### What the model is asked
 
 One call to `LlmProvider.complete` (temperature 0, no tools, no retry, bounded output tokens and timeout). The prompt
-carries the marketplace, the title, the tags, the title limit of the active ruleset and, for each finding the call is
-about, its rule id, field, offending value and message. It does **not** carry the description, brand, bullet points,
+carries the marketplace, the title, the tags and, for each finding the call is about, its rule id, field, offending
+value and message (which names the limit that was broken). It does **not** carry the description, brand, bullet points,
 search terms, price or any other field. The listing text is delimited as untrusted data, as in ADR-011.
 
 The answer must match a JSON schema: at most **3** candidates, each `{title?, tags[]?}` where a tag entry names the

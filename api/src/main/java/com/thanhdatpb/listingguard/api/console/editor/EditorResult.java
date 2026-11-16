@@ -73,6 +73,24 @@ public record EditorResult(Readiness readiness, Trademark trademark, List<Group<
                                 String suggestion, Evidence evidence, FeedbackTarget target) {
     }
 
+    /**
+     * True when the rewrite button applies (ADR-037): the listing rules reported an ERROR or the trademark check reported a finding.
+     * The page also needs the feature to be on.
+     */
+    public boolean needsRewrite() {
+        return ruleGroups.stream().anyMatch(group -> "error".equals(group.css()) && !group.items().isEmpty())
+                || trademark.groups().stream().anyMatch(group -> !group.items().isEmpty());
+    }
+
+    /** The finding the rewrite starts from (ADR-037): the first ERROR of the rules, else the first trademark finding; null when none. */
+    public FeedbackTarget rewriteAnchor() {
+        return java.util.stream.Stream.concat(
+                        ruleGroups.stream().filter(group -> "error".equals(group.css())).flatMap(group -> group.items().stream())
+                                .map(RuleItem::target),
+                        trademark.groups().stream().flatMap(group -> group.items().stream()).map(TrademarkItem::target))
+                .filter(java.util.Objects::nonNull).findFirst().orElse(null);
+    }
+
     /** Every finding of the page that the feedback widget can answer, in the order shown. */
     public List<FeedbackTarget> targets() {
         List<FeedbackTarget> targets = new java.util.ArrayList<>();

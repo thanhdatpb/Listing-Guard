@@ -1,0 +1,10 @@
+/* The rewrite suggestions (ADR-037): a button, and a panel of proposals the seller can read and copy. Colors follow the page's own. */
+.rewrite { margin: 1rem 0; }
+.rewrite-button, .copy-button { cursor: pointer; }
+.rewrite-panel { margin-top: 0.75rem; padding: 0.75rem 1rem; border: 1px solid currentColor; border-radius: 6px; }
+.rewrite-panel .candidate { margin: 0.75rem 0; padding-top: 0.5rem; border-top: 1px solid rgba(127, 127, 127, 0.4); }
+.rewrite-panel .change { margin: 0.5rem 0; }
+.rewrite-panel .label { display: inline-block; min-width: 5.5rem; }
+.rewrite-panel .old { opacity: 0.75; }
+.rewrite-panel .copy { display: inline-block; margin: 0.25rem 0 0; }
+.rewrite-panel .disclaimer { margin-top: 0.5rem; }

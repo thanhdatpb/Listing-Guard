@@ -64,6 +64,11 @@
                 <th:block th:replace="~{console/bulk-fragments :: items(${row.detail.variation.items})}"></th:block>
             </th:block>
         </th:block>
+
+        <!-- ADR-037: only while the feature is on, and only for a row with an ERROR or a trademark finding (the row then carries its listing) -->
+        <th:block th:if="${rewriteAvailable and row.rewriteListing != null}">
+            <th:block th:replace="~{console/rewrite :: bulkButton(${result.marketplace}, ${row})}"></th:block>
+        </th:block>
     </th:block>
 </div>
 

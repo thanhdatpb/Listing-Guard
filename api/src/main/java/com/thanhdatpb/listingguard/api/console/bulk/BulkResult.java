@@ -63,10 +63,33 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
      * @param findings    how many findings the row has, all checks together
      * @param main        the finding that decides the status, or null
      * @param summary     one line for the Sheet: the count and the main finding, and what did not run
+     * @param rewriteListing the row's listing as standard listing JSON, only for a row with an ERROR or a trademark finding and not
+     *                    over {@link #REWRITE_LISTING_MAX_CHARS}, else null (ADR-037). The page prints it only while the rewrite
+     *                    feature is on; it is never stored and never reaches the CSV or the Sheet block.
      */
     public record Row(int index, int line, String sku, Status status, String statusLabel, int findings, Item main, String summary,
-                      Detail detail) {
+                      Detail detail, String rewriteListing) {
+
+        /** A row with no listing to rewrite. */
+        public Row(int index, int line, String sku, Status status, String statusLabel, int findings, Item main, String summary,
+                   Detail detail) {
+            this(index, line, sku, status, statusLabel, findings, main, summary, detail, null);
+        }
+
+        /** The finding the rewrite started from: the first ERROR of the rules, else the first trademark finding; null when none is stored. */
+        public FeedbackTarget rewriteAnchor() {
+            if (detail == null) {
+                return null;
+            }
+            return java.util.stream.Stream.concat(
+                            detail.rules().items().stream().filter(item -> "error".equals(item.level())),
+                            detail.trademark().items().stream())
+                    .map(Item::target).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+        }
     }
+
+    /** The most characters of a row's listing JSON that the page carries for the rewrite button. */
+    public static final int REWRITE_LISTING_MAX_CHARS = 16_000;
 
     /** The three checks of a row, and why a row could not be read. */
     public record Detail(Rules rules, Trademark trademark, Variation variation, String problem) {

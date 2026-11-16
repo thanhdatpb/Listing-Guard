@@ -75,12 +75,13 @@ public class RewriteRunStore {
         return changed == 1;
     }
 
-    public Usage usage(UUID clientId, Instant since) {
+    /** The runs of a client created in {@code [from, to)}, with how many offered a safe suggestion and how many were copied. */
+    public Usage usage(UUID clientId, Instant from, Instant to) {
         return jdbc.queryForObject("""
                 SELECT count(*) AS runs, count(*) FILTER (WHERE candidates_safe > 0) AS with_safe,
                        count(*) FILTER (WHERE used_at IS NOT NULL) AS used
-                FROM rewrite_suggestion_run WHERE client_id = ? AND created_at >= ?""",
+                FROM rewrite_suggestion_run WHERE client_id = ? AND created_at >= ? AND created_at < ?""",
                 (rs, i) -> new Usage(rs.getInt("runs"), rs.getInt("with_safe"), rs.getInt("used")),
-                clientId, Timestamp.from(since));
+                clientId, Timestamp.from(from), Timestamp.from(to));
     }
 }
