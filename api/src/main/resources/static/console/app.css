@@ -8,7 +8,7 @@
    - A component is a class with the "lg-" prefix (BEM: lg-card, lg-card__head, lg-btn--primary), so it cannot meet the class names of
      the pages that were written before it. The shell of the page has the "app-" prefix.
 
-   Load order on a console page: /brand/tokens.css, then this file, then the page's own older sheet (editor.css, console.css, ...). */
+   Load order on a console page: /brand/tokens.css, then this file, then the page's own sheet when it has one (editor.css, bulk.css). */
 
 :root {
   color-scheme: light dark;
@@ -329,8 +329,9 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 
 /* ---------- table ---------- */
 
-/* The wrapper scrolls sideways on a narrow screen instead of squeezing the columns. */
-.lg-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-1); }
+/* The wrapper scrolls sideways on a narrow screen instead of squeezing the columns. It is positioned so that a word only a screen reader hears (an
+   absolute box in a far column) stays inside it: without that the box leaves the wrapper and makes the whole page scroll sideways. */
+.lg-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-1); }
 .lg-table { width: 100%; font-size: 14px; line-height: 20px; }
 .lg-table--scroll { min-width: 40rem; }
 .lg-table th {
@@ -677,3 +678,79 @@ body:has(> .lg-auth) { display: flex; flex-direction: column; min-height: 100vh;
 .lg-auth__foot { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line-soft); display: flex; justify-content: flex-end; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
 .lg-auth__foot .lang { display: flex; gap: var(--space-1); }
 .lg-auth__foot .lang a[aria-current="true"] { color: var(--ink); font-weight: 600; text-decoration: none; }
+
+/* ---------- manage pages: the filter row, the pager, table helpers (ADR-042) ---------- */
+
+/* A row of filters over a table. A control is as small as a chip; every one has a name for a screen reader (aria-label). */
+.lg-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-4); }
+.lg-filters .lg-select, .lg-filters .lg-input { display: inline-block; width: auto; max-width: 100%; min-height: 32px; padding: 4px var(--space-3); border-radius: var(--radius-sm); font-size: 13px; line-height: 18px; }
+.lg-filters .lg-filters__search { width: 14rem; }
+/* Under a table: how much is shown, and the way to the next page. */
+.lg-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); }
+.lg-pager p { margin: 0; }
+.lg-nowrap { white-space: nowrap; }
+.lg-wrap { overflow-wrap: break-word; }
+
+/* A switch that is a button (it posts) or, when the reader cannot change it, a picture with a name: the knob is on the right when it is on, so
+   the state is told by position and not by color alone. */
+.lg-switch { position: relative; display: inline-block; flex: none; width: 36px; height: 20px; padding: 0; border: 0; border-radius: var(--radius-full); background: var(--border-strong); vertical-align: middle; }
+button.lg-switch { cursor: pointer; }
+.lg-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: var(--radius-full); background: var(--surface-1); }
+.lg-switch--on { background: var(--brand); }
+.lg-switch--on::after { left: 18px; background: var(--on-brand); }
+button.lg-switch:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+/* The first cell of a row is its name: a header cell that reads like a cell. */
+.lg-table tbody th[scope="row"] { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); background: transparent; color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 600; white-space: normal; vertical-align: top; }
+.lg-table tbody tr:last-child th[scope="row"] { border-bottom: 0; }
+.lg-table tbody tr:hover th[scope="row"] { background: var(--surface-2); }
+.lg-rowhead .lg-disclosure { margin-top: var(--space-1); font-weight: 400; }
+.lg-rowhead .lg-disclosure p { margin: 0; }
+.lg-inline { display: inline; margin: 0; }
+.lg-plain { margin: 0; padding-left: var(--space-4); }
+/* A form in a card: one column, as wide as a line can be read. */
+.lg-form { max-width: 40rem; }
+
+/* The labelled controls of a filter row that has dates: the word, then the control. */
+.lg-filters .lg-filters__field { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--ink-soft); font-size: 13px; line-height: 18px; font-weight: 500; }
+/* A bar of one piece: the verdicts that divide a total. The parts are told apart by their order and the words under the bar. */
+.lg-chart--bar { height: 28px; max-width: none; border-radius: var(--radius-sm); }
+.lg-chart__seg--correct { fill: var(--success); }
+.lg-chart__seg--false { fill: var(--warning); }
+.lg-chart__seg--useless { fill: var(--ink-muted); }
+.lg-chart__seg { stroke: var(--surface-1); stroke-width: 1; }
+.lg-legend { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-3) 0 0; padding: 0; list-style: none; font-size: 13px; line-height: 18px; }
+.lg-legend__key { display: inline-block; width: 10px; height: 10px; margin-right: var(--space-2); border-radius: 2px; vertical-align: baseline; }
+.lg-legend__key--correct { background: var(--success); }
+.lg-legend__key--false { background: var(--warning); }
+.lg-legend__key--useless { background: var(--ink-muted); }
+
+/* A card that folds: the summary is its heading, and what is inside shows when it is open. */
+.lg-fold > summary { cursor: pointer; }
+.lg-fold > summary > .lg-card__title { display: inline; margin: 0; }
+.lg-fold[open] > summary { margin-bottom: var(--space-3); }
+.lg-chips-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); padding: 0; list-style: none; }
+.lg-table td.lg-main { min-width: 14rem; }
+
+/* The button that does what cannot be undone: red text and a red outline all round, never a red ground; the brand button is for what starts. */
+.lg-btn--destructive { border-color: var(--danger); color: var(--danger); }
+.lg-btn--destructive:hover { background: var(--danger-subtle); border-color: var(--danger); color: var(--danger); }
+/* A hidden control stays hidden whatever display its class gives it. */
+.lg-btn[hidden] { display: none; }
+/* A secret in a banner: the read-only field and the copy button on one line, the field taking what is left. */
+.lg-secret { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+.lg-secret__field { flex: 1 1 18rem; width: auto; min-width: 0; font-family: var(--font-mono); font-size: 13px; }
+
+/* Review of the pages (ADR-042): the text of a header stays a line a person can read, so the buttons of the page sit beside it and not under it;
+   a cell with an address or a note has room to be read; a filter does not stretch to the longest e-mail it lists. */
+.lg-page__sub { max-width: 46rem; }
+.lg-page__head > :first-child { flex: 1 1 24rem; min-width: 0; }
+.lg-page__sub .lg-code { white-space: nowrap; }
+.lg-table td.lg-wrap { min-width: 9rem; }
+.lg-table tbody th[scope="row"].lg-rowhead { min-width: 9rem; }
+/* An address in a table: one line, cut with an ellipsis; the whole of it is in the title and in the page for a screen reader. */
+.lg-table td.lg-ellip { max-width: 11rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-filters .lg-select { max-width: 16rem; text-overflow: ellipsis; }
+.lg-kv + .lg-counts { margin-top: var(--space-4); }
+/* A table with many columns: the sides of a cell are narrower, so the page does not scroll for ten columns. */
+.lg-table--dense th, .lg-table--dense td { padding-left: var(--space-3); padding-right: var(--space-3); }
+.lg-table--dense td.lg-main { min-width: 12rem; }

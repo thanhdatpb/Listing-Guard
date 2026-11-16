@@ -43,14 +43,13 @@ public class ConsoleApiKeysController {
     static final String REVOKE_VIEW = "console/api-key-revoke";
 
     private static final Pattern CONTROL = Pattern.compile("\\p{Cntrl}");
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC);
 
     /** What the table shows of a key, times in UTC. The hash is never part of it. */
     public record KeyRow(String keyId, String label, String created, String lastUsed) {
 
-        static KeyRow of(ApiKey key) {
-            return new KeyRow(key.getKeyId(), key.getLabel(), TIME.format(key.getCreatedAt()),
-                    key.getLastUsedAt() == null ? null : TIME.format(key.getLastUsedAt()));
+        static KeyRow of(ApiKey key, ConsoleMessages messages) {
+            return new KeyRow(key.getKeyId(), key.getLabel(), ConsoleDates.dateTime(messages, key.getCreatedAt()),
+                    key.getLastUsedAt() == null ? null : ConsoleDates.dateTime(messages, key.getLastUsedAt()));
         }
     }
 
@@ -106,7 +105,7 @@ public class ConsoleApiKeysController {
         noStore(response);
         KeyRow key = provisioning.activeKeys(user.clientId()).stream()
                 .filter(found -> found.getKeyId().equals(keyId))
-                .map(KeyRow::of)
+                .map(row -> KeyRow.of(row, messages))
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         model.addAttribute("email", user.email());
@@ -127,7 +126,7 @@ public class ConsoleApiKeysController {
     }
 
     private void populate(Model model, ConsoleUser user, String label) {
-        List<KeyRow> rows = provisioning.activeKeys(user.clientId()).stream().map(KeyRow::of).toList();
+        List<KeyRow> rows = provisioning.activeKeys(user.clientId()).stream().map(row -> KeyRow.of(row, messages)).toList();
         model.addAttribute("email", user.email());
         model.addAttribute("keys", rows);
         model.addAttribute("activeCount", rows.size());

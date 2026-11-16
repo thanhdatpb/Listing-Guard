@@ -53,6 +53,42 @@ Rule sources stay labeled as they are in the rulesets; no unverified limit is pr
 6. The result and findings are stored under the authenticated client in PostgreSQL; only hashes and bounded evidence are stored for retained sensitive packs.
 7. The API returns the findings and evidence, with the ruleset and analysis versions and any applicable disclaimer.
 
+## Giao diện
+
+The console is the page a seller or a lead works in: Vietnamese by default and English with a switch, light and dark, built on one set of
+design tokens ([ADR-040](docs/adr/ADR-040-console-visual-identity-and-design-system.md),
+[ADR-041](docs/adr/ADR-041-console-work-pages.md), [ADR-042](docs/adr/ADR-042-console-manage-pages.md)). Screenshots use invented listings.
+
+**Home.** What the checks held back this week, what needs attention, and the data the checks ran on.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/home-week-dark.png">
+  <img src="docs/images/console/home-week-light.png" alt="The console home page: four figures for the week, the results that need attention with a red diamond on a problem, and the data the checks ran on.">
+</picture>
+
+**Bulk check.** Paste rows from a Sheet or upload a file; every row has its SKU, a shortened title, a status and its main finding.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/bulk-result-dark.png">
+  <img src="docs/images/console/bulk-result-light.png" alt="The bulk check result: summary pills, filters and a table with one row for each pasted line.">
+</picture>
+
+**A row opened.** The listing as it was checked, with the words a finding points at marked, and a card for each finding with its rule, evidence, suggestion and source.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/bulk-detail-dark.png">
+  <img src="docs/images/console/bulk-detail-light.png" alt="The detail of a bulk row: the listing with highlighted words on the left and the finding cards on the right.">
+</picture>
+
+**Periodic re-audit.** Upload the file of the listings on sale again each time the trademark catalog changes; new risks come before the known ones.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/reaudit-result-dark.png">
+  <img src="docs/images/console/reaudit-result-light.png" alt="The re-audit result: the facts of the run, the counts of new and known risks and the button that exports the list to fix.">
+</picture>
+
+History, the watchlist, statistics, the report and API keys are on the same system: [the project guide](docs/overview.md) says what each page does.
+
 ## Use it from AI agents
 
 ![A user asks an AI agent to use a planned Agent Skill and the MCP server, which checks listings without editing or publishing; its exact eight tools call the Java client SDK and Listing Guard API, while compatibility and evaluation support blocks are shown below.](docs/images/agent-integration.svg)

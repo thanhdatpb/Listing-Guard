@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- Parts of the history pages (ADR-041). This file is never served on its own: history.html and history-result.html include it. -->
+
+<!-- The state of a stored check, in words: a check that ran to the end says nothing about the listing, so it is a plain pill; the shape
+     and the ground are only for what needs a look. The history page and the opened result both use it. -->
+<span th:fragment="status(status)" th:switch="${status}">
+    <span class="lg-pill" th:case="'COMPLETED'" th:text="#{history.status.completed}"></span>
+    <span class="lg-pill" th:case="'COMPLETE'" th:text="#{history.status.complete}"></span>
+    <span class="lg-pill lg-pill--warn" th:case="'INCOMPLETE'" th:text="#{history.status.incomplete}"></span>
+    <span class="lg-pill lg-pill--error" th:case="'FAILED'" th:text="#{history.status.failed}"></span>
+    <span class="lg-pill" th:case="'PENDING'" th:text="#{history.status.pending}"></span>
+    <span class="lg-pill" th:case="*" th:text="${status}"></span>
+</span>
+</body>
+</html>

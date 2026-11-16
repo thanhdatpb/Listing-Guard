@@ -2,7 +2,7 @@
 
 Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: edit mode and check history (ADR-033), finding feedback (ADR-034), the console in English
 and Vietnamese (ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030), the value backtest with the labelled
-evaluation (ADR-032), the client trademark watchlist (ADR-031) the periodic re-audit of active listings (ADR-035), the console's visual identity (ADR-040) and the work pages on it (ADR-041). Finding feedback,
+evaluation (ADR-032), the client trademark watchlist (ADR-031) the periodic re-audit of active listings (ADR-035), the console's visual identity (ADR-040), the work pages on it (ADR-041) and the manage pages (ADR-042). Finding feedback,
 the watchlist, edit mode and the re-audit touch the API, and only additively (see their sections); the bulk check adds migration V36,
 finding feedback V37, the watchlist V38, check history V39, the re-audit V40, the LLM usage counter V41 (ADR-036, off by default) and the rewrite suggestions V42 (ADR-037, off by default, console only), all additive. The other changes touch no API response,
 request, status, header or migration.
@@ -12,6 +12,26 @@ additive and non-breaking lines of `contract-tools/target/contract/compatibility
 change. When the next version is cut, move this file to `docs/releases/v<version>.md` and start a new one.
 
 ## What is new
+
+### The manage pages on the design system (ADR-042)
+
+History, the watchlist, the periodic re-audit, statistics, the report and the API keys are on the design system, so the whole console is one product,
+in Vietnamese or English, light or dark, from a phone to a desktop. No API response, request, status, header or migration changed.
+
+- **History** has a row of filters (period, status, marketplace, who checked, part of a SKU), the error and trademark counts as pills, the feedback
+  of each check as "2/3", and Previous / Next. A stored result opens with its findings as the same card as everywhere else. A date filter that the
+  database refused is fixed.
+- **Watchlist** has "Nhập từ Sheet" and "Thêm nhãn", a banner about the level of a match, a filter (word, Nice class, on or off) and a switch per mark
+  with a name for a screen reader. The forms open from the address and need no script.
+- **Re-audit** has the banner that the catalog is newer, with "Rà lại ngay" that leads to the upload form (the listings are not stored), the card of
+  the last run, new risks with the red diamond first, and known risks that fold.
+- **Statistics and report** have figure cards and an SVG chart in the colors of the tokens; the downloadable HTML report of the `health-report` job
+  takes the same tokens, written into the file, with the same Content-Security-Policy and still no script, link or font file.
+- **API keys:** the key just issued is a warning banner; revoking asks with a destructive button.
+- **`console.css` and `watchlist.css` are deleted.** A page that scrolled sideways on a phone (history, watchlist, bulk, API keys) no longer does.
+  Times are printed in the pattern of the language.
+- From the review of the work pages (ADR-041 section 7): a title column in the bulk table, one row for a repeated finding on "Cần xử lý",
+  a short heading and a body on a finding card, the account's e-mail in the sidebar, and the plan card with dates by language, absent where plans are off.
 
 ### Console visual identity and design system (ADR-040)
 

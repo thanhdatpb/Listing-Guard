@@ -4,7 +4,10 @@ import com.thanhdatpb.listingguard.api.console.HomeView.Attention;
 import com.thanhdatpb.listingguard.api.console.HomeView.AttentionKind;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,24 +27,28 @@ public class ConsoleAttentionQueries {
     public static final int LIMIT = 5;
 
     private static final String SQL = """
-            SELECT kind, checked_at, marketplace_code, sku, rule_id, message FROM (
-              SELECT 'ERROR' AS kind, e.checked_at, e.marketplace_code, e.sku, f.rule_id, f.message
+            SELECT kind, checked_at, marketplace_code, sku, rule_id, message, subject, identity FROM (
+              SELECT 'ERROR' AS kind, e.checked_at, e.marketplace_code, e.sku, f.rule_id, f.message, f.value AS subject,
+                     c.content_hash::text AS identity
                 FROM check_history_event e
                 JOIN listing_check c ON e.pack_id = 'listing-rules' AND c.id = e.check_id AND c.client_id = e.client_id
-                JOIN LATERAL (SELECT rule_id, message FROM finding WHERE check_id = c.id AND severity = 'ERROR'
+                JOIN LATERAL (SELECT rule_id, message, value FROM finding WHERE check_id = c.id AND severity = 'ERROR'
                                ORDER BY id LIMIT 1) f ON true
                WHERE e.client_id = ?
               UNION ALL
-              SELECT 'TRADEMARK', e.checked_at, e.marketplace_code, e.sku, f.rule_id, f.message
+              SELECT 'TRADEMARK', e.checked_at, e.marketplace_code, e.sku, f.rule_id, f.message, f.snippet, c.input_hash::text
                 FROM check_history_event e
                 JOIN trademark_check c ON e.pack_id = 'trademark-risk' AND c.id = e.check_id AND c.client_id = e.client_id
                                       AND c.expires_at > ?
-                JOIN LATERAL (SELECT rule_id, message FROM trademark_check_finding WHERE check_id = c.id AND risk = 'HIGH'
+                JOIN LATERAL (SELECT rule_id, message, snippet FROM trademark_check_finding WHERE check_id = c.id AND risk = 'HIGH'
                                ORDER BY position LIMIT 1) f ON true
                WHERE e.client_id = ?
             ) attention
             ORDER BY checked_at DESC, kind
             LIMIT ?""";
+
+    /** How many events are read to find {@link #LIMIT} different results: a listing checked again is one result. */
+    private static final int WINDOW = 60;
 
     private final JdbcTemplate jdbc;
 
@@ -51,8 +58,22 @@ public class ConsoleAttentionQueries {
 
     public List<Attention> latest(UUID clientId, Instant now) {
         Timestamp clock = Timestamp.from(now);
-        return jdbc.query(SQL, (rs, i) -> new Attention(AttentionKind.valueOf(rs.getString("kind")), rs.getString("sku"),
-                rs.getString("rule_id"), rs.getString("message"), rs.getString("marketplace_code"),
-                rs.getTimestamp("checked_at").toInstant()), clientId, clock, clientId, LIMIT);
+        record Row(String identity, Attention attention) {
+        }
+        List<Row> rows = jdbc.query(SQL, (rs, i) -> new Row(rs.getString("identity"),
+                new Attention(AttentionKind.valueOf(rs.getString("kind")), rs.getString("sku"), rs.getString("subject"),
+                        rs.getString("rule_id"), rs.getString("message"), rs.getString("marketplace_code"),
+                        rs.getTimestamp("checked_at").toInstant())), clientId, clock, clientId, WINDOW);
+        // newest first: the first of each listing (its SKU, else its content) and rule stays, the checks after it are the same finding
+        Set<String> seen = new HashSet<>();
+        List<Attention> latest = new ArrayList<>();
+        for (Row row : rows) {
+            Attention item = row.attention();
+            String listing = item.sku() != null && !item.sku().isBlank() ? "sku:" + item.sku() : "content:" + row.identity();
+            if (seen.add(listing + "|" + item.ruleId()) && latest.size() < LIMIT) {
+                latest.add(item);
+            }
+        }
+        return List.copyOf(latest);
     }
 }

@@ -11,6 +11,11 @@ person thought, kept for the people who tune the rules later.
 
 ## Marking a finding
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/history-result-dark.png">
+  <img src="images/console/history-result-light.png" alt="A stored result opened from the history: the facts of the check and a card for each finding with the three feedback buttons.">
+</picture>
+
 On **Check listing** (rule and trademark findings) and **Bulk check** (every finding in an opened row) each finding has three buttons:
 
 | Button | Vietnamese | Means |
@@ -40,6 +45,11 @@ given on; a deleted console account takes its verdicts with it.
 
 ## The home page (`/console`)
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/home-week-dark.png">
+  <img src="images/console/home-week-light.png" alt="The console home page with the figures of the week, the results that need attention and the data the checks ran on.">
+</picture>
+
 For the current ISO week (Monday, UTC, to now):
 
 - **Listings checked**: stored listing-rules results (a listing checked again unchanged counts once).
@@ -50,17 +60,23 @@ For the current ISO week (Monday, UTC, to now):
 
 Under the figures ([ADR-041](adr/ADR-041-console-work-pages.md)):
 
-- **Cần xử lý** (needs attention): the latest five results of the client with an `ERROR` or a `HIGH` trademark risk, each with the SKU a
-  bulk row gave (or the rule id), the finding's own message, the marketplace and the time. It is the one block that prints text of the
+- **Cần xử lý** (needs attention): the latest five different results of the client with an `ERROR` or a `HIGH` trademark risk (the same
+  listing with the same rule is one row however often it was checked), each with the SKU a bulk row gave, else the value the finding is
+  about cut short (the rule id only when it has none), the finding's own message, the marketplace and the time. It is the one block that prints text of the
   client's own results (the same text the History page prints); the statistics and the report still read none.
 - **Dữ liệu kiểm tra**: the trademark catalog in use and the date of its data, the enabled watchlist marks, the latest re-audit and the
   rulesets in force (and the LLM requests today, when the LLM is on).
 - A chart of the last eight weeks (the listings held back by an `ERROR`, drawn on the server as SVG; the listings checked are in the table
   under it), the five listing rules with the most findings with the false positives reported on each (a dash when the report cannot say),
-  and the plan and usage. The re-audit reminder (ADR-035) is a warning banner at the top.
+  and, where plans are on, the plan and usage (the card is absent where they are off). The re-audit reminder (ADR-035) is a warning banner at the top.
 - A client with no result and no verdict in eight weeks sees three steps to start instead, and a button to the bulk check.
 
 ## The Statistics page (`/console/stats`)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/stats-dark.png">
+  <img src="images/console/stats-light.png" alt="The statistics page: figure cards, a bar of how the verdicts divide and the table by rule.">
+</picture>
 
 Choose a period (default: the 28 days that end today; at most `listing-guard.reports.max-days`, 92 by default) and a marketplace.
 

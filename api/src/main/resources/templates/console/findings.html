@@ -16,11 +16,12 @@
             <span class="lg-pill" th:classappend="${card.pillTone != ''} ? 'lg-pill--' + ${card.pillTone}" th:text="${card.pillLabel}"></span>
             <code class="lg-code" th:text="${card.ruleId}"></code>
         </div>
-        <h4 class="lg-finding__title" th:text="${card.message}"></h4>
+        <h4 class="lg-finding__title" th:text="${card.title}"></h4>
         <p class="lg-finding__meta" th:if="${card.field != null or card.detail != null}">
             <th:block th:if="${card.field != null}"><span th:text="#{editor.finding.on}"></span> <code class="lg-code" th:text="${card.field}"></code></th:block>
             <th:block th:if="${card.detail != null}"><span th:if="${card.field != null}"> &middot; </span><span th:text="${card.detail}"></span></th:block>
         </p>
+        <p class="lg-finding__text" th:if="${card.more != null}" th:text="${card.more}"></p>
         <p class="lg-finding__text" th:if="${card.explanation != null}"><span class="lg-text-muted" th:text="#{editor.finding.explains}"></span> <span th:text="${card.explanation}"></span></p>
         <p class="lg-finding__evidence" th:if="${card.evidence != null}"><span class="lg-text-muted" th:text="#{editor.finding.evidence}"></span> <span class="ev"><span th:if="${card.evidence.cutBefore}">&hellip;</span><span th:text="${card.evidence.before}"></span><mark class="lg-highlight" th:classappend="${card.error} ? 'lg-highlight--error'" th:text="${card.evidence.match}"></mark><span th:text="${card.evidence.after}"></span><span th:if="${card.evidence.cutAfter}">&hellip;</span></span></p>
         <p class="lg-finding__meta" th:if="${card.before != null}"><span th:text="#{finding.before(${card.before})}"></span></p>

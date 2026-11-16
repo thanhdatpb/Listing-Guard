@@ -97,4 +97,15 @@ class ListingViewTest {
         assertThat(view.hasContent()).isTrue();
         assertThat(ListingView.of(etsy(null, null), true, List.of(), null, null).hasContent()).isFalse();
     }
+
+    @Test
+    void theTitleOnOneLineIsCutAtAWordAndEndedWithAnEllipsis() {
+        ListingView longer = ListingView.of(etsy("Handmade ceramic mug with a long handle and a sky blue glaze for the morning coffee", null), true,
+                List.of(), 140, 13);
+        ListingView exact = ListingView.of(etsy("Blue  mug" + System.lineSeparator() + "  small", null), true, List.of(), 140, 13);
+
+        assertThat(longer.shortTitle(40)).isEqualTo("Handmade ceramic mug with a long…");
+        assertThat(longer.shortTitle(40).codePointCount(0, longer.shortTitle(40).length())).isLessThanOrEqualTo(40);
+        assertThat(exact.shortTitle(40)).as("white space is one space, and a short title is as it is").isEqualTo("Blue mug small");
+    }
 }

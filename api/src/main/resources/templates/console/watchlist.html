@@ -5,172 +5,234 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{watchlist.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/console.css}">
-    <link rel="stylesheet" th:href="@{/console/watchlist.css}">
 </head>
 <body>
+<!-- The watchlist (ADR-031, ADR-042): the client's own marks. Every account reads it; only an administrator changes it. The add form and
+     the import open from the address (?add, ?edit=, ?import), so the page works without a script and the back button closes them. The
+     brand button is the one that starts the next thing: the header's "Add a mark", or the form's own submit once a form is open. A
+     filter only narrows the table; a change still goes through the whole list and its revision. No text is written here (ADR-028). -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('watchlist')}"></header>
-<main class="page">
+<main class="lg-page" id="watchlist-page">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{watchlist.heading}"></h1>
-    <p class="muted">
-        <span th:text="#{common.signedin(${email})}"></span>
-        <span th:text="#{watchlist.intro}"></span>
-    </p>
-    <p class="muted" id="minimum" th:if="${minimumRisk != null}" th:text="#{watchlist.minimum(${minimumRisk})}"></p>
-
-    <div class="notice applied" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
-    <div class="notice refused" id="plan-refused" role="alert" th:if="${planRefused != null}"><p th:text="${planRefused}"></p></div>
-    <div class="notice refused" id="errors" role="alert" th:if="${errors != null and !errors.isEmpty()}">
-        <p th:text="#{watchlist.errors.heading}"></p>
-        <ul><li th:each="error : ${errors}" th:text="${error}"></li></ul>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{watchlist.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{watchlist.intro}"></p>
+        </div>
+        <div class="lg-actions" th:if="${admin and planRefused == null}">
+            <a class="lg-btn" id="import-open" th:href="@{/console/watchlist(import=1)}" th:text="#{watchlist.import.open}"></a>
+            <a class="lg-btn" id="add-open" th:href="@{/console/watchlist(add=1)} + '#entry-form'"
+               th:classappend="${total > 0 and !formOpen and !importOpen and preview == null} ? 'lg-btn--primary'" th:text="#{watchlist.add}"></a>
+        </div>
     </div>
-    <div class="notice refused" id="import-error" role="alert" th:if="${importError != null}"><p th:text="${importError}"></p></div>
-    <p class="notice" id="readonly" th:if="${planRefused == null and !admin}" th:text="#{watchlist.readonly}"></p>
+
+    <div class="lg-banner lg-banner--success lg-section" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" id="plan-refused" role="alert" th:if="${planRefused != null}"><p th:text="${planRefused}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" id="errors" role="alert" th:if="${errors != null and !errors.isEmpty()}">
+        <div class="lg-banner__body">
+            <p class="lg-banner__title" th:text="#{watchlist.errors.heading}"></p>
+            <ul><li th:each="error : ${errors}" th:text="${error}"></li></ul>
+        </div>
+    </div>
+    <div class="lg-banner lg-banner--error lg-section" id="import-error" role="alert" th:if="${importError != null}"><p th:text="${importError}"></p></div>
+    <div class="lg-banner lg-banner--info lg-section" id="readonly" th:if="${planRefused == null and !admin}"><p th:text="#{watchlist.readonly}"></p></div>
+    <div class="lg-banner lg-banner--info lg-section" id="minimum" th:if="${minimumRisk != null}"><p th:text="#{watchlist.banner(${minimumLabel})}"></p></div>
 
     <th:block th:if="${planRefused == null}">
-    <section th:if="${preview != null}" id="preview" aria-labelledby="preview-heading">
-        <h2 id="preview-heading" th:text="#{watchlist.preview.heading}"></h2>
-        <p class="muted" th:text="#{watchlist.preview.intro}"></p>
-        <ul class="warning-text" id="preview-problems" th:unless="${previewProblems.isEmpty()}">
-            <li th:each="problem : ${previewProblems}" th:text="${problem}"></li>
-        </ul>
-        <div class="table-wrap">
-        <table class="keys watchlist" id="preview-table">
-            <thead>
-            <tr>
-                <th scope="col" th:text="#{watchlist.preview.col.line}"></th>
-                <th scope="col" th:text="#{watchlist.preview.col.mark}"></th>
-                <th scope="col" th:text="#{watchlist.preview.col.outcome}"></th>
-                <th scope="col" th:text="#{watchlist.preview.col.problems}"></th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="row : ${preview}" th:attr="data-outcome=${row.outcome}">
-                <td th:text="${row.line}"></td>
-                <td th:text="${row.mark}"></td>
-                <td th:text="${row.outcomeText}"></td>
-                <td><ul class="plain"><li th:each="problem : ${row.problems}" th:text="${problem}"></li></ul></td>
-            </tr>
-            </tbody>
-        </table>
-        </div>
-        <form id="apply-form" method="post" th:action="@{/console/watchlist/import}" th:if="${previewCanApply}">
-            <input type="hidden" name="data" th:value="${previewData}">
-            <input type="hidden" name="delimiter" th:value="${previewDelimiter}">
-            <input type="hidden" name="revision" th:value="${revision}">
-            <button type="submit" class="primary" th:text="#{watchlist.preview.apply}"></button>
-            <a th:href="@{/console/watchlist}" th:text="#{watchlist.preview.cancel}"></a>
-        </form>
-        <p class="warning-text" id="preview-cannot" th:unless="${previewCanApply}" th:text="#{watchlist.preview.cannot}"></p>
-    </section>
+        <!-- the preview of an import: what every row would do, and the one button that applies it -->
+        <section class="lg-card lg-section" id="preview" aria-labelledby="preview-heading" th:if="${preview != null}">
+            <h2 id="preview-heading" class="lg-card__title" th:text="#{watchlist.preview.heading}"></h2>
+            <p class="lg-text-muted" th:text="#{watchlist.preview.intro}"></p>
+            <ul class="lg-banner__body" id="preview-problems" th:unless="${previewProblems.isEmpty()}">
+                <li th:each="problem : ${previewProblems}" th:text="${problem}"></li>
+            </ul>
+            <div class="lg-table-wrap lg-section">
+                <table class="lg-table lg-table--scroll" id="preview-table">
+                    <caption class="lg-sr-only" th:text="#{watchlist.preview.heading}"></caption>
+                    <thead>
+                    <tr>
+                        <th scope="col" class="lg-num" th:text="#{watchlist.preview.col.line}"></th>
+                        <th scope="col" th:text="#{watchlist.preview.col.mark}"></th>
+                        <th scope="col" th:text="#{watchlist.preview.col.outcome}"></th>
+                        <th scope="col" th:text="#{watchlist.preview.col.problems}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${preview}" th:attr="data-outcome=${row.outcome}">
+                        <td class="lg-num" th:text="${row.line}"></td>
+                        <td class="lg-wrap" th:text="${row.mark}"></td>
+                        <td><span class="lg-pill" th:text="${row.outcomeText}"
+                                  th:classappend="${row.outcome == 'refused'} ? 'lg-pill--error' : (${row.outcome == 'added'} ? 'lg-pill--brand')"></span></td>
+                        <td><ul class="lg-plain"><li th:each="problem : ${row.problems}" th:text="${problem}"></li></ul></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <form id="apply-form" class="lg-actions" method="post" th:action="@{/console/watchlist/import}" th:if="${previewCanApply}">
+                <input type="hidden" name="data" th:value="${previewData}">
+                <input type="hidden" name="delimiter" th:value="${previewDelimiter}">
+                <input type="hidden" name="revision" th:value="${revision}">
+                <button type="submit" class="lg-btn lg-btn--primary" th:text="#{watchlist.preview.apply}"></button>
+                <a class="lg-btn" th:href="@{/console/watchlist}" th:text="#{watchlist.preview.cancel}"></a>
+            </form>
+            <p class="lg-banner lg-banner--warning" id="preview-cannot" th:unless="${previewCanApply}" th:text="#{watchlist.preview.cannot}"></p>
+        </section>
 
-    <h2 id="list-heading">
-        <span th:text="#{watchlist.list.heading}"></span>
-        <span class="muted" id="entry-count"
-              th:text="#{watchlist.count(${#strings.toString(rows.size())}, ${#strings.toString(enabledCount)}, ${#strings.toString(limits.maxEntries)})}"></span>
-    </h2>
-    <p><a id="export" th:href="@{/console/watchlist/export.csv}" th:text="#{watchlist.export}"></a></p>
-    <p id="no-entries" th:if="${rows.isEmpty()}" th:text="#{watchlist.none}"></p>
-    <div class="table-wrap" th:unless="${rows.isEmpty()}">
-    <table class="keys watchlist" id="entries-table" aria-labelledby="list-heading">
-        <thead>
-        <tr>
-            <th scope="col" th:text="#{watchlist.col.mark}"></th>
-            <th scope="col" th:text="#{watchlist.col.aliases}"></th>
-            <th scope="col" th:text="#{watchlist.col.classes}"></th>
-            <th scope="col" th:text="#{watchlist.col.serial}"></th>
-            <th scope="col" th:text="#{watchlist.col.note}"></th>
-            <th scope="col" th:text="#{watchlist.col.status}"></th>
-            <th scope="col" th:text="#{watchlist.col.changed}"></th>
-            <th scope="col" th:if="${admin}"><span class="visually-hidden" th:text="#{watchlist.col.action}"></span></th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="row : ${rows}" th:classappend="${row.enabled} ? '' : 'disabled'">
-            <td class="label" th:text="${row.mark}"></td>
-            <td th:text="${row.aliases}"></td>
-            <td th:text="${row.classes}"></td>
-            <td><code th:if="${row.serialNumber != null}" th:text="${row.serialNumber}"></code></td>
-            <td th:text="${row.note}"></td>
-            <td th:text="${row.enabled} ? #{watchlist.status.enabled} : #{watchlist.status.disabled}"></td>
-            <td class="small">
-                <span th:text="#{watchlist.added(${row.addedBy}, ${row.added})}"></span><br>
-                <span class="muted" th:text="#{watchlist.updated(${row.updatedBy}, ${row.updated})}"></span>
-            </td>
-            <td th:if="${admin}" class="actions">
-                <a class="button" th:href="@{/console/watchlist(edit=${row.id})} + '#entry-form'" th:text="#{watchlist.edit}"
-                   th:aria-label="#{watchlist.edit.aria(${row.mark})}"></a>
-                <form class="inline" method="post" th:action="@{/console/watchlist/entries/{id}/toggle(id=${row.id})}">
-                    <input type="hidden" name="revision" th:value="${revision}">
-                    <button type="submit" th:text="${row.enabled} ? #{watchlist.disable} : #{watchlist.enable}"
-                            th:aria-label="${row.enabled} ? #{watchlist.disable.aria(${row.mark})} : #{watchlist.enable.aria(${row.mark})}"></button>
-                </form>
-                <form class="inline" method="post" th:action="@{/console/watchlist/entries/{id}/delete(id=${row.id})}">
-                    <input type="hidden" name="revision" th:value="${revision}">
-                    <button type="submit" class="danger" th:text="#{watchlist.delete}"
-                            th:aria-label="#{watchlist.delete.aria(${row.mark})}"></button>
-                </form>
-            </td>
-        </tr>
-        </tbody>
-    </table>
-    </div>
+        <!-- the add form and the edit form: the same fields, opened by ?add or ?edit=, or kept open after a refusal -->
+        <section class="lg-card lg-section" id="entry-form" tabindex="-1" aria-labelledby="entry-form-heading" th:if="${admin and formOpen}">
+            <h2 id="entry-form-heading" class="lg-card__title" th:text="${form.id == null} ? #{watchlist.form.add.heading} : #{watchlist.form.edit.heading}"></h2>
+            <form id="save-form" class="lg-form" method="post" th:action="@{/console/watchlist/entries}">
+                <input type="hidden" name="revision" th:value="${revision}">
+                <input type="hidden" name="id" th:if="${form.id != null}" th:value="${form.id}">
+                <div class="lg-field">
+                    <label class="lg-field__label" for="mark" th:text="#{watchlist.form.mark}"></label>
+                    <input class="lg-input" type="text" id="mark" name="mark" required autocomplete="off" th:value="${form.mark}"
+                           aria-describedby="mark-hint" th:attr="maxlength=${limits.maxTextChars}">
+                    <p class="lg-field__hint" id="mark-hint" th:text="#{watchlist.form.mark.hint}"></p>
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" for="aliases"><span th:text="#{watchlist.form.aliases}"></span> <span class="lg-text-muted" th:text="#{watchlist.optional}"></span></label>
+                    <input class="lg-input" type="text" id="aliases" name="aliases" autocomplete="off" th:value="${form.aliases}" aria-describedby="aliases-hint">
+                    <p class="lg-field__hint" id="aliases-hint" th:text="#{watchlist.form.aliases.hint(${#strings.toString(limits.maxAliases)})}"></p>
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" for="classes"><span th:text="#{watchlist.form.classes}"></span> <span class="lg-text-muted" th:text="#{watchlist.optional}"></span></label>
+                    <input class="lg-input" type="text" id="classes" name="classes" autocomplete="off" inputmode="numeric" th:value="${form.classes}" aria-describedby="classes-hint">
+                    <p class="lg-field__hint" id="classes-hint" th:text="#{watchlist.form.classes.hint}"></p>
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" for="serialNumber"><span th:text="#{watchlist.form.serial}"></span> <span class="lg-text-muted" th:text="#{watchlist.optional}"></span></label>
+                    <input class="lg-input" type="text" id="serialNumber" name="serialNumber" autocomplete="off" inputmode="numeric" maxlength="8"
+                           th:value="${form.serialNumber}" aria-describedby="serial-hint">
+                    <p class="lg-field__hint" id="serial-hint" th:text="#{watchlist.form.serial.hint}"></p>
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" for="note"><span th:text="#{watchlist.form.note}"></span> <span class="lg-text-muted" th:text="#{watchlist.optional}"></span></label>
+                    <input class="lg-input" type="text" id="note" name="note" autocomplete="off" th:value="${form.note}" aria-describedby="note-hint"
+                           th:attr="maxlength=${limits.maxNoteChars}">
+                    <p class="lg-field__hint" id="note-hint" th:text="#{watchlist.form.note.hint}"></p>
+                </div>
+                <div class="lg-actions">
+                    <button type="submit" class="lg-btn lg-btn--primary" th:text="${form.id == null} ? #{watchlist.form.add.submit} : #{watchlist.form.save.submit}"></button>
+                    <a class="lg-btn" th:href="@{/console/watchlist}" th:text="#{watchlist.form.cancel}"></a>
+                </div>
+            </form>
+        </section>
 
-    <th:block th:if="${admin}">
-    <h2 id="entry-form" th:text="${form.id == null} ? #{watchlist.form.add.heading} : #{watchlist.form.edit.heading}"></h2>
-    <form id="save-form" method="post" th:action="@{/console/watchlist/entries}">
-        <input type="hidden" name="revision" th:value="${revision}">
-        <input type="hidden" name="id" th:if="${form.id != null}" th:value="${form.id}">
-        <div class="field">
-            <label for="mark" th:text="#{watchlist.form.mark}"></label>
-            <input type="text" id="mark" name="mark" required autocomplete="off" th:value="${form.mark}"
-                   th:attr="maxlength=${limits.maxTextChars}">
-            <p class="hint" th:text="#{watchlist.form.mark.hint}"></p>
-        </div>
-        <div class="field">
-            <label for="aliases"><span th:text="#{watchlist.form.aliases}"></span> <span class="muted" th:text="#{watchlist.optional}"></span></label>
-            <input type="text" id="aliases" name="aliases" autocomplete="off" th:value="${form.aliases}">
-            <p class="hint" th:text="#{watchlist.form.aliases.hint(${#strings.toString(limits.maxAliases)})}"></p>
-        </div>
-        <div class="field">
-            <label for="classes"><span th:text="#{watchlist.form.classes}"></span> <span class="muted" th:text="#{watchlist.optional}"></span></label>
-            <input type="text" id="classes" name="classes" autocomplete="off" inputmode="numeric" th:value="${form.classes}">
-            <p class="hint" th:text="#{watchlist.form.classes.hint}"></p>
-        </div>
-        <div class="field">
-            <label for="serialNumber"><span th:text="#{watchlist.form.serial}"></span> <span class="muted" th:text="#{watchlist.optional}"></span></label>
-            <input type="text" id="serialNumber" name="serialNumber" autocomplete="off" inputmode="numeric" maxlength="8"
-                   th:value="${form.serialNumber}">
-            <p class="hint" th:text="#{watchlist.form.serial.hint}"></p>
-        </div>
-        <div class="field">
-            <label for="note"><span th:text="#{watchlist.form.note}"></span> <span class="muted" th:text="#{watchlist.optional}"></span></label>
-            <input type="text" id="note" name="note" autocomplete="off" th:value="${form.note}"
-                   th:attr="maxlength=${limits.maxNoteChars}">
-            <p class="hint" th:text="#{watchlist.form.note.hint}"></p>
-        </div>
-        <button type="submit" class="primary" th:text="${form.id == null} ? #{watchlist.form.add.submit} : #{watchlist.form.save.submit}"></button>
-        <a th:if="${form.id != null}" th:href="@{/console/watchlist}" th:text="#{watchlist.form.cancel}"></a>
-    </form>
+        <!-- the import of cells from a Sheet or of a file: two steps, the preview first -->
+        <section class="lg-card lg-section" id="import" tabindex="-1" aria-labelledby="import-heading" th:if="${admin and importOpen and preview == null}">
+            <h2 id="import-heading" class="lg-card__title" th:text="#{watchlist.import.heading}"></h2>
+            <p class="lg-text-muted" th:text="#{watchlist.import.intro}"></p>
+            <form id="import-form" class="lg-form" method="post" enctype="multipart/form-data" th:action="@{/console/watchlist/import/preview}">
+                <div class="lg-field">
+                    <label class="lg-field__label" for="pasted" th:text="#{watchlist.import.paste}"></label>
+                    <textarea class="lg-textarea lg-textarea--mono" id="pasted" name="pasted" rows="6" spellcheck="false" aria-describedby="pasted-hint"></textarea>
+                    <p class="lg-field__hint" id="pasted-hint" th:text="#{watchlist.import.paste.hint}"></p>
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" for="file" th:text="#{watchlist.import.file}"></label>
+                    <input class="lg-input" type="file" id="file" name="file" aria-describedby="file-hint"
+                           accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
+                    <p class="lg-field__hint" id="file-hint" th:text="#{watchlist.import.file.hint}"></p>
+                </div>
+                <div class="lg-actions">
+                    <button type="submit" class="lg-btn lg-btn--primary" th:text="#{watchlist.import.submit}"></button>
+                    <a class="lg-btn" th:href="@{/console/watchlist}" th:text="#{watchlist.form.cancel}"></a>
+                </div>
+            </form>
+        </section>
 
-    <h2 id="import-heading" th:text="#{watchlist.import.heading}"></h2>
-    <p class="muted" th:text="#{watchlist.import.intro}"></p>
-    <form id="import-form" method="post" enctype="multipart/form-data" th:action="@{/console/watchlist/import/preview}">
-        <div class="field">
-            <label for="pasted" th:text="#{watchlist.import.paste}"></label>
-            <textarea id="pasted" name="pasted" rows="6" spellcheck="false"></textarea>
-            <p class="hint" th:text="#{watchlist.import.paste.hint}"></p>
+        <!-- no entry yet: an invitation -->
+        <div class="lg-empty" id="no-entries" th:if="${total == 0}">
+            <h2 class="lg-empty__title" th:text="#{watchlist.none}"></h2>
+            <p class="lg-empty__text" th:text="#{watchlist.none.text}"></p>
+            <p th:if="${admin and !formOpen and !importOpen and preview == null}"><a class="lg-btn lg-btn--primary" th:href="@{/console/watchlist(add=1)} + '#entry-form'" th:text="#{watchlist.add}"></a></p>
         </div>
-        <div class="field">
-            <label for="file" th:text="#{watchlist.import.file}"></label>
-            <input type="file" id="file" name="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
-            <p class="hint" th:text="#{watchlist.import.file.hint}"></p>
-        </div>
-        <button type="submit" th:text="#{watchlist.import.submit}"></button>
-    </form>
-    </th:block>
+
+        <th:block th:if="${total > 0}">
+            <form class="lg-filters" id="watchlist-filters" method="get" role="search" th:action="@{/console/watchlist}"
+                  th:aria-label="#{watchlist.filters.aria}">
+                <input class="lg-input lg-filters__search" type="search" name="q" th:value="${filters.q}" autocomplete="off"
+                       th:placeholder="#{watchlist.search.placeholder}" th:aria-label="#{watchlist.search.aria}">
+                <select class="lg-select" name="class" th:aria-label="#{watchlist.filter.class}">
+                    <option value="" th:text="#{watchlist.filter.class.any}"></option>
+                    <option th:each="c : ${classOptions}" th:value="${c}" th:selected="${c == filters.niceClass}" th:text="#{watchlist.filter.class.option(${c})}"></option>
+                </select>
+                <select class="lg-select" name="status" th:aria-label="#{watchlist.filter.status}">
+                    <option value="" th:text="#{watchlist.filter.status.any}"></option>
+                    <option value="on" th:selected="${filters.status == 'on'}" th:text="#{watchlist.filter.status.on}"></option>
+                    <option value="off" th:selected="${filters.status == 'off'}" th:text="#{watchlist.filter.status.off}"></option>
+                </select>
+                <button type="submit" class="lg-btn lg-btn--small" th:text="#{history.filter}"></button>
+                <a class="lg-btn lg-btn--link" id="watchlist-reset" th:if="${filters.active()}" th:href="@{/console/watchlist}" th:text="#{history.reset}"></a>
+            </form>
+
+            <div class="lg-empty" id="no-matches" th:if="${rows.isEmpty()}">
+                <h2 class="lg-empty__title" th:text="#{watchlist.nomatch}"></h2>
+                <p class="lg-empty__text" th:text="#{watchlist.nomatch.text}"></p>
+            </div>
+
+            <div class="lg-table-wrap" th:unless="${rows.isEmpty()}">
+                <table class="lg-table lg-table--scroll" id="entries-table">
+                    <caption class="lg-sr-only" th:text="#{watchlist.table.caption}"></caption>
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{watchlist.col.mark}"></th>
+                        <th scope="col" th:text="#{watchlist.col.aliases}"></th>
+                        <th scope="col" th:text="#{watchlist.col.classes}"></th>
+                        <th scope="col" th:text="#{watchlist.col.serial}"></th>
+                        <th scope="col" th:text="#{watchlist.col.note}"></th>
+                        <th scope="col" th:text="#{watchlist.col.status}"></th>
+                        <th scope="col" th:if="${admin}"><span class="lg-sr-only" th:text="#{watchlist.col.action}"></span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${rows}">
+                        <th scope="row" class="lg-rowhead">
+                            <span class="lg-wrap" th:text="${row.mark}"></span>
+                            <details class="lg-disclosure lg-small">
+                                <summary th:text="#{watchlist.history}"></summary>
+                                <p class="lg-text-muted" th:text="#{watchlist.added(${row.addedBy}, ${row.added})}"></p>
+                                <p class="lg-text-muted" th:text="#{watchlist.updated(${row.updatedBy}, ${row.updated})}"></p>
+                            </details>
+                        </th>
+                        <td class="lg-text-muted lg-wrap"><span th:if="${!row.aliases.isEmpty()}" th:text="${row.aliases}"></span><span th:if="${row.aliases.isEmpty()}">&mdash;</span></td>
+                        <td class="lg-nowrap"><span th:if="${!row.classes.isEmpty()}" th:text="${row.classes}"></span><span class="lg-text-muted" th:if="${row.classes.isEmpty()}">&mdash;</span></td>
+                        <td class="lg-nowrap"><code class="lg-code" th:if="${row.serialNumber != null}" th:text="${row.serialNumber}"></code><span class="lg-text-muted" th:if="${row.serialNumber == null}">&mdash;</span></td>
+                        <td class="lg-wrap"><span th:if="${row.note != null and !row.note.isEmpty()}" th:text="${row.note}"></span><span class="lg-text-muted" th:if="${row.note == null or row.note.isEmpty()}">&mdash;</span></td>
+                        <td>
+                            <form class="lg-inline" method="post" th:if="${admin}" th:action="@{/console/watchlist/entries/{id}/toggle(id=${row.id})}">
+                                <input type="hidden" name="revision" th:value="${revision}">
+                                <button type="submit" class="lg-switch" role="switch" th:classappend="${row.enabled} ? 'lg-switch--on'"
+                                        th:attr="aria-checked=${row.enabled},aria-label=#{watchlist.switch.aria(${row.mark})}"></button>
+                            </form>
+                            <span class="lg-switch" role="img" th:unless="${admin}" th:classappend="${row.enabled} ? 'lg-switch--on'"
+                                  th:attr="aria-label=${row.enabled} ? #{watchlist.status.enabled} : #{watchlist.status.disabled}"></span>
+                        </td>
+                        <td class="lg-nowrap" th:if="${admin}">
+                            <a class="lg-btn lg-btn--small" th:href="@{/console/watchlist(edit=${row.id})} + '#entry-form'" th:text="#{watchlist.edit}"
+                               th:aria-label="#{watchlist.edit.aria(${row.mark})}"></a>
+                            <form class="lg-inline" method="post" th:action="@{/console/watchlist/entries/{id}/delete(id=${row.id})}">
+                                <input type="hidden" name="revision" th:value="${revision}">
+                                <button type="submit" class="lg-btn lg-btn--small" th:text="#{watchlist.delete}"
+                                        th:aria-label="#{watchlist.delete.aria(${row.mark})}"></button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="lg-pager">
+                <p class="lg-small lg-text-muted" id="entry-count"
+                   th:text="${filters.active()} ? #{watchlist.count.shown(${#strings.toString(rows.size())}, ${#strings.toString(total)})} : #{watchlist.count(${#strings.toString(total)}, ${#strings.toString(enabledCount)}, ${#strings.toString(limits.maxEntries)})}"></p>
+                <a class="lg-btn lg-btn--small" id="export" th:href="@{/console/watchlist/export.csv}">
+                    <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-download"/></svg>
+                    <th:block th:text="#{watchlist.export}"></th:block>
+                </a>
+            </div>
+        </th:block>
     </th:block>
 </main>
 </body>

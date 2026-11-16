@@ -5,84 +5,106 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{reaudit.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
 <body>
-<!-- The periodic re-audit (ADR-035): upload the file of the listings that are on sale, read it with the input adapter that knows its
+<!-- The periodic re-audit (ADR-035, ADR-042): upload the file of the listings that are on sale, read it with the input adapter that knows its
      header, and see which risks are new since the last run, what changed in the listings, and the list to fix. Every value goes through
      th:text and every sentence is a message (ADR-028). The file, the rows and the findings are not stored. -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('reaudit')}"></header>
-<main class="page wide" id="reaudit-page">
+<main class="lg-page" id="reaudit-page">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{reaudit.heading}"></h1>
-    <p class="muted">
-        <span th:text="#{common.signedin(${email})}"></span>
-        <span th:text="#{reaudit.intro}"></span>
-    </p>
-
-    <div class="notice refused" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
-
-    <!-- The catalog changed since a scope was last audited. -->
-    <div class="notice" id="reaudit-due" role="status" th:if="${stage == 'form' and notice != null}">
-        <p th:text="#{home.reaudit.heading}"></p>
-        <p th:text="#{home.reaudit.text(${notice.catalogVersion})}"></p>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{reaudit.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{reaudit.intro}"></p>
+        </div>
     </div>
 
-    <!-- The form -->
-    <th:block th:if="${stage == 'form'}">
-        <form id="reaudit-form" method="post" enctype="multipart/form-data" th:action="@{/console/reaudit/run}">
-            <div class="field">
-                <label for="marketplace" th:text="#{bulk.marketplace}"></label>
-                <select id="marketplace" name="marketplace">
-                    <option th:each="m : ${marketplaces}" th:value="${m.code}" th:text="${m.label}" th:selected="${m == marketplace}"></option>
-                </select>
-            </div>
-            <div class="field">
-                <label for="account" th:text="#{reaudit.account.label}"></label>
-                <input type="text" id="account" name="account" maxlength="80" list="account-labels" autocomplete="off"
-                       aria-describedby="account-hint" th:value="${account}">
-                <datalist id="account-labels">
-                    <option th:each="label : ${labels}" th:value="${label}"></option>
-                </datalist>
-                <p class="hint" id="account-hint" th:text="#{reaudit.account.hint}"></p>
-            </div>
-            <div class="field">
-                <label for="file" th:text="#{bulk.file.label}"></label>
-                <input type="file" id="file" name="file" required aria-describedby="file-hint"
-                       accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
-                <p class="hint" id="file-hint" th:text="${fileHint}"></p>
-            </div>
-            <div class="actions">
-                <button type="submit" class="primary" id="run-button" th:text="#{reaudit.run}"></button>
-            </div>
-        </form>
+    <div class="lg-banner lg-banner--error lg-section" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
 
-        <section id="recent-runs" aria-labelledby="recent-heading">
-            <h2 id="recent-heading" th:text="#{reaudit.recent.heading}"></h2>
-            <p class="muted" th:if="${recent.isEmpty()}" th:text="#{reaudit.recent.none}"></p>
-            <div class="report-scroll" th:unless="${recent.isEmpty()}">
-                <table class="bulk-results" id="recent-table" aria-labelledby="recent-heading">
+    <!-- The catalog changed since a scope was last audited. -->
+    <th:block th:if="${stage == 'form' and notice != null}">
+        <div th:replace="~{console/reaudit-fragments :: due(${notice}, '#reaudit-form')}"></div>
+    </th:block>
+
+    <!-- The form, and what the last run said -->
+    <th:block th:if="${stage == 'form'}">
+        <div class="lg-split lg-split--even lg-section">
+            <section class="lg-card" aria-labelledby="upload-heading">
+                <h2 id="upload-heading" class="lg-card__title" th:text="#{reaudit.upload.heading}"></h2>
+                <p class="lg-text-muted lg-small" th:text="#{reaudit.upload.text}"></p>
+                <form id="reaudit-form" class="lg-form" method="post" enctype="multipart/form-data" th:action="@{/console/reaudit/run}">
+                    <div class="lg-field">
+                        <label class="lg-drop" for="file">
+                            <span class="lg-drop__title" th:text="#{bulk.file.label}"></span>
+                            <span class="lg-drop__hint" id="file-hint" th:text="${fileHint}"></span>
+                            <input type="file" id="file" name="file" required aria-describedby="file-hint"
+                                   accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
+                        </label>
+                    </div>
+                    <div class="lg-field lg-field--narrow">
+                        <label class="lg-field__label" for="marketplace" th:text="#{bulk.marketplace}"></label>
+                        <select class="lg-select" id="marketplace" name="marketplace">
+                            <option th:each="m : ${marketplaces}" th:value="${m.code}" th:text="${m.label}" th:selected="${m == marketplace}"></option>
+                        </select>
+                    </div>
+                    <div class="lg-field lg-field--narrow">
+                        <label class="lg-field__label" for="account" th:text="#{reaudit.account.label}"></label>
+                        <input class="lg-input" type="text" id="account" name="account" maxlength="80" list="account-labels" autocomplete="off"
+                               aria-describedby="account-hint" th:value="${account}">
+                        <datalist id="account-labels">
+                            <option th:each="label : ${labels}" th:value="${label}"></option>
+                        </datalist>
+                        <p class="lg-field__hint" id="account-hint" th:text="#{reaudit.account.hint}"></p>
+                    </div>
+                    <div class="lg-actions">
+                        <button type="submit" class="lg-btn lg-btn--primary" id="run-button" th:text="#{reaudit.run}"></button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- the last run, with the counts it stored (the findings themselves are not stored) -->
+            <section class="lg-card" id="last-run" aria-labelledby="last-heading">
+                <h2 id="last-heading" class="lg-card__title" th:text="#{reaudit.last.heading}"></h2>
+                <p class="lg-text-muted" id="no-runs" th:if="${recent.isEmpty()}" th:text="#{reaudit.recent.none}"></p>
+                <ul class="lg-kv" th:unless="${recent.isEmpty()}" th:with="run=${recent.get(0)}">
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.recent.when}"></span><span class="lg-kv__value" th:text="${run.when}"></span></li>
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.last.scope}"></span><span class="lg-kv__value" th:text="${run.account.isEmpty()} ? ${run.marketplace} : (${run.marketplace} + ' · ' + ${run.account})"></span></li>
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.facts.catalog}"></span><span class="lg-kv__value" th:text="${run.catalog == null} ? #{reaudit.catalog.none} : ${run.catalog}"></span></li>
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.last.checked}"></span><span class="lg-kv__value" th:text="${#numbers.formatInteger(run.rows, 1)}"></span></li>
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.last.new}"></span>
+                        <span class="lg-kv__value"><span class="lg-pill lg-pill--trademark" th:if="${run.fresh > 0}" th:text="${#numbers.formatInteger(run.fresh, 1)}"></span><span th:if="${run.fresh == 0}">0</span></span></li>
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.last.known}"></span><span class="lg-kv__value" th:text="${#numbers.formatInteger(run.findings - run.fresh, 1)}"></span></li>
+                </ul>
+            </section>
+        </div>
+
+        <section id="recent-runs" class="lg-section" aria-labelledby="recent-heading" th:if="${!recent.isEmpty()}">
+            <h2 id="recent-heading" class="lg-section-title lg-section" th:text="#{reaudit.recent.heading}"></h2>
+            <div class="lg-table-wrap">
+                <table class="lg-table lg-table--scroll" id="recent-table">
+                    <caption class="lg-sr-only" th:text="#{reaudit.recent.heading}"></caption>
                     <thead>
                     <tr>
                         <th scope="col" th:text="#{reaudit.recent.when}"></th>
                         <th scope="col" th:text="#{bulk.marketplace}"></th>
                         <th scope="col" th:text="#{reaudit.account.column}"></th>
                         <th scope="col" th:text="#{reaudit.facts.catalog}"></th>
-                        <th scope="col" class="n" th:text="#{reaudit.recent.rows}"></th>
-                        <th scope="col" class="n" th:text="#{reaudit.recent.risks}"></th>
-                        <th scope="col" class="n" th:text="#{reaudit.recent.new}"></th>
+                        <th scope="col" class="lg-num" th:text="#{reaudit.recent.rows}"></th>
+                        <th scope="col" class="lg-num" th:text="#{reaudit.recent.risks}"></th>
+                        <th scope="col" class="lg-num" th:text="#{reaudit.recent.new}"></th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="run : ${recent}">
-                        <td th:text="${run.when}"></td>
+                        <td class="lg-nowrap" th:text="${run.when}"></td>
                         <td th:text="${run.marketplace}"></td>
                         <td th:text="${run.account.isEmpty()} ? #{reaudit.account.none} : ${run.account}"></td>
-                        <td th:text="${run.catalog == null} ? #{reaudit.catalog.none} : ${run.catalog}"></td>
-                        <td class="n" th:text="${run.rows}"></td>
-                        <td class="n" th:text="${run.findings}"></td>
-                        <td class="n" th:text="${run.fresh}"></td>
+                        <td><code class="lg-code" th:text="${run.catalog == null} ? #{reaudit.catalog.none} : ${run.catalog}"></code></td>
+                        <td class="lg-num" th:text="${run.rows}"></td>
+                        <td class="lg-num" th:text="${run.findings}"></td>
+                        <td class="lg-num" th:text="${run.fresh}"></td>
                     </tr>
                     </tbody>
                 </table>
@@ -93,76 +115,85 @@
     <!-- The result -->
     <th:block th:if="${stage == 'result'}">
         <section id="result" aria-labelledby="result-heading">
-            <h2 id="result-heading" th:text="#{reaudit.result.heading(${marketplace.label})}"></h2>
-            <p class="muted small" id="result-note" th:text="#{reaudit.result.note}"></p>
-            <th:block th:with="note=${@consoleMessages.disclaimerNote(result.disclaimer)}">
-                <p class="muted small disclaimer" id="result-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
-                <p class="muted small disclaimer" id="result-disclaimer">
-                    <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
-                    <span th:text="${result.disclaimer}"></span>
-                </p>
-            </th:block>
+            <div class="lg-card lg-section">
+                <h2 id="result-heading" class="lg-card__title" th:text="#{reaudit.result.heading(${marketplace.label})}"></h2>
+                <p class="lg-text-muted lg-small" id="result-note" th:text="#{reaudit.result.note}"></p>
+                <th:block th:with="note=${@consoleMessages.disclaimerNote(result.disclaimer)}">
+                    <p class="lg-text-muted lg-small" id="result-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
+                    <p class="lg-text-muted lg-small" id="result-disclaimer">
+                        <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
+                        <span th:text="${result.disclaimer}"></span>
+                    </p>
+                </th:block>
 
-            <div class="notice" th:each="note : ${result.notes}"><p th:text="${note}"></p></div>
-            <div class="notice" id="first-run" th:if="${result.firstRun}"><p th:text="#{reaudit.result.first}"></p></div>
+                <div class="lg-banner lg-banner--warning lg-section" th:each="note : ${result.notes}"><p th:text="${note}"></p></div>
+                <div class="lg-banner lg-banner--info lg-section" id="first-run" th:if="${result.firstRun}"><p th:text="#{reaudit.result.first}"></p></div>
 
-            <dl class="facts" id="run-facts">
-                <dt th:text="#{reaudit.account.column}"></dt>
-                <dd th:text="${result.account.isEmpty()} ? #{reaudit.account.none} : ${result.account}"></dd>
-                <dt th:text="#{reaudit.facts.adapter}"></dt><dd th:text="${result.adapter}"></dd>
-                <dt th:text="#{reaudit.facts.catalog}"></dt>
-                <dd th:text="${result.catalogVersion == null} ? #{reaudit.catalog.none} : ${result.catalogVersion}"></dd>
-                <dt th:text="#{reaudit.facts.watchlist}"></dt>
-                <dd th:text="${result.watchlistRevision == null} ? #{reaudit.watchlist.none} : #{reaudit.watchlist.revision(${#strings.toString(result.watchlistRevision)})}"></dd>
-                <dt th:text="#{reaudit.facts.previous}"></dt>
-                <dd th:if="${result.firstRun}" th:text="#{reaudit.previous.none}"></dd>
-                <dd th:unless="${result.firstRun}"
-                    th:text="#{reaudit.previous.at(${#strings.toString(result.previousAt)}, ${result.previousCatalogVersion == null} ? #{reaudit.catalog.none} : ${result.previousCatalogVersion})}"></dd>
-                <dt th:text="#{reaudit.facts.rows}"></dt>
-                <dd th:text="#{reaudit.facts.rows.value(${#strings.toString(result.rowsTotal)}, ${#strings.toString(result.rowsChecked)})}"></dd>
-            </dl>
+                <ul class="lg-kv" id="run-facts">
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.account.column}"></span>
+                        <span class="lg-kv__value" th:text="${result.account.isEmpty()} ? #{reaudit.account.none} : ${result.account}"></span></li>
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.facts.adapter}"></span>
+                        <span class="lg-kv__value"><code class="lg-code" th:text="${result.adapter}"></code></span></li>
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.facts.catalog}"></span>
+                        <span class="lg-kv__value" th:text="${result.catalogVersion == null} ? #{reaudit.catalog.none} : ${result.catalogVersion}"></span></li>
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.facts.watchlist}"></span>
+                        <span class="lg-kv__value" th:text="${result.watchlistRevision == null} ? #{reaudit.watchlist.none} : #{reaudit.watchlist.revision(${#strings.toString(result.watchlistRevision)})}"></span></li>
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.facts.previous}"></span>
+                        <span class="lg-kv__value" th:if="${result.firstRun}" th:text="#{reaudit.previous.none}"></span>
+                        <span class="lg-kv__value" th:unless="${result.firstRun}"
+                              th:with="pattern=#{format.datetime}"
+                              th:text="#{reaudit.previous.at(${#temporals.format(result.previousAt, pattern)}, ${result.previousCatalogVersion == null} ? #{reaudit.catalog.none} : ${result.previousCatalogVersion})}"></span></li>
+                    <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{reaudit.facts.rows}"></span>
+                        <span class="lg-kv__value" th:text="#{reaudit.facts.rows.value(${#strings.toString(result.rowsTotal)}, ${#strings.toString(result.rowsChecked)})}"></span></li>
+                </ul>
 
-            <ul class="counts" id="counts">
-                <li th:text="#{reaudit.counts.new(${#strings.toString(result.newRisks.size())})}"></li>
-                <li th:text="#{reaudit.counts.known(${#strings.toString(result.knownRisks.size())})}"></li>
-            </ul>
+                <ul class="lg-counts lg-section" id="counts">
+                    <li class="lg-pill" th:classappend="${result.newRisks.isEmpty()} ? '' : 'lg-pill--trademark'" th:text="#{reaudit.counts.new(${#strings.toString(result.newRisks.size())})}"></li>
+                    <li class="lg-pill" th:text="#{reaudit.counts.known(${#strings.toString(result.knownRisks.size())})}"></li>
+                </ul>
 
-            <div class="result-actions">
-                <a class="button primary" id="download-csv" th:href="${result.csvHref}" download="listing-guard-reaudit-fixes.csv"
-                   th:text="#{reaudit.csv}"></a>
-                <a class="button" th:href="@{/console/reaudit(marketplace=${marketplace.code},account=${result.account})}"
-                   th:text="#{reaudit.another}"></a>
+                <div class="lg-actions">
+                    <a class="lg-btn lg-btn--primary" id="download-csv" th:href="${result.csvHref}" download="listing-guard-reaudit-fixes.csv">
+                        <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-download"/></svg>
+                        <th:block th:text="#{reaudit.csv}"></th:block>
+                    </a>
+                    <a class="lg-btn" th:href="@{/console/reaudit(marketplace=${marketplace.code},account=${result.account})}"
+                       th:text="#{reaudit.another}"></a>
+                </div>
             </div>
 
-            <!-- New risks, then known risks: the same table twice -->
-            <section id="new-risks" aria-labelledby="new-heading">
-                <h3 id="new-heading" th:text="#{reaudit.new.heading}"></h3>
-                <p class="muted small" th:text="#{reaudit.new.note}"></p>
-                <p class="muted" th:if="${result.newRisks.isEmpty()}" th:text="#{reaudit.new.none}"></p>
+            <!-- New risks first: what the catalog or the watchlist gained since the previous run -->
+            <section class="lg-card lg-section" id="new-risks" aria-labelledby="new-heading">
+                <h3 id="new-heading" class="lg-card__title" th:text="#{reaudit.new.heading}"></h3>
+                <p class="lg-text-muted lg-small" th:text="#{reaudit.new.note}"></p>
+                <p class="lg-text-muted" th:if="${result.newRisks.isEmpty()}" th:text="#{reaudit.new.none}"></p>
                 <th:block th:unless="${result.newRisks.isEmpty()}">
-                    <div th:replace="~{console/reaudit-fragments :: risks(${result.newRisks}, 'new-table')}"></div>
+                    <div th:replace="~{console/reaudit-fragments :: risks(${result.newRisks}, 'new-table', true)}"></div>
                 </th:block>
             </section>
 
-            <section id="known-risks" aria-labelledby="known-heading">
-                <h3 id="known-heading" th:text="#{reaudit.known.heading}"></h3>
-                <p class="muted small" th:text="#{reaudit.known.note}"></p>
-                <p class="muted" th:if="${result.knownRisks.isEmpty()}" th:text="#{reaudit.known.none}"></p>
-                <th:block th:unless="${result.knownRisks.isEmpty()}">
-                    <div th:replace="~{console/reaudit-fragments :: risks(${result.knownRisks}, 'known-table')}"></div>
-                </th:block>
+            <!-- Known risks: they still need fixing, so the group stays in reach; it is open when it is all there is -->
+            <section class="lg-section" id="known-risks">
+                <details class="lg-card lg-fold" th:open="${result.newRisks.isEmpty() and !result.knownRisks.isEmpty()}">
+                    <summary class="lg-fold__summary"><h3 id="known-heading" class="lg-card__title" th:text="#{reaudit.known.summary(${#strings.toString(result.knownRisks.size())})}"></h3></summary>
+                    <p class="lg-text-muted lg-small" th:text="#{reaudit.known.note}"></p>
+                    <p class="lg-text-muted" th:if="${result.knownRisks.isEmpty()}" th:text="#{reaudit.known.none}"></p>
+                    <th:block th:unless="${result.knownRisks.isEmpty()}">
+                        <div th:replace="~{console/reaudit-fragments :: risks(${result.knownRisks}, 'known-table', false)}"></div>
+                    </th:block>
+                </details>
             </section>
 
             <!-- What changed in the listings since the previous run -->
-            <section id="changes" aria-labelledby="changes-heading" th:if="${result.changes != null}">
-                <h3 id="changes-heading" th:text="#{reaudit.changes.heading}"></h3>
-                <p class="muted small" th:text="#{reaudit.changes.note}"></p>
-                <ul class="counts" id="change-counts">
-                    <li th:text="#{reaudit.changes.edited(${#strings.toString(result.changes.edited.size())})}"></li>
-                    <li th:text="#{reaudit.changes.added(${#strings.toString(result.changes.added.size())})}"></li>
-                    <li th:text="#{reaudit.changes.dropped(${#strings.toString(result.changes.dropped.size())})}"></li>
-                    <li th:text="#{reaudit.changes.unchanged(${#strings.toString(result.changes.unchanged)})}"></li>
-                    <li th:if="${result.changes.unreadable > 0}" th:text="#{reaudit.changes.unreadable(${#strings.toString(result.changes.unreadable)})}"></li>
+            <section class="lg-card lg-section" id="changes" aria-labelledby="changes-heading" th:if="${result.changes != null}">
+                <h3 id="changes-heading" class="lg-card__title" th:text="#{reaudit.changes.heading}"></h3>
+                <p class="lg-text-muted lg-small" th:text="#{reaudit.changes.note}"></p>
+                <ul class="lg-counts lg-section" id="change-counts">
+                    <li class="lg-pill" th:text="#{reaudit.changes.edited(${#strings.toString(result.changes.edited.size())})}"></li>
+                    <li class="lg-pill" th:text="#{reaudit.changes.added(${#strings.toString(result.changes.added.size())})}"></li>
+                    <li class="lg-pill" th:text="#{reaudit.changes.dropped(${#strings.toString(result.changes.dropped.size())})}"></li>
+                    <li class="lg-pill" th:text="#{reaudit.changes.unchanged(${#strings.toString(result.changes.unchanged)})}"></li>
+                    <li class="lg-pill lg-pill--warn" th:if="${result.changes.unreadable > 0}" th:text="#{reaudit.changes.unreadable(${#strings.toString(result.changes.unreadable)})}"></li>
                 </ul>
                 <div th:replace="~{console/reaudit-fragments :: listings('edited', #{reaudit.changes.edited.heading}, ${result.changes.edited})}"></div>
                 <div th:replace="~{console/reaudit-fragments :: listings('added', #{reaudit.changes.added.heading}, ${result.changes.added})}"></div>
@@ -170,22 +201,23 @@
             </section>
 
             <!-- Rows that were not judged -->
-            <section id="skipped" aria-labelledby="skipped-heading" th:unless="${result.skipped.isEmpty()}">
-                <h3 id="skipped-heading" th:text="#{reaudit.skipped.heading}"></h3>
-                <p class="muted small" th:text="#{reaudit.skipped.note}"></p>
-                <div class="report-scroll">
-                    <table class="bulk-results" id="skipped-table" aria-labelledby="skipped-heading">
+            <section class="lg-card lg-section" id="skipped" aria-labelledby="skipped-heading" th:unless="${result.skipped.isEmpty()}">
+                <h3 id="skipped-heading" class="lg-card__title" th:text="#{reaudit.skipped.heading}"></h3>
+                <p class="lg-text-muted lg-small" th:text="#{reaudit.skipped.note}"></p>
+                <div class="lg-table-wrap">
+                    <table class="lg-table lg-table--scroll" id="skipped-table">
+                        <caption class="lg-sr-only" th:text="#{reaudit.skipped.heading}"></caption>
                         <thead>
                         <tr>
-                            <th scope="col" class="n" th:text="#{bulk.table.line}"></th>
+                            <th scope="col" class="lg-num" th:text="#{bulk.table.line}"></th>
                             <th scope="col" th:text="#{bulk.table.sku}"></th>
                             <th scope="col" th:text="#{reaudit.skipped.reason}"></th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr th:each="row : ${result.skipped}">
-                            <td class="n" th:text="${row.line}"></td>
-                            <td class="sku"><span th:if="${row.sku != null}" th:text="${row.sku}"></span><span class="muted" th:if="${row.sku == null}">&mdash;</span></td>
+                            <td class="lg-num" th:text="${row.line}"></td>
+                            <td class="lg-sku"><code class="lg-code" th:if="${row.sku != null}" th:text="${row.sku}"></code><span class="lg-text-muted" th:if="${row.sku == null}">&mdash;</span></td>
                             <td th:text="${row.reason}"></td>
                         </tr>
                         </tbody>
@@ -195,6 +227,5 @@
         </section>
     </th:block>
 </main>
-
 </body>
 </html>

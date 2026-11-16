@@ -16,7 +16,7 @@
     <span id="main" tabindex="-1"></span>
     <div class="lg-page__head">
         <div>
-            <p class="lg-page__crumb" th:text="#{home.week(${#temporals.format(home.weekFrom, 'dd/MM/yyyy')}, ${#temporals.format(home.today, 'dd/MM/yyyy')})}"></p>
+            <p class="lg-page__crumb" th:with="pattern=#{format.date}" th:text="#{home.week(${#temporals.format(home.weekFrom, pattern)}, ${#temporals.format(home.today, pattern)})}"></p>
             <h1 th:text="#{dashboard.heading}"></h1>
             <p class="lg-page__sub" th:text="#{home.sub}"></p>
         </div>
@@ -30,22 +30,9 @@
     </div>
 
     <!-- The catalog changed since a scope was last re-audited (ADR-035): said as a warning, with the way to the page. -->
-    <section class="lg-banner lg-banner--warning lg-section" id="reaudit-notice" role="status" aria-labelledby="reaudit-notice-heading"
-             th:if="${reauditNotice != null}">
-        <div class="lg-banner__body">
-            <h2 id="reaudit-notice-heading" class="lg-banner__title" th:text="#{home.reaudit.heading}"></h2>
-            <p th:text="#{home.reaudit.text(${reauditNotice.catalogVersion})}"></p>
-            <ul>
-                <li th:each="item : ${reauditNotice.stale}">
-                    <span th:text="${item.marketplace}"></span>
-                    <span th:text="${item.account.isEmpty()} ? #{reaudit.account.none} : ${item.account}"></span>:
-                    <span th:text="#{home.reaudit.last(${#strings.substring(#strings.toString(item.startedAt), 0, 10)}, ${item.catalogVersion == null} ? #{reaudit.catalog.none} : ${item.catalogVersion})}"></span>
-                </li>
-            </ul>
-            <p th:if="${reauditNotice.more > 0}" th:text="#{home.reaudit.more(${#strings.toString(reauditNotice.more)})}"></p>
-        </div>
-        <a class="lg-btn lg-btn--small" th:href="@{/console/reaudit}" th:text="#{home.reaudit.link}"></a>
-    </section>
+    <th:block th:if="${reauditNotice != null}">
+        <div th:replace="~{console/reaudit-fragments :: due(${reauditNotice}, @{/console/reaudit})}"></div>
+    </th:block>
 
     <!-- No result and no verdict in eight weeks: how to start, not a page of zeros. -->
     <section class="lg-empty lg-section" id="home-empty" th:if="${home.empty}" aria-labelledby="empty-heading">
@@ -107,13 +94,13 @@
                         <span class="lg-mark" aria-hidden="true"></span>
                         <div class="lg-feed__body">
                             <div class="lg-feed__top">
-                                <code class="lg-code" th:text="${item.sku != null} ? ${item.sku} : ${item.ruleId}"></code>
+                                <code class="lg-code lg-feed__label" th:text="${item.label()}"></code>
                                 <span class="lg-pill" th:classappend="'lg-pill--' + ${item.css()}"
                                       th:text="${item.css() == 'error'} ? #{home.attention.error} : #{home.attention.trademark}"></span>
                             </div>
                             <p class="lg-feed__text" th:text="${item.message}"></p>
                             <p class="lg-feed__meta"
-                               th:text="#{home.attention.meta(${item.marketplace}, ${#temporals.format(item.checkedAt, 'dd/MM HH:mm')})}"></p>
+                               th:with="pattern=#{format.datetime}" th:text="#{home.attention.meta(${item.marketplace}, ${#temporals.format(item.checkedAt, pattern)})}"></p>
                         </div>
                     </li>
                 </ul>
@@ -128,7 +115,7 @@
                         <div class="lg-kv__main">
                             <div class="lg-kv__label" th:text="#{home.data.catalog}"></div>
                             <div class="lg-kv__value" th:if="${home.data.catalogSource != null and home.data.catalogDate != null}"
-                                 th:text="#{home.data.catalog.value(${home.data.catalogSource}, ${#temporals.format(home.data.catalogDate, 'dd/MM/yyyy')})}"></div>
+                                 th:with="pattern=#{format.date}" th:text="#{home.data.catalog.value(${home.data.catalogSource}, ${#temporals.format(home.data.catalogDate, pattern)})}"></div>
                             <div class="lg-code" th:if="${home.data.catalogVersion != null}" th:text="${home.data.catalogVersion}"></div>
                         </div>
                         <span class="lg-pill lg-pill--clean" th:if="${home.data.catalogState == 'READY'}" th:text="#{home.data.catalog.ready}"></span>
@@ -146,7 +133,7 @@
                         <div class="lg-kv__main">
                             <div class="lg-kv__label" th:text="#{home.data.reaudit}"></div>
                             <div class="lg-kv__value" th:if="${home.data.lastReauditAt != null}"
-                                 th:text="#{home.data.reaudit.value(${#temporals.format(home.data.lastReauditAt, 'dd/MM')}, ${#strings.toString(home.data.lastReauditNew)})}"></div>
+                                 th:with="pattern=#{format.daymonth}" th:text="#{home.data.reaudit.value(${#temporals.format(home.data.lastReauditAt, pattern)}, ${#strings.toString(home.data.lastReauditNew)})}"></div>
                             <div class="lg-kv__value" th:if="${home.data.lastReauditAt == null}" th:text="#{home.data.reaudit.never}"></div>
                         </div>
                         <a class="lg-small" th:href="@{/console/reaudit}" th:text="#{home.data.open}"></a>
@@ -248,19 +235,18 @@
         </div>
     </th:block>
 
-    <!-- The plan and the month's usage, with or without data. -->
-    <section class="lg-card" id="home-plan" aria-labelledby="plan-heading">
+    <!-- The plan and the month's usage, with or without data; where plans are off there is nothing to show and no card. -->
+    <section class="lg-card" id="home-plan" aria-labelledby="plan-heading" th:if="${usage.enforced}">
         <div class="lg-card__head">
             <h2 id="plan-heading" class="lg-card__title" th:text="#{dashboard.plan.heading}"></h2>
         </div>
         <ul class="lg-kv">
             <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{dashboard.plan(${usage.plan})}"></span></li>
             <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{dashboard.usage(${#strings.toString(usage.used)})}"></span></li>
-            <li class="lg-kv__item" th:if="${usage.enforced and usage.monthlyQuota != null}"><span class="lg-kv__label"
+            <li class="lg-kv__item" th:if="${usage.monthlyQuota != null}"><span class="lg-kv__label"
                 th:text="#{dashboard.quota(${#strings.toString(usage.monthlyQuota)}, ${#strings.toString(usage.remaining)})}"></span></li>
-            <li class="lg-kv__item" th:if="${usage.enforced and usage.monthlyQuota == null}"><span class="lg-kv__label" th:text="#{dashboard.quota.unlimited}"></span></li>
-            <li class="lg-kv__item" th:unless="${usage.enforced}"><span class="lg-kv__label" th:text="#{dashboard.notenforced}"></span></li>
-            <li class="lg-kv__item"><span class="lg-kv__label"><span th:text="#{dashboard.reset}"></span> <time th:text="${usage.resetAt}"></time></span></li>
+            <li class="lg-kv__item" th:if="${usage.monthlyQuota == null}"><span class="lg-kv__label" th:text="#{dashboard.quota.unlimited}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label"><span th:text="#{dashboard.reset}"></span> <time th:with="pattern=#{format.date}" th:datetime="${usage.resetAt}" th:text="${#temporals.format(usage.resetAt, pattern)}"></time></span></li>
         </ul>
     </section>
 </main>

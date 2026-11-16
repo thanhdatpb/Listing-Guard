@@ -5,218 +5,305 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{report.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
 <body>
+<!-- The health report of the client (ADR-018, ADR-042): the same numbers as GET /api/v1/reports/summary and the health-report job, as
+     figures, a chart of the weeks and a table for each pack. It reads only; nothing is stored. Every value goes through th:text and every
+     sentence is a message (ADR-028). -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('report')}"></header>
-<main class="page wide">
+<main class="lg-page" id="report-page">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{report.heading}"></h1>
-    <p class="muted">
-        <span th:text="#{common.signedin(${email})}"></span> <span th:text="#{report.intro}"></span>
-    </p>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{report.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{report.intro}"></p>
+        </div>
+    </div>
 
-    <form class="report-form" id="report-form" method="get" th:action="@{/console/report}">
-        <div class="field">
-            <label for="from" th:text="#{report.form.from}"></label>
-            <input type="date" id="from" name="from" th:value="${from}">
-        </div>
-        <div class="field">
-            <label for="to" th:text="#{report.form.to}"></label>
-            <input type="date" id="to" name="to" th:value="${to}">
-        </div>
-        <div class="field">
-            <label for="marketplace" th:text="#{report.form.marketplace}"></label>
-            <select id="marketplace" name="marketplace">
-                <option value="" th:text="#{report.form.all}"></option>
-                <option th:each="code : ${marketplaces}" th:value="${code}" th:text="${code}" th:selected="${code == marketplaceSelected}"></option>
-            </select>
-        </div>
-        <button type="submit" class="primary" th:text="#{report.form.submit}"></button>
+    <form class="lg-filters" id="report-form" method="get" th:action="@{/console/report}">
+        <div th:replace="~{console/report-fragments :: period(${from}, ${to}, ${marketplaces}, ${marketplaceSelected})}"></div>
+        <button type="submit" class="lg-btn lg-btn--small" th:text="#{report.form.submit}"></button>
     </form>
-    <p class="muted small" th:text="#{report.note.days(${#strings.toString(maxDays)})}"></p>
+    <p class="lg-small lg-text-muted lg-section" th:text="#{report.note.days(${#strings.toString(maxDays)})}"></p>
 
-    <div class="notice refused" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
 
     <th:block th:if="${report != null}">
         <section id="coverage" th:aria-label="#{report.coverage.aria}">
-            <div class="notice applied" role="note" th:if="${report.coverageNote.complete}"><p th:text="${coverageText}"></p></div>
-            <div class="notice refused" role="note" th:unless="${report.coverageNote.complete}"><p th:text="${coverageText}"></p></div>
+            <div class="lg-banner lg-banner--success lg-section" role="note" th:if="${report.coverageNote.complete}"><div class="lg-banner__body"><p th:text="${coverageText}"></p></div></div>
+            <div class="lg-banner lg-banner--warning lg-section" role="note" th:unless="${report.coverageNote.complete}"><div class="lg-banner__body"><p th:text="${coverageText}"></p></div></div>
         </section>
 
-        <section id="overview" aria-labelledby="overview-heading">
-            <h2 id="overview-heading" th:text="#{report.overview.heading}"></h2>
-            <p class="muted">
-                <time th:text="${report.period.from}"></time> <span th:text="#{report.overview.to}"></span> <time th:text="${report.period.to}"></time>
-                (<span th:text="#{report.overview.days(${#strings.toString(report.period.days)})}"></span>)<span th:if="${report.marketplace != null}"> · <span th:text="#{report.overview.marketplace}"></span>
-                <b th:text="${report.marketplace}"></b></span>. <span th:text="#{report.overview.generated}"></span> <time th:text="${report.generatedAt}"></time>.
+        <!-- the figures first: what a lead looks at, each with its own unit -->
+        <section class="lg-section" id="report-figures" aria-labelledby="figures-heading">
+            <h2 id="figures-heading" class="lg-sr-only" th:text="#{report.figures.heading}"></h2>
+            <div class="lg-grid lg-grid--stats">
+                <div th:replace="~{console/report-fragments :: stat('fig-listing', #{report.fig.listing}, ${report.packs.listingRules.checks}, '', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('fig-error', #{report.fig.error}, ${report.packs.listingRules.findings[0].checksAffected}, 'error', #{report.fig.error.note(${#strings.toString(report.packs.listingRules.findings[0].findings)})})}"></div>
+                <div th:replace="~{console/report-fragments :: stat('fig-ready', #{report.fig.ready}, (${report.packs.listingRules.readiness.readyRate != null} ? ${#numbers.formatDecimal(report.packs.listingRules.readiness.readyRate * 100, 1, 'NONE', 1, 'POINT') + '%'} : '&mdash;'), 'clean', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('fig-trademark', #{report.fig.trademark}, ${report.packs.trademarkRisk.checks}, '', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('fig-high', #{report.fig.high}, ${report.packs.trademarkRisk.riskLevels['HIGH']}, 'trademark', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('fig-rate', #{report.fig.rate}, (${report.feedback.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(report.feedback.falsePositiveRate, 1, 1)}), '', #{report.fig.rate.note(${#strings.toString(report.feedback.verdicts)})})}"></div>
+            </div>
+        </section>
+
+        <section class="lg-card lg-section" id="overview" aria-labelledby="overview-heading">
+            <h2 id="overview-heading" class="lg-card__title" th:text="#{report.overview.heading}"></h2>
+            <p class="lg-text-muted">
+                <time th:datetime="${report.period.from}" th:with="pattern=#{format.date}" th:text="${#temporals.format(report.period.from, pattern)}"></time> <span th:text="#{report.overview.to}"></span> <time th:datetime="${report.period.to}" th:with="pattern=#{format.date}" th:text="${#temporals.format(report.period.to, pattern)}"></time>
+                (<span th:text="#{report.overview.days(${#strings.toString(report.period.days)})}"></span>)<span th:if="${report.marketplace != null}"> &middot; <span th:text="#{report.overview.marketplace}"></span>
+                <strong th:text="${report.marketplace}"></strong></span>. <time th:datetime="${report.generatedAt}" th:with="pattern=#{format.datetime}" th:text="#{report.overview.generated.at(${#temporals.format(report.generatedAt, pattern)})}"></time>
             </p>
-            <p class="muted small" th:text="#{report.overview.note}"></p>
-            <table class="report">
-                <thead>
-                <tr>
-                    <th scope="col" th:text="#{report.col.pack}"></th>
-                    <th scope="col" class="n" th:text="#{report.col.results}"></th>
-                    <th scope="col" th:text="#{report.col.status}"></th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr>
-                    <td>listing-rules</td>
-                    <td class="n" th:text="${report.packs.listingRules.checks}"></td>
-                    <td><span th:each="entry, it : ${report.packs.listingRules.statuses}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
-                </tr>
-                <tr>
-                    <td>trademark-risk</td>
-                    <td class="n" th:text="${report.packs.trademarkRisk.checks}"></td>
-                    <td><span th:each="entry, it : ${report.packs.trademarkRisk.completeness}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
-                </tr>
-                <tr>
-                    <td>variation-checks</td>
-                    <td class="n" th:text="${report.packs.variationChecks.checks}"></td>
-                    <td><span th:each="entry, it : ${report.packs.variationChecks.completeness}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
-                </tr>
-                <tr>
-                    <td>personalization-screening</td>
-                    <td class="n" th:text="${report.packs.personalizationScreening.checks}"></td>
-                    <td><span th:each="entry, it : ${report.packs.personalizationScreening.completeness}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
-                </tr>
-                </tbody>
-            </table>
+            <p class="lg-small lg-text-muted" th:text="#{report.overview.note}"></p>
+            <div class="lg-table-wrap">
+                <table class="lg-table lg-table--scroll">
+                    <caption class="lg-sr-only" th:text="#{report.overview.heading}"></caption>
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{report.col.pack}"></th>
+                        <th scope="col" class="lg-num" th:text="#{report.col.results}"></th>
+                        <th scope="col" th:text="#{report.col.status}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>listing-rules</td>
+                        <td class="lg-num" th:text="${report.packs.listingRules.checks}"></td>
+                        <td><span th:each="entry, it : ${report.packs.listingRules.statuses}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
+                    </tr>
+                    <tr>
+                        <td>trademark-risk</td>
+                        <td class="lg-num" th:text="${report.packs.trademarkRisk.checks}"></td>
+                        <td><span th:each="entry, it : ${report.packs.trademarkRisk.completeness}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
+                    </tr>
+                    <tr>
+                        <td>variation-checks</td>
+                        <td class="lg-num" th:text="${report.packs.variationChecks.checks}"></td>
+                        <td><span th:each="entry, it : ${report.packs.variationChecks.completeness}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
+                    </tr>
+                    <tr>
+                        <td>personalization-screening</td>
+                        <td class="lg-num" th:text="${report.packs.personalizationScreening.checks}"></td>
+                        <td><span th:each="entry, it : ${report.packs.personalizationScreening.completeness}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
-        <section id="listing-rules" aria-labelledby="listing-rules-heading">
-            <h2 id="listing-rules-heading">listing-rules</h2>
-            <h3 th:text="#{report.severity.heading}"></h3>
+        <!-- the weeks of the period: one bar a week, with the numbers in a table under it -->
+        <section class="lg-card lg-section" id="by-week" aria-labelledby="by-week-heading">
+            <h2 id="by-week-heading" class="lg-card__title" th:text="#{report.week.heading}"></h2>
+            <th:block th:if="${weekChart != null and !weekChart.columns.isEmpty()}">
+                <svg class="lg-chart" role="img" th:attr="viewBox='0 0 ' + ${weekChart.width} + ' ' + ${weekChart.height},aria-labelledby='by-week-heading'"
+                     xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" focusable="false">
+                    <g th:each="tick : ${weekChart.ticks}">
+                        <line class="lg-chart__axis" th:attr="x1=${weekChart.left},x2=${weekChart.width - 8},y1=${tick.y},y2=${tick.y}"></line>
+                        <text class="lg-chart__label" text-anchor="end" th:attr="x=${weekChart.left - 6},y=${tick.y + 4}" th:text="${tick.value}"></text>
+                    </g>
+                    <g th:each="column, it : ${weekChart.columns}">
+                        <rect class="lg-chart__bar" rx="4" th:classappend="${it.last} ? 'lg-chart__bar--now'"
+                              th:attr="x=${column.bar.x},y=${column.bar.y},width=${column.bar.width},height=${column.bar.height}">
+                            <title th:text="#{report.chart.bar(${column.week.isoWeek}, ${#strings.toString(column.week.checked)})}"></title>
+                        </rect>
+                        <text class="lg-chart__value" text-anchor="middle" th:attr="x=${column.labelX},y=${column.bar.y - 6}" th:text="${column.week.checked}"></text>
+                        <text class="lg-chart__label" text-anchor="middle" th:attr="x=${column.labelX},y=${weekChart.baseline + 18}" th:text="${column.week.label}"></text>
+                    </g>
+                </svg>
+                <p class="lg-small lg-text-muted" th:text="#{report.chart.note}"></p>
+            </th:block>
+            <details class="lg-disclosure">
+                <summary th:text="#{report.week.table}"></summary>
+                <div class="lg-table-wrap">
+                    <table class="lg-table lg-table--scroll">
+                        <caption class="lg-sr-only" th:text="#{report.week.heading}"></caption>
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{report.week.col.week}"></th>
+                            <th scope="col" th:text="#{report.week.col.days}"></th>
+                            <th scope="col" th:text="#{report.week.col.partial}"></th>
+                            <th scope="col" class="lg-num" th:text="#{report.week.col.ruleresults}"></th>
+                            <th scope="col" class="lg-num">ERROR</th>
+                            <th scope="col" class="lg-num">WARNING</th>
+                            <th scope="col" class="lg-num" th:text="#{report.week.col.ready}"></th>
+                            <th scope="col" class="lg-num" th:text="#{report.week.col.mean}"></th>
+                            <th scope="col" class="lg-num" th:text="#{report.week.col.trademark}"></th>
+                            <th scope="col" class="lg-num">HIGH</th>
+                            <th scope="col" class="lg-num">MEDIUM</th>
+                            <th scope="col" class="lg-num">LOW</th>
+                            <th scope="col" class="lg-num">UNKNOWN</th>
+                            <th scope="col" class="lg-num" th:text="#{report.week.col.variation}"></th>
+                            <th scope="col" class="lg-num" th:text="#{report.week.col.screenings}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="w : ${report.byWeek}">
+                            <td th:text="${w.isoWeek}"></td>
+                            <td class="lg-nowrap"><time th:text="${w.from}"></time> <span th:text="#{report.overview.to}"></span> <time th:text="${w.to}"></time></td>
+                            <td th:text="${w.partial} ? #{report.week.yes} : #{report.week.no}"></td>
+                            <td class="lg-num" th:text="${w.listingRules.checks}"></td>
+                            <td class="lg-num" th:text="${w.listingRules.findings[0].findings}"></td>
+                            <td class="lg-num" th:text="${w.listingRules.findings[1].findings}"></td>
+                            <td class="lg-num" th:text="${w.listingRules.readiness.readyRate != null ? #numbers.formatDecimal(w.listingRules.readiness.readyRate * 100, 1, 'NONE', 1, 'POINT') + '%' : '-'}"></td>
+                            <td class="lg-num" th:text="${w.listingRules.readiness.averageScore != null ? #numbers.formatDecimal(w.listingRules.readiness.averageScore, 1, 'NONE', 1, 'POINT') : '-'}"></td>
+                            <td class="lg-num" th:text="${w.trademarkRisk.checks}"></td>
+                            <td class="lg-num" th:text="${w.trademarkRisk.riskLevels['HIGH']}"></td>
+                            <td class="lg-num" th:text="${w.trademarkRisk.riskLevels['MEDIUM']}"></td>
+                            <td class="lg-num" th:text="${w.trademarkRisk.riskLevels['LOW']}"></td>
+                            <td class="lg-num" th:text="${w.trademarkRisk.riskLevels['UNKNOWN']}"></td>
+                            <td class="lg-num" th:text="${w.variationChecks.checks}"></td>
+                            <td class="lg-num" th:text="${w.personalizationScreening.checks}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            <p class="lg-small lg-text-muted" th:text="#{report.week.note}"></p>
+        </section>
+
+        <section class="lg-card lg-section" id="listing-rules" aria-labelledby="listing-rules-heading">
+            <h2 id="listing-rules-heading" class="lg-card__title">listing-rules</h2>
+            <h3 class="lg-group__title" th:text="#{report.severity.heading}"></h3>
             <div th:replace="~{console/report-fragments :: severities(${report.packs.listingRules.findings})}"></div>
-            <h3 th:text="#{report.readiness.heading}"></h3>
-            <table class="report" id="readiness">
-                <tbody>
-                <tr><td th:text="#{report.readiness.withreadiness}"></td><td class="n" th:text="${report.packs.listingRules.readiness.checksWithReadiness}"></td></tr>
-                <tr><td th:text="#{report.readiness.scored}"></td><td class="n" th:text="${report.packs.listingRules.readiness.scoredChecks}"></td></tr>
-                <tr><td th:text="#{report.readiness.incomplete}"></td><td class="n" th:text="${report.packs.listingRules.readiness.incompleteChecks}"></td></tr>
-                <tr><td th:text="#{report.readiness.ready}"></td><td class="n" th:text="${report.packs.listingRules.readiness.readyChecks}"></td></tr>
-                <tr><td th:text="#{report.readiness.readyrate}"></td><td class="n" th:text="${report.packs.listingRules.readiness.readyRate != null ? #numbers.formatDecimal(report.packs.listingRules.readiness.readyRate * 100, 1, 'NONE', 1, 'POINT') + '%' : '-'}"></td></tr>
-                <tr><td th:text="#{report.readiness.mean}"></td><td class="n" th:text="${report.packs.listingRules.readiness.averageScore != null ? #numbers.formatDecimal(report.packs.listingRules.readiness.averageScore, 1, 'NONE', 1, 'POINT') : '-'}"></td></tr>
-                <tr><td th:text="#{report.readiness.without}"></td><td class="n" th:text="${report.packs.listingRules.readiness.checksWithoutReadiness}"></td></tr>
-                <tr><td th:text="#{report.readiness.versions}"></td><td class="n"><span th:each="version, it : ${report.packs.listingRules.readiness.versions}"><span th:text="${version}"></span><span th:unless="${it.last}">, </span></span><span th:if="${report.packs.listingRules.readiness.versions.isEmpty()}">-</span></td></tr>
-                </tbody>
-            </table>
-            <p class="muted small" th:text="#{report.readiness.note}"></p>
-            <h3 th:text="#{report.rules.heading}"></h3>
+            <h3 class="lg-group__title" th:text="#{report.readiness.heading}"></h3>
+            <div class="lg-table-wrap">
+                <table class="lg-table" id="readiness">
+                    <caption class="lg-sr-only" th:text="#{report.readiness.heading}"></caption>
+                    <tbody>
+                    <tr><td th:text="#{report.readiness.withreadiness}"></td><td class="lg-num" th:text="${report.packs.listingRules.readiness.checksWithReadiness}"></td></tr>
+                    <tr><td th:text="#{report.readiness.scored}"></td><td class="lg-num" th:text="${report.packs.listingRules.readiness.scoredChecks}"></td></tr>
+                    <tr><td th:text="#{report.readiness.incomplete}"></td><td class="lg-num" th:text="${report.packs.listingRules.readiness.incompleteChecks}"></td></tr>
+                    <tr><td th:text="#{report.readiness.ready}"></td><td class="lg-num" th:text="${report.packs.listingRules.readiness.readyChecks}"></td></tr>
+                    <tr><td th:text="#{report.readiness.readyrate}"></td><td class="lg-num" th:text="${report.packs.listingRules.readiness.readyRate != null ? #numbers.formatDecimal(report.packs.listingRules.readiness.readyRate * 100, 1, 'NONE', 1, 'POINT') + '%' : '-'}"></td></tr>
+                    <tr><td th:text="#{report.readiness.mean}"></td><td class="lg-num" th:text="${report.packs.listingRules.readiness.averageScore != null ? #numbers.formatDecimal(report.packs.listingRules.readiness.averageScore, 1, 'NONE', 1, 'POINT') : '-'}"></td></tr>
+                    <tr><td th:text="#{report.readiness.without}"></td><td class="lg-num" th:text="${report.packs.listingRules.readiness.checksWithoutReadiness}"></td></tr>
+                    <tr><td th:text="#{report.readiness.versions}"></td><td class="lg-num"><span th:each="version, it : ${report.packs.listingRules.readiness.versions}"><span th:text="${version}"></span><span th:unless="${it.last}">, </span></span><span th:if="${report.packs.listingRules.readiness.versions.isEmpty()}">-</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="lg-small lg-text-muted" th:text="#{report.readiness.note}"></p>
+            <h3 class="lg-group__title" th:text="#{report.rules.heading}"></h3>
             <div th:replace="~{console/report-fragments :: rules(${report.packs.listingRules.topRules})}"></div>
         </section>
 
-        <section id="trademark-risk" aria-labelledby="trademark-risk-heading">
-            <h2 id="trademark-risk-heading">trademark-risk</h2>
-            <h3 th:text="#{report.trademark.levels.heading}"></h3>
-            <table class="report" id="risk-levels">
-                <thead>
-                <tr>
-                    <th scope="col" th:text="#{report.col.risklevel}"></th>
-                    <th scope="col" class="n" th:text="#{report.col.results}"></th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="level : ${report.packs.trademarkRisk.riskLevels}">
-                    <td th:text="${level.key}"></td>
-                    <td class="n" th:text="${level.value}"></td>
-                </tr>
-                </tbody>
-            </table>
-            <p class="muted small" th:text="#{report.trademark.unknown.note}"></p>
-            <h3 th:text="#{report.trademark.marks.heading}"></h3>
-            <p th:if="${report.packs.trademarkRisk.topMarks.items.isEmpty()}" th:text="#{report.trademark.marks.none}"></p>
-            <div class="report-scroll" th:unless="${report.packs.trademarkRisk.topMarks.items.isEmpty()}">
-                <table class="report" id="top-marks">
+        <section class="lg-card lg-section" id="trademark-risk" aria-labelledby="trademark-risk-heading">
+            <h2 id="trademark-risk-heading" class="lg-card__title">trademark-risk</h2>
+            <h3 class="lg-group__title" th:text="#{report.trademark.levels.heading}"></h3>
+            <div class="lg-table-wrap">
+                <table class="lg-table" id="risk-levels">
+                    <caption class="lg-sr-only" th:text="#{report.trademark.levels.heading}"></caption>
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{report.col.risklevel}"></th>
+                        <th scope="col" class="lg-num" th:text="#{report.col.results}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="level : ${report.packs.trademarkRisk.riskLevels}">
+                        <td th:text="${level.key}"></td>
+                        <td class="lg-num" th:text="${level.value}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="lg-small lg-text-muted" th:text="#{report.trademark.unknown.note}"></p>
+            <h3 class="lg-group__title" th:text="#{report.trademark.marks.heading}"></h3>
+            <p class="lg-text-muted" th:if="${report.packs.trademarkRisk.topMarks.items.isEmpty()}" th:text="#{report.trademark.marks.none}"></p>
+            <div class="lg-table-wrap" th:unless="${report.packs.trademarkRisk.topMarks.items.isEmpty()}">
+                <table class="lg-table lg-table--scroll" id="top-marks">
+                    <caption class="lg-sr-only" th:text="#{report.trademark.marks.heading}"></caption>
                     <thead>
                     <tr>
                         <th scope="col" th:text="#{report.col.mark}"></th>
-                        <th scope="col" class="n" th:text="#{report.col.findings}"></th>
-                        <th scope="col" class="n" th:text="#{report.col.affected}"></th>
+                        <th scope="col" class="lg-num" th:text="#{report.col.findings}"></th>
+                        <th scope="col" class="lg-num" th:text="#{report.col.affected}"></th>
                         <th scope="col" th:text="#{report.col.highest}"></th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="item : ${report.packs.trademarkRisk.topMarks.items}">
-                        <td th:text="${item.mark}"></td>
-                        <td class="n" th:text="${item.findings}"></td>
-                        <td class="n" th:text="${item.checksAffected}"></td>
+                        <td class="lg-wrap" th:text="${item.mark}"></td>
+                        <td class="lg-num" th:text="${item.findings}"></td>
+                        <td class="lg-num" th:text="${item.checksAffected}"></td>
                         <td th:text="${item.highestRisk}"></td>
                     </tr>
                     </tbody>
                 </table>
             </div>
             <th:block th:with="note=${@consoleMessages.disclaimerNote(trademarkDisclaimer)}">
-                <p class="muted small" id="trademark-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
-                <p class="muted small" id="trademark-disclaimer">
+                <p class="lg-small lg-text-muted" id="trademark-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
+                <p class="lg-small lg-text-muted" id="trademark-disclaimer">
                     <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
                     <span th:text="${trademarkDisclaimer}"></span>
                 </p>
             </th:block>
         </section>
 
-        <section id="variation-checks" aria-labelledby="variation-checks-heading">
-            <h2 id="variation-checks-heading">variation-checks</h2>
+        <section class="lg-card lg-section" id="variation-checks" aria-labelledby="variation-checks-heading">
+            <h2 id="variation-checks-heading" class="lg-card__title">variation-checks</h2>
             <div th:replace="~{console/report-fragments :: severities(${report.packs.variationChecks.findings})}"></div>
-            <h3 th:text="#{report.rules.heading}"></h3>
+            <h3 class="lg-group__title" th:text="#{report.rules.heading}"></h3>
             <div th:replace="~{console/report-fragments :: rules(${report.packs.variationChecks.topRules})}"></div>
         </section>
 
-        <section id="personalization-screening" aria-labelledby="personalization-screening-heading">
-            <h2 id="personalization-screening-heading">personalization-screening</h2>
-            <table class="report">
-                <tbody>
-                <tr>
-                    <td th:text="#{report.pers.scan}"></td>
-                    <td><span th:each="entry, it : ${report.packs.personalizationScreening.trademarkStatus}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
-                </tr>
-                <tr>
-                    <td th:text="#{report.pers.risk}"></td>
-                    <td><span th:each="entry, it : ${report.packs.personalizationScreening.trademarkRiskLevels}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
-                </tr>
-                </tbody>
-            </table>
-            <p class="muted small" th:text="#{report.pers.nomarks}"></p>
-            <h3 th:text="#{report.pers.findings}"></h3>
+        <section class="lg-card lg-section" id="personalization-screening" aria-labelledby="personalization-screening-heading">
+            <h2 id="personalization-screening-heading" class="lg-card__title">personalization-screening</h2>
+            <div class="lg-table-wrap">
+                <table class="lg-table">
+                    <caption class="lg-sr-only" th:text="#{report.pers.scan}"></caption>
+                    <tbody>
+                    <tr>
+                        <td th:text="#{report.pers.scan}"></td>
+                        <td><span th:each="entry, it : ${report.packs.personalizationScreening.trademarkStatus}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
+                    </tr>
+                    <tr>
+                        <td th:text="#{report.pers.risk}"></td>
+                        <td><span th:each="entry, it : ${report.packs.personalizationScreening.trademarkRiskLevels}"><span th:text="${entry.key} + ' ' + ${entry.value}"></span><span th:unless="${it.last}"> · </span></span></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="lg-small lg-text-muted" th:text="#{report.pers.nomarks}"></p>
+            <h3 class="lg-group__title" th:text="#{report.pers.findings}"></h3>
             <div th:replace="~{console/report-fragments :: severities(${report.packs.personalizationScreening.findings})}"></div>
-            <h3 th:text="#{report.pers.rules}"></h3>
+            <h3 class="lg-group__title" th:text="#{report.pers.rules}"></h3>
             <div th:replace="~{console/report-fragments :: rules(${report.packs.personalizationScreening.topRules})}"></div>
         </section>
 
         <!-- Verdicts on findings (ADR-034): counts and rule ids only, never a note. -->
-        <section id="feedback" aria-labelledby="feedback-heading">
-            <h2 id="feedback-heading" th:text="#{report.feedback.heading}"></h2>
-            <p class="muted small" th:text="#{report.feedback.note}"></p>
-            <dl class="facts">
-                <dt th:text="#{report.feedback.verdicts}"></dt><dd th:text="${report.feedback.verdicts}"></dd>
-                <dt th:text="#{feedback.verdict.correct}"></dt><dd th:text="${report.feedback.byVerdict['CORRECT']}"></dd>
-                <dt th:text="#{feedback.verdict.false-positive}"></dt><dd th:text="${report.feedback.byVerdict['FALSE_POSITIVE']}"></dd>
-                <dt th:text="#{feedback.verdict.not-useful}"></dt><dd th:text="${report.feedback.byVerdict['NOT_USEFUL']}"></dd>
-                <dt th:text="#{report.feedback.rate}"></dt>
-                <dd th:text="${report.feedback.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(report.feedback.falsePositiveRate, 1, 1)}"></dd>
-            </dl>
-            <h3 th:text="#{report.feedback.top}"></h3>
-            <p th:if="${report.feedback.topFalsePositiveRules.items.isEmpty()}" th:text="#{report.feedback.none}"></p>
-            <div class="report-scroll" th:unless="${report.feedback.topFalsePositiveRules.items.isEmpty()}">
-                <table class="report" id="feedback-top">
+        <section class="lg-card lg-section" id="feedback" aria-labelledby="feedback-heading">
+            <h2 id="feedback-heading" class="lg-card__title" th:text="#{report.feedback.heading}"></h2>
+            <p class="lg-small lg-text-muted" th:text="#{report.feedback.note}"></p>
+            <ul class="lg-kv">
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{report.feedback.verdicts}"></span><span class="lg-kv__value" th:text="${report.feedback.verdicts}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{feedback.verdict.correct}"></span><span class="lg-kv__value" th:text="${report.feedback.byVerdict['CORRECT']}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{feedback.verdict.false-positive}"></span><span class="lg-kv__value" th:text="${report.feedback.byVerdict['FALSE_POSITIVE']}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{feedback.verdict.not-useful}"></span><span class="lg-kv__value" th:text="${report.feedback.byVerdict['NOT_USEFUL']}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{report.feedback.rate}"></span>
+                    <span class="lg-kv__value" th:text="${report.feedback.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(report.feedback.falsePositiveRate, 1, 1)}"></span></li>
+            </ul>
+            <h3 class="lg-group__title" th:text="#{report.feedback.top}"></h3>
+            <p class="lg-text-muted" th:if="${report.feedback.topFalsePositiveRules.items.isEmpty()}" th:text="#{report.feedback.none}"></p>
+            <div class="lg-table-wrap" th:unless="${report.feedback.topFalsePositiveRules.items.isEmpty()}">
+                <table class="lg-table lg-table--scroll" id="feedback-top">
+                    <caption class="lg-sr-only" th:text="#{report.feedback.top}"></caption>
                     <thead>
                     <tr>
                         <th scope="col" th:text="#{report.col.pack}"></th>
                         <th scope="col" th:text="#{report.col.rule}"></th>
-                        <th scope="col" class="n" th:text="#{stats.col.falsepositive}"></th>
-                        <th scope="col" class="n" th:text="#{stats.col.verdicts}"></th>
-                        <th scope="col" class="n" th:text="#{stats.col.rate}"></th>
+                        <th scope="col" class="lg-num" th:text="#{stats.col.falsepositive}"></th>
+                        <th scope="col" class="lg-num" th:text="#{stats.col.verdicts}"></th>
+                        <th scope="col" class="lg-num" th:text="#{stats.col.rate}"></th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="item : ${report.feedback.topFalsePositiveRules.items}">
-                        <td th:text="${item.pack}"></td>
-                        <td th:text="${item.ruleId}"></td>
-                        <td class="n" th:text="${item.falsePositives}"></td>
-                        <td class="n" th:text="${item.verdicts}"></td>
-                        <td class="n" th:text="${#numbers.formatPercent(item.falsePositiveRate, 1, 1)}"></td>
+                        <td class="lg-nowrap" th:text="${item.pack}"></td>
+                        <td><code class="lg-code" th:text="${item.ruleId}"></code></td>
+                        <td class="lg-num" th:text="${item.falsePositives}"></td>
+                        <td class="lg-num" th:text="${item.verdicts}"></td>
+                        <td class="lg-num" th:text="${#numbers.formatPercent(item.falsePositiveRate, 1, 1)}"></td>
                     </tr>
                     </tbody>
                 </table>
@@ -224,91 +311,47 @@
         </section>
 
         <!-- The periodic re-audit (ADR-035): counts only, no SKU and no text. -->
-        <section id="reaudit" aria-labelledby="reaudit-heading">
-            <h2 id="reaudit-heading" th:text="#{report.reaudit.heading}"></h2>
-            <p class="muted small" th:text="#{report.reaudit.note}"></p>
-            <dl class="facts">
-                <dt th:text="#{report.reaudit.runs}"></dt><dd th:text="${report.reaudit.runs}"></dd>
-                <dt th:text="#{report.reaudit.clients}"></dt><dd th:text="${report.reaudit.clients}"></dd>
-                <dt th:text="#{report.reaudit.listings}"></dt><dd th:text="${report.reaudit.listingsChecked}"></dd>
-                <dt th:text="#{report.reaudit.findings}"></dt><dd th:text="${report.reaudit.findings}"></dd>
-                <dt th:text="#{report.reaudit.new}"></dt><dd th:text="${report.reaudit.newFindings}"></dd>
-                <dt th:text="#{report.reaudit.catalog}"></dt>
-                <dd th:text="${report.reaudit.servedCatalog == null} ? #{reaudit.catalog.none} : ${report.reaudit.servedCatalog}"></dd>
-                <dt th:text="#{report.reaudit.due}"></dt>
-                <dd th:text="${report.reaudit.scopesToReaudit == null} ? '&mdash;' : ${report.reaudit.scopesToReaudit}"></dd>
-            </dl>
-            <p th:if="${report.reaudit.scopesToReaudit != null and report.reaudit.scopesToReaudit > 0}">
-                <a class="button" th:href="@{/console/reaudit}" th:text="#{report.reaudit.link}"></a>
+        <section class="lg-card lg-section" id="reaudit" aria-labelledby="reaudit-heading">
+            <h2 id="reaudit-heading" class="lg-card__title" th:text="#{report.reaudit.heading}"></h2>
+            <p class="lg-small lg-text-muted" th:text="#{report.reaudit.note}"></p>
+            <ul class="lg-kv">
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{report.reaudit.runs}"></span><span class="lg-kv__value" th:text="${report.reaudit.runs}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{report.reaudit.clients}"></span><span class="lg-kv__value" th:text="${report.reaudit.clients}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{report.reaudit.listings}"></span><span class="lg-kv__value" th:text="${report.reaudit.listingsChecked}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{report.reaudit.findings}"></span><span class="lg-kv__value" th:text="${report.reaudit.findings}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{report.reaudit.new}"></span><span class="lg-kv__value" th:text="${report.reaudit.newFindings}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{report.reaudit.catalog}"></span>
+                    <span class="lg-kv__value" th:text="${report.reaudit.servedCatalog == null} ? #{reaudit.catalog.none} : ${report.reaudit.servedCatalog}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{report.reaudit.due}"></span>
+                    <span class="lg-kv__value" th:text="${report.reaudit.scopesToReaudit == null} ? '&mdash;' : ${report.reaudit.scopesToReaudit}"></span></li>
+            </ul>
+            <p class="lg-card__foot" th:if="${report.reaudit.scopesToReaudit != null and report.reaudit.scopesToReaudit > 0}">
+                <a class="lg-btn lg-btn--small" th:href="@{/console/reaudit}" th:text="#{report.reaudit.link}"></a>
             </p>
         </section>
 
-        <section id="by-week" aria-labelledby="by-week-heading">
-            <h2 id="by-week-heading" th:text="#{report.week.heading}"></h2>
-            <div class="report-scroll">
-                <table class="report">
+        <section class="lg-card lg-section" id="versions" aria-labelledby="versions-heading">
+            <h2 id="versions-heading" class="lg-card__title" th:text="#{report.versions.heading}"></h2>
+            <div class="lg-table-wrap">
+                <table class="lg-table">
+                    <caption class="lg-sr-only" th:text="#{report.versions.heading}"></caption>
                     <thead>
                     <tr>
-                        <th scope="col" th:text="#{report.week.col.week}"></th>
-                        <th scope="col" th:text="#{report.week.col.days}"></th>
-                        <th scope="col" th:text="#{report.week.col.partial}"></th>
-                        <th scope="col" class="n" th:text="#{report.week.col.ruleresults}"></th>
-                        <th scope="col" class="n">ERROR</th>
-                        <th scope="col" class="n">WARNING</th>
-                        <th scope="col" class="n" th:text="#{report.week.col.ready}"></th>
-                        <th scope="col" class="n" th:text="#{report.week.col.mean}"></th>
-                        <th scope="col" class="n" th:text="#{report.week.col.trademark}"></th>
-                        <th scope="col" class="n">HIGH</th>
-                        <th scope="col" class="n">MEDIUM</th>
-                        <th scope="col" class="n">LOW</th>
-                        <th scope="col" class="n">UNKNOWN</th>
-                        <th scope="col" class="n" th:text="#{report.week.col.variation}"></th>
-                        <th scope="col" class="n" th:text="#{report.week.col.screenings}"></th>
+                        <th scope="col" th:text="#{report.col.pack}"></th>
+                        <th scope="col" th:text="#{report.col.marketplace}"></th>
+                        <th scope="col" th:text="#{report.col.ruleset}"></th>
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:each="w : ${report.byWeek}">
-                        <td th:text="${w.isoWeek}"></td>
-                        <td><time th:text="${w.from}"></time> <span th:text="#{report.overview.to}"></span> <time th:text="${w.to}"></time></td>
-                        <td th:text="${w.partial} ? #{report.week.yes} : #{report.week.no}"></td>
-                        <td class="n" th:text="${w.listingRules.checks}"></td>
-                        <td class="n" th:text="${w.listingRules.findings[0].findings}"></td>
-                        <td class="n" th:text="${w.listingRules.findings[1].findings}"></td>
-                        <td class="n" th:text="${w.listingRules.readiness.readyRate != null ? #numbers.formatDecimal(w.listingRules.readiness.readyRate * 100, 1, 'NONE', 1, 'POINT') + '%' : '-'}"></td>
-                        <td class="n" th:text="${w.listingRules.readiness.averageScore != null ? #numbers.formatDecimal(w.listingRules.readiness.averageScore, 1, 'NONE', 1, 'POINT') : '-'}"></td>
-                        <td class="n" th:text="${w.trademarkRisk.checks}"></td>
-                        <td class="n" th:text="${w.trademarkRisk.riskLevels['HIGH']}"></td>
-                        <td class="n" th:text="${w.trademarkRisk.riskLevels['MEDIUM']}"></td>
-                        <td class="n" th:text="${w.trademarkRisk.riskLevels['LOW']}"></td>
-                        <td class="n" th:text="${w.trademarkRisk.riskLevels['UNKNOWN']}"></td>
-                        <td class="n" th:text="${w.variationChecks.checks}"></td>
-                        <td class="n" th:text="${w.personalizationScreening.checks}"></td>
+                    <tr th:each="ruleset : ${report.versions.rulesets}">
+                        <td th:text="${ruleset.pack}"></td>
+                        <td th:text="${ruleset.marketplace}"></td>
+                        <td><code class="lg-code" th:text="${ruleset.version}"></code></td>
                     </tr>
                     </tbody>
                 </table>
             </div>
-            <p class="muted small" th:text="#{report.week.note}"></p>
-        </section>
-
-        <section id="versions" aria-labelledby="versions-heading">
-            <h2 id="versions-heading" th:text="#{report.versions.heading}"></h2>
-            <table class="report">
-                <thead>
-                <tr>
-                    <th scope="col" th:text="#{report.col.pack}"></th>
-                    <th scope="col" th:text="#{report.col.marketplace}"></th>
-                    <th scope="col" th:text="#{report.col.ruleset}"></th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="ruleset : ${report.versions.rulesets}">
-                    <td th:text="${ruleset.pack}"></td>
-                    <td th:text="${ruleset.marketplace}"></td>
-                    <td th:text="${ruleset.version}"></td>
-                </tr>
-                </tbody>
-            </table>
-            <p class="muted small">
+            <p class="lg-small lg-text-muted">
                 <span th:text="#{report.versions.catalog}"></span> <span th:text="${report.versions.trademarkCatalog.state}"></span><span th:if="${report.versions.trademarkCatalog.version != null}"> (<span th:text="${report.versions.trademarkCatalog.version}"></span>)</span>.
                 <span th:text="#{report.versions.older}"></span>
             </p>

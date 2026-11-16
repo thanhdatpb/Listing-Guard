@@ -1,17 +1,38 @@
 <!DOCTYPE html>
 <html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <body>
-<!-- Parts of the periodic re-audit page (ADR-035). This file is never served on its own; reaudit.html includes the fragments below.
-     Every value is printed with th:text, so a listing's text is never markup. No text is written here (ADR-028): every sentence is
-     a message. -->
+<!-- Parts of the periodic re-audit page (ADR-035, ADR-042). This file is never served on its own; reaudit.html and the home page include
+     the fragments below. Every value is printed with th:text, so a listing's text is never markup. No text is written here (ADR-028):
+     every sentence is a message. -->
 
-<!-- The table of risks of one group. -->
-<th:block th:fragment="risks(items, id)">
-    <div class="report-scroll">
-        <table class="bulk-results" th:id="${id}">
+<!-- The catalog changed since a scope was last audited: said as a warning, with the way to the page. The home page links to the page, the
+     page itself to its form (the listings are not stored, so a re-audit needs the file again). -->
+<section class="lg-banner lg-banner--warning lg-section" id="reaudit-notice" role="status" aria-labelledby="reaudit-notice-heading"
+         th:fragment="due(notice, href)">
+    <div class="lg-banner__body">
+        <h2 id="reaudit-notice-heading" class="lg-banner__title" th:text="#{home.reaudit.heading}"></h2>
+        <p th:text="#{home.reaudit.text(${notice.catalogVersion})}"></p>
+        <ul>
+            <li th:each="item : ${notice.stale}">
+                <span th:text="${item.marketplace}"></span>
+                <span th:text="${item.account.isEmpty()} ? #{reaudit.account.none} : ${item.account}"></span>:
+                <span th:with="pattern=#{format.date}" th:text="#{home.reaudit.last(${#temporals.format(item.startedAt, pattern)}, ${item.catalogVersion == null} ? #{reaudit.catalog.none} : ${item.catalogVersion})}"></span>
+            </li>
+        </ul>
+        <p th:if="${notice.more > 0}" th:text="#{home.reaudit.more(${#strings.toString(notice.more)})}"></p>
+    </div>
+    <a class="lg-btn lg-btn--small" th:href="${href}" th:text="#{home.reaudit.link}"></a>
+</section>
+
+<!-- The table of risks of one group. In the group of new risks ({@code marks}) a risk that is a problem to fix has the red diamond, as on
+     a finding card; the columns and their order are the same in both groups. -->
+<th:block th:fragment="risks(items, id, marks)">
+    <div class="lg-table-wrap">
+        <table class="lg-table lg-table--scroll" th:id="${id}">
+            <caption class="lg-sr-only" th:text="${marks} ? #{reaudit.new.heading} : #{reaudit.known.heading}"></caption>
             <thead>
             <tr>
-                <th scope="col" class="n" th:text="#{bulk.table.line}"></th>
+                <th scope="col" class="lg-num" th:text="#{bulk.table.line}"></th>
                 <th scope="col" th:text="#{bulk.table.sku}"></th>
                 <th scope="col" th:text="#{reaudit.export.rule}"></th>
                 <th scope="col" th:text="#{reaudit.export.mark}"></th>
@@ -21,15 +42,16 @@
             </thead>
             <tbody>
             <tr th:each="risk : ${items}">
-                <td class="n" th:text="${risk.line}"></td>
-                <td class="sku"><span th:if="${risk.sku != null}" th:text="${risk.sku}"></span><span class="muted" th:if="${risk.sku == null}">&mdash;</span></td>
-                <td><code th:text="${risk.ruleId}"></code></td>
-                <td><span th:if="${risk.mark != null}" th:text="${risk.mark}"></span><span class="muted" th:if="${risk.mark == null}">&mdash;</span></td>
-                <td><span class="status" th:classappend="${risk.level == 'error' or risk.level == 'high'} ? 'error' : 'warning'" th:text="${risk.levelLabel}"></span></td>
-                <td class="main">
-                    <details>
+                <td class="lg-num" th:text="${risk.line}"></td>
+                <td class="lg-sku"><span class="lg-mark lg-mark--inline" aria-hidden="true" th:if="${marks and (risk.level == 'error' or risk.level == 'high')}"></span><code class="lg-code" th:if="${risk.sku != null}" th:text="${risk.sku}"></code><span class="lg-text-muted" th:if="${risk.sku == null}">&mdash;</span></td>
+                <td><code class="lg-code" th:text="${risk.ruleId}"></code></td>
+                <td class="lg-wrap"><strong th:if="${risk.mark != null}" th:text="${risk.mark}"></strong><span class="lg-text-muted" th:if="${risk.mark == null}">&mdash;</span></td>
+                <td><span class="lg-pill" th:text="${risk.levelLabel}"
+                          th:classappend="${risk.level == 'error'} ? 'lg-pill--error' : (${risk.level == 'high' or risk.level == 'medium' or risk.level == 'warning'} ? 'lg-pill--warn')"></span></td>
+                <td class="lg-main">
+                    <details class="lg-disclosure">
                         <summary th:text="${risk.message}"></summary>
-                        <p class="muted small" th:if="${risk.field != null}" th:text="#{reaudit.risk.field(${risk.field})}"></p>
+                        <p class="lg-text-muted lg-small" th:if="${risk.field != null}" th:text="#{reaudit.risk.field(${risk.field})}"></p>
                         <p th:if="${risk.suggestion != null and !risk.suggestion.isEmpty()}" th:text="${risk.suggestion}"></p>
                     </details>
                 </td>
@@ -42,10 +64,10 @@
 <!-- A list of listings of one kind of change: edited, added or dropped. -->
 <th:block th:fragment="listings(kind, heading, items)">
     <div th:id="'changes-' + ${kind}" th:unless="${items.isEmpty()}">
-        <h4 th:text="${heading}"></h4>
-        <ul class="listings">
-            <li th:each="item : ${items}">
-                <span th:if="${item.sku != null}" th:text="${item.sku}"></span>
+        <h4 class="lg-group__title" th:text="${heading}"></h4>
+        <ul class="lg-chips-list">
+            <li class="lg-chip lg-chip--neutral" th:each="item : ${items}">
+                <code class="lg-code" th:if="${item.sku != null}" th:text="${item.sku}"></code>
                 <span th:if="${item.sku == null}" th:text="#{reaudit.changes.row(${#strings.toString(item.position)})}"></span>
             </li>
         </ul>

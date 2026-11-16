@@ -204,7 +204,7 @@ example for an application that calls the API. It needs no migration and no plan
   takes effect at once.
 - A client that an operator gave more keys than the limit keeps them all; the console only refuses to create another until
   enough are revoked.
-- The page serves `/console/console.css` and `/console/keys.js` behind the console sign-in.
+- The page serves `/console/keys.js` behind the console sign-in; its style is the shared `/brand/app.css`.
 
 ### Bulk check page (ADR-029)
 

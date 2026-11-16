@@ -63,9 +63,19 @@ The console editor, the console bulk check and `batch-check` call the same servi
 
 ## The console page
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/watchlist-dark.png">
+  <img src="images/console/watchlist-light.png" alt="The watchlist page: the Import from Sheet and Add a mark buttons, a banner about the level of a match, a filter row and the table of marks with a switch.">
+</picture>
+
 `/console/watchlist` (menu "Watchlist", in English and Vietnamese). Every account of the client can read it and export it; **only an
 `ADMIN` account changes it**: add, edit, switch off or on, delete, import. A `MEMBER` sees the list read only with a note, and every
 write route answers it `403`. The role is read from the database at each request.
+
+- **The page** has a banner that says a match is reported at the level of the setting or higher, a filter row (a word, a Nice class, on
+  or off; it narrows the table only) and a table in which the mark is the name of its row. The switch of a row is a button with a state for an
+  administrator and a picture with a word for a member. The add form, the edit form and the import open from the address (`?add`, `?edit=`,
+  `?import`), so the page needs no script and the back button closes them ([ADR-042](adr/ADR-042-console-manage-pages.md)).
 
 - **A magic-link account** owns the client made for it, so it is an `ADMIN`. **An account of the shared Cloudflare Access client**
   (ADR-027), and any account an operator made, is a `MEMBER` until the operator promotes it.

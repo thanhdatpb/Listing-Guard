@@ -117,6 +117,32 @@ public class FindingCards {
                 null, card.value(), null, null, card.target());
     }
 
+    // ---- a stored result opened from the history
+
+    /**
+     * One finding of a stored check as the history reads it back: the API's own text, the value or span it was about, and the address of
+     * its feedback. {@code level} is {@code error}, {@code warning}, {@code info}, {@code high}, {@code medium} or {@code low};
+     * {@code mark} is the catalog mark of a trademark finding and {@code source} its {@code CATALOG}, {@code CONTEXT} or
+     * {@code WATCHLIST}, both null for any other pack.
+     */
+    public record Stored(String ruleId, String level, String field, String message, String suggestion, String value, String mark,
+                         String source, FindingCard.Fix fix, FeedbackTarget target) {
+    }
+
+    /** The findings of a stored check of {@code pack}, as cards in the order they were stored; the history page and the editor share them. */
+    public List<FindingCard> history(String pack, String marketplace, List<Stored> findings) {
+        String kind = kindOf(pack);
+        List<FindingCard> cards = new ArrayList<>();
+        for (Stored item : findings) {
+            String source = "trademark".equals(kind) ? origin(item.ruleId(), item.mark() != null, item.source())
+                    : "rules".equals(kind) ? sources.listingRule(marketplace, item.ruleId()) : null;
+            cards.add(card(kind, item.level(), item.ruleId(), item.field(), item.message(), item.suggestion(),
+                    item.mark() == null ? null : messages.get("bulk.item.catalogmark", item.mark()), source, null, item.fix(), null,
+                    item.value(), null, null, messages.ruleExplanation(item.ruleId()), item.target()));
+        }
+        return List.copyOf(cards);
+    }
+
     // ---- building blocks
 
     private FindingCard card(String kind, String level, String ruleId, String field, String message, String suggestion, String detail,

@@ -453,4 +453,71 @@ class ConsoleReauditIntegrationTest {
 
         assertThat(after).contains("id=\"recent-table\"").contains("shop-a").contains("<option value=\"shop-a\">");
     }
+
+    // ---- the design system (ADR-042)
+
+    private static int countOf(String html, String text) {
+        int count = 0;
+        for (int at = html.indexOf(text); at >= 0; at = html.indexOf(text, at + text.length())) {
+            count++;
+        }
+        return count;
+    }
+
+    @Test
+    void theFormOfAClientThatNeverRanIsAnInvitationWithTheUploadBoxAndNoLastRun() throws Exception {
+        ConsoleUser user = user();
+
+        String page = mvc.perform(get("/console/reaudit").with(signedIn(user))).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(page).contains("id=\"reaudit-page\"").contains("class=\"lg-drop\"").contains("id=\"reaudit-form\"")
+                .contains("id=\"last-run\"").contains("id=\"no-runs\"").contains("<h2 id=\"last-heading\"")
+                .doesNotContain("id=\"recent-table\"").doesNotContain("id=\"reaudit-notice\"").doesNotContain("/console/console.css")
+                .doesNotContain("class=\"page wide\"").doesNotContain("class=\"notice");
+        assertThat(page).containsPattern("for=\"marketplace\"").containsPattern("for=\"account\"");
+        assertThat(countOf(page, "lg-btn--primary")).as("one brand button: the run").isEqualTo(1);
+        assertThat(page).containsPattern("<h1[^>]*>Rà định kỳ</h1>");
+    }
+
+    @Test
+    void theLastRunIsACardWithItsCountsAndTheBannerOfAStaleCatalogHasAButtonToTheForm() throws Exception {
+        ConsoleUser user = user();
+        run(user, "shop-a", file(row("E-1", "Plain ceramic mug " + unique())));
+
+        String fresh = mvc.perform(get("/console/reaudit").with(signedIn(user))).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+        int from = fresh.indexOf("id=\"last-run\"");
+        String card = fresh.substring(from, fresh.indexOf("</section>", from));
+        assertThat(card).contains("shop-a").contains("Listing đã rà").contains("Rủi ro đã biết").doesNotContain("id=\"no-runs\"");
+        assertThat(fresh).as("the run used the catalog served now").doesNotContain("id=\"reaudit-notice\"");
+
+        claimRunWasMadeWith(user, olderCatalog("Zorvex"));
+        String stale = mvc.perform(get("/console/reaudit").with(signedIn(user))).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(stale).contains("id=\"reaudit-notice\"").contains("lg-banner--warning").contains("Catalog đã cập nhật, nên rà lại")
+                .contains(TrademarkReadyTestConfig.catalogVersion()).contains("shop-a");
+        // the listings are not stored, so "Re-audit now" leads to the form that takes the file again
+        assertThat(stale).containsPattern("<a class=\"lg-btn lg-btn--small\" href=\"#reaudit-form\">");
+        assertThat(stale.indexOf("id=\"reaudit-notice\"")).isLessThan(stale.indexOf("id=\"reaudit-form\""));
+    }
+
+    @Test
+    void theResultHasTheNewRisksWithTheDiamondAndTheKnownRisksInAFoldThatOpensWhenItIsAllThereIs() throws Exception {
+        ConsoleUser user = user();
+        String text = "Zorvex ceramic mug " + unique();
+
+        String first = run(user, "shop-fold", file(row("E-1", text)));
+        assertThat(first).contains("id=\"known-table\"").contains("<details class=\"lg-card lg-fold\" open=\"open\">")
+                .contains("id=\"download-csv\"").doesNotContain("id=\"new-table\"");
+        assertThat(countOf(first, "lg-btn--primary")).as("one brand button: the CSV").isEqualTo(1);
+
+        claimRunWasMadeWith(user, olderCatalog("Zorvex"));
+        String second = run(user, "shop-fold", file(row("E-1", text), row("E-2", "Brask ceramic mug " + unique())));
+
+        assertThat(second).contains("id=\"new-table\"").contains("class=\"lg-mark lg-mark--inline\"")
+                .contains("<details class=\"lg-card lg-fold\">").doesNotContain("class=\"notice");
+        assertThat(second.indexOf("id=\"new-risks\"")).as("new risks come first").isLessThan(second.indexOf("id=\"known-risks\""));
+    }
 }

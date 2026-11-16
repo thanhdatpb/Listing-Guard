@@ -95,7 +95,7 @@ class ConsoleDesignSystemIntegrationTest {
 
     @Test
     void theOtherConsoleFilesStayBehindTheSignIn() throws Exception {
-        for (String path : new String[] {"/console/app.css", "/console/editor.css", "/console/console.css", "/console/vendor/htmx.min.js", "/console"}) {
+        for (String path : new String[] {"/console/app.css", "/console/editor.css", "/console/bulk.css", "/console/vendor/htmx.min.js", "/console"}) {
             mvc.perform(get(path)).andExpect(status().is3xxRedirection()).andExpect(header().string("Location", "/login"));
         }
     }
@@ -181,16 +181,15 @@ class ConsoleDesignSystemIntegrationTest {
     }
 
     @Test
-    void thePagesKeepTheStyleSheetsTheyHadAndSetNoInlineColor() throws Exception {
+    void everyPageLoadsOnlyTheSheetsItNeedsAndSetsNoInlineColor() throws Exception {
         ConsoleUser user = userOf(PlanTestSupport.newClient(provisioning, clients, PlanCode.FREE));
         String editor = body(mvc.perform(get("/console/check").with(signedIn(user))).andReturn());
         String keys = body(mvc.perform(get("/console/api-keys").with(signedIn(user))).andReturn());
 
         assertThat(editor).contains("/console/editor.css").contains("/console/editor.js");
-        assertThat(keys).contains("/console/console.css").doesNotContain("/console/editor.css");
+        assertThat(keys).contains("/brand/app.css").doesNotContain("/console/console.css").doesNotContain("/console/editor.css");
         assertThat(editor).doesNotContain("/console/console.css").doesNotContain("/console/bulk.css");
         assertThat(editor.indexOf("/brand/app.css")).isLessThan(editor.indexOf("/console/editor.css"));
-        assertThat(keys.indexOf("/brand/app.css")).isLessThan(keys.indexOf("/console/console.css"));
         assertThat(editor).doesNotContain("style=\"");
     }
 

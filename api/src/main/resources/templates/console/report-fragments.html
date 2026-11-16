@@ -1,53 +1,78 @@
 <!DOCTYPE html>
 <html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <body>
-<!-- Parts of the report page (ADR-018) that repeat for each pack. This file is never served on its own; console/report includes
-     the fragments below. Every value goes through th:text; every sentence is a message (ADR-028). The severity and the rule id are
-     codes of the API and are printed as they are. -->
+<!-- Parts of the report page (ADR-018, ADR-042) that repeat: the period filter and a figure card (also used by the statistics page), the
+     findings per severity and the ranking of rules of a pack. This file is never served on its own. Every value goes through th:text;
+     every sentence is a message (ADR-028). The severity and the rule id are codes of the API and are printed as they are. -->
+
+<!-- The three controls that choose what a report or the statistics cover: the first day, the last day and the marketplace. -->
+<th:block th:fragment="period(from, to, marketplaces, selected)">
+    <label class="lg-filters__field"><span th:text="#{report.form.from}"></span>
+        <input class="lg-input" type="date" id="from" name="from" th:value="${from}"></label>
+    <label class="lg-filters__field"><span th:text="#{report.form.to}"></span>
+        <input class="lg-input" type="date" id="to" name="to" th:value="${to}"></label>
+    <label class="lg-filters__field"><span th:text="#{report.form.marketplace}"></span>
+        <select class="lg-select" id="marketplace" name="marketplace">
+            <option value="" th:text="#{report.form.all}"></option>
+            <option th:each="code : ${marketplaces}" th:value="${code}" th:text="${code}" th:selected="${code == selected}"></option>
+        </select></label>
+</th:block>
+
+<!-- One figure: what it counts, the number, and when there is one a short note. {@code tone} is empty, {@code error}, {@code trademark}
+     or {@code clean}; the number is the same size in every tone, the color only says what kind of thing it counts. -->
+<div class="lg-card lg-stat" th:fragment="stat(id, label, value, tone, note)" th:id="${id}">
+    <p class="lg-stat__label" th:text="${label}"></p>
+    <p class="lg-stat__value" th:classappend="${tone != ''} ? 'lg-stat__value--' + ${tone}" th:text="${value}"></p>
+    <p class="lg-stat__note" th:if="${note != null}" th:text="${note}"></p>
+</div>
 
 <!-- Findings per severity: a list of SeverityCountView. -->
-<table class="report" th:fragment="severities(list)">
-    <thead>
-    <tr>
-        <th scope="col" th:text="#{report.col.severity}"></th>
-        <th scope="col" class="n" th:text="#{report.col.findings}"></th>
-        <th scope="col" class="n" th:text="#{report.col.affected}"></th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr th:each="s : ${list}">
-        <td th:text="${s.severity}"></td>
-        <td class="n" th:text="${s.findings}"></td>
-        <td class="n" th:text="${s.checksAffected}"></td>
-    </tr>
-    </tbody>
-</table>
+<div class="lg-table-wrap" th:fragment="severities(list)">
+    <table class="lg-table">
+        <caption class="lg-sr-only" th:text="#{report.col.severity}"></caption>
+        <thead>
+        <tr>
+            <th scope="col" th:text="#{report.col.severity}"></th>
+            <th scope="col" class="lg-num" th:text="#{report.col.findings}"></th>
+            <th scope="col" class="lg-num" th:text="#{report.col.affected}"></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="s : ${list}">
+            <td><code class="lg-code" th:text="${s.severity}"></code></td>
+            <td class="lg-num" th:text="${s.findings}"></td>
+            <td class="lg-num" th:text="${s.checksAffected}"></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
 
 <!-- A ranking of rules: a RuleRankingView. Under each rule id, what the rule checks (ADR-028), when a sentence exists. -->
 <div th:fragment="rules(ranking)">
-    <p th:if="${ranking.items.isEmpty()}" th:text="#{report.rules.none}"></p>
+    <p class="lg-text-muted" th:if="${ranking.items.isEmpty()}" th:text="#{report.rules.none}"></p>
     <th:block th:unless="${ranking.items.isEmpty()}">
-        <div class="report-scroll">
-            <table class="report">
+        <div class="lg-table-wrap">
+            <table class="lg-table lg-table--scroll">
+                <caption class="lg-sr-only" th:text="#{report.rules.heading}"></caption>
                 <thead>
                 <tr>
                     <th scope="col" th:text="#{report.col.rule}"></th>
                     <th scope="col" th:text="#{report.col.severity}"></th>
-                    <th scope="col" class="n" th:text="#{report.col.findings}"></th>
-                    <th scope="col" class="n" th:text="#{report.col.affected}"></th>
+                    <th scope="col" class="lg-num" th:text="#{report.col.findings}"></th>
+                    <th scope="col" class="lg-num" th:text="#{report.col.affected}"></th>
                 </tr>
                 </thead>
                 <tbody>
                 <tr th:each="item : ${ranking.items}" th:with="explanation=${@consoleMessages.ruleExplanation(item.ruleId)}">
-                    <td><span th:text="${item.ruleId}"></span><span class="muted small explain" th:if="${explanation != null}"><br><span th:text="${explanation}"></span></span></td>
-                    <td th:text="${item.severity}"></td>
-                    <td class="n" th:text="${item.findings}"></td>
-                    <td class="n" th:text="${item.checksAffected}"></td>
+                    <td class="lg-main"><code class="lg-code" th:text="${item.ruleId}"></code><span class="lg-text-muted lg-small" th:if="${explanation != null}"><br><span th:text="${explanation}"></span></span></td>
+                    <td><code class="lg-code" th:text="${item.severity}"></code></td>
+                    <td class="lg-num" th:text="${item.findings}"></td>
+                    <td class="lg-num" th:text="${item.checksAffected}"></td>
                 </tr>
                 </tbody>
             </table>
         </div>
-        <p class="muted small"
+        <p class="lg-small lg-text-muted"
            th:text="#{report.rules.footer(${#strings.toString(ranking.items.size())}, ${#strings.toString(ranking.distinctRules)})}"></p>
     </th:block>
 </div>

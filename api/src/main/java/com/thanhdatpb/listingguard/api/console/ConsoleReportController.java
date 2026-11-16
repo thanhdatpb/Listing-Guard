@@ -11,10 +11,12 @@ import com.thanhdatpb.listingguard.api.report.ReportQuery;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkRulesets;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -74,6 +76,7 @@ public class ConsoleReportController {
             model.addAttribute("marketplaceSelected", query.marketplace() == null ? "" : query.marketplace());
             HealthReport report = service.summary(user.clientId(), query);
             model.addAttribute("report", report);
+            model.addAttribute("weekChart", weekChart(report));
             model.addAttribute("coverageText", coverageText(report.coverageNote(), query.from()));
         } catch (InvalidReportPeriodException | ReportPeriodTooLongException | UnknownMarketplaceException
                  | MarketplaceNotYetSupportedException e) {
@@ -124,6 +127,15 @@ public class ConsoleReportController {
         return gaps.isEmpty()
                 ? messages.get("report.coverage.complete", String.join(", ", kept))
                 : messages.get("report.coverage.incomplete", String.join(", ", gaps));
+    }
+
+    /** One bar for each week of the report: its listing-rules results, the first day of the week under it. */
+    private WeeklyChart weekChart(HealthReport report) {
+        DateTimeFormatter day = DateTimeFormatter.ofPattern(messages.get("format.daymonth"), LocaleContextHolder.getLocale());
+        return WeeklyChart.of(report.byWeek().stream()
+                .map(week -> new WeeklyChart.Week(week.isoWeek(), day.format(week.from()), week.partial(), week.listingRules().checks(),
+                        week.listingRules().findings().get(0).findings()))
+                .toList(), WeeklyChart.Week::checked);
     }
 
     private static boolean blank(String text) {
