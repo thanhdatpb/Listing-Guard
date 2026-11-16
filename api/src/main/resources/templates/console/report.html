@@ -184,6 +184,44 @@
             <div th:replace="~{console/report-fragments :: rules(${report.packs.personalizationScreening.topRules})}"></div>
         </section>
 
+        <!-- Verdicts on findings (ADR-034): counts and rule ids only, never a note. -->
+        <section id="feedback" aria-labelledby="feedback-heading">
+            <h2 id="feedback-heading" th:text="#{report.feedback.heading}"></h2>
+            <p class="muted small" th:text="#{report.feedback.note}"></p>
+            <dl class="facts">
+                <dt th:text="#{report.feedback.verdicts}"></dt><dd th:text="${report.feedback.verdicts}"></dd>
+                <dt th:text="#{feedback.verdict.correct}"></dt><dd th:text="${report.feedback.byVerdict['CORRECT']}"></dd>
+                <dt th:text="#{feedback.verdict.false-positive}"></dt><dd th:text="${report.feedback.byVerdict['FALSE_POSITIVE']}"></dd>
+                <dt th:text="#{feedback.verdict.not-useful}"></dt><dd th:text="${report.feedback.byVerdict['NOT_USEFUL']}"></dd>
+                <dt th:text="#{report.feedback.rate}"></dt>
+                <dd th:text="${report.feedback.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(report.feedback.falsePositiveRate, 1, 1)}"></dd>
+            </dl>
+            <h3 th:text="#{report.feedback.top}"></h3>
+            <p th:if="${report.feedback.topFalsePositiveRules.items.isEmpty()}" th:text="#{report.feedback.none}"></p>
+            <div class="report-scroll" th:unless="${report.feedback.topFalsePositiveRules.items.isEmpty()}">
+                <table class="report" id="feedback-top">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{report.col.pack}"></th>
+                        <th scope="col" th:text="#{report.col.rule}"></th>
+                        <th scope="col" class="n" th:text="#{stats.col.falsepositive}"></th>
+                        <th scope="col" class="n" th:text="#{stats.col.verdicts}"></th>
+                        <th scope="col" class="n" th:text="#{stats.col.rate}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="item : ${report.feedback.topFalsePositiveRules.items}">
+                        <td th:text="${item.pack}"></td>
+                        <td th:text="${item.ruleId}"></td>
+                        <td class="n" th:text="${item.falsePositives}"></td>
+                        <td class="n" th:text="${item.verdicts}"></td>
+                        <td class="n" th:text="${#numbers.formatPercent(item.falsePositiveRate, 1, 1)}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <section id="by-week" aria-labelledby="by-week-heading">
             <h2 id="by-week-heading" th:text="#{report.week.heading}"></h2>
             <div class="report-scroll">
