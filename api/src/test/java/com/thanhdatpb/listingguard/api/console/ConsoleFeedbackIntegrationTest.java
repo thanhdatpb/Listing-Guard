@@ -341,4 +341,33 @@ class ConsoleFeedbackIntegrationTest {
         int to = html.indexOf(end, from);
         return html.substring(from, to);
     }
+
+    @Test
+    void theStatisticsPageIsFiguresATableAndABarOfTheVerdictsInTheColorsOfTheTokens() throws Exception {
+        TestClient client = client();
+        ConsoleUser user = member(client);
+
+        String empty = html(mvc.perform(get("/console/stats").with(signedIn(user))).andExpect(status().isOk()));
+        assertThat(empty).contains("id=\"stats-page\"").contains("id=\"stat-verdicts\"").contains("id=\"stat-rate\"").doesNotContain("id=\"stats-split\"")
+                .doesNotContain("id=\"stats-rule-table\"").contains("id=\"stats-csv\"").contains("class=\"lg-empty\"")
+                .doesNotContain("class=\"page wide\"").doesNotContain("/console/console.css").doesNotContain("class=\"report");
+        assertThat(empty).containsPattern("<form[^>]*class=\"lg-filters\"[^>]*id=\"stats-form\"").contains("class=\"lg-filters__field\"");
+
+        UUID checkId = checkInEditor(user, client);
+        mvc.perform(press(user, checkId, 0, "FALSE_POSITIVE", null, true)).andExpect(status().isOk());
+        mvc.perform(press(user, checkId, 1, "CORRECT", null, true)).andExpect(status().isOk());
+        String page = html(mvc.perform(get("/console/stats").with(signedIn(user))).andExpect(status().isOk()));
+
+        assertThat(page).contains("id=\"stats-split\"").contains("<svg class=\"lg-chart lg-chart--bar\" role=\"img\"").contains("lg-chart__seg--correct")
+                .contains("lg-chart__seg--false").contains("lg-legend").contains("id=\"stats-csv\"").contains("id=\"stats-rule-table\"")
+                .contains("<caption class=\"lg-sr-only\">").contains("id=\"stats-reviewer-table\"");
+        // the bar is as wide as its box: the three parts fill 600 units, however the verdicts divide
+        String bar = between(page, "<svg class=\"lg-chart lg-chart--bar\"", "</svg>");
+        java.util.regex.Matcher part = java.util.regex.Pattern.compile("width=\"(\\d+)\"").matcher(bar);
+        int widths = 0;
+        while (part.find()) {
+            widths += Integer.parseInt(part.group(1));
+        }
+        assertThat(widths).isEqualTo(600);
+    }
 }

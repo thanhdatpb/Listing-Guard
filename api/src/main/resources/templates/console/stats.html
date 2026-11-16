@@ -5,131 +5,141 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{stats.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
 <body>
-<!-- The statistics page (ADR-034): verdicts per rule and per reviewer for the signed-in account's client, and a CSV of the same
+<!-- The statistics page (ADR-034, ADR-042): verdicts per rule and per reviewer for the signed-in account's client, and a CSV of the same
      numbers. No note and no text of a listing is shown. Every value goes through th:text; every sentence is a message (ADR-028). -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('stats')}"></header>
-<main class="page wide">
+<main class="lg-page" id="stats-page">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{stats.heading}"></h1>
-    <p class="muted"><span th:text="#{common.signedin(${email})}"></span> <span th:text="#{stats.intro}"></span></p>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{stats.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{stats.intro}"></p>
+        </div>
+        <div class="lg-actions" th:if="${stats != null}">
+            <a class="lg-btn" id="stats-csv" th:href="@{/console/stats.csv(from=${from},to=${to},marketplace=${marketplaceSelected})}">
+                <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-download"/></svg>
+                <th:block th:text="#{stats.csv}"></th:block>
+            </a>
+        </div>
+    </div>
 
-    <form class="report-form" id="stats-form" method="get" th:action="@{/console/stats}">
-        <div class="field">
-            <label for="from" th:text="#{report.form.from}"></label>
-            <input type="date" id="from" name="from" th:value="${from}">
-        </div>
-        <div class="field">
-            <label for="to" th:text="#{report.form.to}"></label>
-            <input type="date" id="to" name="to" th:value="${to}">
-        </div>
-        <div class="field">
-            <label for="marketplace" th:text="#{report.form.marketplace}"></label>
-            <select id="marketplace" name="marketplace">
-                <option value="" th:text="#{report.form.all}"></option>
-                <option th:each="code : ${marketplaces}" th:value="${code}" th:text="${code}" th:selected="${code == marketplaceSelected}"></option>
-            </select>
-        </div>
-        <button type="submit" class="primary" th:text="#{report.form.submit}"></button>
+    <form class="lg-filters" id="stats-form" method="get" th:action="@{/console/stats}">
+        <div th:replace="~{console/report-fragments :: period(${from}, ${to}, ${marketplaces}, ${marketplaceSelected})}"></div>
+        <button type="submit" class="lg-btn lg-btn--small" th:text="#{report.form.submit}"></button>
     </form>
-    <p class="muted small" th:text="#{report.note.days(${#strings.toString(maxDays)})}"></p>
+    <p class="lg-small lg-text-muted lg-section" th:text="#{report.note.days(${#strings.toString(maxDays)})}"></p>
 
-    <div class="notice refused" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
 
     <th:block th:if="${stats != null}">
-        <section id="stats-totals" aria-labelledby="totals-heading">
-            <h2 id="totals-heading" th:text="#{stats.totals.heading}"></h2>
-            <p class="muted">
+        <section id="stats-totals" class="lg-section" aria-labelledby="totals-heading">
+            <h2 id="totals-heading" class="lg-section-title lg-section" th:text="#{stats.totals.heading}"></h2>
+            <p class="lg-text-muted lg-small">
                 <time th:text="${stats.period.from}"></time> <span th:text="#{report.overview.to}"></span> <time th:text="${stats.period.to}"></time>
-                (<span th:text="#{report.overview.days(${#strings.toString(stats.period.days)})}"></span>)<span th:if="${stats.marketplace != null}"> &middot; <b th:text="${stats.marketplace}"></b></span>
+                (<span th:text="#{report.overview.days(${#strings.toString(stats.period.days)})}"></span>)<span th:if="${stats.marketplace != null}"> &middot; <strong th:text="${stats.marketplace}"></strong></span>
             </p>
-            <dl class="facts">
-                <dt th:text="#{stats.col.verdicts}"></dt><dd th:text="${stats.totals.verdicts}"></dd>
-                <dt th:text="#{feedback.verdict.correct}"></dt><dd th:text="${stats.totals.byVerdict['CORRECT']}"></dd>
-                <dt th:text="#{feedback.verdict.false-positive}"></dt><dd th:text="${stats.totals.byVerdict['FALSE_POSITIVE']}"></dd>
-                <dt th:text="#{feedback.verdict.not-useful}"></dt><dd th:text="${stats.totals.byVerdict['NOT_USEFUL']}"></dd>
-                <dt th:text="#{stats.col.rate}"></dt>
-                <dd th:text="${stats.totals.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(stats.totals.falsePositiveRate, 1, 1)}"></dd>
-            </dl>
-            <p class="muted small" th:text="#{stats.note}"></p>
-            <p><a class="button" id="stats-csv"
-                  th:href="@{/console/stats.csv(from=${from},to=${to},marketplace=${marketplaceSelected})}" th:text="#{stats.csv}"></a></p>
+            <div class="lg-grid lg-grid--stats lg-section">
+                <div th:replace="~{console/report-fragments :: stat('stat-verdicts', #{stats.col.verdicts}, ${stats.totals.verdicts}, '', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('stat-correct', #{feedback.verdict.correct}, ${stats.totals.byVerdict['CORRECT']}, 'clean', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('stat-false-positive', #{feedback.verdict.false-positive}, ${stats.totals.byVerdict['FALSE_POSITIVE']}, 'trademark', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('stat-not-useful', #{feedback.verdict.not-useful}, ${stats.totals.byVerdict['NOT_USEFUL']}, '', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('stat-rate', #{stats.col.rate}, (${stats.totals.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(stats.totals.falsePositiveRate, 1, 1)}), '', null)}"></div>
+            </div>
+
+            <!-- how the verdicts divide: one bar, three parts; the numbers are under it, so the color is never the only way to read it -->
+            <div class="lg-card lg-section" id="stats-split" th:if="${stats.totals.verdicts > 0}"
+                 th:with="total=${stats.totals.verdicts}, c=${stats.totals.byVerdict['CORRECT']}, f=${stats.totals.byVerdict['FALSE_POSITIVE']}, n=${stats.totals.byVerdict['NOT_USEFUL']}">
+                <h3 id="split-heading" class="lg-card__title" th:text="#{stats.split.heading}"></h3>
+                <svg class="lg-chart lg-chart--bar" role="img" viewBox="0 0 600 28" preserveAspectRatio="none" focusable="false" aria-labelledby="split-heading"
+                     xmlns="http://www.w3.org/2000/svg" th:with="cw=${c * 600 / total}, fw=${f * 600 / total}">
+                    <rect class="lg-chart__seg lg-chart__seg--correct" x="0" y="0" height="28" th:attr="width=${cw}"></rect>
+                    <rect class="lg-chart__seg lg-chart__seg--false" y="0" height="28" th:attr="x=${cw},width=${fw}"></rect>
+                    <rect class="lg-chart__seg lg-chart__seg--useless" y="0" height="28" th:attr="x=${cw + fw},width=${600 - cw - fw}"></rect>
+                </svg>
+                <ul class="lg-legend">
+                    <li><span class="lg-legend__key lg-legend__key--correct" aria-hidden="true"></span><span th:text="#{feedback.verdict.correct}"></span> <strong th:text="${c}"></strong></li>
+                    <li><span class="lg-legend__key lg-legend__key--false" aria-hidden="true"></span><span th:text="#{feedback.verdict.false-positive}"></span> <strong th:text="${f}"></strong></li>
+                    <li><span class="lg-legend__key lg-legend__key--useless" aria-hidden="true"></span><span th:text="#{feedback.verdict.not-useful}"></span> <strong th:text="${n}"></strong></li>
+                </ul>
+            </div>
+            <p class="lg-small lg-text-muted" th:text="#{stats.note}"></p>
         </section>
 
         <!-- ADR-037: the use of the rewrite suggestions, only while the feature is on -->
-        <section id="stats-rewrite" aria-labelledby="rewrite-stats-heading" th:if="${rewriteUsage != null}">
-            <h2 id="rewrite-stats-heading" th:text="#{stats.rewrite.heading}"></h2>
-            <dl class="facts">
-                <dt th:text="#{stats.rewrite.runs}"></dt><dd th:text="${rewriteUsage.runs}"></dd>
-                <dt th:text="#{stats.rewrite.safe}"></dt><dd th:text="${rewriteUsage.withSafe}"></dd>
-                <dt th:text="#{stats.rewrite.used}"></dt><dd th:text="${rewriteUsage.used}"></dd>
-                <dt th:text="#{stats.rewrite.rate}"></dt>
-                <dd th:text="${rewriteUsage.rate == null} ? '&mdash;' : ${#numbers.formatPercent(rewriteUsage.rate, 1, 1)}"></dd>
-            </dl>
-            <p class="muted small" th:text="#{stats.rewrite.note}"></p>
+        <section id="stats-rewrite" class="lg-section" aria-labelledby="rewrite-stats-heading" th:if="${rewriteUsage != null}">
+            <h2 id="rewrite-stats-heading" class="lg-section-title lg-section" th:text="#{stats.rewrite.heading}"></h2>
+            <div class="lg-grid lg-grid--stats lg-section">
+                <div th:replace="~{console/report-fragments :: stat('stat-rewrite-runs', #{stats.rewrite.runs}, ${rewriteUsage.runs}, '', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('stat-rewrite-safe', #{stats.rewrite.safe}, ${rewriteUsage.withSafe}, '', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('stat-rewrite-used', #{stats.rewrite.used}, ${rewriteUsage.used}, '', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('stat-rewrite-rate', #{stats.rewrite.rate}, (${rewriteUsage.rate == null} ? '&mdash;' : ${#numbers.formatPercent(rewriteUsage.rate, 1, 1)}), '', null)}"></div>
+            </div>
+            <p class="lg-small lg-text-muted" th:text="#{stats.rewrite.note}"></p>
         </section>
 
-        <section id="stats-rules" aria-labelledby="rules-heading">
-            <h2 id="rules-heading" th:text="#{stats.byrule.heading}"></h2>
-            <p class="muted" th:if="${stats.byRule.isEmpty()}" th:text="#{stats.byrule.none}"></p>
-            <div class="report-scroll" th:unless="${stats.byRule.isEmpty()}">
-                <table class="report" id="stats-rule-table">
+        <section id="stats-rules" class="lg-section" aria-labelledby="rules-heading">
+            <h2 id="rules-heading" class="lg-section-title lg-section" th:text="#{stats.byrule.heading}"></h2>
+            <div class="lg-empty" th:if="${stats.byRule.isEmpty()}"><p class="lg-empty__text" th:text="#{stats.byrule.none}"></p></div>
+            <div class="lg-table-wrap" th:unless="${stats.byRule.isEmpty()}">
+                <table class="lg-table lg-table--scroll" id="stats-rule-table">
+                    <caption class="lg-sr-only" th:text="#{stats.byrule.heading}"></caption>
                     <thead>
                     <tr>
                         <th scope="col" th:text="#{report.col.pack}"></th>
                         <th scope="col" th:text="#{report.col.rule}"></th>
                         <th scope="col" th:text="#{stats.col.source}"></th>
-                        <th scope="col" class="n" th:text="#{report.col.findings}"></th>
-                        <th scope="col" class="n" th:text="#{stats.col.verdicts}"></th>
-                        <th scope="col" class="n" th:text="#{feedback.verdict.correct}"></th>
-                        <th scope="col" class="n" th:text="#{feedback.verdict.false-positive}"></th>
-                        <th scope="col" class="n" th:text="#{feedback.verdict.not-useful}"></th>
-                        <th scope="col" class="n" th:text="#{stats.col.rate}"></th>
+                        <th scope="col" class="lg-num" th:text="#{report.col.findings}"></th>
+                        <th scope="col" class="lg-num" th:text="#{stats.col.verdicts}"></th>
+                        <th scope="col" class="lg-num" th:text="#{feedback.verdict.correct}"></th>
+                        <th scope="col" class="lg-num" th:text="#{feedback.verdict.false-positive}"></th>
+                        <th scope="col" class="lg-num" th:text="#{feedback.verdict.not-useful}"></th>
+                        <th scope="col" class="lg-num" th:text="#{stats.col.rate}"></th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="rule : ${stats.byRule}" th:with="explanation=${@consoleMessages.ruleExplanation(rule.ruleId)}">
                         <td th:text="${rule.pack}"></td>
-                        <td><code th:text="${rule.ruleId}"></code><span class="muted small explain" th:if="${explanation != null}"><br><span th:text="${explanation}"></span></span></td>
+                        <td class="lg-main"><code class="lg-code" th:text="${rule.ruleId}"></code><span class="lg-text-muted lg-small" th:if="${explanation != null}"><br><span th:text="${explanation}"></span></span></td>
                         <td th:text="${rule.source}"></td>
-                        <td class="n" th:text="${rule.findings}"></td>
-                        <td class="n" th:text="${rule.verdicts}"></td>
-                        <td class="n" th:text="${rule.correct}"></td>
-                        <td class="n" th:text="${rule.falsePositive}"></td>
-                        <td class="n" th:text="${rule.notUseful}"></td>
-                        <td class="n" th:text="${rule.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(rule.falsePositiveRate, 1, 1)}"></td>
+                        <td class="lg-num" th:text="${rule.findings}"></td>
+                        <td class="lg-num" th:text="${rule.verdicts}"></td>
+                        <td class="lg-num" th:text="${rule.correct}"></td>
+                        <td class="lg-num" th:text="${rule.falsePositive}"></td>
+                        <td class="lg-num" th:text="${rule.notUseful}"></td>
+                        <td class="lg-num" th:text="${rule.falsePositiveRate == null} ? '&mdash;' : ${#numbers.formatPercent(rule.falsePositiveRate, 1, 1)}"></td>
                     </tr>
                     </tbody>
                 </table>
             </div>
         </section>
 
-        <section id="stats-reviewers" aria-labelledby="reviewers-heading">
-            <h2 id="reviewers-heading" th:text="#{stats.byreviewer.heading}"></h2>
-            <p class="muted" th:if="${stats.byReviewer.isEmpty()}" th:text="#{stats.byreviewer.none}"></p>
-            <div class="report-scroll" th:unless="${stats.byReviewer.isEmpty()}">
-                <table class="report" id="stats-reviewer-table">
+        <section id="stats-reviewers" class="lg-section" aria-labelledby="reviewers-heading">
+            <h2 id="reviewers-heading" class="lg-section-title lg-section" th:text="#{stats.byreviewer.heading}"></h2>
+            <div class="lg-empty" th:if="${stats.byReviewer.isEmpty()}"><p class="lg-empty__text" th:text="#{stats.byreviewer.none}"></p></div>
+            <div class="lg-table-wrap" th:unless="${stats.byReviewer.isEmpty()}">
+                <table class="lg-table lg-table--scroll" id="stats-reviewer-table">
+                    <caption class="lg-sr-only" th:text="#{stats.byreviewer.heading}"></caption>
                     <thead>
                     <tr>
                         <th scope="col" th:text="#{stats.col.reviewer}"></th>
                         <th scope="col" th:text="#{stats.col.kind}"></th>
-                        <th scope="col" class="n" th:text="#{stats.col.verdicts}"></th>
-                        <th scope="col" class="n" th:text="#{feedback.verdict.correct}"></th>
-                        <th scope="col" class="n" th:text="#{feedback.verdict.false-positive}"></th>
-                        <th scope="col" class="n" th:text="#{feedback.verdict.not-useful}"></th>
+                        <th scope="col" class="lg-num" th:text="#{stats.col.verdicts}"></th>
+                        <th scope="col" class="lg-num" th:text="#{feedback.verdict.correct}"></th>
+                        <th scope="col" class="lg-num" th:text="#{feedback.verdict.false-positive}"></th>
+                        <th scope="col" class="lg-num" th:text="#{feedback.verdict.not-useful}"></th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="reviewer : ${stats.byReviewer}">
-                        <td th:text="${reviewer.display()}"></td>
+                        <td class="lg-wrap" th:text="${reviewer.display()}"></td>
                         <td th:text="${reviewer.kind == 'ACCOUNT'} ? #{stats.kind.account} : #{stats.kind.apikey}"></td>
-                        <td class="n" th:text="${reviewer.verdicts}"></td>
-                        <td class="n" th:text="${reviewer.correct}"></td>
-                        <td class="n" th:text="${reviewer.falsePositive}"></td>
-                        <td class="n" th:text="${reviewer.notUseful}"></td>
+                        <td class="lg-num" th:text="${reviewer.verdicts}"></td>
+                        <td class="lg-num" th:text="${reviewer.correct}"></td>
+                        <td class="lg-num" th:text="${reviewer.falsePositive}"></td>
+                        <td class="lg-num" th:text="${reviewer.notUseful}"></td>
                     </tr>
                     </tbody>
                 </table>

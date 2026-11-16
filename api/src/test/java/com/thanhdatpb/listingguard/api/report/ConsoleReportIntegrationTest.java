@@ -121,15 +121,15 @@ class ConsoleReportIntegrationTest {
 
         String html = page(userOf(mine), "from", "2026-11-02", "to", "2026-11-08");
 
-        assertThat(section(html, "overview")).contains("listing-rules</td>").containsPattern("listing-rules</td>\\s*<td class=\"n\">3</td>")
-                .containsPattern("trademark-risk</td>\\s*<td class=\"n\">1</td>");
+        assertThat(section(html, "overview")).contains("listing-rules</td>").containsPattern("listing-rules</td>\\s*<td class=\"lg-num\">3</td>")
+                .containsPattern("trademark-risk</td>\\s*<td class=\"lg-num\">1</td>");
         assertThat(section(html, "listing-rules")).contains("rule_only_mine");
         assertThat(section(html, "trademark-risk")).contains("MARK_ONLY_MINE");
         assertThat(html).doesNotContain("rule_only_theirs").doesNotContain("MARK_ONLY_THEIRS");
         // and the other account sees the other numbers
         String theirPage = page(userOf(other), "from", "2026-11-02", "to", "2026-11-08");
         assertThat(theirPage).contains("rule_only_theirs").contains("MARK_ONLY_THEIRS").doesNotContain("rule_only_mine");
-        assertThat(section(theirPage, "overview")).containsPattern("listing-rules</td>\\s*<td class=\"n\">1</td>");
+        assertThat(section(theirPage, "overview")).containsPattern("listing-rules</td>\\s*<td class=\"lg-num\">1</td>");
     }
 
     @Test
@@ -156,7 +156,7 @@ class ConsoleReportIntegrationTest {
 
         String html = page(userOf(c), "from", "2026-11-02", "to", "2026-11-08", "marketplace", "amazon");
 
-        assertThat(section(html, "overview")).containsPattern("listing-rules</td>\\s*<td class=\"n\">2</td>").contains("AMAZON");
+        assertThat(section(html, "overview")).containsPattern("listing-rules</td>\\s*<td class=\"lg-num\">2</td>").contains("AMAZON");
         assertThat(html).containsPattern("<option value=\"AMAZON\"[^>]*selected");
     }
 
@@ -164,7 +164,7 @@ class ConsoleReportIntegrationTest {
     void aPeriodOlderThanTheRetentionIsFlagged() throws Exception {
         String html = page(userOf(client()), "from", "2026-10-01", "to", "2026-10-31");
 
-        assertThat(section(html, "coverage")).contains("complete from 2026-10-11").contains("notice refused");
+        assertThat(section(html, "coverage")).contains("complete from 2026-10-11").contains("lg-banner--warning");
     }
 
     @Test
@@ -228,5 +228,28 @@ class ConsoleReportIntegrationTest {
     void aVisitorWhoIsNotSignedInIsSentToTheLoginPage() throws Exception {
         mvc.perform(get("/console/report").param("from", "2026-11-02").param("to", "2026-11-08")).andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void theFiguresAreCardsAndTheWeeksAreAChartAndNothingOfTheOldSheetIsLeft() throws Exception {
+        TestClient mine = client();
+        UUID listing = data.listing(mine.id(), "ETSY", CREATED);
+        data.finding(listing, "ERROR", "rule_a");
+
+        String html = page(userOf(mine), "from", "2026-11-02", "to", "2026-11-08");
+
+        assertThat(html).contains("id=\"report-page\"").contains("id=\"report-figures\"").contains("id=\"fig-listing\"")
+                .contains("id=\"fig-error\"").contains("id=\"fig-ready\"").contains("id=\"fig-trademark\"").contains("id=\"fig-high\"")
+                .contains("id=\"fig-rate\"").contains("class=\"lg-card lg-stat\"").contains("lg-stat__value--error");
+        // the weeks: an SVG with a name, bars and the numbers in a table that opens
+        assertThat(section(html, "by-week")).contains("<svg class=\"lg-chart\" role=\"img\"").contains("lg-chart__bar")
+                .contains("<details class=\"lg-disclosure\">").contains("<caption class=\"lg-sr-only\">");
+        assertThat(html).containsPattern("<form[^>]*class=\"lg-filters\"[^>]*id=\"report-form\"")
+                .contains("class=\"lg-filters__field\"").contains("name=\"from\"");
+        assertThat(html).doesNotContain("class=\"report\"").doesNotContain("class=\"page wide\"").doesNotContain("/console/console.css")
+                .doesNotContain("report-scroll").doesNotContain("class=\"notice").doesNotContain("class=\"muted");
+        // a refusal has neither the figures nor the chart
+        String refused = refused(userOf(client()), "from", "2026-11-09", "to", "2026-11-02");
+        assertThat(refused).contains("lg-banner--error").doesNotContain("id=\"report-figures\"").doesNotContain("lg-chart");
     }
 }

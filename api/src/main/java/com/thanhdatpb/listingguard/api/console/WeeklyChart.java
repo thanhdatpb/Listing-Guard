@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.api.console;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.ToLongFunction;
 
 /**
  * The weekly bar chart of the console home page (ADR-034, ADR-041), as coordinates the template writes into an inline SVG: no script and
@@ -34,9 +35,14 @@ public record WeeklyChart(int width, int height, int left, int baseline, long ma
     static final int BOTTOM = 32;
 
     public static WeeklyChart of(List<Week> weeks) {
+        return of(weeks, Week::withError);
+    }
+
+    /** The same chart for another figure of the week: the report page draws the listing-rules results of each week, not the errors. */
+    public static WeeklyChart of(List<Week> weeks, ToLongFunction<Week> measure) {
         long max = 0;
         for (Week week : weeks) {
-            max = Math.max(max, week.withError());
+            max = Math.max(max, measure.applyAsLong(week));
         }
         long scale = niceCeiling(max);
         int baseline = HEIGHT - BOTTOM;
@@ -48,7 +54,7 @@ public record WeeklyChart(int width, int height, int left, int baseline, long ma
         for (int i = 0; i < weeks.size(); i++) {
             Week week = weeks.get(i);
             int start = LEFT + i * slot + (slot - barWidth) / 2;
-            columns.add(new Column(week, bar(start, barWidth, week.withError(), scale, baseline, plotHeight), LEFT + i * slot + slot / 2));
+            columns.add(new Column(week, bar(start, barWidth, measure.applyAsLong(week), scale, baseline, plotHeight), LEFT + i * slot + slot / 2));
         }
         List<Tick> ticks = new ArrayList<>();
         for (int step = 0; step <= 2; step++) {

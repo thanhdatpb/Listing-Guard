@@ -709,6 +709,20 @@ button.lg-switch:focus-visible { outline: 2px solid var(--brand); outline-offset
 /* A form in a card: one column, as wide as a line can be read. */
 .lg-form { max-width: 40rem; }
 
+/* The labelled controls of a filter row that has dates: the word, then the control. */
+.lg-filters .lg-filters__field { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--ink-soft); font-size: 13px; line-height: 18px; font-weight: 500; }
+/* A bar of one piece: the verdicts that divide a total. The parts are told apart by their order and the words under the bar. */
+.lg-chart--bar { height: 28px; max-width: none; border-radius: var(--radius-sm); }
+.lg-chart__seg--correct { fill: var(--success); }
+.lg-chart__seg--false { fill: var(--warning); }
+.lg-chart__seg--useless { fill: var(--ink-muted); }
+.lg-chart__seg { stroke: var(--surface-1); stroke-width: 1; }
+.lg-legend { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-3) 0 0; padding: 0; list-style: none; font-size: 13px; line-height: 18px; }
+.lg-legend__key { display: inline-block; width: 10px; height: 10px; margin-right: var(--space-2); border-radius: 2px; vertical-align: baseline; }
+.lg-legend__key--correct { background: var(--success); }
+.lg-legend__key--false { background: var(--warning); }
+.lg-legend__key--useless { background: var(--ink-muted); }
+
 /* A card that folds: the summary is its heading, and what is inside shows when it is open. */
 .lg-fold > summary { cursor: pointer; }
 .lg-fold > summary > .lg-card__title { display: inline; margin: 0; }
