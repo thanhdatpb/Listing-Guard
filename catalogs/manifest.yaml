@@ -81,4 +81,23 @@
 #     filters:
 #       include_classes: [25, 35]
 #       include_status: [REGISTERED, PENDING]
+#
+#   The Hugging Face rebuild of the USPTO data, converted by the hf-convert job (ADR-030): the job prints this entry with the
+#   real sha256 and writes <file>.report.json. source_date is the build's data_current_through. The dataset card says US
+#   government work (public domain); the rebuild is a third party's, so read the card yourself before you list it. The values
+#   below are those of the build of 2026-11-02 (data through 2026-10-31) with the default filters:
+#
+#   - version: hf-uspto-2026-10
+#     format_version: jsonl-1
+#     sources:
+#       - source_key: uspto
+#         file: hf-uspto-2026-10.jsonl
+#         source_name: "USPTO trademark case files, Hugging Face illeatmyhat/uspto-trademarks build-20261102-070543 (converted by hf-convert)"
+#         url: https://huggingface.co/datasets/illeatmyhat/uspto-trademarks
+#         license: "US government work, public domain (per the dataset card); a third-party rebuild of USPTO bulk XML, not checked by Listing Guard"
+#         source_date: 2026-10-31
+#         sha256: 9cad195fbd32bce4bde094f8282ccbfaee905104aa69b92f7ce42016593b3a80
+#     filters:
+#       include_classes: [14, 16, 18, 20, 21, 24, 25, 28]
+#       include_status: [REGISTERED, PENDING]
 catalogs: []

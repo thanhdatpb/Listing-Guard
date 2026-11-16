@@ -8,7 +8,9 @@ The `trademark-import` job itself reads local files only. **You are responsible 
 allow this storage and use.** No accuracy has been measured on real data. `uspto-sync` can collect USPTO backfile and daily
 files from operator-provided folders; its optional Open Data Portal download is off by default and unverified end to end. The
 `uspto-convert` job (below) follows the public daily applications XML DTD and applies the A2c latest-transaction and filters
-rules, but is **unverified against real data**. For any other source, convert your data to `jsonl-1` yourself.
+rules, but is **unverified against real data**. Without a USPTO key, the `hf-convert` job converts a public Parquet rebuild of the
+USPTO bulk XML from Hugging Face ([Hugging Face source](#hugging-face-source-hf-convert), ADR-030). For any other source, convert
+your data to `jsonl-1` yourself.
 
 ### USPTO sync and activation
 
@@ -60,6 +62,68 @@ result is a reference warning, not a legal conclusion. Only a hash of the listin
 are stored, for 30 days (`listing-guard.trademark.retention.period`); a scheduled cleanup in the API deletes expired
 results. Without a catalog the endpoint answers `503` (`trademark-not-configured`) and nothing else changes. See the
 [integration guide](integration-guide.md#trademark-checks) and [deployment](deployment.md).
+
+## Hugging Face source (`hf-convert`)
+
+[`illeatmyhat/uspto-trademarks`](https://huggingface.co/datasets/illeatmyhat/uspto-trademarks) is a third party's rebuild of the
+USPTO bulk XML: the annual backfile plus the dailies, as Parquet tables joined by `serial_no`, with the latest state of each case
+file. Its card says the data is a US government work (public domain). The `hf-convert` job turns it into one `jsonl-1` file that
+`trademark-import` loads like any other ([ADR-030](adr/ADR-030-hugging-face-uspto-parquet-source.md), which also holds the column
+names, the measurements and the open questions). The job needs no USPTO key, no database and no network.
+
+1. **Check the terms.** Read the dataset card. The rebuild is a third party's and Listing Guard has not checked it; you are
+   responsible for the use.
+2. **Download** into `catalogs/raw/hf/` (git-ignored), keeping the repository's layout: the `case_file` and `intl_class` Parquet
+   files, `profile/build_lineage.json` (the build and the date of the data) and `lookups/status_codes.csv` (the status codes are
+   checked against it). Pin the commit you read. On 2026-11-16 it was `50e430b4c021614e1302bddb45a4afcdcb7823f2`, data through
+   2026-10-31, about 775 MB:
+
+   ```bash
+   REV=50e430b4c021614e1302bddb45a4afcdcb7823f2
+   B=https://huggingface.co/datasets/illeatmyhat/uspto-trademarks/resolve/$REV
+   for f in profile/build_lineage.json lookups/status_codes.csv lookups/_sources.json \
+            data/intl_class/data_0.parquet data/case_file/data_0.parquet; do
+     mkdir -p "catalogs/raw/hf/$(dirname $f)" && curl -fL --retry 3 "$B/$f" -o "catalogs/raw/hf/$f"
+   done
+   ```
+
+   With the Hugging Face CLI the equivalent is `hf download illeatmyhat/uspto-trademarks --repo-type dataset --revision $REV
+   --include "data/case_file/*" "data/intl_class/*" "profile/*" "lookups/*" --local-dir catalogs/raw/hf`. A later build may have
+   more or other file names: list them on the dataset page. At that commit `data/case_file/` also holds `data_1` and `data_2`, left
+   by the previous build. The job handles them (the latest row of a serial number wins and gives the same output), but they cost
+   350 MB and a third more time, so `data_0` is enough there.
+3. **Convert:**
+
+   ```bash
+   docker compose --profile tools run --rm --build hf-convert --input=hf --output=hf-uspto-2026-10.jsonl
+   # optional: --min-year=2015 (only marks registered, or filed when not registered, in 2015 or later), --strict, --overwrite
+   ```
+
+   It writes `catalogs/raw/hf-uspto-2026-10.jsonl`, keeping for each serial number its latest row, a live status code (the
+   dataset's Live/Registered and Live/Pending codes), at least one of the Nice classes 14, 16, 18, 20, 21, 24, 25 and 28, and only
+   marks with words of at least two letters or digits. It also writes `hf-uspto-2026-10.jsonl.report.json`: rows read, serial
+   numbers, written, removed as not live by status code, filtered by each reason, the files with their SHA-256, the build and its
+   date. Finally it prints the `sha256` and a manifest entry. The filters are `hf/hf-convert-filters-2026-11.yaml` (every value
+   `unverified`); to change one, copy it with a new `version` into `catalogs/raw/` and pass
+   `HF_FILTERS=file:/catalogs/raw/<copy>.yaml`. An `INCOMPLETE` run (a missing lineage or lookup, a file of the build missing, two
+   different rows for one serial number) still writes the file but says why: do not deploy it before you read the problems. On the
+   dev machine the default run wrote 1,224,122 marks (104 MB) in about a minute with DuckDB at 2 GB.
+
+   The job is also a plain jar: `./mvnw -B -pl hf-convert -am package`, then
+   `CATALOGS_DIR=catalogs java -jar hf-convert/target/listing-guard-hf-convert.jar --input=hf --output=<name>.jsonl`.
+   `--input=hf://datasets/illeatmyhat/uspto-trademarks@<rev>` reads the repository directly, but only with `--allow-network`
+   (`HF_CONVERT_ALLOW_NETWORK=true`). It then downloads DuckDB's `httpfs` extension, and the report cannot hash the files it read.
+4. **Describe it in `catalogs/manifest.yaml`:** paste the printed entry. It uses the `sources:` form with `source_key: uspto`, so
+   the stored source ids are `uspto:<serial>`, which the TSDR link and `tsdr-status` read. `source_date` is the build's
+   `data_current_through`.
+5. **Import and serve** as in steps 3 and 4 of the workflow above:
+   `docker compose run --rm trademark-import --catalog=hf-uspto-2026-10`, then set `TRADEMARK_CATALOG_VERSION` to the printed name
+   (or activate it, see [deployment](deployment.md#trademark-catalog-adr-009-pr-a2)). On the dev machine the import of the default
+   output took about 5 minutes, loaded 1,040,779 entries (records that normalize to the same mark are merged) and used 292 MB of
+   database.
+6. **Next build.** The dataset is rebuilt monthly. Download the new build into a fresh folder (for example `catalogs/raw/hf-2026-11/`),
+   convert it with `--input=hf-2026-11` to a new file name, add a new manifest entry and import it as a new version. Never edit an
+   imported file.
 
 ## Keeping the status of marks current: `tsdr-status`
 

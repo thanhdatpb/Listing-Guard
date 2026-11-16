@@ -24,6 +24,7 @@
         <module>api</module>
         <module>mcp-server</module>
         <module>contract-tools</module>
+        <module>hf-convert</module>
     </modules>
 
     <properties>

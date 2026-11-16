@@ -190,6 +190,34 @@ services:
       # only raw/ is mounted, and writable: the job reads the XML there and writes the jsonl-1 file and its report there
       - ./catalogs/raw:/catalogs/raw
 
+  # Converts the Hugging Face dataset illeatmyhat/uspto-trademarks (Parquet) in catalogs/raw/hf/ to one jsonl-1 file in
+  # catalogs/raw/ (ADR-030), which trademark-import then loads like any other. Its own image (Dockerfile target hf-convert,
+  # DuckDB inside), never the api's; no database, and no network unless HF_CONVERT_ALLOW_NETWORK=true (then
+  # --input=hf://datasets/illeatmyhat/uspto-trademarks reads the repository directly). Prints the sha256 and a manifest entry,
+  # and writes <output>.report.json. Steps: docs/trademark-catalog.md, "Hugging Face source".
+  #   docker compose --profile tools run --rm --build hf-convert --input=hf --output=hf-uspto-2026-10.jsonl [--min-year=2015] [--overwrite] [--strict]
+  # The dataset card says the data is a US government work (public domain), rebuilt by a third party; check it yourself.
+  hf-convert:
+    image: listing-guard-hf-convert:dev
+    build:
+      context: .
+      target: hf-convert
+    profiles: ["tools"]
+    mem_limit: ${HF_CONVERT_MEM_LIMIT:-3g}
+    environment:
+      CATALOGS_DIR: /catalogs
+      JAVA_TOOL_OPTIONS: ${HF_CONVERT_JAVA_TOOL_OPTIONS:--Xmx512m}
+      # DuckDB's own memory (outside the Java heap); 2GB and 1500MB were measured to be enough (ADR-030), 1GB is not
+      HF_CONVERT_MEMORY_LIMIT: ${HF_CONVERT_MEMORY_LIMIT:-2GB}
+      HF_CONVERT_THREADS: ${HF_CONVERT_THREADS:-2}
+      HF_CONVERT_ALLOW_NETWORK: ${HF_CONVERT_ALLOW_NETWORK:-false}
+      HF_CONVERT_STRICT: ${HF_CONVERT_STRICT:-false}
+      HF_CONVERT_MIN_YEAR: ${HF_CONVERT_MIN_YEAR:-}
+      HF_FILTERS: ${HF_FILTERS:-classpath:hf/hf-convert-filters-2026-11.yaml}
+    volumes:
+      # only raw/ is mounted, and writable: the job reads the Parquet files there and writes the jsonl-1 file and its report
+      - ./catalogs/raw:/catalogs/raw
+
   # Keeps a catalog of USPTO marks up to date (ADR-009, PR A2d); see docker-compose.prod.yml and docs/deploy-oracle.md.
   # Offline: put the zips you downloaded in a folder of catalogs/raw/ and pass it as --input-dir (first with --backfile).
   # The ODP download stays off unless USPTO_SYNC_DOWNLOAD_ENABLED=true (every endpoint UNVERIFIED). Set USPTO_SYNC_LICENSE.
