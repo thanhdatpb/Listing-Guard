@@ -414,7 +414,7 @@ class ConsoleBulkIntegrationTest {
 
         String result = run(seller, mapping);
 
-        assertThat(result).contains("<h4>Biến thể</h4>").contains("duplicate_combination");
+        assertThat(result).contains("<h4 class=\"lg-group__title\">Biến thể</h4>").contains("duplicate_combination");
         assertThat(resultRows(result)).hasSize(3);
         // three listings with a title only: rules and trademark each (6), and one unit for the family
         assertThat(used(seller)).isEqualTo(7);
@@ -556,7 +556,7 @@ class ConsoleBulkIntegrationTest {
             String result = mvc.perform(runRequest(seller, mapping, Map.of(), Map.of(), false).cookie(cookie))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
-            assertThat(result).as(language).contains("tag_length").containsPattern("class=\"small muted\">[^<]+</p>");
+            assertThat(result).as(language).contains("tag_length").containsPattern("class=\"lg-finding__text\"><span class=\"lg-text-muted\">[^<]+</span> <span>[^<]+</span></p>");
         }
     }
 

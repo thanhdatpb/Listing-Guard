@@ -70,7 +70,7 @@ final class BulkPages {
             request.param("col." + i, selected);
         }
         Map<String, String> chosen = new LinkedHashMap<>();
-        Matcher separatorSelects = Pattern.compile("<select id=\"sep-([a-z_]+)\"").matcher(mappingHtml);
+        Matcher separatorSelects = Pattern.compile("<select[^>]*id=\"sep-([a-z_]+)\"").matcher(mappingHtml);
         while (separatorSelects.find()) {
             chosen.put(separatorSelects.group(1), selected(mappingHtml, "sep-" + separatorSelects.group(1)));
         }
@@ -84,7 +84,7 @@ final class BulkPages {
     }
 
     static int columnCount(String html) {
-        Matcher matcher = Pattern.compile("<select id=\"col-(\\d+)\"").matcher(html);
+        Matcher matcher = Pattern.compile("<select[^>]*id=\"col-(\\d+)\"").matcher(html);
         int count = 0;
         while (matcher.find()) {
             count = Math.max(count, Integer.parseInt(matcher.group(1)) + 1);
@@ -102,7 +102,7 @@ final class BulkPages {
     }
 
     static String selected(String html, String selectId) {
-        Matcher select = Pattern.compile("<select id=\"" + selectId + "\"[^>]*>(.*?)</select>", Pattern.DOTALL).matcher(html);
+        Matcher select = Pattern.compile("<select[^>]*id=\"" + selectId + "\"[^>]*>(.*?)</select>", Pattern.DOTALL).matcher(html);
         assertThat(select.find()).as("a select with id " + selectId).isTrue();
         Matcher option = Pattern.compile("<option value=\"([^\"]*)\"[^>]*\\bselected").matcher(select.group(1));
         return option.find() ? option.group(1) : "";
@@ -129,22 +129,23 @@ final class BulkPages {
         Matcher row = Pattern.compile("<tr data-group=\"[A-Z]+\"[^>]*>(.*?)</tr>", Pattern.DOTALL).matcher(body.group(1));
         while (row.find()) {
             String cells = row.group(1);
-            int line = Integer.parseInt(find(cells, "<td class=\"n\">(\\d+)</td>"));
-            String sku = find(cells, "<td class=\"sku\">(.*?)</td>").replaceAll("<[^>]+>", "").trim();
-            Matcher status = Pattern.compile("<span class=\"status ([a-z-]+)\">([^<]+)</span>").matcher(cells);
+            int line = Integer.parseInt(find(cells, "<td class=\"lg-num\">(\\d+)</td>"));
+            String sku = find(cells, "<td class=\"lg-sku\">(.*?)</td>").replaceAll("<[^>]+>", "").trim();
+            Matcher status = Pattern.compile("<span class=\"lg-pill(?: lg-pill--([a-z]+))?\">([^<]+)</span>").matcher(cells);
             assertThat(status.find()).isTrue();
-            Matcher counts = Pattern.compile("<td class=\"n\">(\\d+)</td>").matcher(cells);
+            Matcher counts = Pattern.compile("<td class=\"lg-num\">(\\d+)</td>").matcher(cells);
             counts.find();
             counts.find();
             rows.add(new ResultRow(line, HtmlUtils.htmlUnescape(sku).equals("—") ? null : HtmlUtils.htmlUnescape(sku),
-                    status.group(1), HtmlUtils.htmlUnescape(status.group(2)), Integer.parseInt(counts.group(1))));
+                    status.group(1) == null ? "" : status.group(1), HtmlUtils.htmlUnescape(status.group(2)),
+                    Integer.parseInt(counts.group(1))));
         }
         return rows;
     }
 
     /** The lines of the block to paste back into a Sheet, split the way a Sheet splits it. */
     static List<String> sheetLines(String html) {
-        Matcher matcher = Pattern.compile("<textarea id=\"sheet-block\"[^>]*>(.*?)</textarea>", Pattern.DOTALL).matcher(html);
+        Matcher matcher = Pattern.compile("<textarea[^>]*id=\"sheet-block\"[^>]*>(.*?)</textarea>", Pattern.DOTALL).matcher(html);
         assertThat(matcher.find()).as("the block for the Sheet").isTrue();
         return List.of(HtmlUtils.htmlUnescape(matcher.group(1)).split("\n", -1));
     }

@@ -85,8 +85,11 @@ public class ConsoleBulkController {
         }
     }
 
-    /** One column of the mapping step: what it holds (a few cells) and what the page chose for it. */
-    public record ColumnView(int index, String letter, String label, List<String> samples, String selected) {
+    /**
+     * One column of the mapping step: what it holds (a few cells) and what the page chose for it. {@code chip} is the short name of the
+     * chosen target ("Title"), empty when the column is skipped.
+     */
+    public record ColumnView(int index, String letter, String label, List<String> samples, String selected, String chip) {
     }
 
     public record TargetOption(String key, String label) {
@@ -102,10 +105,16 @@ public class ConsoleBulkController {
      * @param dataField the text to send back, with the line break that an HTML textarea drops at its start put in front of it
      * @param intro     how many rows and columns the table has and how the header was read, in the language of the page
      * @param costNote  what the run can cost, or null when plans are off
+     * @param rows      how many rows the run will check (blank rows are not counted)
      */
     public record MappingPage(String dataField, String delimiter, boolean header, String intro, List<ColumnView> columns,
                               List<SeparatorView> separators, List<String> problems, boolean remember, String costNote,
-                              boolean remembered) {
+                              boolean remembered, long rows) {
+
+        /** True when no column has a meaning yet, so the table that corrects them is opened for the seller. */
+        public boolean noneChosen() {
+            return columns.stream().allMatch(column -> column.selected().isEmpty());
+        }
     }
 
     private final BulkProperties limits;
@@ -117,11 +126,14 @@ public class ConsoleBulkController {
     private final ConsoleMessages messages;
     private final ConsoleFeedbackSupport feedback;
     private final com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history;
+    private final com.thanhdatpb.listingguard.ruleengine.readiness.ReadinessScorer readiness;
 
     public ConsoleBulkController(BulkProperties limits, BulkCheckService service, BulkMappingStore mappingStore,
                                  ConsoleAccountRepository accounts, PlanService plans, ObjectMapper mapper,
                                  ConsoleMessages messages, ConsoleFeedbackSupport feedback,
-                                 com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history) {
+                                 com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history,
+                                 com.thanhdatpb.listingguard.ruleengine.readiness.ReadinessScorer readiness) {
+        this.readiness = readiness;
         this.messages = messages;
         this.feedback = feedback;
         this.history = history;
@@ -384,7 +396,8 @@ public class ConsoleBulkController {
         ColumnMapping mapping = again != null ? again.mapping() : ColumnMapping.suggest(marketplace, table.labels(), stored.orElse(null));
         List<ColumnView> columns = new ArrayList<>();
         for (int i = 0; i < table.columns(); i++) {
-            columns.add(new ColumnView(i, BulkTable.letters(i), table.labels().get(i), samples(table, i), mapping.targetOf(i)));
+            columns.add(new ColumnView(i, BulkTable.letters(i), table.labels().get(i), samples(table, i), mapping.targetOf(i),
+                    chip(marketplace, mapping.targetOf(i))));
         }
         List<SeparatorView> separators = new ArrayList<>();
         for (BulkTargets.Target target : BulkTargets.of(marketplace)) {
@@ -404,13 +417,29 @@ public class ConsoleBulkController {
                 + messages.get("bulk.mapping.guess");
         model.addAttribute("mapping", new MappingPage("\n" + text, delimiterName(table.delimiter()), table.header(), intro,
                 columns, separators, again == null ? List.of() : again.problems(), again == null || again.remember(),
-                costNote(user, judgeable), stored.isPresent()));
+                costNote(user, judgeable), stored.isPresent(), judgeable));
         return VIEW;
+    }
+
+    /** The short name of a target for a chip: its label up to the first parenthesis ("Tags (several columns...)" gives "Tags"). */
+    private String chip(EditorMarketplace marketplace, String target) {
+        if (target == null || target.isEmpty()) {
+            return "";
+        }
+        for (BulkTargets.Target candidate : BulkTargets.of(marketplace)) {
+            if (candidate.key().equals(target)) {
+                String label = candidate.label(messages);
+                int paren = label.indexOf(" (");
+                return paren > 0 ? label.substring(0, paren) : label;
+            }
+        }
+        return "";
     }
 
     private String result(ConsoleUser user, EditorMarketplace marketplace, BulkResult result, List<String> extraNotes, Model model) {
         base(model, user, marketplace, Tab.PASTE);
         model.addAttribute("stage", "result");
+        model.addAttribute("readinessMax", readiness.config().baseScore());
         List<String> notes = new ArrayList<>(extraNotes);
         notes.addAll(result.notes());
         model.addAttribute("result", new BulkResult(result.marketplace(), result.header(), result.rows(), result.counts(), notes,

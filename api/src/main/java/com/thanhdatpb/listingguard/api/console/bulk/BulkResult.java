@@ -91,8 +91,19 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
     /** The most characters of a row's listing JSON that the page carries for the rewrite button. */
     public static final int REWRITE_LISTING_MAX_CHARS = 16_000;
 
+    /** How many rows have at least one trademark finding, whatever the status of the row (the summary pill of the page). */
+    public long trademarkRows() {
+        return rows.stream().filter(row -> row.detail() != null && !row.detail().trademark().items().isEmpty()).count();
+    }
+
     /** The three checks of a row, and why a row could not be read. */
-    public record Detail(Rules rules, Trademark trademark, Variation variation, String problem) {
+    public record Detail(Rules rules, Trademark trademark, Variation variation, String problem,
+                         com.thanhdatpb.listingguard.api.console.ListingView listing) {
+
+        /** A detail with no listing to show. */
+        public Detail(Rules rules, Trademark trademark, Variation variation, String problem) {
+            this(rules, trademark, variation, problem, null);
+        }
 
         static Detail unread(String problem) {
             return new Detail(Rules.notRun(null), Trademark.notRun(null), Variation.none(), problem);
@@ -100,6 +111,11 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
 
         static Detail empty() {
             return new Detail(Rules.notRun(null), Trademark.notRun(null), Variation.none(), null);
+        }
+
+        /** The same detail with the listing as it was checked (ADR-041); the page prints it and nothing keeps it. */
+        Detail withListing(com.thanhdatpb.listingguard.api.console.ListingView view) {
+            return new Detail(rules, trademark, variation, problem, view);
         }
     }
 
@@ -152,10 +168,18 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
      * {@code explanation} says what the rule checks in general, in the language of the page (null when there is none). {@code fix}
      * and {@code fixValue} are a verified suggestion of the rules, shown and never applied: {@code fixValue} is null for a fix that
      * removes the value. {@code target} is the address of the stored finding the feedback widget answers (ADR-034), null when the
-     * finding is not stored.
+     * finding is not stored. {@code value} (the value a rule finding is about) and {@code spanStart} and {@code spanEnd} (the span of a
+     * trademark finding, -1 for none) only tell the page where to put the highlight in the listing (ADR-041); they are never printed
+     * on their own.
      */
     public record Item(String level, String levelLabel, String ruleId, String field, String message, String suggestion, String detail,
-                       String explanation, String fix, String fixValue, FeedbackTarget target) {
+                       String explanation, String fix, String fixValue, FeedbackTarget target, String value, int spanStart,
+                       int spanEnd) {
+
+        public Item(String level, String levelLabel, String ruleId, String field, String message, String suggestion, String detail,
+                    String explanation, String fix, String fixValue, FeedbackTarget target) {
+            this(level, levelLabel, ruleId, field, message, suggestion, detail, explanation, fix, fixValue, target, null, -1, -1);
+        }
 
         public Item(String level, String levelLabel, String ruleId, String field, String message, String suggestion, String detail,
                     String explanation, String fix, String fixValue) {

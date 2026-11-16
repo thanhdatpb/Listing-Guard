@@ -19,7 +19,13 @@
           other.setAttribute('aria-pressed', other === button ? 'true' : 'false');
         });
         Array.prototype.forEach.call(rows, function (row) {
-          row.hidden = wanted !== 'ALL' && row.getAttribute('data-group') !== wanted;
+          var hide = wanted !== 'ALL' && row.getAttribute('data-group') !== wanted;
+          row.hidden = hide;
+          // the detail that opens under a row goes with it
+          var detail = document.getElementById('bulk-detail-' + row.id.replace('row-', ''));
+          if (detail) {
+            detail.hidden = hide;
+          }
         });
       });
     });

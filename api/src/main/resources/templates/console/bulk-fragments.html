@@ -1,37 +1,63 @@
 <!DOCTYPE html>
 <html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <body>
-<!-- Parts of the bulk check page (ADR-029). This file is never served on its own; bulk.html includes the fragments below.
-     Every value is printed with th:text, so a listing's text is never markup. The detail of a row shows what the editor shows:
-     the readiness and the trademark panel side by side with the disclaimer, then the findings. A suggested fix is shown and
-     never applied. No text is written here (ADR-028): every sentence is a message. -->
+<!-- Parts of the bulk check page (ADR-029, ADR-041). This file is never served on its own; bulk.html includes the fragments below.
+     Every value is printed with th:text, so a listing's text is never markup. The detail of a row has two columns: the listing as it was
+     checked with its readiness and the trademark result (and the disclaimer) on the left, a card for each finding on the right. A
+     suggested fix is shown and never applied. No text is written here (ADR-028): every sentence is a message. -->
 
-<div class="row-detail" th:fragment="rowDetail(row, disclaimer)">
-    <p class="muted" th:if="${row.detail.problem != null}" th:text="#{bulk.detail.unreadable(${row.detail.problem})}"></p>
-    <th:block th:if="${row.detail.problem == null}">
-        <div class="verdicts">
-            <section class="verdict"
-                     th:classappend="${!row.detail.rules.ran} ? 'not-run' : (${row.detail.rules.readiness == 'READY'} ? 'ready' : (${row.detail.rules.readiness == 'NOT_READY'} ? 'not-ready' : 'incomplete'))">
-                <h4 th:text="#{bulk.detail.readiness}"></h4>
-                <p class="big" th:if="${row.detail.rules.score != null}" th:text="${row.detail.rules.score}"></p>
-                <p class="headline" th:if="${row.detail.rules.ran}" th:text="${row.detail.rules.readinessLabel}"></p>
-                <p class="headline" th:unless="${row.detail.rules.ran}" th:text="#{bulk.detail.notchecked(${row.detail.rules.note})}"></p>
-                <p class="muted small" th:text="#{bulk.detail.readiness.note}"></p>
+<!-- The top of the input card: the two ways to enter the table (links, the current one marked) and the marketplace the table is for. -->
+<div class="lg-bulk__top" th:fragment="top(selectId)">
+    <nav class="lg-seg" th:aria-label="#{bulk.tabs.aria}">
+        <a class="lg-seg__item" th:href="@{/console/bulk(tab='paste',marketplace=${marketplace.code})}" id="tab-paste" th:text="#{bulk.tab.paste}"
+           th:aria-current="${tab.key == 'paste'} ? 'page'"></a>
+        <a class="lg-seg__item" th:href="@{/console/bulk(tab='file',marketplace=${marketplace.code})}" id="tab-file" th:text="#{bulk.tab.file}"
+           th:aria-current="${tab.key == 'file'} ? 'page'"></a>
+    </nav>
+    <div class="lg-bulk__market">
+        <label class="lg-small lg-text-muted" th:for="${selectId}" th:text="#{bulk.marketplace}"></label>
+        <select class="lg-select" th:id="${selectId}" name="marketplace">
+            <option th:each="m : ${marketplaces}" th:value="${m.code}" th:text="${m.label}" th:selected="${m == marketplace}"></option>
+        </select>
+    </div>
+</div>
+
+<div class="lg-detail" th:fragment="rowDetail(row, disclaimer)">
+    <p class="lg-text-muted" th:if="${row.detail.problem != null}" th:text="#{bulk.detail.unreadable(${row.detail.problem})}"></p>
+    <div class="lg-split" th:if="${row.detail.problem == null}">
+        <div class="lg-card lg-detail__listing">
+            <div class="lg-card__head">
+                <h3 class="lg-card__title" th:text="#{listing.card.heading}"></h3>
+            </div>
+            <th:block th:if="${row.detail.listing != null}">
+                <div th:replace="~{console/findings :: listing(${row.detail.listing})}"></div>
+            </th:block>
+            <!-- readiness: the score of the listing rules, or why there is none; the maximum is the readiness setting -->
+            <section class="lg-meter">
+                <th:block th:if="${row.detail.rules.ran}">
+                    <div th:replace="~{console/findings :: meter(${row.detail.rules.score}, '&mdash;', ${readinessMax}, ${row.detail.rules.readinessLabel}, #{bulk.detail.readiness.note}, null)}"></div>
+                </th:block>
+                <th:block th:unless="${row.detail.rules.ran}">
+                    <div th:replace="~{console/findings :: meter(null, '&mdash;', ${readinessMax}, #{bulk.detail.notchecked(${row.detail.rules.note})}, #{bulk.detail.readiness.note}, null)}"></div>
+                </th:block>
             </section>
-            <section class="verdict"
-                     th:classappend="${row.detail.trademark.kind.name() == 'RESULT'} ? 'result' : (${row.detail.trademark.kind.name() == 'INCOMPLETE'} ? 'incomplete' : 'unavailable')">
-                <h4 th:text="#{bulk.detail.trademark}"></h4>
-                <p class="big" th:text="${row.detail.trademark.level != null} ? ${row.detail.trademark.level} : '&mdash;'"></p>
-                <p class="headline" th:if="${row.detail.trademark.kind.name() == 'RESULT' and row.detail.trademark.items.isEmpty()}"
+            <!-- the trademark result and its disclaimer: in every row, next to the findings of the row -->
+            <section class="lg-detail__trademark">
+                <div class="lg-meter__head">
+                    <h4 class="lg-meter__label" th:text="#{bulk.detail.trademark}"></h4>
+                    <span class="lg-pill" th:classappend="${row.detail.trademark.level == 'HIGH' or row.detail.trademark.level == 'MEDIUM'} ? 'lg-pill--trademark'"
+                          th:text="${row.detail.trademark.level != null} ? ${row.detail.trademark.level} : '&mdash;'"></span>
+                </div>
+                <p class="lg-meter__note" th:if="${row.detail.trademark.kind.name() == 'RESULT' and row.detail.trademark.items.isEmpty()}"
                    th:text="#{bulk.detail.trademark.none}"></p>
-                <p class="headline" th:if="${row.detail.trademark.kind.name() == 'RESULT' and !row.detail.trademark.items.isEmpty()}"
+                <p class="lg-meter__note" th:if="${row.detail.trademark.kind.name() == 'RESULT' and !row.detail.trademark.items.isEmpty()}"
                    th:text="#{bulk.detail.trademark.some(${'' + row.detail.trademark.items.size()})}"></p>
-                <p class="headline" th:if="${row.detail.trademark.kind.name() == 'INCOMPLETE'}" th:text="#{bulk.detail.trademark.incomplete}"></p>
-                <p class="headline" th:if="${row.detail.trademark.kind.name() == 'NOT_RUN'}"
+                <p class="lg-meter__note" th:if="${row.detail.trademark.kind.name() == 'INCOMPLETE'}" th:text="#{bulk.detail.trademark.incomplete}"></p>
+                <p class="lg-meter__note" th:if="${row.detail.trademark.kind.name() == 'NOT_RUN'}"
                    th:text="#{bulk.detail.notchecked(${row.detail.trademark.note})}"></p>
                 <th:block th:with="note=${@consoleMessages.disclaimerNote(disclaimer)}">
-                    <p class="muted small disclaimer" th:if="${note != null}" th:text="${note}"></p>
-                    <p class="muted small disclaimer">
+                    <p class="lg-meter__note" th:if="${note != null}" th:text="${note}"></p>
+                    <p class="lg-meter__note">
                         <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
                         <span th:text="${disclaimer}"></span>
                     </p>
@@ -39,52 +65,40 @@
             </section>
         </div>
 
-        <th:block th:if="${row.detail.rules.ran}">
-            <h4 th:text="#{bulk.detail.rules(${'' + row.detail.rules.items.size()})}"></h4>
-            <p class="muted small" th:if="${row.detail.rules.items.isEmpty()}" th:text="#{bulk.detail.rules.none}"></p>
-            <th:block th:if="${!row.detail.rules.items.isEmpty()}">
-                <th:block th:replace="~{console/bulk-fragments :: items(${row.detail.rules.items})}"></th:block>
+        <div class="lg-stack">
+            <th:block th:if="${row.detail.rules.ran}">
+                <h4 class="lg-group__title" th:text="#{bulk.detail.rules(${'' + row.detail.rules.items.size()})}"></h4>
+                <p class="lg-text-muted lg-small" th:if="${row.detail.rules.items.isEmpty()}" th:text="#{bulk.detail.rules.none}"></p>
+                <th:block th:if="${!row.detail.rules.items.isEmpty()}" th:with="cards=${@findingCards.bulk(row.detail.rules.items, 'rules', result.marketplace)}">
+                    <div th:replace="~{console/findings :: cards(${cards})}"></div>
+                </th:block>
             </th:block>
-        </th:block>
 
-        <th:block th:if="${!row.detail.trademark.items.isEmpty()}">
-            <h4 th:text="#{bulk.detail.trademark.findings(${'' + row.detail.trademark.items.size()})}"></h4>
-            <th:block th:replace="~{console/bulk-fragments :: items(${row.detail.trademark.items})}"></th:block>
-        </th:block>
-
-        <th:block th:if="${row.detail.variation.kind.name() != 'NONE'}">
-            <h4 th:text="#{bulk.detail.variation}"></h4>
-            <p class="muted small" th:if="${row.detail.variation.kind.name() == 'NOT_RUN'}"
-               th:text="#{bulk.detail.notchecked(${row.detail.variation.note})}"></p>
-            <p class="muted small" th:if="${row.detail.variation.kind.name() == 'INCOMPLETE'}"
-               th:text="#{bulk.detail.variation.incomplete}"></p>
-            <p class="muted small" th:if="${row.detail.variation.kind.name() == 'RESULT' and row.detail.variation.items.isEmpty()}"
-               th:text="#{bulk.detail.variation.none}"></p>
-            <th:block th:if="${!row.detail.variation.items.isEmpty()}">
-                <th:block th:replace="~{console/bulk-fragments :: items(${row.detail.variation.items})}"></th:block>
+            <th:block th:if="${!row.detail.trademark.items.isEmpty()}" th:with="cards=${@findingCards.bulk(row.detail.trademark.items, 'trademark', result.marketplace)}">
+                <h4 class="lg-group__title" th:text="#{bulk.detail.trademark.findings(${'' + row.detail.trademark.items.size()})}"></h4>
+                <div th:replace="~{console/findings :: cards(${cards})}"></div>
             </th:block>
-        </th:block>
 
-        <!-- ADR-037: only while the feature is on, and only for a row with an ERROR or a trademark finding (the row then carries its listing) -->
-        <th:block th:if="${rewriteAvailable and row.rewriteListing != null}">
-            <th:block th:replace="~{console/rewrite :: bulkButton(${result.marketplace}, ${row})}"></th:block>
-        </th:block>
-    </th:block>
-</div>
+            <th:block th:if="${row.detail.variation.kind.name() != 'NONE'}">
+                <h4 class="lg-group__title" th:text="#{bulk.detail.variation}"></h4>
+                <p class="lg-text-muted lg-small" th:if="${row.detail.variation.kind.name() == 'NOT_RUN'}"
+                   th:text="#{bulk.detail.notchecked(${row.detail.variation.note})}"></p>
+                <p class="lg-text-muted lg-small" th:if="${row.detail.variation.kind.name() == 'INCOMPLETE'}"
+                   th:text="#{bulk.detail.variation.incomplete}"></p>
+                <p class="lg-text-muted lg-small" th:if="${row.detail.variation.kind.name() == 'RESULT' and row.detail.variation.items.isEmpty()}"
+                   th:text="#{bulk.detail.variation.none}"></p>
+                <th:block th:if="${!row.detail.variation.items.isEmpty()}" th:with="cards=${@findingCards.bulk(row.detail.variation.items, 'variation', result.marketplace)}">
+                    <div th:replace="~{console/findings :: cards(${cards})}"></div>
+                </th:block>
+            </th:block>
 
-<ul class="items" th:fragment="items(list)">
-    <li class="item" th:each="f : ${list}" th:classappend="${f.level}">
-        <p class="msg"><span class="level" th:text="${f.levelLabel}"></span><span th:text="${f.message}"></span></p>
-        <p class="meta small muted"><code th:text="${f.ruleId}"></code><th:block th:if="${f.field != null}"> <span th:text="#{bulk.item.at}"></span> <code th:text="${f.field}"></code></th:block><th:block th:if="${f.detail != null}"> &middot; <span th:text="${f.detail}"></span></th:block></p>
-        <p class="small muted" th:if="${f.explanation != null}" th:text="${f.explanation}"></p>
-        <p class="small" th:if="${f.suggestion != null}" th:text="${f.suggestion}"></p>
-        <div class="fix" th:if="${f.fix != null}">
-            <p class="small"><strong th:text="#{bulk.item.fix}"></strong> <span th:text="${f.fix}"></span></p>
-            <p class="small" th:if="${f.fixValue != null}"><span th:text="#{bulk.item.fix.value}"></span> <code th:text="${f.fixValue}"></code></p>
-            <p class="small" th:if="${f.fixValue == null}" th:text="#{bulk.item.fix.remove}"></p>
+            <!-- ADR-037: only while the feature is on, and only for a row with an ERROR or a trademark finding (the row then carries its listing) -->
+            <th:block th:if="${rewriteAvailable and row.rewriteListing != null}">
+                <th:block th:replace="~{console/rewrite :: bulkButton(${result.marketplace}, ${row})}"></th:block>
+            </th:block>
+            <p class="lg-small lg-text-muted" th:text="#{finding.legal}"></p>
         </div>
-        <form th:replace="~{console/feedback :: widget(${f.target})}"></form>
-    </li>
-</ul>
+    </div>
+</div>
 </body>
 </html>

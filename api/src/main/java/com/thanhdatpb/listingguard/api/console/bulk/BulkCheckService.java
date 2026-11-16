@@ -6,8 +6,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.CheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
+import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.console.ConsoleLlmLabel;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
+import com.thanhdatpb.listingguard.api.console.ListingView;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Detail;
 import com.thanhdatpb.listingguard.api.console.bulk.BulkResult.Item;
@@ -98,10 +100,12 @@ public class BulkCheckService {
     private final TrademarkRulesets trademarkRulesets;
     private final PlanService plans;
     private final ConsoleMessages messages;
+    private final NormalizerRegistry normalizers;
 
     public BulkCheckService(CheckService checks, TrademarkCheckService trademarks, VariationCheckService variations,
                             TrademarkCatalogRuntime trademarkCatalog, TrademarkRulesets trademarkRulesets, PlanService plans,
-                            ConsoleMessages messages) {
+                            ConsoleMessages messages, NormalizerRegistry normalizers) {
+        this.normalizers = normalizers;
         this.checks = checks;
         this.trademarks = trademarks;
         this.variations = variations;
@@ -186,7 +190,7 @@ public class BulkCheckService {
 
         List<Row> rows = new ArrayList<>();
         for (int i = 0; i < accs.size(); i++) {
-            rows.add(row(i + 1, accs.get(i)));
+            rows.add(row(i + 1, accs.get(i), marketplace));
         }
         List<String> notes = new ArrayList<>();
         if (trademarkNote != null) {
@@ -201,13 +205,16 @@ public class BulkCheckService {
         return BulkResult.of(messages, marketplace.code(), header, rows, notes, trademarkRulesets.ruleset().disclaimer());
     }
 
-    private Row row(int index, Acc acc) {
+    private Row row(int index, Acc acc, EditorMarketplace marketplace) {
         Input input = acc.input;
         if (input.preset() == Status.EMPTY) {
             return new Row(index, input.line(), null, Status.EMPTY, Status.EMPTY.label(messages), 0, null, "", Detail.empty());
         }
         Detail detail = input.preset() == Status.UNREADABLE ? Detail.unread(input.problem())
                 : new Detail(acc.rules, acc.trademark, variation(acc), null);
+        if (input.preset() != Status.UNREADABLE && input.listing() != null) {
+            detail = detail.withListing(listingView(marketplace, input, detail));
+        }
         BulkAssessment.Assessed assessed = BulkAssessment.of(messages, detail);
         return new Row(index, input.line(), input.sku(), assessed.status(), assessed.status().label(messages), assessed.findings(),
                 assessed.main(), assessed.summary(), detail, rewriteListing(input, assessed.status(), detail));
@@ -223,6 +230,27 @@ public class BulkCheckService {
         }
         String json = input.listing().toString();
         return json.length() <= BulkResult.REWRITE_LISTING_MAX_CHARS ? json : null;
+    }
+
+    /**
+     * The listing of a row with the words its findings point at marked (ADR-041), built from the request of that row and never kept.
+     * A span that does not fit is dropped by {@link ListingView}; nothing here changes a finding.
+     */
+    private ListingView listingView(EditorMarketplace marketplace, Input input, Detail detail) {
+        List<ListingView.Mark> marks = new ArrayList<>();
+        for (Item item : detail.rules().items()) {
+            ListingView.Mark mark = ListingView.ruleMark(item.field(), item.value(), item.level());
+            if (mark != null) {
+                marks.add(mark);
+            }
+        }
+        for (Item item : detail.trademark().items()) {
+            if (item.field() != null && item.spanStart() >= 0) {
+                marks.add(ListingView.Mark.span(item.field(), item.spanStart(), item.spanEnd(), "trademark"));
+            }
+        }
+        return ListingView.of(normalizers.get(marketplace.code()).normalize(input.listing()), marketplace == EditorMarketplace.ETSY,
+                marks, null, null);
     }
 
     private static BulkResult.Variation variation(Acc acc) {
@@ -246,7 +274,7 @@ public class BulkCheckService {
                 items.add(new Item(level, BulkText.level(messages, level), finding.ruleId(), finding.field(), finding.message(),
                         finding.suggestion(), null, messages.ruleExplanation(finding.ruleId()),
                         fix == null ? null : fix.description(), fix == null ? null : fix.proposedValue(),
-                        FeedbackTarget.listingRules(result.checkId(), index)));
+                        FeedbackTarget.listingRules(result.checkId(), index), finding.value(), -1, -1));
             }
             String readiness = readiness(result.readiness());
             return new BulkResult.Rules(true, null, readiness, readinessLabel(readiness), score(result.readiness()),
@@ -309,7 +337,7 @@ public class BulkCheckService {
                         finding.suggestion(), finding.mark() == null ? null : messages.get("bulk.item.catalogmark", finding.mark()),
                         withLlmLabel(messages.ruleExplanation(finding.ruleId()),
                                 ConsoleLlmLabel.sentence(messages, ConsoleLlmLabel.reason(finding.riskAdjustments()))), null, null,
-                        FeedbackTarget.trademark(result.checkId(), index)));
+                        FeedbackTarget.trademark(result.checkId(), index), null, finding.start(), finding.end()));
             }
             boolean complete = result.completeness() == Completeness.COMPLETE;
             String level = result.riskLevel() == RiskLevel.UNKNOWN || result.riskLevel() == null ? null : result.riskLevel().name();

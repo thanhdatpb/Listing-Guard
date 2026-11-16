@@ -5,101 +5,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{bulk.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/editor.css}">
-    <link rel="stylesheet" th:href="@{/console/console.css}">
     <link rel="stylesheet" th:href="@{/console/bulk.css}">
     <script th:src="@{/console/bulk.js}" defer></script>
     <th:block th:replace="~{console/layout :: htmx}"></th:block>
     <th:block th:if="${rewriteAvailable}"><th:block th:replace="~{console/rewrite :: assets}"></th:block></th:block>
 </head>
 <body>
+<!-- The bulk check (ADR-029, ADR-041): an input card (paste or upload, the marketplace, the columns it understood), then a result card with
+     the summary, the two ways to take the result away and one row for each line, whose detail opens under it. -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('bulk')}"></header>
-<main class="page wide" id="bulk-page">
+<main class="lg-page" id="bulk-page">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{bulk.heading}"></h1>
-    <p class="muted">
-        <span th:text="#{common.signedin(${email})}"></span>
-        <span th:text="#{bulk.intro}"></span>
-    </p>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{bulk.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{bulk.intro}"></p>
+        </div>
+    </div>
 
-    <div class="notice refused" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
 
     <!-- Step 1: paste or upload -->
-    <th:block th:if="${stage == 'form'}">
-        <nav class="tabs" th:aria-label="#{bulk.tabs.aria}">
-            <a th:href="@{/console/bulk(tab='paste',marketplace=${marketplace.code})}" id="tab-paste" th:text="#{bulk.tab.paste}"
-               th:classappend="${tab.key == 'paste'} ? 'active'" th:aria-current="${tab.key == 'paste'} ? 'page'"></a>
-            <a th:href="@{/console/bulk(tab='file',marketplace=${marketplace.code})}" id="tab-file" th:text="#{bulk.tab.file}"
-               th:classappend="${tab.key == 'file'} ? 'active'" th:aria-current="${tab.key == 'file'} ? 'page'"></a>
-        </nav>
-
+    <div class="lg-card lg-section" th:if="${stage == 'form'}">
         <form id="paste-form" method="post" enctype="multipart/form-data" th:action="@{/console/bulk/prepare}"
               th:if="${tab.key == 'paste'}">
             <input type="hidden" name="source" value="paste">
-            <div class="field">
-                <label for="paste-marketplace" th:text="#{bulk.marketplace}"></label>
-                <select id="paste-marketplace" name="marketplace">
-                    <option th:each="m : ${marketplaces}" th:value="${m.code}" th:text="${m.label}" th:selected="${m == marketplace}"></option>
-                </select>
-            </div>
-            <div class="field">
-                <label for="text" th:text="#{bulk.paste.label}"></label>
-                <textarea id="text" name="text" class="paste" rows="12" spellcheck="false" aria-describedby="text-hint"
+            <div th:replace="~{console/bulk-fragments :: top('paste-marketplace')}"></div>
+            <div class="lg-field">
+                <label class="lg-field__label" for="text" th:text="#{bulk.paste.label}"></label>
+                <textarea id="text" name="text" class="lg-textarea lg-textarea--mono" rows="10" spellcheck="false" aria-describedby="text-hint"
                           th:text="${pasted}"></textarea>
-                <p class="hint" id="text-hint" th:text="${pasteHint}"></p>
+                <p class="lg-field__hint" id="text-hint" th:text="${pasteHint}"></p>
             </div>
-            <div class="field">
-                <label for="paste-header" th:text="#{bulk.header.label}"></label>
-                <select id="paste-header" name="header">
+            <div class="lg-field lg-field--narrow">
+                <label class="lg-field__label" for="paste-header" th:text="#{bulk.header.label}"></label>
+                <select class="lg-select" id="paste-header" name="header">
                     <option value="auto" selected th:text="#{bulk.header.auto}"></option>
                     <option value="yes" th:text="#{bulk.header.yes}"></option>
                     <option value="no" th:text="#{bulk.header.no}"></option>
                 </select>
             </div>
-            <div class="actions">
-                <button type="submit" class="primary" th:text="#{bulk.paste.submit}"></button>
+            <div class="lg-actions">
+                <button type="submit" class="lg-btn lg-btn--primary" th:text="#{bulk.paste.submit}"></button>
             </div>
         </form>
 
         <form id="file-form" method="post" enctype="multipart/form-data" th:action="@{/console/bulk/prepare}"
               th:if="${tab.key == 'file'}">
             <input type="hidden" name="source" value="file">
-            <div class="field">
-                <label for="file-marketplace" th:text="#{bulk.marketplace}"></label>
-                <select id="file-marketplace" name="marketplace">
-                    <option th:each="m : ${marketplaces}" th:value="${m.code}" th:text="${m.label}" th:selected="${m == marketplace}"></option>
-                </select>
+            <div th:replace="~{console/bulk-fragments :: top('file-marketplace')}"></div>
+            <div class="lg-field">
+                <label class="lg-drop" for="file">
+                    <span class="lg-drop__title" th:text="#{bulk.file.label}"></span>
+                    <span class="lg-drop__hint" id="file-hint" th:text="${fileHint}"></span>
+                    <input type="file" id="file" name="file" required aria-describedby="file-hint"
+                           accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
+                </label>
             </div>
-            <div class="field">
-                <label for="file" th:text="#{bulk.file.label}"></label>
-                <input type="file" id="file" name="file" required aria-describedby="file-hint"
-                       accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
-                <p class="hint" id="file-hint" th:text="${fileHint}"></p>
-            </div>
-            <div class="field">
-                <label for="file-header" th:text="#{bulk.file.header.label}"></label>
-                <select id="file-header" name="header">
+            <div class="lg-field lg-field--narrow">
+                <label class="lg-field__label" for="file-header" th:text="#{bulk.file.header.label}"></label>
+                <select class="lg-select" id="file-header" name="header">
                     <option value="auto" selected th:text="#{bulk.header.auto}"></option>
                     <option value="yes" th:text="#{bulk.header.yes}"></option>
                     <option value="no" th:text="#{bulk.header.no}"></option>
                 </select>
             </div>
-            <div class="actions">
-                <button type="submit" class="primary" th:text="#{bulk.file.submit}"></button>
+            <div class="lg-actions">
+                <button type="submit" class="lg-btn lg-btn--primary" th:text="#{bulk.file.submit}"></button>
             </div>
         </form>
-    </th:block>
+    </div>
 
-    <!-- Step 2: what is each column -->
-    <th:block th:if="${stage == 'mapping'}">
-        <h2 id="mapping-heading" th:text="#{bulk.mapping.heading}"></h2>
-        <p id="mapping-intro" th:text="${mapping.intro}"></p>
-        <div class="notice applied" id="remembered-note" role="status" th:if="${mapping.remembered}">
+    <!-- Step 2: what is each column. The columns the page understood are chips; the table that corrects them opens under "Edit the
+         columns" and is always in the form, so every choice is sent with the press of the one button. -->
+    <div class="lg-card lg-section" th:if="${stage == 'mapping'}">
+        <div class="lg-card__head">
+            <h2 id="mapping-heading" class="lg-card__title" th:text="#{bulk.mapping.heading}"></h2>
+        </div>
+        <p id="mapping-intro" class="lg-text-muted" th:text="${mapping.intro}"></p>
+        <div class="lg-banner lg-banner--success lg-section" id="remembered-note" role="status" th:if="${mapping.remembered}">
             <p th:text="#{bulk.mapping.remembered}"></p>
         </div>
-        <div class="notice refused" id="mapping-problems" role="alert" th:if="${!mapping.problems.isEmpty()}">
-            <ul class="problems"><li th:each="problem : ${mapping.problems}" th:text="${problem}"></li></ul>
+        <div class="lg-banner lg-banner--error lg-section" id="mapping-problems" role="alert" th:if="${!mapping.problems.isEmpty()}">
+            <ul><li th:each="problem : ${mapping.problems}" th:text="${problem}"></li></ul>
         </div>
 
         <form id="run-form" method="post" enctype="multipart/form-data" th:action="@{/console/bulk/run}">
@@ -110,138 +99,169 @@
                  The first line break is put in front by the controller, because an HTML textarea drops the one at its start. -->
             <textarea name="data" hidden th:text="${mapping.dataField}"></textarea>
 
-            <table class="mapping" aria-labelledby="mapping-heading">
+            <div class="lg-bulk__chips" id="mapping-chips">
+                <span class="lg-text-muted lg-small" th:text="#{bulk.mapping.chips}"></span>
+                <th:block th:each="c : ${mapping.columns}"><span class="lg-chip" th:if="${!c.chip.isEmpty()}" th:text="#{bulk.mapping.chip(${c.letter}, ${c.chip})}"></span></th:block>
+            </div>
+
+            <details class="lg-disclosure lg-bulk__edit" th:open="${!mapping.problems.isEmpty() or mapping.noneChosen}">
+                <summary th:text="#{bulk.mapping.edit}"></summary>
+                <div class="lg-table-wrap">
+                    <table class="lg-table lg-table--scroll" id="mapping-table">
+                        <caption class="lg-sr-only" th:text="#{bulk.mapping.heading}"></caption>
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{bulk.mapping.col.letter}"></th>
+                            <th scope="col" th:text="#{bulk.mapping.col.what}"></th>
+                            <th scope="col" th:text="#{bulk.mapping.col.is}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="c : ${mapping.columns}">
+                            <th scope="row"><span class="lg-chip lg-chip--neutral" th:text="${c.letter}"></span></th>
+                            <td>
+                                <strong th:text="${c.label}"></strong>
+                                <br th:if="${!c.samples.isEmpty()}">
+                                <span class="lg-text-muted lg-small" th:each="sample, state : ${c.samples}"
+                                      th:text="${state.last} ? ${sample} : ${sample} + ' · '"></span>
+                            </td>
+                            <td>
+                                <label class="lg-sr-only" th:for="'col-' + ${c.index}" th:text="#{bulk.mapping.col.label(${c.letter})}"></label>
+                                <select class="lg-select" th:id="'col-' + ${c.index}" th:name="'col.' + ${c.index}">
+                                    <option value="" th:selected="${c.selected == ''}" th:text="#{bulk.mapping.skip}"></option>
+                                    <option th:each="t : ${targets}" th:value="${t.key}" th:text="${t.label}"
+                                            th:selected="${t.key == c.selected}"></option>
+                                </select>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <fieldset class="lg-bulk__separators" th:if="${!mapping.separators.isEmpty()}">
+                    <legend class="lg-field__label" th:text="#{bulk.separators.legend}"></legend>
+                    <p class="lg-field__hint" th:text="#{bulk.separators.help}"></p>
+                    <div class="lg-field" th:each="s : ${mapping.separators}">
+                        <label class="lg-field__label" th:for="'sep-' + ${s.key}" th:text="${s.label}"></label>
+                        <select class="lg-select" th:id="'sep-' + ${s.key}" th:name="'sep.' + ${s.key}">
+                            <option th:each="o : ${separatorOptions}" th:value="${o.key}" th:text="${o.label}"
+                                    th:selected="${o.key == s.selected}"></option>
+                        </select>
+                    </div>
+                </fieldset>
+            </details>
+
+            <label class="lg-bulk__remember">
+                <input type="checkbox" id="remember" name="remember" value="on" th:checked="${mapping.remember}">
+                <span th:text="#{bulk.remember}"></span>
+            </label>
+
+            <p class="lg-field__hint" id="cost" th:text="${mapping.costNote != null} ? ${mapping.costNote} : #{bulk.cost.none}"></p>
+            <div class="lg-actions">
+                <button type="submit" class="lg-btn lg-btn--primary" id="run-button" th:text="#{bulk.run.rows(${#strings.toString(mapping.rows)})}"></button>
+                <a class="lg-btn" th:href="@{/console/bulk(marketplace=${marketplace.code})}" th:text="#{bulk.restart}"></a>
+            </div>
+        </form>
+    </div>
+
+    <!-- The result -->
+    <section class="lg-card lg-section" id="result" aria-labelledby="result-heading" th:if="${stage == 'result'}">
+        <div class="lg-card__head">
+            <div class="lg-counts" id="counts">
+                <h2 id="result-heading" class="lg-card__title" th:text="#{bulk.result.heading(${marketplace.label})}"></h2>
+                <span class="lg-pill" th:text="#{bulk.counts.total(${'' + result.counts.total})}"></span>
+                <span class="lg-pill lg-pill--error" th:text="#{bulk.counts.error(${'' + result.counts.error})}"></span>
+                <span class="lg-pill lg-pill--trademark" th:text="#{bulk.counts.trademark(${'' + result.trademarkRows()})}"></span>
+                <span class="lg-pill lg-pill--warn" th:text="#{bulk.counts.warning(${'' + result.counts.warning})}"></span>
+                <span class="lg-pill lg-pill--clean" th:text="#{bulk.counts.ok(${'' + result.counts.ok})}"></span>
+                <span class="lg-pill" th:text="#{bulk.counts.others(${'' + result.counts.others})}"></span>
+            </div>
+            <div class="lg-actions">
+                <button type="button" id="copy-sheet" data-copy-from="sheet-block" class="lg-btn lg-btn--small" hidden
+                        th:attr="data-i18n-copied=#{js.bulk.copied},data-i18n-failed=#{js.bulk.failed}">
+                    <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-copy"/></svg>
+                    <th:block th:text="#{bulk.copy}"></th:block>
+                </button>
+                <a class="lg-btn lg-btn--small" id="download-csv" th:href="${result.csvHref}" download="listing-guard-bulk-results.csv">
+                    <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-download"/></svg>
+                    <th:block th:text="#{bulk.csv}"></th:block>
+                </a>
+            </div>
+        </div>
+        <p class="lg-field__hint" id="result-note" th:text="#{bulk.result.note}"></p>
+        <th:block th:with="note=${@consoleMessages.disclaimerNote(result.disclaimer)}">
+            <p class="lg-field__hint" id="result-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
+            <p class="lg-field__hint" id="result-disclaimer">
+                <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
+                <span th:text="${result.disclaimer}"></span>
+            </p>
+        </th:block>
+
+        <div class="lg-banner lg-banner--info lg-section" th:each="note : ${result.notes}"><p th:text="${note}"></p></div>
+
+        <div class="lg-bulk__filters" id="status-filters" role="group" th:aria-label="#{bulk.filter.aria}" hidden>
+            <button type="button" class="lg-btn lg-btn--small" data-filter="ALL" aria-pressed="true" th:text="#{bulk.filter.all}"></button>
+            <button type="button" class="lg-btn lg-btn--small" data-filter="ERROR" aria-pressed="false" th:text="#{bulk.filter.error}"></button>
+            <button type="button" class="lg-btn lg-btn--small" data-filter="WARNING" aria-pressed="false" th:text="#{bulk.filter.warning}"></button>
+            <button type="button" class="lg-btn lg-btn--small" data-filter="OK" aria-pressed="false" th:text="#{bulk.filter.ok}"></button>
+            <button type="button" class="lg-btn lg-btn--small" data-filter="OTHER" aria-pressed="false" th:text="#{bulk.filter.other}"></button>
+        </div>
+        <p class="lg-feedback__status" id="copy-status" role="status" aria-live="polite"></p>
+
+        <div class="lg-table-wrap lg-section">
+            <table class="lg-table lg-table--scroll" id="bulk-results">
+                <caption class="lg-sr-only" th:text="#{bulk.table.caption}"></caption>
                 <thead>
                 <tr>
-                    <th scope="col" th:text="#{bulk.mapping.col.letter}"></th>
-                    <th scope="col" th:text="#{bulk.mapping.col.what}"></th>
-                    <th scope="col" th:text="#{bulk.mapping.col.is}"></th>
+                    <th scope="col" class="lg-num" th:text="#{bulk.table.line}"></th>
+                    <th scope="col" th:text="#{bulk.table.sku}"></th>
+                    <th scope="col" th:text="#{bulk.table.status}"></th>
+                    <th scope="col" class="lg-num" th:text="#{bulk.table.findings}"></th>
+                    <th scope="col" th:text="#{bulk.table.main}"></th>
+                    <th scope="col"><span class="lg-sr-only" th:text="#{bulk.table.detail}"></span></th>
                 </tr>
                 </thead>
                 <tbody>
-                <tr th:each="c : ${mapping.columns}">
-                    <th scope="row"><span class="letter" th:text="${c.letter}"></span></th>
-                    <td class="what">
-                        <strong th:text="${c.label}"></strong>
-                        <br th:if="${!c.samples.isEmpty()}">
-                        <span class="muted small" th:each="sample, state : ${c.samples}"
-                              th:text="${state.last} ? ${sample} : ${sample} + ' · '"></span>
+                <th:block th:each="row : ${result.rows}">
+                <tr th:attr="data-group=${row.status.group()},id='row-' + ${row.index}" th:classappend="'row-' + ${row.status.css()}">
+                    <td class="lg-num" th:text="${row.line}"></td>
+                    <td class="lg-sku"><code class="lg-code" th:if="${row.sku != null}" th:text="${row.sku}"></code><span class="lg-text-muted" th:if="${row.sku == null}">&mdash;</span></td>
+                    <td><span class="lg-pill" th:classappend="${row.status.name() == 'ERROR'} ? 'lg-pill--error' : (${row.status.name() == 'WARNING'} ? 'lg-pill--warn' : (${row.status.name() == 'OK'} ? 'lg-pill--clean'))" th:text="${row.statusLabel}"></span></td>
+                    <td class="lg-num" th:text="${row.findings}"></td>
+                    <td class="lg-main">
+                        <div class="lg-main__line" th:if="${row.status.name() != 'EMPTY'}">
+                            <span class="lg-mark" aria-hidden="true" th:if="${row.main != null and (row.main.level == 'error' or row.main.level == 'high')}"></span>
+                            <span th:text="${row.main != null} ? ${row.main.message} : ${row.summary}"></span>
+                        </div>
+                        <span class="lg-text-muted" th:if="${row.status.name() == 'EMPTY'}" th:text="#{bulk.row.empty}"></span>
                     </td>
-                    <td class="pick">
-                        <label class="visually-hidden" th:for="'col-' + ${c.index}" th:text="#{bulk.mapping.col.label(${c.letter})}"></label>
-                        <select th:id="'col-' + ${c.index}" th:name="'col.' + ${c.index}">
-                            <option value="" th:selected="${c.selected == ''}" th:text="#{bulk.mapping.skip}"></option>
-                            <option th:each="t : ${targets}" th:value="${t.key}" th:text="${t.label}"
-                                    th:selected="${t.key == c.selected}"></option>
-                        </select>
+                    <td><a class="lg-small" th:if="${row.status.name() != 'EMPTY'}" th:href="'#bulk-detail-' + ${row.index}"
+                           th:attr="aria-label=#{bulk.row.detail.aria(${row.line})}" th:text="#{bulk.row.detail}"></a></td>
+                </tr>
+                <tr class="lg-detail-row" th:attr="id='bulk-detail-' + ${row.index},data-detail-of=${row.index}" th:if="${row.status.name() != 'EMPTY'}">
+                    <td colspan="6">
+                        <div th:replace="~{console/bulk-fragments :: rowDetail(${row}, ${result.disclaimer})}"></div>
+                        <p class="lg-small"><a th:href="'#row-' + ${row.index}" th:text="#{bulk.row.close}"></a></p>
                     </td>
                 </tr>
+                </th:block>
                 </tbody>
             </table>
+        </div>
+        <p class="lg-field__hint" th:text="#{bulk.order.note}"></p>
 
-            <fieldset class="separators" th:if="${!mapping.separators.isEmpty()}">
-                <legend th:text="#{bulk.separators.legend}"></legend>
-                <p class="muted small" th:text="#{bulk.separators.help}"></p>
-                <div class="field" th:each="s : ${mapping.separators}">
-                    <label th:for="'sep-' + ${s.key}" th:text="${s.label}"></label>
-                    <select th:id="'sep-' + ${s.key}" th:name="'sep.' + ${s.key}">
-                        <option th:each="o : ${separatorOptions}" th:value="${o.key}" th:text="${o.label}"
-                                th:selected="${o.key == s.selected}"></option>
-                    </select>
-                </div>
-            </fieldset>
+        <details class="lg-disclosure" id="sheet-help">
+            <summary th:text="#{bulk.sheet.summary}"></summary>
+            <p class="lg-text-muted lg-small" th:text="${result.header} ? #{bulk.sheet.withheader} : #{bulk.sheet.noheader}"></p>
+            <label class="lg-sr-only" for="sheet-block" th:text="#{bulk.sheet.label}"></label>
+            <textarea class="lg-textarea lg-textarea--mono" id="sheet-block" readonly rows="6" spellcheck="false" th:text="${result.sheetBlock}"></textarea>
+        </details>
 
-            <div class="checkbox">
-                <input type="checkbox" id="remember" name="remember" value="on" th:checked="${mapping.remember}">
-                <label for="remember" th:text="#{bulk.remember}"></label>
-            </div>
-
-            <p class="cost" id="cost" th:text="${mapping.costNote != null} ? ${mapping.costNote} : #{bulk.cost.none}"></p>
-            <div class="actions">
-                <button type="submit" class="primary" id="run-button" th:text="#{bulk.run}"></button>
-                <a class="button" th:href="@{/console/bulk(marketplace=${marketplace.code})}" th:text="#{bulk.restart}"></a>
-            </div>
-        </form>
-    </th:block>
-
-    <!-- The result -->
-    <th:block th:if="${stage == 'result'}">
-        <section id="result" aria-labelledby="result-heading">
-            <h2 id="result-heading" th:text="#{bulk.result.heading(${marketplace.label})}"></h2>
-            <p class="muted small" id="result-note" th:text="#{bulk.result.note}"></p>
-            <th:block th:with="note=${@consoleMessages.disclaimerNote(result.disclaimer)}">
-                <p class="muted small disclaimer" id="result-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
-                <p class="muted small disclaimer" id="result-disclaimer">
-                    <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
-                    <span th:text="${result.disclaimer}"></span>
-                </p>
-            </th:block>
-
-            <div class="notice" th:each="note : ${result.notes}"><p th:text="${note}"></p></div>
-
-            <ul class="counts" id="counts">
-                <li th:text="#{bulk.counts.total(${'' + result.counts.total})}"></li>
-                <li th:text="#{bulk.counts.error(${'' + result.counts.error})}"></li>
-                <li th:text="#{bulk.counts.warning(${'' + result.counts.warning})}"></li>
-                <li th:text="#{bulk.counts.ok(${'' + result.counts.ok})}"></li>
-                <li th:text="#{bulk.counts.others(${'' + result.counts.others})}"></li>
-            </ul>
-
-            <div class="filters" id="status-filters" role="group" th:aria-label="#{bulk.filter.aria}" hidden>
-                <button type="button" data-filter="ALL" aria-pressed="true" th:text="#{bulk.filter.all}"></button>
-                <button type="button" data-filter="ERROR" aria-pressed="false" th:text="#{bulk.filter.error}"></button>
-                <button type="button" data-filter="WARNING" aria-pressed="false" th:text="#{bulk.filter.warning}"></button>
-                <button type="button" data-filter="OK" aria-pressed="false" th:text="#{bulk.filter.ok}"></button>
-                <button type="button" data-filter="OTHER" aria-pressed="false" th:text="#{bulk.filter.other}"></button>
-            </div>
-
-            <div class="result-actions">
-                <button type="button" id="copy-sheet" data-copy-from="sheet-block" class="primary" hidden th:text="#{bulk.copy}"
-                        th:attr="data-i18n-copied=#{js.bulk.copied},data-i18n-failed=#{js.bulk.failed}"></button>
-                <a class="button" id="download-csv" th:href="${result.csvHref}" download="listing-guard-bulk-results.csv"
-                   th:text="#{bulk.csv}"></a>
-                <a class="button" th:href="@{/console/bulk(marketplace=${marketplace.code})}" th:text="#{bulk.another}"></a>
-                <a class="button" th:href="@{/console/history}" th:text="#{nav.history}"></a>
-            </div>
-            <p class="copy-status" id="copy-status" role="status" aria-live="polite"></p>
-
-            <details class="sheet-help" id="sheet-help">
-                <summary th:text="#{bulk.sheet.summary}"></summary>
-                <p class="muted small" th:text="${result.header} ? #{bulk.sheet.withheader} : #{bulk.sheet.noheader}"></p>
-                <label class="visually-hidden" for="sheet-block" th:text="#{bulk.sheet.label}"></label>
-                <textarea id="sheet-block" readonly rows="6" spellcheck="false" th:text="${result.sheetBlock}"></textarea>
-            </details>
-
-            <div class="report-scroll">
-                <table class="bulk-results" id="bulk-results" aria-labelledby="result-heading">
-                    <thead>
-                    <tr>
-                        <th scope="col" class="n" th:text="#{bulk.table.line}"></th>
-                        <th scope="col" th:text="#{bulk.table.sku}"></th>
-                        <th scope="col" th:text="#{bulk.table.status}"></th>
-                        <th scope="col" class="n" th:text="#{bulk.table.findings}"></th>
-                        <th scope="col" th:text="#{bulk.table.main}"></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="row : ${result.rows}" th:attr="data-group=${row.status.group()}" th:classappend="'row-' + ${row.status.css()}">
-                        <td class="n" th:text="${row.line}"></td>
-                        <td class="sku"><span th:if="${row.sku != null}" th:text="${row.sku}"></span><span class="muted" th:if="${row.sku == null}">&mdash;</span></td>
-                        <td><span class="status" th:classappend="${row.status.css()}" th:text="${row.statusLabel}"></span></td>
-                        <td class="n" th:text="${row.findings}"></td>
-                        <td class="main">
-                            <details th:if="${row.status.name() != 'EMPTY'}">
-                                <summary th:text="${row.main != null} ? ${row.main.message} : ${row.summary}"></summary>
-                                <div th:replace="~{console/bulk-fragments :: rowDetail(${row}, ${result.disclaimer})}"></div>
-                            </details>
-                            <span class="muted" th:if="${row.status.name() == 'EMPTY'}" th:text="#{bulk.row.empty}"></span>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </th:block>
+        <div class="lg-actions lg-bulk__after">
+            <a class="lg-btn" th:href="@{/console/bulk(marketplace=${marketplace.code})}" th:text="#{bulk.another}"></a>
+            <a class="lg-btn" th:href="@{/console/history}" th:text="#{nav.history}"></a>
+        </div>
+    </section>
 </main>
 </body>
 </html>
