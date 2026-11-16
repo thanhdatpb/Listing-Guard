@@ -125,9 +125,16 @@ final class HttpTransport implements AutoCloseable {
         if (request.ifNoneMatch() != null) {
             builder.header("If-None-Match", request.ifNoneMatch());
         }
+        if (request.ifMatch() != null) {
+            builder.header("If-Match", request.ifMatch());
+        }
         if (request.operation().isPost()) {
             builder.header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(request.jsonBody(), StandardCharsets.UTF_8));
+        } else if (request.operation() == Operation.TRADEMARK_WATCHLIST_REPLACE) {
+            // the one PUT of the SDK (ADR-031): the client's own watchlist, never a listing
+            builder.header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(request.jsonBody(), StandardCharsets.UTF_8));
         } else {
             builder.GET();
         }

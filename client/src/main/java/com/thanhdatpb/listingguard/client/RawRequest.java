@@ -19,9 +19,16 @@ public final class RawRequest {
     private final String productType;
     private final String requestId;
     private final String ifNoneMatch;
+    private final String ifMatch;
 
     private RawRequest(Operation operation, String jsonBody, String marketplace, String productType, String requestId,
             String ifNoneMatch) {
+        this(operation, jsonBody, marketplace, productType, requestId, ifNoneMatch, null);
+    }
+
+    private RawRequest(Operation operation, String jsonBody, String marketplace, String productType, String requestId,
+            String ifNoneMatch, String ifMatch) {
+        this.ifMatch = ifMatch;
         this.operation = operation;
         this.jsonBody = jsonBody;
         this.marketplace = marketplace;
@@ -33,7 +40,7 @@ public final class RawRequest {
     /**
      * A {@code POST} with a JSON body that is sent exactly as given.
      *
-     * @param operation one of the four {@code POST} operations
+     * @param operation one of the four {@code POST} operations; the watchlist {@code PUT} has {@link #replaceTrademarkWatchlist}
      * @param jsonBody  the request body, a JSON object as text
      * @throws IllegalArgumentException when the operation is not a {@code POST}
      */
@@ -44,6 +51,21 @@ public final class RawRequest {
             throw new IllegalArgumentException(operation + " is not a POST operation");
         }
         return new RawRequest(operation, jsonBody, null, null, null, null);
+    }
+
+    /**
+     * {@code PUT /api/v1/trademark-watchlist} with a JSON body that is sent exactly as given (ADR-031).
+     *
+     * @param jsonBody the whole list, a JSON object as text
+     */
+    public static RawRequest replaceTrademarkWatchlist(String jsonBody) {
+        Objects.requireNonNull(jsonBody, "jsonBody");
+        return new RawRequest(Operation.TRADEMARK_WATCHLIST_REPLACE, jsonBody, null, null, null, null);
+    }
+
+    /** {@code GET /api/v1/trademark-watchlist} (ADR-031). */
+    public static RawRequest trademarkWatchlist() {
+        return new RawRequest(Operation.TRADEMARK_WATCHLIST, null, null, null, null, null);
     }
 
     /**
@@ -78,7 +100,24 @@ public final class RawRequest {
         if (id == null || !REQUEST_ID.matcher(id).matches()) {
             throw new IllegalArgumentException("A request id is 1 to 64 characters from A-Za-z0-9._-");
         }
-        return new RawRequest(operation, jsonBody, marketplace, productType, id, ifNoneMatch);
+        return new RawRequest(operation, jsonBody, marketplace, productType, id, ifNoneMatch, ifMatch);
+    }
+
+    /**
+     * The same {@code PUT} with an {@code If-Match} header: the API replaces the list only if it is still at that revision
+     * ({@code 412 watchlist-revision-mismatch} otherwise).
+     *
+     * @param revision the revision read earlier, sent as the {@code ETag} {@code "<revision>"}; {@code null} for none
+     */
+    public RawRequest withExpectedRevision(Long revision) {
+        if (operation != Operation.TRADEMARK_WATCHLIST_REPLACE) {
+            throw new IllegalArgumentException("If-Match applies to the watchlist PUT only");
+        }
+        if (revision != null && revision < 0) {
+            throw new IllegalArgumentException("A revision is not negative");
+        }
+        return new RawRequest(operation, jsonBody, marketplace, productType, requestId, ifNoneMatch,
+                revision == null ? null : "\"" + revision + "\"");
     }
 
     /**
@@ -88,11 +127,11 @@ public final class RawRequest {
      * @param etag the {@code ETag} of an earlier answer, exactly as received
      */
     public RawRequest withIfNoneMatch(String etag) {
-        if (operation.isPost()) {
+        if (operation.hasBody()) {
             throw new IllegalArgumentException("If-None-Match applies to a GET only");
         }
         return new RawRequest(operation, jsonBody, marketplace, productType, requestId,
-                etag == null || etag.isEmpty() ? null : etag);
+                etag == null || etag.isEmpty() ? null : etag, null);
     }
 
     /** Which call. */
@@ -118,6 +157,11 @@ public final class RawRequest {
     /** The caller's request id, or {@code null} for a generated one. */
     public String requestId() {
         return requestId;
+    }
+
+    /** The {@code If-Match} value of a watchlist {@code PUT}, or {@code null}. */
+    public String ifMatch() {
+        return ifMatch;
     }
 
     /** The {@code If-None-Match} value, or {@code null}. */

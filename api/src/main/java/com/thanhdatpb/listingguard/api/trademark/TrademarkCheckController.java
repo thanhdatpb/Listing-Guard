@@ -14,6 +14,7 @@ import static com.thanhdatpb.listingguard.api.docs.ApiExamples.TRADEMARK_REQUEST
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.TRADEMARK_RESULT;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.TRADEMARK_RESULT_CACHED;
 import static com.thanhdatpb.listingguard.api.docs.ApiExamples.TRADEMARK_RESULT_PRODUCT_TYPE;
+import static com.thanhdatpb.listingguard.api.docs.ApiExamples.TRADEMARK_RESULT_WATCHLIST_ONLY;
 
 import com.thanhdatpb.listingguard.api.client.AuthenticatedClient;
 import com.thanhdatpb.listingguard.api.security.ApiKeyFilter;
@@ -84,7 +85,9 @@ public class TrademarkCheckController {
                                             @ExampleObject(name = "cached", summary = "The same listing again: the stored result",
                                                     value = TRADEMARK_RESULT_CACHED),
                                             @ExampleObject(name = "product-type", summary = "With a product type: a lower level, and why",
-                                                    value = TRADEMARK_RESULT_PRODUCT_TYPE)})),
+                                                    value = TRADEMARK_RESULT_PRODUCT_TYPE),
+                                            @ExampleObject(name = "watchlist-only", summary = "No catalog is served, the client has a watchlist: INCOMPLETE, watchlist findings only",
+                                                    value = TRADEMARK_RESULT_WATCHLIST_ONLY)})),
                     @ApiResponse(responseCode = "400", description = "Invalid request (code `invalid-request`), unknown marketplace (`unknown-marketplace`) or a `product_type` the ruleset does not declare (`unknown-product-type`; the declared ones are in `known`). A product type is never ignored: the request is refused before anything is stored or counted.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = {
@@ -108,7 +111,7 @@ public class TrademarkCheckController {
                                     examples = {
                                             @ExampleObject(name = "rate-limited", value = PROBLEM_RATE_LIMITED),
                                             @ExampleObject(name = "quota-exceeded", value = PROBLEM_QUOTA_EXCEEDED)})),
-                    @ApiResponse(responseCode = "503", description = "Trademark checks are not available on this server: no catalog is configured or the configured one is refused (code `trademark-not-configured`). `POST /api/v1/checks` is not affected. Retrying does not help; an operator must configure a catalog.",
+                    @ApiResponse(responseCode = "503", description = "Trademark checks are not available on this server: no catalog is configured or the configured one is refused (code `trademark-not-configured`), and the calling client has no enabled watchlist entry (a client that has one gets a `200` with `catalogStatus` NOT_CONFIGURED instead). `POST /api/v1/checks` is not affected. Retrying does not help; an operator must configure a catalog.",
                             content = @Content(mediaType = PROBLEM, schema = @Schema(implementation = ProblemDetail.class),
                                     examples = @ExampleObject(value = PROBLEM_TRADEMARK_NOT_CONFIGURED)))})
     public TrademarkCheckResult check(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,

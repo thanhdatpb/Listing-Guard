@@ -12,6 +12,8 @@ import com.thanhdatpb.listingguard.client.model.PersonalizationScreeningResult;
 import com.thanhdatpb.listingguard.client.model.RulesetLimits;
 import com.thanhdatpb.listingguard.client.model.TrademarkCheckRequest;
 import com.thanhdatpb.listingguard.client.model.TrademarkCheckResult;
+import com.thanhdatpb.listingguard.client.model.TrademarkWatchlist;
+import com.thanhdatpb.listingguard.client.model.TrademarkWatchlistRequest;
 import com.thanhdatpb.listingguard.client.model.Usage;
 import com.thanhdatpb.listingguard.client.model.VariationCheckRequest;
 import com.thanhdatpb.listingguard.client.model.VariationCheckResult;
@@ -115,6 +117,62 @@ public final class ListingGuardClient implements AutoCloseable {
     /** The asynchronous form of {@link #trademarkChecks(TrademarkCheckRequest)}. */
     public CompletableFuture<TrademarkCheckResult> trademarkChecksAsync(TrademarkCheckRequest request) {
         return post(Operation.TRADEMARK_CHECKS, request, TrademarkCheckResult.class);
+    }
+
+    /**
+     * {@code GET /api/v1/trademark-watchlist} (ADR-031): the calling client's own list of marks, which every trademark check
+     * looks for next to the catalog. An empty list (revision 0) when the client never had one. Costs no quota.
+     */
+    public TrademarkWatchlist trademarkWatchlist() {
+        return await(trademarkWatchlistAsync());
+    }
+
+    /**
+     * The same as a conditional request: {@code 304} when {@code ifNoneMatch} is the {@code ETag} of the current list.
+     *
+     * @param ifNoneMatch the {@code ETag} of an earlier answer, or {@code null} for a plain request
+     */
+    public Conditional<TrademarkWatchlist> trademarkWatchlist(String ifNoneMatch) {
+        return await(trademarkWatchlistAsync(ifNoneMatch));
+    }
+
+    /** The asynchronous form of {@link #trademarkWatchlist()}. */
+    public CompletableFuture<TrademarkWatchlist> trademarkWatchlistAsync() {
+        return typed(RawRequest.trademarkWatchlist(), TrademarkWatchlist.class);
+    }
+
+    /** The asynchronous form of {@link #trademarkWatchlist(String)}. */
+    public CompletableFuture<Conditional<TrademarkWatchlist>> trademarkWatchlistAsync(String ifNoneMatch) {
+        return conditional(RawRequest.trademarkWatchlist().withIfNoneMatch(ifNoneMatch), TrademarkWatchlist.class);
+    }
+
+    /**
+     * {@code PUT /api/v1/trademark-watchlist} (ADR-031): replaces the client's whole list. The one call of the SDK that is neither
+     * a {@code GET} nor a {@code POST}; it writes the calling client's own configuration, never a listing. Costs no quota.
+     *
+     * @param request          the whole list, in the order to keep
+     * @param expectedRevision the {@link TrademarkWatchlist#revision()} the change is based on, or {@code null} to replace
+     *                         whatever is stored; a stale one throws {@link WatchlistRevisionMismatchException}
+     * @throws ValidationException when the list has problems (all of them in {@code errors()}); nothing is stored
+     */
+    public TrademarkWatchlist replaceTrademarkWatchlist(TrademarkWatchlistRequest request, Long expectedRevision) {
+        return await(replaceTrademarkWatchlistAsync(request, expectedRevision));
+    }
+
+    /** The asynchronous form of {@link #replaceTrademarkWatchlist(TrademarkWatchlistRequest, Long)}. */
+    public CompletableFuture<TrademarkWatchlist> replaceTrademarkWatchlistAsync(TrademarkWatchlistRequest request,
+            Long expectedRevision) {
+        Objects.requireNonNull(request, "request");
+        String body;
+        try {
+            body = mapper.writeValueAsString(request);
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            // Only the class: a message could quote part of the list.
+            return CompletableFuture.failedFuture(new ListingGuardTransportException(Kind.FAILED,
+                    "The request could not be written as JSON (" + e.getClass().getSimpleName() + ").", null));
+        }
+        return typed(RawRequest.replaceTrademarkWatchlist(body).withExpectedRevision(expectedRevision),
+                TrademarkWatchlist.class);
     }
 
     /** {@code POST /api/v1/variation-checks}: the structure of a parent and its children. */

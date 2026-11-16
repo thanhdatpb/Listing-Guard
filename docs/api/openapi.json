@@ -5224,6 +5224,63 @@
                       "skippedRuleIds" : [ ],
                       "watchlist" : null
                     }
+                  },
+                  "watchlist-only" : {
+                    "description" : "watchlist-only",
+                    "summary" : "No catalog is served, the client has a watchlist: INCOMPLETE, watchlist findings only",
+                    "value" : {
+                      "analysisVersion" : "3c5e7a9b1d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c",
+                      "cached" : false,
+                      "catalogStatus" : "NOT_CONFIGURED",
+                      "catalogVersion" : "none",
+                      "checkId" : "5d1e7c2a-9b40-4f63-8e21-3c7a9d0b4f12",
+                      "completeness" : "INCOMPLETE",
+                      "createdAt" : "2026-11-16T09:15:30.123456Z",
+                      "disclaimer" : "Kết quả chỉ là cảnh báo tham khảo, không phải kết luận pháp lý về việc một nội dung có vi phạm nhãn hiệu hay không.",
+                      "expiresAt" : "2026-12-16T09:15:30.123456Z",
+                      "failedRuleIds" : [ ],
+                      "findings" : [ {
+                        "end" : 15,
+                        "field" : "title",
+                        "insideColorPhrase" : false,
+                        "mark" : "Brimwick Otters",
+                        "matchType" : "PHRASE",
+                        "message" : "Cụm 'Brimwick Otters' ở title trùng với mục 'Brimwick Otters' trong watchlist của khách hàng. Ghi chú trong watchlist: từng bị claim",
+                        "otherRuleIds" : [ ],
+                        "risk" : "HIGH",
+                        "riskAdjustments" : [ ],
+                        "ruleId" : "watchlist_match",
+                        "score" : 1.0,
+                        "snippet" : "Brimwick Otters",
+                        "source" : "WATCHLIST",
+                        "sourceIds" : [ "uspto:12345678" ],
+                        "sourceLinks" : [ {
+                          "label" : "USPTO TSDR",
+                          "sourceId" : "uspto:12345678",
+                          "url" : "https://tsdr.uspto.gov/#caseNumber=12345678&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch"
+                        } ],
+                        "start" : 0,
+                        "suggestion" : "Xem lại việc dùng 'Brimwick Otters' ở title: mục này do chính khách hàng đưa vào watchlist. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý.",
+                        "watchlistEntry" : {
+                          "entryId" : "6f2a9c4e-1b3d-4e58-a7c9-0d2e4f6a8b1c",
+                          "mark" : "Brimwick Otters",
+                          "matchedAlias" : null,
+                          "niceClasses" : [ 25 ],
+                          "note" : "từng bị claim",
+                          "serialNumber" : "12345678"
+                        }
+                      } ],
+                      "marketplace" : "ETSY",
+                      "productType" : null,
+                      "riskLevel" : "HIGH",
+                      "rulesetVersion" : "trademark-risk-2026-11b",
+                      "skippedRuleIds" : [ "catalog_exact", "catalog_phrase", "catalog_fuzzy", "color_name_contains_mark", "pure_color_description" ],
+                      "watchlist" : {
+                        "entries" : 2,
+                        "revision" : 3,
+                        "version" : "8a1f3c5e7b9d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a"
+                      }
+                    }
                   }
                 },
                 "schema" : {
@@ -5498,7 +5555,7 @@
                 }
               }
             },
-            "description" : "Trademark checks are not available on this server: no catalog is configured or the configured one is refused (code `trademark-not-configured`). `POST /api/v1/checks` is not affected. Retrying does not help; an operator must configure a catalog.",
+            "description" : "Trademark checks are not available on this server: no catalog is configured or the configured one is refused (code `trademark-not-configured`), and the calling client has no enabled watchlist entry (a client that has one gets a `200` with `catalogStatus` NOT_CONFIGURED instead). `POST /api/v1/checks` is not affected. Retrying does not help; an operator must configure a catalog.",
             "headers" : {
               "Deprecation" : {
                 "$ref" : "#/components/headers/Deprecation"

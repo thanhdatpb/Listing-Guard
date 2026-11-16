@@ -69,6 +69,7 @@ final class Problems {
             case "rate-limited" -> new RateLimitedException(problem, retryAfter(response, now));
             case "invalid-request", "unprocessable-request" -> new ValidationException(problem);
             case "unknown-product-type" -> new UnknownProductTypeException(problem);
+            case WatchlistRevisionMismatchException.CODE -> new WatchlistRevisionMismatchException(problem);
             default -> code.endsWith("-not-configured")
                     ? new NotConfiguredException(problem)
                     : new ListingGuardApiException(problem);

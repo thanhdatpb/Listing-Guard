@@ -21,6 +21,11 @@ import java.util.UUID;
  * @param createdAt       when the result was stored (UTC)
  * @param expiresAt       when it stops being retained (UTC)
  * @param productType     the product type the request named, or {@code null}
+ * @param catalogStatus   {@code SERVED} when the text was compared with the catalog; {@code NOT_CONFIGURED} when the deployment
+ *                        serves none and only the client's watchlist and the rules that need no catalog ran (ADR-031): the result
+ *                        is then {@code INCOMPLETE} and the absence of catalog findings says nothing
+ * @param skippedRuleIds  the rules that did not run because no catalog is served; empty otherwise
+ * @param watchlist       the client's watchlist the check used, or {@code null} when it had no enabled entry
  * @param findings        the matches, with evidence
  */
 public record TrademarkCheckResult(
@@ -37,10 +42,14 @@ public record TrademarkCheckResult(
         Instant createdAt,
         Instant expiresAt,
         String productType,
+        TrademarkCatalogStatus catalogStatus,
+        List<String> skippedRuleIds,
+        WatchlistUsage watchlist,
         List<TrademarkCheckFinding> findings) {
 
     public TrademarkCheckResult {
         failedRuleIds = Copies.list(failedRuleIds);
+        skippedRuleIds = Copies.list(skippedRuleIds);
         findings = Copies.list(findings);
     }
 }
