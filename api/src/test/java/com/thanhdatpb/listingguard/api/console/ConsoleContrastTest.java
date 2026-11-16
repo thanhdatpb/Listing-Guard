@@ -21,9 +21,10 @@ class ConsoleContrastTest {
     /** {text, ground}: each is a pair app.css puts together. */
     private static final String[][] TEXT_PAIRS = {
             {"ink", "surface-0"}, {"ink", "surface-1"}, {"ink", "hover"}, {"ink", "surface-2"}, {"ink", "warning-subtle"},
+            {"ink", "danger-subtle"},
             {"ink-muted", "surface-0"}, {"ink-muted", "surface-1"}, {"ink-muted", "hover"}, {"ink-muted", "surface-2"},
             {"ink-muted", "brand-subtle"},
-            {"ink-soft", "surface-1"}, {"ink-soft", "hover"}, {"ink-soft", "surface-2"},
+            {"ink-soft", "surface-0"}, {"ink-soft", "surface-1"}, {"ink-soft", "hover"}, {"ink-soft", "surface-2"},
             {"on-brand", "brand"}, {"on-brand", "brand-strong"},
             {"brand-text", "surface-0"}, {"brand-text", "surface-1"}, {"brand-text", "brand-subtle"},
             {"brand-strong", "surface-0"}, {"brand-strong", "surface-1"},
