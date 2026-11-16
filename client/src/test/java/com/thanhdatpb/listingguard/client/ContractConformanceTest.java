@@ -15,6 +15,11 @@ import com.thanhdatpb.listingguard.client.model.Finding;
 import com.thanhdatpb.listingguard.client.model.Fix;
 import com.thanhdatpb.listingguard.client.model.FixesCapability;
 import com.thanhdatpb.listingguard.client.model.Limit;
+import com.thanhdatpb.listingguard.client.model.ListingEditFeedbackTarget;
+import com.thanhdatpb.listingguard.client.model.ListingEditFinding;
+import com.thanhdatpb.listingguard.client.model.ListingEditRequest;
+import com.thanhdatpb.listingguard.client.model.ListingEditResult;
+import com.thanhdatpb.listingguard.client.model.ListingEditSide;
 import com.thanhdatpb.listingguard.client.model.PackCapability;
 import com.thanhdatpb.listingguard.client.model.PersonalizationScreeningRequest;
 import com.thanhdatpb.listingguard.client.model.PersonalizationScreeningResult;
@@ -81,7 +86,7 @@ import org.junit.jupiter.api.Test;
  *       documented problem becomes the exception of its code.</li>
  *   <li>Requests follow {@code docs/api/input-schema.json}, the machine-readable request formats of ADR-022 (the OpenAPI document
  *       types four request members that are JSON values as strings, see the README Roadmap): the same member names and
- *       compatible types, every definition reachable from the four request bodies is mapped, and each operation's OpenAPI request
+ *       compatible types, every definition reachable from the five request bodies is mapped, and each operation's OpenAPI request
  *       body names the same definition.</li>
  * </ul>
  *
@@ -97,6 +102,11 @@ class ContractConformanceTest {
     /** Each SDK response record and the OpenAPI schema it follows. */
     static final Map<Class<?>, String> RESPONSES = Map.ofEntries(
             entry(CheckResult.class, "CheckResult"),
+            entry(ListingEditResult.class, "ListingEditResult"),
+            entry(ListingEditSide.class, "ListingEditSide"),
+            entry(ListingEditFinding.class, "ListingEditComparedFinding"),
+            entry(ListingEditFeedbackTarget.class, "FeedbackTarget"),
+            entry(Map.class, "JsonNode"),
             entry(Finding.class, "FindingView"),
             entry(Fix.class, "FixView"),
             entry(Readiness.class, "ReadinessView"),
@@ -130,6 +140,8 @@ class ContractConformanceTest {
             entry(CheckRequest.class, "CheckRequest"),
             entry(TrademarkCheckRequest.class, "TrademarkCheckRequest"),
             entry(VariationCheckRequest.class, "VariationCheckRequest"),
+            entry(ListingEditRequest.class, "ListingEditRequest"),
+            entry(ListingEditRequest.VariationFamily.class, "ListingEditVariationFamily"),
             entry(VariationParent.class, "VariationParent"),
             entry(VariationChild.class, "VariationChild"),
             entry(PersonalizationScreeningRequest.class, "PersonalizationScreeningRequest"),
@@ -140,6 +152,7 @@ class ContractConformanceTest {
             Operation.CHECKS, CheckRequest.class,
             Operation.TRADEMARK_CHECKS, TrademarkCheckRequest.class,
             Operation.VARIATION_CHECKS, VariationCheckRequest.class,
+            Operation.LISTING_EDITS, ListingEditRequest.class,
             Operation.PERSONALIZATION_SCREENINGS, PersonalizationScreeningRequest.class);
 
     private static JsonNode doc;
@@ -159,6 +172,7 @@ class ContractConformanceTest {
     @Test
     void everyResponseRecordHasExactlyTheMembersOfItsSchema() {
         for (Map.Entry<Class<?>, String> e : RESPONSES.entrySet()) {
+            if (!e.getKey().isRecord()) continue; // Dynamic JSON objects are represented as Map in the SDK.
             JsonNode schema = schemas.get(e.getValue());
             assertThat(schema).as("schema %s", e.getValue()).isNotNull();
             assertThat(new TreeSet<>(jsonNames(e.getKey()).keySet())).as("%s vs %s", e.getKey().getSimpleName(), e.getValue())
@@ -170,6 +184,7 @@ class ContractConformanceTest {
     void everyResponseMemberHasACompatibleTypeAndEveryNullableOneIsBoxed() {
         List<String> problems = new ArrayList<>();
         for (Map.Entry<Class<?>, String> e : RESPONSES.entrySet()) {
+            if (!e.getKey().isRecord()) continue; // Map members are checked recursively from their containing record.
             JsonNode properties = schemas.get(e.getValue()).path("properties");
             jsonNames(e.getKey()).forEach((name, component) -> {
                 JsonNode property = properties.get(name);
@@ -257,7 +272,7 @@ class ContractConformanceTest {
     }
 
     @Test
-    void everyDefinitionReachableFromTheFourRequestBodiesIsMapped() {
+    void everyDefinitionReachableFromTheFiveRequestBodiesIsMapped() {
         Set<String> reachable = new LinkedHashSet<>();
         Deque<JsonNode> todo = new ArrayDeque<>();
         for (Class<?> request : REQUEST_OF.values()) {
@@ -437,6 +452,8 @@ class ContractConformanceTest {
             if (expect(where, raw, problems, Map.class)) {
                 checkResponse(where + "{}", property.get("additionalProperties"), typeArgument(javaType, 1), problems);
             }
+        } else if (types.isEmpty() && raw == Object.class) {
+            // An empty object schema is an arbitrary JSON value, as used for pack-specific finding payloads.
         } else {
             problems.add(where + ": a document type the test does not know: " + types);
         }

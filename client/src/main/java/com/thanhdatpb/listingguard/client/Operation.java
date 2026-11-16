@@ -13,6 +13,8 @@ public enum Operation {
     TRADEMARK_CHECKS("POST", "/api/v1/trademark-checks"),
     /** {@code POST /api/v1/variation-checks}. */
     VARIATION_CHECKS("POST", "/api/v1/variation-checks"),
+    /** {@code POST /api/v1/listing-edits} (ADR-033). */
+    LISTING_EDITS("POST", "/api/v1/listing-edits"),
     /** {@code POST /api/v1/personalization-screenings}. */
     PERSONALIZATION_SCREENINGS("POST", "/api/v1/personalization-screenings"),
     /** {@code GET /api/v1/rulesets/{marketplace}/limits}. */
@@ -48,7 +50,7 @@ public enum Operation {
         return path;
     }
 
-    /** True for the four checks, the {@code POST} calls. */
+    /** True for the check operations, the {@code POST} calls. */
     public boolean isPost() {
         return "POST".equals(method);
     }

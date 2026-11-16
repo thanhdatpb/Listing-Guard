@@ -17,6 +17,8 @@ import com.thanhdatpb.listingguard.client.model.TrademarkWatchlistRequest;
 import com.thanhdatpb.listingguard.client.model.Usage;
 import com.thanhdatpb.listingguard.client.model.VariationCheckRequest;
 import com.thanhdatpb.listingguard.client.model.VariationCheckResult;
+import com.thanhdatpb.listingguard.client.model.ListingEditRequest;
+import com.thanhdatpb.listingguard.client.model.ListingEditResult;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -183,6 +185,16 @@ public final class ListingGuardClient implements AutoCloseable {
     /** The asynchronous form of {@link #variationChecks(VariationCheckRequest)}. */
     public CompletableFuture<VariationCheckResult> variationChecksAsync(VariationCheckRequest request) {
         return post(Operation.VARIATION_CHECKS, request, VariationCheckResult.class);
+    }
+
+    /** {@code POST /api/v1/listing-edits}: compares findings before and after a seller's edit. */
+    public ListingEditResult listingEdits(ListingEditRequest request) {
+        return await(listingEditsAsync(request));
+    }
+
+    /** The asynchronous form of {@link #listingEdits(ListingEditRequest)}. */
+    public CompletableFuture<ListingEditResult> listingEditsAsync(ListingEditRequest request) {
+        return post(Operation.LISTING_EDITS, request, ListingEditResult.class);
     }
 
     /**

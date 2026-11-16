@@ -45,10 +45,13 @@ public class CheckController {
 
     private final CheckService service;
     private final FixesProperties fixes;
+    private final com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history;
 
-    public CheckController(CheckService service, FixesProperties fixes) {
+    public CheckController(CheckService service, FixesProperties fixes,
+                           com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history) {
         this.service = service;
         this.fixes = fixes;
+        this.history = history;
     }
 
     @PostMapping
@@ -100,7 +103,9 @@ public class CheckController {
                                             @ExampleObject(name = "quota-exceeded", value = PROBLEM_QUOTA_EXCEEDED)}))})
     public MappingJacksonValue check(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
                                      @Valid @RequestBody CheckRequest request) {
-        return response(service.check(client.id(), request));
+        CheckResult result = service.check(client.id(), request);
+        history.api(client, com.thanhdatpb.listingguard.api.plan.Pack.LISTING_RULES.id(), result.checkId(), result.marketplace(), 1, null);
+        return response(result);
     }
 
     @GetMapping("/{id}")

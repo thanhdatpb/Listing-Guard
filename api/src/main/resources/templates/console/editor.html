@@ -17,6 +17,7 @@
         <p class="muted">
             <span th:text="#{common.signedin(${email})}"></span> <span th:text="#{editor.intro}"></span>
         </p>
+        <p><a th:href="@{/console/check/edit}" th:text="#{edit.mode.button}"></a></p>
 
         <nav class="tabs" th:aria-label="#{editor.marketplace.aria}">
             <a th:each="m : ${marketplaces}" th:href="@{/console/check(marketplace=${m.code})}" th:text="${m.label}"

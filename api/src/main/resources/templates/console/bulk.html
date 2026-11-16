@@ -198,6 +198,7 @@
                 <a class="button" id="download-csv" th:href="${result.csvHref}" download="listing-guard-bulk-results.csv"
                    th:text="#{bulk.csv}"></a>
                 <a class="button" th:href="@{/console/bulk(marketplace=${marketplace.code})}" th:text="#{bulk.another}"></a>
+                <a class="button" th:href="@{/console/history}" th:text="#{nav.history}"></a>
             </div>
             <p class="copy-status" id="copy-status" role="status" aria-live="polite"></p>
 
