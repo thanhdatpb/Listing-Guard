@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{history.title}"></title>
+    <link rel="stylesheet" th:href="@{/console/console.css}">
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('history')}"></header>
+<main class="layout">
+    <h1 th:text="#{history.heading}"></h1>
+    <p class="muted" th:text="#{history.intro}"></p>
+    <form method="get" th:action="@{/console/history}" class="filters">
+        <label for="from" th:text="#{history.from}"></label><input id="from" type="date" name="from" th:value="${from}">
+        <label for="to" th:text="#{history.to}"></label><input id="to" type="date" name="to" th:value="${to}">
+        <label for="status" th:text="#{history.status}"></label>
+        <select id="status" name="status">
+            <option value="" th:text="#{history.status.any}" th:selected="${status == ''}"></option>
+            <option value="COMPLETED" th:text="#{history.status.completed}" th:selected="${status == 'COMPLETED'}"></option>
+            <option value="COMPLETE" th:text="#{history.status.complete}" th:selected="${status == 'COMPLETE'}"></option>
+            <option value="INCOMPLETE" th:text="#{history.status.incomplete}" th:selected="${status == 'INCOMPLETE'}"></option>
+            <option value="FAILED" th:text="#{history.status.failed}" th:selected="${status == 'FAILED'}"></option>
+            <option value="PENDING" th:text="#{history.status.pending}" th:selected="${status == 'PENDING'}"></option>
+        </select>
+        <label for="marketplace" th:text="#{history.marketplace}"></label>
+        <select id="marketplace" name="marketplace">
+            <option value="" th:text="#{history.marketplace.any}" th:selected="${marketplace == ''}"></option>
+            <option value="ETSY" th:text="#{edit.marketplace.etsy}" th:selected="${marketplace == 'ETSY'}"></option>
+            <option value="AMAZON" th:text="#{edit.marketplace.amazon}" th:selected="${marketplace == 'AMAZON'}"></option>
+        </select>
+        <label for="checker" th:text="#{history.checker}"></label>
+        <input id="checker" name="checker" type="search" th:value="${checker}">
+        <button type="submit" th:text="#{history.filter}"></button>
+    </form>
+    <p th:if="${history.rows().isEmpty()}" class="muted" th:text="#{history.empty}"></p>
+    <div class="report-scroll" th:if="${!history.rows().isEmpty()}">
+        <table>
+            <thead><tr>
+                <th th:text="#{history.col.time}"></th><th th:text="#{history.col.checker}"></th>
+                <th th:text="#{history.col.marketplace}"></th><th th:text="#{history.col.rows}"></th>
+                <th th:text="#{history.col.sku}"></th><th th:text="#{history.col.errors}"></th>
+                <th th:text="#{history.col.trademarks}"></th><th th:text="#{history.col.feedback}"></th>
+                <th th:text="#{history.col.status}"></th><th th:text="#{history.col.result}"></th>
+            </tr></thead>
+            <tbody>
+            <tr th:each="row : ${history.rows()}">
+                <td th:text="${#temporals.format(row.checkedAt(), 'yyyy-MM-dd HH:mm')}"></td>
+                <td th:text="${row.checker()}"></td><td th:text="${row.marketplace()}"></td>
+                <td th:text="${#numbers.formatInteger(row.rowCount(), 1)}"></td>
+                <td th:text="${row.sku() == null ? '—' : row.sku()}"></td>
+                <td th:text="${#numbers.formatInteger(row.errors(), 1)}"></td>
+                <td th:text="${#numbers.formatInteger(row.trademarks(), 1)}"></td>
+                <td><span th:if="${row.reviewed()}" th:text="#{history.feedback.reviewed}"></span>
+                    <span th:unless="${row.reviewed()}" th:text="#{history.feedback.none}"></span></td>
+                <td th:text="${row.status()}"></td>
+                <td>
+                    <a th:href="@{/console/history/{pack}/{id}(pack=${row.pack()},id=${row.checkId()})}"
+                       th:text="#{history.open}"></a>
+                    <a th:href="@{/console/check/edit(marketplace=${row.marketplace()})}"
+                       th:text="#{history.edit}"></a>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <nav th:if="${history.pages() > 1}" th:aria-label="#{history.pagination}">
+        <a th:if="${history.page() > 0}" th:href="@{/console/history(from=${from},to=${to},status=${status},marketplace=${marketplace},checker=${checker},page=${history.page()-1})}"
+           th:text="#{history.previous}"></a>
+        <span th:text="#{history.page(${history.page()+1},${history.pages()})}"></span>
+        <a th:if="${history.page()+1 < history.pages()}" th:href="@{/console/history(from=${from},to=${to},status=${status},marketplace=${marketplace},checker=${checker},page=${history.page()+1})}"
+           th:text="#{history.next}"></a>
+    </nav>
+    <p class="muted small" th:text="#{history.privacy}"></p>
+</main>
+</body>
+</html>

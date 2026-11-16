@@ -40,14 +40,17 @@ public class ConsoleEditorController {
     private final EditorCheckService checks;
     private final ConsoleMessages messages;
     private final ConsoleFeedbackSupport feedback;
+    private final com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history;
 
     public ConsoleEditorController(PlanService plans, RulesetLimitsService rulesetLimits, EditorCheckService checks,
-                                   ConsoleMessages messages, ConsoleFeedbackSupport feedback) {
+                                   ConsoleMessages messages, ConsoleFeedbackSupport feedback,
+                                   com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history) {
         this.plans = plans;
         this.rulesetLimits = rulesetLimits;
         this.checks = checks;
         this.messages = messages;
         this.feedback = feedback;
+        this.history = history;
     }
 
     @GetMapping("/console/check")
@@ -72,6 +75,16 @@ public class ConsoleEditorController {
             return VIEW;
         }
         EditorResult result = checks.check(user.clientId(), selected, mapped.listing());
+        feedback.accountId(user).ifPresent(account -> {
+            if (result.readiness().checkId() != null) {
+                history.account(user.clientId(), account, com.thanhdatpb.listingguard.api.plan.Pack.LISTING_RULES.id(),
+                        result.readiness().checkId(), selected.code(), 1, null);
+            }
+            if (result.trademark().checkId() != null) {
+                history.account(user.clientId(), account, com.thanhdatpb.listingguard.api.plan.Pack.TRADEMARK_RISK.id(),
+                        result.trademark().checkId(), selected.code(), 1, null);
+            }
+        });
         populate(model, user, selected, form, Map.of());
         model.addAttribute("result", result);
         feedback.populate(model, user, result.targets());

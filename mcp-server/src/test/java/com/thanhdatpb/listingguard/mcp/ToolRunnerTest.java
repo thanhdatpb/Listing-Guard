@@ -101,12 +101,9 @@ class ToolRunnerTest {
                 + (extra.isEmpty() ? "" : "," + extra) + "}";
     }
 
-    // ---- the tools ----------------------------------------------------------------------------------------------
-
-    @Test
-    void thereAreExactlyEightToolsWithTheFixedNames() {
+    void thereAreExactlyNineToolsWithTheFixedNames() {
         assertThat(catalog.tools()).extracting(ToolSpec::name).containsExactly(
-                "check_listing", "check_trademark", "check_variations", "screen_personalization", "get_limits",
+                "check_listing", "check_trademark", "check_variations", "check_listing_edit", "screen_personalization", "get_limits",
                 "get_usage", "get_capabilities", "get_watchlist");
     }
 
@@ -134,7 +131,7 @@ class ToolRunnerTest {
                 .containsExactlyInAnyOrder("get_limits", "get_usage", "get_capabilities", "get_watchlist");
         for (ToolSpec tool : catalog.tools()) {
             assertThat(tool.name()).doesNotContainIgnoringCase("apply").doesNotContainIgnoringCase("publish")
-                    .doesNotContainIgnoringCase("edit").doesNotContainIgnoringCase("fix")
+                    .doesNotContainIgnoringCase("fix")
                     .doesNotContainIgnoringCase("update").doesNotContainIgnoringCase("delete")
                     .doesNotContainIgnoringCase("save").doesNotContainIgnoringCase("set_");
         }
@@ -152,6 +149,9 @@ class ToolRunnerTest {
                         map("marketplace", "AMAZON", "parent", map("sku", "P"),
                                 "children", List.of(map("sku", "C1", "attributes", map("color", "Red")))),
                         "POST", "/api/v1/variation-checks"),
+                Arguments.of("check_listing_edit",
+                        map("marketplace", "ETSY", "before", map("title", "Old"), "after", map("title", "New")),
+                        "POST", "/api/v1/listing-edits"),
                 Arguments.of("screen_personalization",
                         map("marketplace", "ETSY", "print_profile", "latin_basic", "product_type", "jersey",
                                 "values", List.of(map("label", "name", "text", "Đạt"))),
@@ -540,6 +540,7 @@ class ToolRunnerTest {
         return Stream.of(
                 Arguments.of("check_listing", map("listing", map()), "marketplace"),
                 Arguments.of("check_listing", map("marketplace", "ETSY"), "listing"),
+                Arguments.of("check_listing_edit", map("marketplace", "ETSY", "after", map()), "before"),
                 Arguments.of("check_listing", map("marketplace", "  ", "listing", map()), "marketplace"),
                 Arguments.of("check_listing", map("marketplace", "ETSY", "listing", "SECRET-VALUE-XYZ"), "listing"),
                 Arguments.of("check_listing", map("marketplace", 5, "listing", map()), "marketplace"),
@@ -699,6 +700,7 @@ class ToolRunnerTest {
         return switch (tool) {
             case "check_listing", "check_trademark" -> map("marketplace", "ETSY", "listing", map("title", "x"));
             case "check_variations" -> map("marketplace", "AMAZON", "children", List.of(map("sku", "C1")));
+            case "check_listing_edit" -> map("marketplace", "ETSY", "before", map("title", "Old"), "after", map("title", "New"));
             case "screen_personalization" -> map("marketplace", "ETSY", "values", List.of(map("text", "A")));
             case "get_limits" -> map("marketplace", "ETSY");
             default -> map();

@@ -116,12 +116,15 @@ public class ConsoleBulkController {
     private final ObjectMapper mapper;
     private final ConsoleMessages messages;
     private final ConsoleFeedbackSupport feedback;
+    private final com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history;
 
     public ConsoleBulkController(BulkProperties limits, BulkCheckService service, BulkMappingStore mappingStore,
                                  ConsoleAccountRepository accounts, PlanService plans, ObjectMapper mapper,
-                                 ConsoleMessages messages, ConsoleFeedbackSupport feedback) {
+                                 ConsoleMessages messages, ConsoleFeedbackSupport feedback,
+                                 com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history) {
         this.messages = messages;
         this.feedback = feedback;
+        this.history = history;
         this.limits = limits;
         this.service = service;
         this.mappingStore = mappingStore;
@@ -413,7 +416,22 @@ public class ConsoleBulkController {
         model.addAttribute("result", new BulkResult(result.marketplace(), result.header(), result.rows(), result.counts(), notes,
                 result.disclaimer(), result.sheetBlock(), result.csvHref()));
         feedback.populate(model, user, result.targets());
+        feedback.accountId(user).ifPresent(account -> result.rows().forEach(row -> {
+            var detail = row.detail();
+            if (detail == null) return;
+            historyTarget(user.clientId(), account, marketplace.code(), row, "listing-rules",
+                    detail.rules().items().stream().map(BulkResult.Item::target).filter(java.util.Objects::nonNull).findFirst().orElse(null));
+            historyTarget(user.clientId(), account, marketplace.code(), row, "trademark-risk",
+                    detail.trademark().items().stream().map(BulkResult.Item::target).filter(java.util.Objects::nonNull).findFirst().orElse(null));
+            historyTarget(user.clientId(), account, marketplace.code(), row, "variation-checks",
+                    detail.variation().items().stream().map(BulkResult.Item::target).filter(java.util.Objects::nonNull).findFirst().orElse(null));
+        }));
         return VIEW;
+    }
+
+    private void historyTarget(java.util.UUID clientId, java.util.UUID accountId, String marketplace, BulkResult.Row row,
+                               String pack, com.thanhdatpb.listingguard.api.feedback.FeedbackTarget target) {
+        if (target != null) history.account(clientId, accountId, pack, target.checkId(), marketplace, 1, row.sku());
     }
 
     private String refuse(ConsoleUser user, EditorMarketplace marketplace, Tab tab, BulkTable.Refused refusal, String text,

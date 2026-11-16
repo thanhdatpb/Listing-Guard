@@ -45,9 +45,12 @@ public class TrademarkCheckController {
     private static final String PROBLEM = "application/problem+json";
 
     private final TrademarkCheckService service;
+    private final com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history;
 
-    public TrademarkCheckController(TrademarkCheckService service) {
+    public TrademarkCheckController(TrademarkCheckService service,
+                                    com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history) {
         this.service = service;
+        this.history = history;
     }
 
     @PostMapping
@@ -116,7 +119,10 @@ public class TrademarkCheckController {
                                     examples = @ExampleObject(value = PROBLEM_TRADEMARK_NOT_CONFIGURED)))})
     public TrademarkCheckResult check(@Parameter(hidden = true) @RequestAttribute(ApiKeyFilter.CLIENT_ATTRIBUTE) AuthenticatedClient client,
                                       @Valid @RequestBody TrademarkCheckRequest request) {
-        return service.check(client.id(), request);
+        TrademarkCheckResult result = service.check(client.id(), request);
+        history.api(client, com.thanhdatpb.listingguard.api.plan.Pack.TRADEMARK_RISK.id(), result.checkId(), result.marketplace(),
+                1, null);
+        return result;
     }
 
     @GetMapping("/{id}")
