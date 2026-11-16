@@ -54,7 +54,7 @@ figures, **Cần xử lý**, **Dữ liệu kiểm tra**, the chart, the frequent
   reported false-positive rate, from ADR-034's queries. `trademarkHoldsBySource` now tells the client's own watchlist (`watchlist_match`)
   from the catalog, which share the `matched_mark` column; a result held by two sources is counted under both, as before.
 - **Cần xử lý** is the latest five results of the client with an `ERROR` or a `HIGH` trademark risk, each with its SKU (when a bulk row gave
-  one) or its rule id, a pill, the finding's own message and the marketplace and time. It reads `check_history_event` and the first stored
+  one) or what the finding is about (section 7), a pill, the finding's own message and the marketplace and time. It reads `check_history_event` and the first stored
   finding of that result (`ConsoleAttentionQueries`), every statement starting with the client's id, a trademark result only while it is
   retained. **This changes a sentence of ADR-034**: the home page was counts only; it now also prints one finding message and a SKU of this
   client's own, the same text the History page prints to the same account. The health report, the statistics and the CSV are unchanged and
@@ -111,6 +111,26 @@ copy status, the rewrite result) are polite live regions; a page has one `h1` an
 element with a name; the keyboard meets the form before the result and the result before the preview, and a row's link right after the row.
 `ConsoleWorkPagesAccessibilityIntegrationTest` reads these as a browser receives them.
 
+### 7. Changes after the first review
+
+The first look at the pages showed five things that were wrong for a person who reads them every day. They are decided here.
+
+- **A title column in the bulk table.** The title is shown on one line (60 characters, cut at a word, ended with "…") between the SKU and
+  the status, and hidden under 860 px where there is no room. It is the same text the detail shows, so it adds no reach to the data: it is
+  read from the row of the request, printed once, and **never stored**; the CSV a person downloads is unchanged. This answers open question 3.
+- **One row for one result on "Cần xử lý".** The same listing with the same rule is one row however often it was checked: the query reads the
+  latest sixty events and keeps the first (newest) of each listing (its SKU, else its content hash) and rule, up to five. A row without a SKU
+  is named by what the finding is about, as stored with the finding (the title when the rule is about the title, a tag or a span
+  otherwise), cut at 60 characters, and by the rule id only when the finding has nothing of its own. The listing's title is never stored,
+  so a row cannot name a listing by a title the finding does not carry.
+- **A card has a short heading and a body.** The heading is the first sentence of the finding's message, at most 90 characters (cut at a
+  word); the rest of the message, or all of it when the heading was cut, is the first paragraph of the body. Nothing of the message is
+  dropped, and the same applies to trademark cards.
+- **The sidebar names the account by its e-mail.** The name of a client that a sign-in made up (`web-` and 24 hexadecimal digits) is an
+  identifier and is not shown; a name that a person gave is shown below the e-mail.
+- **"Gói và mức sử dụng"** prints the reset date in the format of the language (`01/12/2026`, "Dec 1, 2026"), never an ISO instant, and the
+  whole card is absent where plans are off (it only said that nothing is enforced).
+
 ## Differences from the mockups
 
 Data the pages do not have, or a technical limit:
@@ -119,11 +139,10 @@ Data the pages do not have, or a technical limit:
   with a whole week would mislead); the second figure is listings with an `ERROR`, not a count of errors; "Cần xử lý" has the marketplace
   and time where the mockup has a seller account label (a check stores none), and no "Rà định kỳ" rows (a re-audit stores no finding text);
   the chart shows eight weeks, not six; the rules table has listing rules only (the trademark pack's top list is of marks, not rules).
-- **Bulk.** "Đạt", not "Sạch"; no title column in the table (the title is in the detail, where the words are marked); "Chi tiết" opens
-  under the row, not on a page of its own.
+- **Bulk.** "Đạt", not "Sạch"; "Chi tiết" opens under the row, not on a page of its own.
 - **Detail.** No "Chế độ sửa" and "Copy title gợi ý" buttons: edit mode needs both versions and a bulk result is not stored; the rewrite
-  button exists only behind the LLM switch and is in the row's detail. The finding's heading is the finding's own message, not a short title,
-  and its paragraph is the rule's sentence. The tag counter has no maximum in a bulk row (the limits are read for the editor only).
+  button exists only behind the LLM switch and is in the row's detail. The finding's heading is the first sentence of the finding's own
+  message (see section 7), not a title written for it, and its paragraph is the rest of the message and the rule's sentence. The tag counter has no maximum in a bulk row (the limits are read for the editor only).
 - **The source line** names a host, not a document title ("Etsy Seller Handbook"), because that is what the ruleset records.
 
 ## Consequences
@@ -146,7 +165,8 @@ Data the pages do not have, or a technical limit:
 
 1. The Vietnamese copy of the new keys (the home blocks, the finding card, the bulk detail) needs a native read, like the rest of ADR-028.
 2. Should "Cần xử lý" list re-audit rows once a re-audit keeps a finding message? Today it keeps none, on purpose (ADR-035).
-3. Should the bulk result table show the title? It would put the seller's text in the table as well as in the detail.
+3. Should "Cần xử lý" keep a short title with each finding, so that a result without a SKU can be named by its title? It would store a
+   piece of the seller's text, which ADR-034 chose not to do.
 
 ## Results
 
