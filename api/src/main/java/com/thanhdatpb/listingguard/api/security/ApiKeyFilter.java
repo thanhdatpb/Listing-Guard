@@ -53,6 +53,10 @@ public final class ApiKeyFilter extends OncePerRequestFilter {
         if (path.equals("/health")) {
             return true;
         }
+        // the visual identity of the console (ADR-040): files of the product that the sign-in page loads, read by anyone
+        if (path.startsWith("/brand/")) {
+            return true;
+        }
         if (consoleEnabled && (path.equals("/login") || path.startsWith("/login/")
                 || path.equals("/console") || path.startsWith("/console/") || path.equals("/logout"))) {
             return true;
