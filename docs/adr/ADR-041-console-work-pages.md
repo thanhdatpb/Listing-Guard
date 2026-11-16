@@ -150,7 +150,8 @@ Data the pages do not have, or a technical limit:
 - One look for a finding on every page, and one place to change it.
 - A pack that adds a finding field adds it to `FindingCard` once.
 - The home page reads one finding message and a SKU per attention row; ADR-034's "counts only" no longer holds for that block.
-- Pages not moved yet (API keys, statistics, report, re-audit, watchlist, history) keep `console.css`.
+- Pages not moved yet (API keys, statistics, report, re-audit, watchlist, history) kept `console.css`; they moved in
+  [ADR-042](ADR-042-console-manage-pages.md) and the sheet is gone.
 
 ## Alternatives considered
 

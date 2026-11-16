@@ -13,12 +13,26 @@ It only checks and suggests. Nothing is published, edited or written to a market
 
 ## Run an audit
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/reaudit-form-dark.png">
+  <img src="images/console/reaudit-form-light.png" alt="The re-audit page: a warning banner that the catalog was updated, the upload box with the marketplace and account label, and a card with the last run.">
+</picture>
+
 1. Export the listings that are on sale from the marketplace (Etsy listings export, Amazon flat file) or save your Sheet as CSV (UTF-8). The
    header must be one that a built-in input adapter recognizes ([adapters.md](adapters.md)): `etsy-listings-export`, `amazon-flat-file` or the
    experimental `shopify-product-csv`. Any other table is refused with this list; use the [bulk check](bulk-check.md) for it.
 2. Open **Re-audit**, choose the marketplace, optionally type an **account or label** (for example the name of a shop), choose the file and press
    **Run re-audit**. The file is limited like the bulk check's: `listing-guard.console.bulk.max-rows` (200 rows) and `max-bytes` (1 MiB).
 3. Read the result, and download **the list to fix** (CSV).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/reaudit-result-dark.png">
+  <img src="images/console/reaudit-result-light.png" alt="The re-audit result with the counts of new and known risks and the export button.">
+</picture>
+
+When the catalog served now is not the one of the last run of a scope, the page opens with a warning banner. Its **Re-audit now** button leads to the
+upload form: the listings are not stored, so a run needs the file again. New risks are a table with a red diamond on a risk to fix; known risks fold,
+and are open when they are all there is.
 
 The label keeps audits apart: each (marketplace, label) is compared only with its own previous run. Leave it empty if you have one shop. A file of
 another shop under the same label looks like many dropped and many new listings, so give each shop its own label.

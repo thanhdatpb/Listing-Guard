@@ -386,7 +386,7 @@ It never edits a listing, never publishes, and does no SEO.
   is labelled "Simulation", cuts the search result by CSS and holds no character count, logo, image, brand color or domain.
   Rendered values always go through `th:text`.
   **API keys page and shared layout (B4a, reduced scope)** (`ConsoleApiKeysController`, `templates/console/{layout,api-keys,
-  api-key-revoke}.html`, `static/console/{console.css,keys.js}`): `GET|POST /console/api-keys`, `GET|POST
+  api-key-revoke}.html`, `static/console/keys.js`): `GET|POST /console/api-keys`, `GET|POST
   /console/api-keys/{keyId}/revoke` (GET only confirms). **No plan gating, no migration, no Plan & usage page** (dropped: paid
   features are deferred). The page calls `ClientProvisioning.createKey(clientId, label, maxActiveKeys)` / `revokeKey(clientId,
   keyId)`, which write the same audit lines as the admin job; a key of another client is a 404, never a 403. The secret is in
@@ -395,7 +395,7 @@ It never edits a listing, never publishes, and does no SEO.
   operator keys too; the count and insert hold a row lock on the client. `ConsoleModelAdvice` sets `demoCatalog` when
   `listing-guard.trademark.catalog-version` starts with `demo-`: every console page (sign-in pages included, inline style) shows
   the banner and the editor's trademark panel repeats it.
-  **Watchlist page (ADR-031, V38)** (`api/.../console/watchlist/`, `templates/console/watchlist.html`, `static/console/watchlist.css`): menu
+  **Watchlist page (ADR-031, V38)** (`api/.../console/watchlist/`, `templates/console/watchlist.html`): menu
   "Watchlist"; every account reads and exports, only an `ADMIN` account writes (a role on `account`, never in the session); see the
   **Client trademark watchlist** bullet. **Edit mode and check history (ADR-033, Proposed; V39)** (`api/.../edit/`, `api/.../history/`,
   `console/ConsoleHistoryController`, `templates/console/{edit-mode,history,history-result}.html`, [docs/edit-mode.md](docs/edit-mode.md)):
@@ -1055,11 +1055,19 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   are on the components: a page that prints a finding builds a `FindingCard` through the bean `findingCards` (`FindingCards`: editor, bulk row,
   edit comparison; `FindingSources` adds the source line from the active ruleset) and includes `console/findings :: card(${card})`, never its own
   markup; the listing as checked is `ListingView` (`findings :: listing`) and the readiness a `<progress>` whose maximum is the readiness
-  setting. A fragment argument may not call a bean: evaluate it with `th:with` first. The bulk detail opens by `:target`, no script. Old sheets:
-  `console.css` is the sheet of the pages not moved yet (API keys, statistics, report, re-audit, watchlist, history) and goes with them;
-  `editor.css` and `bulk.css` hold the layout of their page only; `rewrite.css` and the alias block are gone, and `ConsolePageCssTest` holds
+  setting. A fragment argument may not call a bean: evaluate it with `th:with` first. The bulk detail opens by `:target`, no script. Sheets:
+  `console.css` and `watchlist.css` are deleted (ADR-042: every page is on `app.css`); `editor.css` and `bulk.css` hold the layout of their page only; `rewrite.css` and the alias block are gone, and `ConsolePageCssTest` holds
   every sheet to no color code and no color name of its own. `ConsoleWorkPagesAccessibilityIntegrationTest` holds the captions, `aria-hidden`
   icons, `aria-pressed` and live regions. A test that scans a page for `<img>`, `<svg>` or `<script>` strips the sidebar first (`ConsoleTestSupport.withoutShell`).
+  **The manage pages (ADR-042)**: history (`ConsoleHistoryController`, a `GET` filter form over `CheckHistoryService.Query`, the verdict counts "2/3",
+  a stored result printed by `FindingCards.history`), watchlist (the add form, the import and `?edit=` open from the address; `Filters` narrow the
+  table only; the switch is `role="switch"`), re-audit (the banner is `reaudit-fragments :: due`, shared with the home page; "Rà lại ngay" leads to the
+  upload form), statistics and report (figure cards, an SVG bar of the verdicts, `WeeklyChart.of(weeks, measure)` for the weekly report chart),
+  API keys (the new key is a warning banner; the revoke button is `lg-btn--destructive`). The report file of the `health-report` job embeds the
+  token values (`HealthReportHtml.tokens()`), with the same CSP. A time goes through `ConsoleDates` and the `format.*` messages, never ISO text.
+  A class named `lg-x--<token>` followed by `:` trips `ConsoleAppCssTest` (it reads a declared variable): name a modifier after the use, not the token.
+  A word only a screen reader hears is an absolute box: `lg-table-wrap` is positioned, or it widens the page. `ConsolePageCssTest` scans every
+  sheet, page and script for color codes and old color names.
 
 ## Git
 
