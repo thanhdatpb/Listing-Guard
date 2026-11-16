@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccount;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRepository;
+import com.thanhdatpb.listingguard.api.console.ConsoleFeedbackSupport;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.console.editor.EditorCost;
@@ -114,11 +115,13 @@ public class ConsoleBulkController {
     private final PlanService plans;
     private final ObjectMapper mapper;
     private final ConsoleMessages messages;
+    private final ConsoleFeedbackSupport feedback;
 
     public ConsoleBulkController(BulkProperties limits, BulkCheckService service, BulkMappingStore mappingStore,
                                  ConsoleAccountRepository accounts, PlanService plans, ObjectMapper mapper,
-                                 ConsoleMessages messages) {
+                                 ConsoleMessages messages, ConsoleFeedbackSupport feedback) {
         this.messages = messages;
+        this.feedback = feedback;
         this.limits = limits;
         this.service = service;
         this.mappingStore = mappingStore;
@@ -409,6 +412,7 @@ public class ConsoleBulkController {
         notes.addAll(result.notes());
         model.addAttribute("result", new BulkResult(result.marketplace(), result.header(), result.rows(), result.counts(), notes,
                 result.disclaimer(), result.sheetBlock(), result.csvHref()));
+        feedback.populate(model, user, result.targets());
         return VIEW;
     }
 

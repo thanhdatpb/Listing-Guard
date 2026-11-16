@@ -6,6 +6,7 @@
     <title th:text="#{editor.title}"></title>
     <link rel="stylesheet" th:href="@{/console/editor.css}">
     <script th:src="@{/console/editor.js}" defer></script>
+    <th:block th:replace="~{console/layout :: htmx}"></th:block>
 </head>
 <body>
 <div th:replace="~{console/layout :: demoBanner}"></div>
@@ -207,6 +208,7 @@
                                         th:value="${f.fixId}" th:formaction="@{/console/check/apply}"
                                         th:aria-label="#{editor.fix.apply.aria(${f.field})}" th:text="#{editor.fix.apply}"></button>
                             </div>
+                            <form th:replace="~{console/feedback :: widget(${f.target})}"></form>
                         </li>
                     </ul>
                 </div>
@@ -226,6 +228,7 @@
                             <p class="evidence small" th:if="${f.evidence != null}"><span th:text="#{editor.finding.evidence}"></span>
                                 <th:block th:replace="~{console/editor-fragments :: evidence(${f.evidence})}"></th:block></p>
                             <p class="small" th:if="${f.suggestion != null}" th:text="${f.suggestion}"></p>
+                            <form th:replace="~{console/feedback :: widget(${f.target})}"></form>
                         </li>
                     </ul>
                 </div>

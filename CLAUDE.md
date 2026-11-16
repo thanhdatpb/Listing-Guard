@@ -385,6 +385,18 @@ It never edits a listing, never publishes, and does no SEO.
   part is Warning (`Cảnh báo`); a part that did not run (no catalog, plan, quota) is said in the row and never becomes a silent `Đạt`; the trademark
   disclaimer is on the page and in each row's detail; a cell that starts like a formula gets a leading apostrophe in the pasted block
   and the CSV. No API endpoint, MCP tool or `openapi.json` change.
+  **Finding feedback, home page and statistics (ADR-034, Proposed; V37)** (`api/.../feedback/`, `console/ConsoleFeedback*`,
+  `ConsoleHomeService`, `ConsoleStatsController`, `templates/console/{feedback,feedback-saved,stats,dashboard}.html`; docs/feedback.md): a
+  verdict (`CORRECT`, `FALSE_POSITIVE`, `NOT_USEFUL`) and an optional note of at most 280 characters next to each stored finding of the
+  editor and the bulk check, one per reviewer (a console account, or the API key) and finding, changeable; table `finding_verdict` holds the
+  address (pack, result id, finding index), `rule_id`, `source` (`RULE`, `CATALOG`, reserved `WATCHLIST`), level, `analysisVersion`, verdict,
+  note and times, **never a text of the listing**. `FindingFeedbackService` is the only writer and `FeedbackStatsQueries` the only place that
+  counts verdicts (statistics page and endpoint, home page, health report). htmx 2.0.4 comes from the WebJar (`api/pom.xml` `htmx.version`
+  equals `ConsoleVendorResources.HTMX_VERSION`, a test holds it), is served at `/console/vendor/htmx.min.js` and is the only script added; the
+  widget is a plain POST form that works without it. `GET /console` is the home page (week cards, a server-drawn SVG chart of eight
+  weeks, rules most often marked false positive, shortcuts, an empty state) and `GET /console/stats[.csv]` the statistics. API:
+  `POST /api/v1/feedback` and `GET /api/v1/feedback/stats` (no plan pack, no quota; problems `invalid-feedback`, `finding-not-found`);
+  `HealthReport.feedback`. The MCP server and the SDK have no method for them.
   **Localization (ADR-028, Proposed; implemented)**: every sentence the console prints is a key of `api/src/main/resources/messages.properties`
   (English, the base) and `messages_vi.properties`, read through Spring's `MessageSource` (`#{...}` in a template, `ConsoleMessages` in
   Java; `spring.messages.basename: messages,rules`, no fallback to the JVM's language). The language of a page: the `lang` link in the
@@ -504,11 +516,16 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     that needs a background run, variation attributes for adapter files, a mapping shared by the members of a client, a decimal
     comma). Not planned: storing a pasted table or its result, applying a fix, writing to a Sheet or a marketplace, a console page for
     images, personalization or the health report in bulk.
-17. Value backtest and labelled evaluation (ADR-032, Proposed): done as one PR (`feature/value-backtest`: ADR, `api/.../evaluation/`,
+17. Finding feedback and value dashboard (ADR-034, Proposed): done as one PR (`feature/finding-feedback-and-stats`: ADR, V37, `api/.../feedback/`,
+    the console widget, home page and Statistics page, two endpoints, the health report section, `docs/feedback.md`). Open questions the
+    maintainer decides are at the end of the ADR (members seeing each other's verdicts, checking a note against the finding's value, a
+    plan pack for the statistics, SDK and MCP read access). The history page, the edit mode and the watchlist are not on `main`: their
+    shortcuts and the `WATCHLIST` source come with them.
+18. Value backtest and labelled evaluation (ADR-032, Proposed): done as one PR (`feature/value-backtest`: ADR, `api/.../evaluation/`,
     the `backtest` and `eval-listing` jobs and compose services, 27 sample cases, the baseline, the CI summary step, `docs/backtest.md`).
     Open questions the maintainer decides are at the end of the ADR (the default catch lines, more issue types, a review of the sample
     labels, gating recall). Not planned: an endpoint, a console page or an MCP tool for either job, storing a claim file.
-18. Hugging Face USPTO source (ADR-030, Proposed): done as one PR (`feature/hf-trademark-import`: ADR, `hf-convert/` module, filters
+19. Hugging Face USPTO source (ADR-030, Proposed): done as one PR (`feature/hf-trademark-import`: ADR, `hf-convert/` module, filters
     YAML, Dockerfile target and compose services, tests, measurements, docs). Open questions the maintainer decides are at the end of
     the ADR (the dataset's terms, 717 and the codes the 2005 table counted as live, classes 9 and 26, a pinned revision, DuckDB 2.0).
     Next: import it on the A1 and measure a trademark check against a catalog of a million entries, then A4 evaluation on it.
@@ -848,6 +865,15 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   verdict). Every printed value goes through `th:text` and every sentence is a message of both bundles (ADR-028: a new text is a key
   in `messages.properties` and `messages_vi.properties`, never a literal in the template, the script or a class), a cell that starts like
   a formula gets a leading apostrophe, and a fix is shown and never applied. A new multipart POST path outside the console needs its entry in `bodyLimitFilter` (`ApiSecurityConfig`) and an ADR.
+- **Finding feedback** (ADR-034): a verdict changes no finding, rule, result, cache, `analysisVersion` or charge, and no query of it takes
+  `requirePack`, `requireQuota` or `charge`. **Never store, log, export or return the text of a listing with a verdict**: the row copies only
+  the rule id, source, level and `analysisVersion`; the note is the reviewer's own words, shown only to its author, and **no statistic, CSV,
+  report, health-report section or API answer selects `note`** (a test puts a secret in a note and holds it). Every statement starts with
+  `client_id = ?`; another client's, an unknown and an expired finding are one `404 finding-not-found`, never a `403`. Verdicts are counted
+  by `updated_at`, findings by the result's creation, a retained pack only while `expires_at` is ahead, and a rate is null with no verdict
+  (never zero) and is "reported", never "accuracy". An API answer names a reviewer by kind and id, never an e-mail. `FeedbackSource`,
+  `FeedbackVerdict` and the packs equal the `CHECK` constraints of V37 (`FeedbackModelTest`). A page that shows a stored finding adds the
+  widget with `console/feedback :: widget(target)` and `ConsoleFeedbackSupport.populate`; a new text is a key of both bundles (ADR-028).
 - **MCP server** (ADR-017, ADR-023): `mcp-server` stays a client of the REST API and depends on exactly one module, `client` (a test
   reads its POM and its imports: no database, no Spring, no `core`, no `api`); it calls the API only through `ApiGateway` (an SDK raw
   call with `RetryPolicy.none()`). A new tool means a new `Endpoint` entry, a `ToolSpec` with a schema that

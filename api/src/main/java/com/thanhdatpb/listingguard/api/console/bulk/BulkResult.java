@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
+import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import java.util.List;
 
 /**
@@ -127,10 +128,27 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
      * page prints. {@code detail} carries what the finding is about beyond its message (the catalog mark of a trademark finding).
      * {@code explanation} says what the rule checks in general, in the language of the page (null when there is none). {@code fix}
      * and {@code fixValue} are a verified suggestion of the rules, shown and never applied: {@code fixValue} is null for a fix that
-     * removes the value.
+     * removes the value. {@code target} is the address of the stored finding the feedback widget answers (ADR-034), null when the
+     * finding is not stored.
      */
     public record Item(String level, String levelLabel, String ruleId, String field, String message, String suggestion, String detail,
-                       String explanation, String fix, String fixValue) {
+                       String explanation, String fix, String fixValue, FeedbackTarget target) {
+
+        public Item(String level, String levelLabel, String ruleId, String field, String message, String suggestion, String detail,
+                    String explanation, String fix, String fixValue) {
+            this(level, levelLabel, ruleId, field, message, suggestion, detail, explanation, fix, fixValue, null);
+        }
+    }
+
+    /** Every stored finding of the result that the feedback widget can answer, in the order of the rows. */
+    public List<FeedbackTarget> targets() {
+        List<FeedbackTarget> targets = new java.util.ArrayList<>();
+        for (Row row : rows) {
+            java.util.stream.Stream.of(row.detail().rules().items(), row.detail().trademark().items(),
+                            row.detail().variation().items())
+                    .flatMap(List::stream).map(Item::target).filter(java.util.Objects::nonNull).forEach(targets::add);
+        }
+        return targets;
     }
 
     /** How many rows have each status. */

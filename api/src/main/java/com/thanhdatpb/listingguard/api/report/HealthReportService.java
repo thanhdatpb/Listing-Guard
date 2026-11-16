@@ -1,6 +1,9 @@
 package com.thanhdatpb.listingguard.api.report;
 
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
+import com.thanhdatpb.listingguard.api.feedback.FeedbackStats;
+import com.thanhdatpb.listingguard.api.feedback.FeedbackStatsQueries;
+import com.thanhdatpb.listingguard.api.feedback.FeedbackStatsService;
 import com.thanhdatpb.listingguard.api.personalization.PersonalizationProperties;
 import com.thanhdatpb.listingguard.api.personalization.PersonalizationRetentionProperties;
 import com.thanhdatpb.listingguard.api.personalization.PersonalizationRulesets;
@@ -97,8 +100,10 @@ public class HealthReportService {
     private final PersonalizationRetentionProperties personalizationRetention;
     private final TransactionTemplate snapshot;
     private final Clock clock;
+    private final FeedbackStatsQueries feedbackQueries;
 
-    public HealthReportService(ReportsProperties properties, HealthReportQueries queries, NormalizerRegistry normalizers,
+    public HealthReportService(ReportsProperties properties, HealthReportQueries queries, FeedbackStatsQueries feedbackQueries,
+                               NormalizerRegistry normalizers,
                                ActiveRulesets rulesets, TrademarkRulesets trademarkRulesets, VariationRulesets variationRulesets,
                                PersonalizationRulesets personalizationRulesets, TrademarkProperties trademarkProperties,
                                VariationProperties variationProperties, PersonalizationProperties personalizationProperties,
@@ -108,6 +113,7 @@ public class HealthReportService {
                                PlatformTransactionManager transactionManager, Clock clock) {
         this.properties = properties;
         this.queries = queries;
+        this.feedbackQueries = feedbackQueries;
         this.normalizers = normalizers;
         this.rulesets = rulesets;
         this.trademarkRulesets = trademarkRulesets;
@@ -206,7 +212,24 @@ public class HealthReportService {
                 new ReportCoverage.Retained(Pack.PERSONALIZATION_SCREENING.id(), personalizationRetention.period())));
 
         return new HealthReport(new PeriodView(query.from(), query.to(), query.days()), query.marketplace(),
-                now.truncatedTo(ChronoUnit.SECONDS), versions(query), packs, List.copyOf(weeks), coverage);
+                now.truncatedTo(ChronoUnit.SECONDS), versions(query), packs, List.copyOf(weeks), coverage, feedback(scope));
+    }
+
+    /**
+     * The verdicts of the period (ADR-034), from the queries the statistics page uses, inside this report's snapshot. They select
+     * counts, verdicts, pack and rule ids only, never a note.
+     */
+    private HealthReport.FeedbackSummaryView feedback(Scope scope) {
+        FeedbackStatsQueries.Scope feedbackScope = new FeedbackStatsQueries.Scope(scope.clientId(), scope.from(),
+                scope.toExclusive(), scope.marketplace(), scope.now());
+        FeedbackStats.VerdictTotalsView totals = FeedbackStatsService.totals(feedbackQueries.verdicts(feedbackScope));
+        List<FeedbackStatsQueries.FalsePositiveRow> rows = feedbackQueries.topFalsePositives(feedbackScope, properties.topRules());
+        List<HealthReport.FalsePositiveRuleView> items = rows.stream()
+                .map(row -> new HealthReport.FalsePositiveRuleView(row.pack(), row.ruleId(), row.falsePositives(), row.verdicts(),
+                        FeedbackStatsService.rate(row.falsePositives(), row.verdicts())))
+                .toList();
+        return new HealthReport.FeedbackSummaryView(totals.verdicts(), totals.byVerdict(), totals.falsePositiveRate(),
+                new HealthReport.FalsePositiveRankingView(properties.topRules(), rows.isEmpty() ? 0 : rows.get(0).distinct(), items));
     }
 
     // ---- the pack views. period is true for the totals (pack id and ranked lists present) and false for a week.

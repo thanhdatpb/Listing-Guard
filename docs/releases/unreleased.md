@@ -1,15 +1,42 @@
 # Unreleased changes
 
-Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: the console in English and Vietnamese
-(ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030) and the value backtest with the labelled evaluation
-(ADR-032). They change no API response, request, status or header; the bulk check adds one additive migration, V36 (see its
-section).
+Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: finding feedback (ADR-034), the console in English
+and Vietnamese (ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030) and the value backtest with the labelled
+evaluation (ADR-032). Only finding feedback touches the API, and only additively (two operations, two problem codes and one response
+member, see its section); the bulk check adds migration V36 and finding feedback adds V37, both additive. The other changes touch no API
+response, request, status, header or migration.
 
 Every pull request that changes the API runs the compatibility check (`./mvnw -B -pl contract-tools verify`, ADR-022) and copies the
 additive and non-breaking lines of `contract-tools/target/contract/compatibility-report.md` here, with a short section for the
 change. When the next version is cut, move this file to `docs/releases/v<version>.md` and start a new one.
 
 ## What is new
+
+### Finding feedback and the weekly home page (ADR-034)
+
+Every finding of the console's *Check listing* and *Bulk check* pages now has three buttons, **Correct / Đúng**, **False positive / Báo
+nhầm** and **Not useful / Không hữu ích**, and an optional note of at most 280 characters (do not paste listing text). One click saves
+without reloading the page (htmx 2.0.4, from a WebJar served by the console; no CDN), a second click changes the verdict, and the form
+works without scripts. The console home page (`/console`) becomes a weekly view: listings checked, listings held back by an `ERROR`,
+trademark holds by source, the reported false-positive rate, an eight-week SVG chart drawn on the server, the rules most often marked false
+positive, shortcuts, and an empty state with three steps. A new **Statistics** page (`/console/stats`, and a CSV) shows verdicts per rule
+and per reviewer for a report to a manager. Guide: [feedback.md](../feedback.md).
+
+- **V37** (additive): table `finding_verdict`. It stores the client, the reviewer (a console account or an API key), the address of the
+  finding (pack, result id, index), `rule_id`, source, level, `analysisVersion`, the verdict, the note and times. **No text of a listing.**
+  The legacy, unused `finding_feedback` table of V1 is left alone.
+- **API, additive:** `POST /api/v1/feedback` (operation `recordFeedback`) and `GET /api/v1/feedback/stats` (`getFeedbackStats`); new
+  problem codes `invalid-feedback` (400) and `finding-not-found` (404); `HealthReport.feedback` on `GET /api/v1/reports/summary`, the
+  `health-report` job's `report.json` and `report.html`, and the console Report page. Neither endpoint needs a plan pack or costs a unit.
+  The compatibility check reports additive lines only:
+  - `operation-added` at `POST /api/v1/feedback` and `GET /api/v1/feedback/stats`
+  - `problem-code-added` at `problem invalid-feedback` and `problem finding-not-found`
+  - `response-property-added` at `schema HealthReport.feedback`
+- The MCP server stays read-only (no tool for feedback) and the Java SDK has no method for it yet.
+- A verdict changes no finding, rule, result, cache or `analysisVersion`. A rate is what reviewers reported, not a measured precision.
+- New dependency: `org.webjars.npm:htmx.org` 2.0.4 (`api/pom.xml`, `htmx.version`).
+- The history page, the edit mode and the watchlist named in the request are not on `main`; their feedback widget and shortcuts come with
+  them (ADR-034, "Pages not on main"). The English and Vietnamese texts have not been reviewed by a native reader.
 
 ### A trademark catalog from the Hugging Face USPTO rebuild: `hf-convert` (ADR-030)
 
