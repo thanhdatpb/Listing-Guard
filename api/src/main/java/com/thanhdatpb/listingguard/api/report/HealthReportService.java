@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.api.report;
 
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
+import com.thanhdatpb.listingguard.api.console.reaudit.ReauditStore;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackStats;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackStatsQueries;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackStatsService;
@@ -101,9 +102,10 @@ public class HealthReportService {
     private final TransactionTemplate snapshot;
     private final Clock clock;
     private final FeedbackStatsQueries feedbackQueries;
+    private final ReauditStore reaudits;
 
     public HealthReportService(ReportsProperties properties, HealthReportQueries queries, FeedbackStatsQueries feedbackQueries,
-                               NormalizerRegistry normalizers,
+                               ReauditStore reaudits, NormalizerRegistry normalizers,
                                ActiveRulesets rulesets, TrademarkRulesets trademarkRulesets, VariationRulesets variationRulesets,
                                PersonalizationRulesets personalizationRulesets, TrademarkProperties trademarkProperties,
                                VariationProperties variationProperties, PersonalizationProperties personalizationProperties,
@@ -114,6 +116,7 @@ public class HealthReportService {
         this.properties = properties;
         this.queries = queries;
         this.feedbackQueries = feedbackQueries;
+        this.reaudits = reaudits;
         this.normalizers = normalizers;
         this.rulesets = rulesets;
         this.trademarkRulesets = trademarkRulesets;
@@ -212,7 +215,20 @@ public class HealthReportService {
                 new ReportCoverage.Retained(Pack.PERSONALIZATION_SCREENING.id(), personalizationRetention.period())));
 
         return new HealthReport(new PeriodView(query.from(), query.to(), query.days()), query.marketplace(),
-                now.truncatedTo(ChronoUnit.SECONDS), versions(query), packs, List.copyOf(weeks), coverage, feedback(scope));
+                now.truncatedTo(ChronoUnit.SECONDS), versions(query), packs, List.copyOf(weeks), coverage, feedback(scope), reaudit(scope));
+    }
+
+    /**
+     * The re-audit runs of the period (ADR-035), inside this report's snapshot: counts only, from the trace the console keeps
+     * (V40), which holds no text. {@code scopesToReaudit} compares the latest run of each scope with the catalog served now.
+     */
+    private HealthReport.ReauditSummaryView reaudit(Scope scope) {
+        ReauditStore.Totals totals = reaudits.totals(scope.clientId(), scope.marketplace(), scope.from(), scope.toExclusive());
+        TrademarkCatalogRuntime.Status status = trademarkRuntime.status();
+        boolean served = status.state() == TrademarkCatalogRuntime.State.READY;
+        return new HealthReport.ReauditSummaryView(totals.runs(), totals.clients(), totals.rowsChecked(), totals.findings(),
+                totals.findingsNew(), served ? status.detail() : null,
+                served ? reaudits.staleScopes(scope.clientId(), scope.marketplace(), status.detail()) : null);
     }
 
     /**

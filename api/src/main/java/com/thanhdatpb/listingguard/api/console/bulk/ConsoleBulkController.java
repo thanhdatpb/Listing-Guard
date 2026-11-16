@@ -300,7 +300,7 @@ public class ConsoleBulkController {
     }
 
     /** The built-in CSV adapter whose columns the header holds (the one with most columns when several do), or empty. */
-    private static Optional<ConfiguredCsvAdapter> adapterFor(String text) {
+    public static Optional<ConfiguredCsvAdapter> adapterFor(String text) {
         ConfiguredCsvAdapter best = null;
         int bestColumns = -1;
         for (ListingInputAdapter adapter : ADAPTERS) {

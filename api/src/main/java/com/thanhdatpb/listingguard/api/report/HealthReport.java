@@ -33,7 +33,27 @@ public record HealthReport(
         @Schema(description = "Which packs delete their results, after how long, and so from which day their numbers are complete.")
         CoverageView coverageNote,
         @Schema(description = "Verdicts that reviewers gave on findings in the period (ADR-034), for the whole period only.")
-        FeedbackSummaryView feedback) {
+        FeedbackSummaryView feedback,
+        @Schema(description = "The periodic re-audits of the console in the period (ADR-035), for the whole period only. Counts "
+                + "only: no listing, SKU or finding text is in it.")
+        ReauditSummaryView reaudit) {
+
+    @Schema(description = "A run of the console's periodic re-audit is counted by when it started. `findings` are the risks that need "
+            + "fixing (listing-rules ERROR or WARNING, trademark MEDIUM or HIGH); `newFindings` are those caused by a catalog mark or "
+            + "watchlist entry the previous run of the same scope did not have.")
+    public record ReauditSummaryView(
+            @Schema(description = "Runs that started in the period.", example = "3") long runs,
+            @Schema(description = "Clients that ran at least one.", example = "1") long clients,
+            @Schema(description = "Listings read and checked, all runs together (a listing counts once per run).", example = "540")
+            long listingsChecked,
+            @Schema(description = "Risks found, all runs together.", example = "41") long findings,
+            @Schema(description = "Of those, the new ones.", example = "6") long newFindings,
+            @Schema(description = "The catalog version this deployment serves now; null when none is served.", nullable = true,
+                    example = "uspto-2026-11-0123456789ab") String servedCatalog,
+            @Schema(description = "Scopes (client, marketplace, account label) whose latest run was made with another catalog than "
+                    + "the one served now, so a new run is due. Null when no catalog is served. Counted over all time, not the period.",
+                    nullable = true, example = "2") Long scopesToReaudit) {
+    }
 
     @Schema(description = "Verdicts are counted by when they were last given. A rate is what reviewers reported, not a measured precision.")
     public record FeedbackSummaryView(

@@ -2,16 +2,43 @@
 
 Changes on `main` since v0.8.0 (see [v0.8.0.md](v0.8.0.md)) that have not shipped yet: edit mode and check history (ADR-033), finding feedback (ADR-034), the console in English
 and Vietnamese (ADR-028), the console bulk check (ADR-029), the `hf-convert` job (ADR-030), the value backtest with the labelled
-evaluation (ADR-032), the client trademark watchlist (ADR-031) and edit mode and check history (ADR-033). Finding feedback,
-the watchlist and edit mode touch the API, and only additively (see their sections); the bulk check adds migration V36, finding
-feedback V37, the watchlist V38 and check history V39, all additive. The other changes touch no API response, request, status,
-header or migration.
+evaluation (ADR-032), the client trademark watchlist (ADR-031) and the periodic re-audit of active listings (ADR-035). Finding feedback,
+the watchlist, edit mode and the re-audit touch the API, and only additively (see their sections); the bulk check adds migration V36,
+finding feedback V37, the watchlist V38, check history V39 and the re-audit V40, all additive. The other changes touch no API response,
+request, status, header or migration.
 
 Every pull request that changes the API runs the compatibility check (`./mvnw -B -pl contract-tools verify`, ADR-022) and copies the
 additive and non-breaking lines of `contract-tools/target/contract/compatibility-report.md` here, with a short section for the
 change. When the next version is cut, move this file to `docs/releases/v<version>.md` and start a new one.
 
 ## What is new
+
+### Periodic re-audit of active listings (ADR-035)
+
+New marks reach the USPTO register every day, so a listing that was safe when it was published can touch one today. The console has a new
+**Re-audit** page (`/console/reaudit`, "Rà định kỳ" in Vietnamese): upload the file of the listings you have on sale and the page checks every
+row again, splits the risks into **new** (caused by a catalog mark or a watchlist entry that the seller's previous audit did not have) and
+**known**, tells which listings were **edited, added or dropped** since that audit, and gives the list to fix as a CSV (SKU, account, rule,
+mark, risk level). Guide: [reaudit.md](../reaudit.md).
+
+- **File and scope.** Only a file that a built-in input adapter recognizes (Etsy listings export, Amazon flat file, experimental Shopify) is read,
+  so runs stay comparable; any other table goes to the bulk check. An optional account or label (a shop name) keeps audits apart: a run is
+  compared with the previous run of the same client, marketplace and label. **The first run of a scope has nothing to compare with**, so every
+  risk is listed as known and the page says so.
+- **What runs.** The listing rules and the trademark check (the catalog and the client's watchlist) through the services the API calls, so
+  plans, quota and the cache are theirs. No variation check (the adapters do not read variation attributes). A risk is a rules `ERROR` or
+  `WARNING`, or a trademark `HIGH` or `MEDIUM`.
+- **Reminder.** When the served catalog is not the one the latest run of a scope used, the home page says "Catalog đã cập nhật, nên rà lại"
+  with a link. The health report has a new section.
+- **Migration V40** (additive; follows V39 of check history): tables `reaudit_run` and `reaudit_run_row` keep times, the catalog and watchlist versions, SKUs, a hash of each row and counts.
+  **Not the file, a title, a tag, a description, a finding or a mark.** The newest 20 runs of a scope are kept
+  (`listing-guard.console.reaudit.keep-runs`).
+- **API, additive:** `HealthReport.reaudit` (runs, clients, listings checked, risks, new risks, the catalog served and the scopes due) on
+  `GET /api/v1/reports/summary`, the `health-report` job and `/console/report`. No new endpoint, MCP tool or SDK method.
+  - `response-property-added` at `schema HealthReport.reaudit`
+- **For the maintainer to decide** (ADR-035, open questions): comparing the first run with the catalog before the served one, whether a changed
+  watchlist note counts as new, a scheduled run that reads a Sheet, an e-mail reminder, variation checks for adapter files, the scope of an
+  audit, and leaving marks that TSDR reports dead out of the new group. The Vietnamese texts have not been reviewed by a native reader.
 
 ### Client trademark watchlist (ADR-031)
 
