@@ -18,7 +18,7 @@ import java.util.StringJoiner;
  * return gets a leading apostrophe, as {@code batch-check}'s reports do: a finding can quote a listing, and a spreadsheet would run
  * what looks like a formula.
  */
-final class BulkExport {
+public final class BulkExport {
 
     private BulkExport() {
     }
@@ -59,17 +59,17 @@ final class BulkExport {
     }
 
     /** A link that downloads the CSV without the server keeping it. */
-    static String csvHref(String csv) {
+    public static String csvHref(String csv) {
         return "data:text/csv;charset=utf-8;base64," + Base64.getEncoder().encodeToString(csv.getBytes(StandardCharsets.UTF_8));
     }
 
     /** The text on one line: every run of blanks, tabs and line breaks becomes one space. */
-    static String oneLine(String text) {
+    public static String oneLine(String text) {
         return text == null ? "" : text.replaceAll("[\\s\\p{Cntrl}]+", " ").trim();
     }
 
     /** A leading apostrophe on a cell a spreadsheet would read as a formula. */
-    static String defuse(String value) {
+    public static String defuse(String value) {
         if (value == null || value.isEmpty()) {
             return "";
         }
@@ -81,7 +81,7 @@ final class BulkExport {
     }
 
     /** One CSV cell: defused, and quoted when it holds a comma, a quote or a line break. */
-    static String cell(String value) {
+    public static String cell(String value) {
         String text = defuse(value);
         if (text.indexOf(',') >= 0 || text.indexOf('"') >= 0 || text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0) {
             return '"' + text.replace("\"", "\"\"") + '"';

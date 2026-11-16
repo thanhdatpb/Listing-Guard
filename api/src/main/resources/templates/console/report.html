@@ -222,6 +222,26 @@
             </div>
         </section>
 
+        <!-- The periodic re-audit (ADR-035): counts only, no SKU and no text. -->
+        <section id="reaudit" aria-labelledby="reaudit-heading">
+            <h2 id="reaudit-heading" th:text="#{report.reaudit.heading}"></h2>
+            <p class="muted small" th:text="#{report.reaudit.note}"></p>
+            <dl class="facts">
+                <dt th:text="#{report.reaudit.runs}"></dt><dd th:text="${report.reaudit.runs}"></dd>
+                <dt th:text="#{report.reaudit.clients}"></dt><dd th:text="${report.reaudit.clients}"></dd>
+                <dt th:text="#{report.reaudit.listings}"></dt><dd th:text="${report.reaudit.listingsChecked}"></dd>
+                <dt th:text="#{report.reaudit.findings}"></dt><dd th:text="${report.reaudit.findings}"></dd>
+                <dt th:text="#{report.reaudit.new}"></dt><dd th:text="${report.reaudit.newFindings}"></dd>
+                <dt th:text="#{report.reaudit.catalog}"></dt>
+                <dd th:text="${report.reaudit.servedCatalog == null} ? #{reaudit.catalog.none} : ${report.reaudit.servedCatalog}"></dd>
+                <dt th:text="#{report.reaudit.due}"></dt>
+                <dd th:text="${report.reaudit.scopesToReaudit == null} ? '&mdash;' : ${report.reaudit.scopesToReaudit}"></dd>
+            </dl>
+            <p th:if="${report.reaudit.scopesToReaudit != null and report.reaudit.scopesToReaudit > 0}">
+                <a class="button" th:href="@{/console/reaudit}" th:text="#{report.reaudit.link}"></a>
+            </p>
+        </section>
+
         <section id="by-week" aria-labelledby="by-week-heading">
             <h2 id="by-week-heading" th:text="#{report.week.heading}"></h2>
             <div class="report-scroll">

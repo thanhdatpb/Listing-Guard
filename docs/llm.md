@@ -80,7 +80,7 @@ the vendor's terms; an agreement with your clients may be needed.
 - **Console home page**: "LLM requests today: used / limit" per provider (UTC day), only when the LLM is on. Cache hits are not counted.
 - **Audit log**: one INFO line per call on logger `com.thanhdatpb.listingguard.audit.llm`: purpose, provider, model, data kinds,
   outcome (`OK`, `CACHE_HIT`, `FAILED:<kind>`, `SKIPPED:<reason>`), tokens. Never the prompt, the answer, a key or a listing.
-- **Database**: table `llm_usage` (V40) holds requests and tokens per day and provider, nothing else.
+- **Database**: table `llm_usage` (V41) holds requests and tokens per day and provider, nothing else.
 - **A finding**: `riskAdjustments` has an entry with reason `llm_descriptive`, `from` = the level the rule assigned, `to` = `LOW`.
 - **Analysis version**: with the judge on, the fingerprint holds `llm_judge = <prompt version>:<hash>;models=...;max=...;snippet=...`,
   so a new prompt, model, order or setting misses the cache.

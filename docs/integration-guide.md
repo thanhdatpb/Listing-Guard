@@ -964,7 +964,7 @@ reason alone gives) and `note` (Vietnamese text). `risk` is the lowest `to`; an 
 | `reason` | When |
 |---|---|
 | `outside_product_classes` | The request named a `product_type`, the mark has Nice classes and none is the product type's. |
-| `common_word` | The mark is a word of the ruleset's `generic_words` list and the match is not an exact or phrase match in a brand field (`brand`, `shop_name`). A fuzzy match of such a mark is always capped. **`trademark-risk-2026-11b` lists no word, so this reason does not occur until the maintainer has reviewed the list.** |
+| `common_word` | The mark is a word of the ruleset's `generic_words` list and the match is not an exact or phrase match in a brand field (`brand`, `shop_name`). A fuzzy match of such a mark is always capped. **`trademark-risk-2026-11b` lists no word, so this reason does not occur until the maintainer has reviewed the list.** |
 | `llm_descriptive` | Only when the operator turned the LLM judge on (ADR-036, `docs/llm.md`): a language model read the sentence around a MEDIUM catalog match and thinks the word describes the product. `from` is the level the rule assigned, `to` is `LOW`; `note` starts with "LLM: có thể là từ mô tả." and gives the model's reason. The finding is kept; a model never raises a level. |
 
 ```json
@@ -1503,6 +1503,12 @@ the same service, so the three always agree.
 `byVerdict` (`CORRECT`, `FALSE_POSITIVE`, `NOT_USEFUL`, always present), `falsePositiveRate` (null without verdicts) and
 `topFalsePositiveRules` (pack, rule id, false positives, verdicts, rate; limit `listing-guard.reports.top-rules`). It is for the whole
 period only, not per week, and holds no note.
+
+**`reaudit`** (ADR-035, [reaudit.md](reaudit.md)) counts the periodic re-audits of the console that started in the period: `runs`,
+`clients`, `listingsChecked`, `findings` (risks that need fixing) and `newFindings` (those caused by a catalog mark or a watchlist entry the
+previous run of the same scope did not have). `servedCatalog` is the catalog version the deployment serves now (null when none) and
+`scopesToReaudit` how many (client, marketplace, account label) scopes were last audited with another catalog, so a new run is due; it is
+null when no catalog is served and counts over all time, not the period. Counts only: no SKU and no text of a listing.
 
 ## Finding feedback
 
