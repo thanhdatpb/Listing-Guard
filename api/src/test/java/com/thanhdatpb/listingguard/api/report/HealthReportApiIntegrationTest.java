@@ -570,10 +570,19 @@ class HealthReportApiIntegrationTest {
         UUID screening = data.screening(c.id(), "ETSY", created, until, "COMPLETE", "COMPLETE", "LOW");
         ids.add(screening);
         data.screeningFinding(screening, 0, "unsupported_characters", "WARNING", secret);
+        // a verdict on the listing finding with the secret as its note (ADR-034): the report counts it and never reads the note
+        jdbc.update("""
+                INSERT INTO finding_verdict (client_id, account_id, api_key_id, pack_id, check_id, finding_position, marketplace_code,
+                    rule_id, source, finding_level, analysis_version, verdict, note, created_at, updated_at)
+                VALUES (?, NULL, (SELECT id FROM api_key WHERE client_id = ? LIMIT 1), 'listing-rules', ?, 0, 'ETSY', 'title_length',
+                    'RULE', 'ERROR', 'test-analysis', 'FALSE_POSITIVE', ?, ?, ?)""",
+                c.id(), c.id(), listing, secret, HealthReportTestData.at(created), HealthReportTestData.at(created));
 
         String body = body(c, WEEK_FROM, WEEK_TO, null);
 
         assertThat(body).doesNotContain(secret).contains("TM_MARK_X").contains("title_length");
+        assertThat(mapper.readTree(body).at("/feedback/byVerdict/FALSE_POSITIVE").asLong()).isEqualTo(1);
+        assertThat(mapper.readTree(body).findValues("note")).isEmpty();
         for (UUID id : ids) {
             assertThat(body).doesNotContain(id.toString());
         }
@@ -609,6 +618,12 @@ class HealthReportApiIntegrationTest {
         data.variationFinding(variation, 0, "duplicate_sku", "WARNING");
         UUID screening = data.screening(c.id(), "ETSY", created, until, "COMPLETE", "COMPLETE", "LOW");
         data.screeningFinding(screening, 0, "unsupported_characters", "WARNING");
+        jdbc.update("""
+                INSERT INTO finding_verdict (client_id, api_key_id, pack_id, check_id, finding_position, marketplace_code, rule_id,
+                    source, finding_level, analysis_version, verdict, created_at, updated_at)
+                VALUES (?, (SELECT id FROM api_key WHERE client_id = ? LIMIT 1), 'listing-rules', ?, 0, 'ETSY', 'title_length',
+                    'RULE', 'ERROR', 'test-analysis', 'FALSE_POSITIVE', ?, ?)""",
+                c.id(), c.id(), listing, HealthReportTestData.at(created), HealthReportTestData.at(created));
 
         JsonNode actual = week(c);
         JsonNode example = mapper.readTree(ApiExamples.REPORT_SUMMARY);

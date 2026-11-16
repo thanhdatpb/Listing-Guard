@@ -31,7 +31,34 @@ public record HealthReport(
                 + "The first and the last week are clipped to the period and marked `partial` when the ISO week is longer.")
         List<WeekView> byWeek,
         @Schema(description = "Which packs delete their results, after how long, and so from which day their numbers are complete.")
-        CoverageView coverageNote) {
+        CoverageView coverageNote,
+        @Schema(description = "Verdicts that reviewers gave on findings in the period (ADR-034), for the whole period only.")
+        FeedbackSummaryView feedback) {
+
+    @Schema(description = "Verdicts are counted by when they were last given. A rate is what reviewers reported, not a measured precision.")
+    public record FeedbackSummaryView(
+            @Schema(description = "Verdicts given in the period.", example = "12") long verdicts,
+            @Schema(description = "Verdicts per verdict; `CORRECT`, `FALSE_POSITIVE` and `NOT_USEFUL` are always present.",
+                    example = "{\"CORRECT\": 8, \"FALSE_POSITIVE\": 3, \"NOT_USEFUL\": 1}") Map<String, Long> byVerdict,
+            @Schema(description = "`FALSE_POSITIVE / verdicts`, four decimals; null when there is no verdict.", nullable = true,
+                    example = "0.25") Double falsePositiveRate,
+            @Schema(description = "The rules marked `FALSE_POSITIVE` most often.") FalsePositiveRankingView topFalsePositiveRules) {
+    }
+
+    public record FalsePositiveRankingView(
+            @Schema(description = "The most items the list holds (`listing-guard.reports.top-rules`).", example = "10") int limit,
+            @Schema(description = "Every rule with a false positive in the period, before the list is cut.", example = "2") long distinctRules,
+            @Schema(description = "Most false positives first, then most verdicts, then pack and rule id by code point.")
+            List<FalsePositiveRuleView> items) {
+    }
+
+    public record FalsePositiveRuleView(
+            @Schema(example = "listing-rules") String pack,
+            @Schema(example = "title_repeated_words") String ruleId,
+            @Schema(example = "2") long falsePositives,
+            @Schema(description = "Every verdict on this rule in the period.", example = "4") long verdicts,
+            @Schema(description = "`falsePositives / verdicts`, four decimals.", example = "0.5") double falsePositiveRate) {
+    }
 
     public record PeriodView(
             @Schema(example = "2026-11-02") LocalDate from,
