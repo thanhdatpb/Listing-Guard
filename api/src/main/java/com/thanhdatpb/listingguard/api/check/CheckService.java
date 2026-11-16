@@ -132,6 +132,21 @@ public class CheckService {
     }
 
     /**
+     * Runs the client's active ruleset on a listing and returns the outcome without storing, caching or counting anything
+     * (ADR-037): the verification of a rewrite suggestion, which is not a listing of the seller. It uses the same normalizer
+     * and ruleset as {@link #checkDetailed}; only the plan's pack is required, no quota is used, and no row is written.
+     *
+     * @throws com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException if the client's plan has no {@code listing-rules} pack
+     */
+    public RuleRun evaluate(UUID clientId, CheckRequest request) {
+        plans.requirePack(clientId, Pack.LISTING_RULES);
+        Normalizer normalizer = normalizers.get(request.marketplace());
+        Listing listing = normalizer.normalize(request.listing());
+        String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
+        return ruleEngine.runDetailed(listing, rulesets.get(RulesetConfig.DEFAULT_PACK_ID, marketplace).config());
+    }
+
+    /**
      * A check of this client. One that belongs to another client is reported exactly like one that does not exist,
      * so the answer does not reveal which ids are in use.
      */

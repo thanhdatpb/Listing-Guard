@@ -120,24 +120,10 @@ public class TrademarkCheckService {
         // an undeclared product type is the client's mistake: refuse it, never scan as if none had been named
         String productType = productType(requestedProductType);
         WatchlistService.Active watchlist = watchlists == null ? WatchlistService.Active.NONE : watchlists.active(clientId);
-        Map<String, String> watchlistComponents = watchlist.watchlist().fingerprintComponents();
-        TrademarkScanner scanner;
-        String fingerprint;
-        Long catalogVersionId;
-        if (runtime.ready() || watchlist.watchlist().isEmpty()) {
-            // without a watchlist an unserved catalog is refused here, exactly as before ADR-031
-            // a client without a watchlist asks exactly as before (the one-argument form), so its fingerprint cannot move
-            TrademarkCatalogRuntime.Serving serving = watchlistComponents.isEmpty()
-                    ? runtime.serving(marketplace) : runtime.serving(marketplace, watchlistComponents);
-            scanner = serving.scanner();
-            fingerprint = serving.fingerprint().value();
-            catalogVersionId = serving.catalogVersionId();
-        } else {
-            TrademarkCatalogRuntime.Unserved unserved = runtime.withoutCatalog(marketplace, watchlistComponents);
-            scanner = unserved.scanner();
-            fingerprint = unserved.fingerprint().value();
-            catalogVersionId = null;
-        }
+        Prepared prepared = prepare(marketplace, watchlist);
+        TrademarkScanner scanner = prepared.scanner();
+        String fingerprint = prepared.fingerprint();
+        Long catalogVersionId = prepared.catalogVersionId();
 
         TrademarkCheckInput input = input(listing, productType);
         TrademarkCheckStore.Identity identity = new TrademarkCheckStore.Identity(clientId, marketplace,
@@ -169,6 +155,40 @@ public class TrademarkCheckService {
             }
             throw e;
         }
+    }
+
+    /** The scanner a check of one marketplace uses, with the fingerprint that identifies it and the catalog version it serves. */
+    private record Prepared(TrademarkScanner scanner, String fingerprint, Long catalogVersionId) {
+    }
+
+    private Prepared prepare(String marketplace, WatchlistService.Active watchlist) {
+        Map<String, String> watchlistComponents = watchlist.watchlist().fingerprintComponents();
+        if (runtime.ready() || watchlist.watchlist().isEmpty()) {
+            // without a watchlist an unserved catalog is refused here, exactly as before ADR-031
+            // a client without a watchlist asks exactly as before (the one-argument form), so its fingerprint cannot move
+            TrademarkCatalogRuntime.Serving serving = watchlistComponents.isEmpty()
+                    ? runtime.serving(marketplace) : runtime.serving(marketplace, watchlistComponents);
+            return new Prepared(serving.scanner(), serving.fingerprint().value(), serving.catalogVersionId());
+        }
+        TrademarkCatalogRuntime.Unserved unserved = runtime.withoutCatalog(marketplace, watchlistComponents);
+        return new Prepared(unserved.scanner(), unserved.fingerprint().value(), null);
+    }
+
+    /**
+     * Scans a listing with the served catalog and the client's active watchlist and returns the outcome without storing,
+     * caching or counting anything (ADR-037): the verification of a rewrite suggestion, which is not a listing of the seller.
+     * Same normalizer, scanner and watchlist as {@link #check}; only the plan's pack is required, no quota is used.
+     *
+     * @throws TrademarkUnavailableException if no catalog is served and the client has no watchlist
+     * @throws com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException if the client's plan has no {@code trademark-risk} pack
+     */
+    public TrademarkResult evaluate(UUID clientId, CheckRequest request) {
+        plans.requirePack(clientId, Pack.TRADEMARK_RISK);
+        Normalizer normalizer = normalizers.get(request.marketplace());
+        Listing listing = normalizer.normalize(request.listing());
+        String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
+        WatchlistService.Active watchlist = watchlists == null ? WatchlistService.Active.NONE : watchlists.active(clientId);
+        return prepare(marketplace, watchlist).scanner().scan(input(listing, null), watchlist.watchlist());
     }
 
     /**
