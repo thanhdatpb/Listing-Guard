@@ -241,7 +241,7 @@ public class ConsoleWatchlistController {
         WatchlistView view = watchlists.read(user.clientId());
         return ResponseEntity.ok()
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename("watchlist.csv").build().toString())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename("trademark-watchlist.csv").build().toString())
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .body(WatchlistTable.csv(view.entries()).getBytes(StandardCharsets.UTF_8));
     }
