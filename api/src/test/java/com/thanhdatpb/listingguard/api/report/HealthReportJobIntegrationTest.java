@@ -303,6 +303,30 @@ class HealthReportJobIntegrationTest {
         }
     }
 
+    /**
+     * ADR-042: the file takes its colors, spaces, radii and fonts from the console's tokens, written into the page, so it needs no style
+     * sheet and no font file: the values of both schemes are there, the style uses them by name and no color of its own is left.
+     */
+    @Test
+    void theHtmlFollowsTheDesignTokensAndStillLoadsNothing() throws Exception {
+        TestClient c = client();
+        populate(c);
+
+        String html = html(job().run(options(c.name(), FROM, TO, null)).dir());
+
+        assertThat(html).contains("--brand:").contains("--ink:").contains("--surface-1:").contains("--danger-subtle:")
+                .contains("--font-sans:").contains("--radius-lg:").contains("@media (prefers-color-scheme: dark)");
+        assertThat(html).contains("background:var(--surface-0)").contains("color:var(--ink)").contains("font-family:var(--font-sans)")
+                .contains(".warn{background:var(--warning-subtle);color:var(--warning)}");
+        // what the old style wrote on its own, and what a single file cannot use
+        assertThat(html).doesNotContain("#1f2933").doesNotContain("#f5f7fa").doesNotContain("#fff3c4").doesNotContain("@font-face")
+                .doesNotContain("/*").doesNotContain("@import").doesNotContain("woff2").doesNotContain("url(");
+        // the policy is the one it always had
+        assertThat(html).contains("<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'\">");
+        // the style of the page comes after the values it names
+        assertThat(html.indexOf("--brand:")).isLessThan(html.indexOf("background:var(--surface-0)"));
+    }
+
     @Test
     void theHtmlIsInVietnameseAndSaysWhatItCovers() throws Exception {
         TestClient c = client();

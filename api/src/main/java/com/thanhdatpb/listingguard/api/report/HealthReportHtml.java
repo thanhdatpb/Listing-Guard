@@ -30,28 +30,53 @@ final class HealthReportHtml {
     private static final DateTimeFormatter TIME =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'", Locale.ROOT).withZone(ZoneOffset.UTC);
 
-    private static final String STYLE = """
-            body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin:0;padding:24px;color:#1f2933;background:#f5f7fa;line-height:1.5}
+    /**
+     * The values of the console's design tokens (ADR-040, ADR-042): the colors of the light and the dark scheme, the spaces, the radii and
+     * the font families, read from the file the console links ({@code static/brand/tokens.css}) and written into the page, so the report
+     * follows them and the file still needs nothing: the {@code @font-face} blocks, which name a file, are dropped (the family falls back
+     * to the system fonts, as the token itself lists) and so are the comments and the type classes of the design pack.
+     */
+    private static final String TOKENS = tokens();
+
+    private static final String STYLE = TOKENS + """
+            body{font-family:var(--font-sans);margin:0;padding:var(--space-6);color:var(--ink);background:var(--surface-0);font-size:15px;line-height:24px}
             main{max-width:1100px;margin:0 auto}
-            section{background:#fff;padding:20px 28px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.12);margin:0 0 24px}
-            h1{font-size:1.6rem;margin:0 0 4px}
-            h2{font-size:1.3rem;margin:0 0 8px}
-            h3{font-size:1.05rem;margin:22px 0 6px;border-bottom:1px solid #e4e7eb;padding-bottom:4px}
-            p{margin:6px 0}
-            .meta{color:#52606d;font-size:.9rem}
-            table{border-collapse:collapse;width:100%;margin:8px 0;font-size:.9rem}
-            th,td{border:1px solid #d9e2ec;padding:5px 9px;text-align:left;vertical-align:top}
-            th{background:#f0f4f8}
+            section{background:var(--surface-1);padding:var(--space-4) var(--space-6);border:1px solid var(--border);border-radius:var(--radius-lg);margin:0 0 var(--space-6)}
+            h1{font-size:28px;line-height:36px;font-weight:700;letter-spacing:-.01em;margin:0 0 var(--space-1)}
+            h2{font-size:18px;line-height:26px;font-weight:600;margin:0 0 var(--space-2)}
+            h3{font-size:15px;line-height:24px;font-weight:600;margin:var(--space-6) 0 var(--space-2);padding-bottom:var(--space-1);border-bottom:1px solid var(--border)}
+            p{margin:var(--space-2) 0}
+            .meta{color:var(--ink-muted);font-size:13px;line-height:18px}
+            table{border-collapse:collapse;width:100%;margin:var(--space-2) 0;font-size:14px;line-height:20px}
+            th,td{border:1px solid var(--border);padding:var(--space-2) var(--space-3);text-align:left;vertical-align:top}
+            th{background:var(--surface-0);color:var(--ink-muted);font-size:12px;line-height:18px;font-weight:600}
             td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-            .banner{padding:10px 14px;border-radius:6px;margin:12px 0}
-            .warn{background:#fff3c4;border:1px solid #f7c948}
-            .ok{background:#e3f9e5;border:1px solid #7bc47f}
-            .note{color:#52606d;font-size:.86rem}
-            code{background:#f0f4f8;padding:1px 5px;border-radius:3px;font-size:.88em}
-            @media (max-width:700px){body{padding:8px}section{padding:12px}table{display:block;overflow-x:auto}}
-            """;
+            .banner{padding:var(--space-3) var(--space-4);border-radius:var(--radius-md);margin:var(--space-3) 0}
+            .warn{background:var(--warning-subtle);color:var(--warning)}
+            .ok{background:var(--success-subtle);color:var(--success)}
+            .note{color:var(--ink-muted);font-size:13px;line-height:18px}
+            code{font-family:var(--font-mono);background:var(--surface-0);padding:1px 6px;border-radius:var(--radius-sm);font-size:13px}
+            @media (max-width:700px){body{padding:var(--space-2)}section{padding:var(--space-3)}table{display:block;overflow-x:auto}}
+            """;;
 
     private HealthReportHtml() {
+    }
+
+    /** The token file without what a single, self-contained file cannot use; an empty text when the file is not there. */
+    private static String tokens() {
+        try (java.io.InputStream in = HealthReportHtml.class.getResourceAsStream("/static/brand/tokens.css")) {
+            if (in == null) {
+                return "";
+            }
+            String css = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            css = css.replaceAll("(?s)/\\*.*?\\*/", "")
+                    .replaceAll("(?s)@font-face\\s*\\{[^}]*\\}", "")
+                    .replaceAll("(?m)^\\.t-[^\\n]*$", "")
+                    .replaceAll("\\n\\s*\\n+", "\n");
+            return css.strip() + "\n";
+        } catch (java.io.IOException e) {
+            return "";
+        }
     }
 
     static String render(HealthReportJob.RunFile run, String trademarkDisclaimer) {
