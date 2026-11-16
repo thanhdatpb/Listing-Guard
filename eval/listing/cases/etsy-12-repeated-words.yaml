@@ -1,0 +1,17 @@
+# Synthetic sample case (ADR-032): self-written, not taken from a real listing; the DEMO marks are invented.
+id: etsy-12-repeated-words
+marketplace: ETSY
+note: "The word mug appears three times in the title."
+listing:
+  title: "Mug Coffee Mug Ceramic Mug Blue Glaze"
+  description: A stoneware mug thrown on the wheel and finished with a blue glaze. Holds about 350 ml.
+  tags: [ceramic mug, coffee mug, blue glaze, stoneware, kitchen gift]
+  price: 28.00
+  quantity: 4
+  who_made: i_did
+  when_made: made_to_order
+  category: Home & Living > Kitchen & Dining > Drinkware > Mugs
+expected:
+  - rule: title_repeated_words
+    field: title
+trademark_risk: LOW

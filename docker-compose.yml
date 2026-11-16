@@ -333,6 +333,52 @@ services:
     volumes:
       - ./health-report:/health-report
 
+  # Backtest (ADR-032, docs/backtest.md): runs the rule check and the trademark scan over a labelled listing file (was it
+  # claimed or taken down, what about, which mark) and writes eval/backtest/out/<UTC timestamp>/report.md and report.json:
+  # how many claimed listings would have been caught, why the others were missed, how often unclaimed ones are flagged.
+  # Nothing is stored or charged and no client is needed. Put the file in eval/backtest/input/ (git-ignored); the mapping
+  # has the batch-check format.
+  #   docker compose run --rm backtest --input=/backtest/input/<file.csv> --mapping=/backtest/mappings/<mapping.yaml> \
+  #     --marketplace=ETSY|AMAZON --claimed-column=<column> [--issue-column=<column>] [--mark-column=<column>]
+  # Trademark results need TRADEMARK_CATALOG_VERSION (or TRADEMARK_FOLLOW_ACTIVATION), as for the api; without it only the
+  # rules run and the report says so.
+  backtest:
+    image: listing-guard-api:dev
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: backtest
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
+      DB_USER: ${POSTGRES_USER:-listingguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+      LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
+      BACKTEST_DIR: /backtest
+    volumes:
+      - ./eval/backtest:/backtest
+
+  # Scores the active rulesets against the labelled sample set eval/listing/cases/ (ADR-032) with the DEMO trademark catalog
+  # and writes eval/listing/out/report.md; it fails when a verified rule's precision is below eval/listing/baseline.json.
+  # --update-baseline writes the baseline from this run instead. CI runs the same comparison (ListingEvalGateTest).
+  eval-listing:
+    image: listing-guard-api:dev
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: eval-listing
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-listingguard}
+      DB_USER: ${POSTGRES_USER:-listingguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-listingguard}
+      EVAL_LISTING_DIR: /eval/listing
+      EVAL_DEMO_CATALOG_DIR: /catalogs/demo
+    volumes:
+      - ./eval:/eval
+      - ./catalogs/demo:/catalogs/demo:ro
+
   # Runs eval/retrieval/queries.yaml against the ingested corpus and writes eval/retrieval/results.md.
   # Needs an embedding provider (EMBEDDING_PROVIDER=api or ollama); with the default `none` it fails at once and says so.
   # With `api` the evaluation questions are sent to Google too. It fails if the corpus was embedded with another

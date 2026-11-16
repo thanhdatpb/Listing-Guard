@@ -160,7 +160,7 @@ public class TrademarkCheckService {
      * The same with the request's product type (ADR-009), which is not the listing's own {@code productType}: that one is the
      * Amazon product type, only hashed as the category.
      */
-    static TrademarkCheckInput input(Listing listing, String productType) {
+    public static TrademarkCheckInput input(Listing listing, String productType) {
         String category = listing.category() != null ? listing.category() : listing.productType();
         return new TrademarkCheckInput(listing.title(), listing.tags(), listing.bulletPoints(), listing.description(),
                 listing.brand(), null, listing.searchTerms(), category, productType);

@@ -334,6 +334,34 @@ services:
     volumes:
       - ./health-report:/health-report
 
+  # Backtest (ADR-032, docs/backtest.md): measures the checks against a labelled listing file (claimed or not, issue type,
+  # mark) and writes eval/backtest/out/<UTC timestamp>/report.md and report.json. It stores nothing, charges nothing and needs
+  # no client. The input holds client listings and claim records: copy it to eval/backtest/input/ only for the run and delete
+  # it afterwards. The folder must be writable by uid 10001 (docs/deployment.md). Set the trademark settings as for the api.
+  #   docker compose -f docker-compose.prod.yml --profile prod --profile tools run --rm backtest \
+  #     --input=/backtest/input/<file.csv> --mapping=/backtest/mappings/<mapping.yaml> --marketplace=ETSY|AMAZON \
+  #     --claimed-column=<column> [--issue-column=<column>] [--mark-column=<column>]
+  backtest:
+    image: ghcr.io/thanhdatpb/listing-guard:${LISTING_GUARD_VERSION:?Set LISTING_GUARD_VERSION in .env}
+    profiles: ["tools"]
+    mem_limit: ${JOB_MEM_LIMIT:-1g}
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: backtest
+      JAVA_TOOL_OPTIONS: ${JOB_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0}
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
+      # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
+      LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
+      BACKTEST_DIR: /backtest
+    volumes:
+      - ./eval/backtest:/backtest
+
   # Compares maintainer-saved policy documents with the stored hash snapshot; it never downloads or calls a model.
   #   docker compose -f docker-compose.prod.yml --profile prod --profile policy-diff run --rm policy-diff [--dry-run]
   policy-diff:

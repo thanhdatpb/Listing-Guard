@@ -1,0 +1,194 @@
+{
+  "format" : "listing-guard/eval-listing-baseline/v1",
+  "rulesetVersions" : {
+    "AMAZON" : "amazon-2026-12c",
+    "ETSY" : "etsy-2026-12"
+  },
+  "trademarkRulesetVersion" : "trademark-risk-2026-11b",
+  "cases" : 27,
+  "rules" : [ {
+    "key" : "AMAZON/prohibited_content",
+    "sourceStatus" : "SECONDARY",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "AMAZON/required_fields",
+    "sourceStatus" : "VERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "AMAZON/search_terms_length",
+    "sourceStatus" : "SECONDARY",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "AMAZON/title_forbidden_chars",
+    "sourceStatus" : "SECONDARY",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/duplicate_tags",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/personalization_dropdown_options",
+    "sourceStatus" : "VERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/personalization_free_text_sensitive",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/personalization_question_count",
+    "sourceStatus" : "VERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/personalization_question_text",
+    "sourceStatus" : "VERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/personalization_upload_files",
+    "sourceStatus" : "VERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/price_quantity_positive",
+    "sourceStatus" : "VERIFIED",
+    "truePositives" : 2,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/required_fields",
+    "sourceStatus" : "VERIFIED",
+    "truePositives" : 2,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/tag_characters",
+    "sourceStatus" : "VERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/tag_count",
+    "sourceStatus" : "SECONDARY",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/tag_length",
+    "sourceStatus" : "SECONDARY",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/title_characters",
+    "sourceStatus" : "VERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/title_length",
+    "sourceStatus" : "VERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/title_promotional_terms",
+    "sourceStatus" : "SECONDARY",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/title_repeated_words",
+    "sourceStatus" : "SECONDARY",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/title_word_count",
+    "sourceStatus" : "SECONDARY",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "trademark/catalog_exact",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 2,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "trademark/catalog_fuzzy",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "trademark/catalog_phrase",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  } ]
+}

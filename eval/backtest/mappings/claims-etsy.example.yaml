@@ -1,0 +1,18 @@
+# Mapping for a backtest file of Etsy listings (ADR-032, docs/backtest.md). It has the batch-check mapping format
+# (docs/batch-check.md): `id` names the column that identifies a row, every other key is a field of docs/input-schema.md.
+#
+# EXAMPLE ONLY. The column names are the ones of the template in docs/backtest.md ("Prepare the file"), not of any real export:
+# change each one to match your file exactly (case and spaces matter). The label columns (claimed, issue, mark) are not in the
+# mapping: pass them on the command line with --claimed-column, --issue-column and --mark-column.
+#
+#   docker compose run --rm backtest --input=/backtest/input/<file.csv> --mapping=/backtest/mappings/<your copy>.yaml \
+#     --marketplace=ETSY --claimed-column=claimed --issue-column=issue --mark-column=mark
+id: row_id
+title: title
+description: description
+tags: {column: tags, separator: ","}
+price: price
+quantity: quantity
+who_made: who_made
+when_made: when_made
+category: category

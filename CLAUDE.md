@@ -285,6 +285,25 @@ It never edits a listing, never publishes, and does no SEO.
   writes to a marketplace and does not alter pack hashes or `analysisVersion`. A template may name an `id_column`
   (`ListingRecord.id`: a SKU or handle that names the record in a report; the three CSV built-ins set it); `ConfiguredCsvAdapter`
   exposes its `delimiter()`. Both are additive.
+- **Value backtest and labelled evaluation** (`api/.../evaluation/`, ADR-032, Proposed; implemented, `docs/backtest.md`): two
+  one-shot jobs and a CI gate. `ListingAnalyzer` runs the normalizer, `RuleEngine.runDetailed` with the active `listing-rules` ruleset
+  and a trademark scanner on `TrademarkCheckService.input`, and **stores nothing, charges nothing, reads no cache and needs no client**.
+  **`backtest`** (profile and `tools` compose service, both compose files): a CSV with the batch-check mapping plus label columns named
+  on the command line (`--claimed-column` yes/no, `--issue-column` from the closed `IssueType` list, `--mark-column`), the served
+  catalog (`TrademarkCatalogRuntime.serving`); writes `eval/backtest/out/<UTC>/report.md` (Vietnamese) and `report.json`
+  (`listing-guard/backtest/v1`): recall of claimed rows (caught = a rule finding at `--catch-severity`, default WARNING, or a trademark
+  level at `--catch-trademark-risk`, default MEDIUM; undetermined rows are counted apart), one `MissReason` per miss (decided in a fixed
+  order by `BacktestRow`/`MissDiagnosis`, which ask the scanner's own catalog and normalizer after the scan and never change it), the
+  flagged share of unclaimed rows (an upper-bound estimate of false alarms), per-rule counts. Rows with a wrong cell count are
+  `UNREADABLE`, a label off the list `LABEL_INVALID`, both reported by line. **No report holds listing text** (row id, rule id, field,
+  severity, catalog mark, labelled mark, and only for `SPELLING_VARIANT` the near word cut to 40 characters; a test holds it); the input
+  and `out/` are git-ignored. **`eval-listing`** (profile and compose service): `eval/listing/cases/*.yaml` (27 synthetic cases, strict
+  `ListingEvalCase` loader; every expected finding listed, anything else reported is a FP), scanned with the **DEMO catalog** only
+  (`DemoCatalogScanner`), scored per rule (`<MARKETPLACE>/<rule>`, `trademark/<rule>`) by `ListingEvaluator` against
+  `eval/listing/baseline.json` (`ListingEvalBaseline`). **`ListingEvalGateTest`** (plain JUnit in `api`, no Docker; rulesets read from
+  `application.yml`) fails a build when a `verified` rule's precision falls below the baseline or a case is not analysed completely;
+  CI appends `api/target/eval-listing/report.md` to the job summary. ADR-030 and ADR-031 were not in the repository when ADR-032 was
+  written: the backtest uses whatever `TrademarkCatalogRuntime` serves.
 - **Listing health report** (`api/.../report/`, ADR-018, Proposed; implemented): counts of the results a client has stored over a
   period, for a lead. `GET /api/v1/reports/summary?from=&to=[&marketplace=]` (an API key; the client is the key's, there is no client
   parameter; `from` and `to` are required UTC dates, both included, at most `listing-guard.reports.max-days` = 92; `400
@@ -485,7 +504,11 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     that needs a background run, variation attributes for adapter files, a mapping shared by the members of a client, a decimal
     comma). Not planned: storing a pasted table or its result, applying a fix, writing to a Sheet or a marketplace, a console page for
     images, personalization or the health report in bulk.
-17. Hugging Face USPTO source (ADR-030, Proposed): done as one PR (`feature/hf-trademark-import`: ADR, `hf-convert/` module, filters
+17. Value backtest and labelled evaluation (ADR-032, Proposed): done as one PR (`feature/value-backtest`: ADR, `api/.../evaluation/`,
+    the `backtest` and `eval-listing` jobs and compose services, 27 sample cases, the baseline, the CI summary step, `docs/backtest.md`).
+    Open questions the maintainer decides are at the end of the ADR (the default catch lines, more issue types, a review of the sample
+    labels, gating recall). Not planned: an endpoint, a console page or an MCP tool for either job, storing a claim file.
+18. Hugging Face USPTO source (ADR-030, Proposed): done as one PR (`feature/hf-trademark-import`: ADR, `hf-convert/` module, filters
     YAML, Dockerfile target and compose services, tests, measurements, docs). Open questions the maintainer decides are at the end of
     the ADR (the dataset's terms, 717 and the codes the 2005 table counted as live, classes 9 and 26, a pinned revision, DuckDB 2.0).
     Next: import it on the A1 and measure a trademark check against a catalog of a million entries, then A4 evaluation on it.
@@ -550,6 +573,15 @@ Health report (see `docs/deployment.md`; reads the database, writes `health-repo
 ```bash
 docker compose run --rm health-report (--client=<name|id> | --all-clients) [--from=YYYY-MM-DD --to=YYYY-MM-DD] [--marketplace=ETSY|AMAZON]
 # profile `health-report`; no network, no model, writes nothing to the database; ./health-report is mounted at /health-report
+```
+
+Backtest and labelled evaluation (ADR-032, `docs/backtest.md`, `eval/README.md`; nothing written to the database):
+
+```bash
+docker compose run --rm backtest --input=/backtest/input/<file.csv> --mapping=/backtest/mappings/<mapping.yaml> \
+  --marketplace=ETSY|AMAZON --claimed-column=<col> [--issue-column=<col>] [--mark-column=<col>]   # ./eval/backtest at /backtest
+docker compose run --rm eval-listing [--update-baseline]          # eval/listing/out/report.md; non-zero exit on a regression
+./mvnw -B -pl api -am test -Dtest=ListingEvalGateTest -Dsurefire.failIfNoSpecifiedTests=false [-Deval.listing.update=true]
 ```
 
 Policy diff (see `docs/policy-monitor.md`; reads maintainer-saved `policies/raw/`, compares hashes in the DB, writes a report):
@@ -653,9 +685,10 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   reused. Replacing an expired result deletes it and inserts in one transaction; only the unique violation of
   `uq_trademark_check_cache` counts as a cache race. The advisory-lock key pair `(1279746628, 1380271182)` is reserved for
   retention cleanup (trademark, variation and personalization results, ADR-010, ADR-015, ADR-016): no other kind of query may take it. Field indexes `tags[i]` and `bullet_points[i]` count the cleaned list.
-- Ingest, eval, admin, trademark-import, batch-check, health-report, policy-diff and tsdr-status are one-shot jobs (profiles
-  `ingest`, `eval-retrieval`, `admin`, `trademark-import`, `batch-check`, `health-report`, `policy-diff`, `tsdr-status`), not
-  HTTP endpoints. `hf-convert` (ADR-030) is one-shot too, but a jar and image of its own, not a Spring profile.
+- Ingest, eval, admin, trademark-import, batch-check, health-report, policy-diff, tsdr-status, backtest and eval-listing are one-shot
+  jobs (profiles `ingest`, `eval-retrieval`, `admin`, `trademark-import`, `batch-check`, `health-report`, `policy-diff`, `tsdr-status`,
+  `backtest`, `eval-listing`), not HTTP endpoints. `hf-convert` (ADR-030) is one-shot too, but a jar and image of its own, not a
+  Spring profile.
   They need no client API keys; `ingest` and `eval-retrieval` need an embedding provider (below) and fail at once
   with the default `none`, `admin` does not (it uses `hashing`). `GET /policies/search` is a debug view (API key needed) that answers 404 unless
   `listing-guard.policies.search-endpoint.enabled=true`.
@@ -860,6 +893,12 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
 - Strong-led headings (`<p><strong>`) and plain roman labels ("i. Messages") are nested by their marker:
   `1.`/`a.` level 70, `i.` level 80 (`i.` is a letter right after `h.`), an unnumbered strong heading is a
   child of the nearest numbered heading above. Real `h1`-`h6` always close them.
+- **Backtest and labelled evaluation** (ADR-032): the backtest never calls `CheckService` or `TrademarkCheckService` (they store
+  and charge) and never writes the database; a claim file and its reports stay out of git. A report holds no listing text: add a
+  column only if it is an id, a rule id, a field, a severity, a level, a catalog mark or a count. A new `IssueType` or `MissReason` is a
+  code change with its docs (`docs/backtest.md`, the ADR). `eval/listing/baseline.json` comes only from a real run
+  (`-Deval.listing.update=true` or `--update-baseline`), never by hand, and is committed in the PR that changes it; never lower the gate
+  or drop a case to make a build pass. Sample cases are synthetic, list every expected finding, and use only DEMO marks.
 - Tests read boundary values from the ruleset instead of hard-coding limits.
 
 ## Git
