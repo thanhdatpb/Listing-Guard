@@ -245,7 +245,7 @@ Tick each one on the real host. "Here" says what this review saw; the rest is yo
 | 9 | **Backups restore.** Daily and weekly dumps to R2 with lifecycle rules (7 and 28 days), and **a restore tried**. | Here: the scripts' dump and restore worked on a throwaway database (34 migrations at the time, data intact). **Yours:** the same on the A1 or a scratch host, from an R2 download (the scripts take a local file; download it first), with the time it takes. |
 | 10 | **Console** (only if enabled). HTTPS base URL, SMTP, Secure cookie, Access in front of `/console/*`. | Here: the API refuses to start misconfigured. A real sign-in is yours to try. |
 | 11 | **The `tools` jobs are not exposed.** They have no port; they run only with `docker compose run`. | Compose file. |
-| 12 | **Image and host updates.** Unattended upgrades and fail2ban from the bootstrap; Trivy scans the amd64 image at release (CRITICAL, fixed only); the base images `eclipse-temurin:25-jre` and `pgvector/pgvector:pg16` float and `cloudflared` is pinned (`2026.11.0`): update the tags on a schedule. | The arm64 image is not scanned. |
+| 12 | **Image and host updates.** Unattended upgrades and fail2ban from the bootstrap; Trivy scans the amd64 image at release (CRITICAL, fixed only); the base images `eclipse-temurin:21-jre` and `pgvector/pgvector:pg16` float and `cloudflared` is pinned (`2026.11.0`): update the tags on a schedule. | The arm64 image is not scanned. |
 | 13 | **Retention.** Trademark, variation, personalization and image results are kept 30 days; buyer text is never stored. The health report's JSON is the only long-term record of counts. | Code and tests. |
 | 14 | **No data of a single company** is in the repository, and the DEMO catalog is never served. | Convention; `capabilities` shows `demo`. |
 | 15 | **`/api/v1/*` is public and protected by the API key and the rate limit alone.** The key is `lg_` plus 43 random characters, stored as SHA-256; the limit is per client and applies **after** the key check, so a request with no valid key is answered `401` and is not limited by the application (the API does not limit by IP). Cloudflare's edge is the only thing that stops a flood of keyless requests. | Here: a keyless and a wrong-key call answer `401 application/problem+json`. **Yours:** consider a Cloudflare rate-limiting rule for `/api/v1/*` ([section 7](#7-open-items)); whether your plan allows one was not checked. |
@@ -406,8 +406,9 @@ work left open by the decision to keep Access off `/api/v1/*`.
    a catalog is imported and its terms are checked; the sync's ODP download and the TSDR calls need keys and a first real run
    (ADR-009).
 9. **`/v3/api-docs` stays on behind a key**; the start-up warns about it. Disable it with a forwarded setting if you prefer.
-10. **Base images float** (`eclipse-temurin:25-jre`, `pgvector/pgvector:pg16`); the build and the tests run on Java 21 while the
-    image runs Java 25 (unchanged since the move to Spring Boot 4.1). Pin by digest or align the versions when you decide.
+10. **Base images float** (`eclipse-temurin:21-jre`, `pgvector/pgvector:pg16`). The build, the tests (`ci.yml`, `pom.xml`
+    `java.version`) and the image all use Java 21: the image used to build and run on Java 25 while CI used 21, so code that
+    compiled in CI could fail in the image build (found by ADR-036's `LlmCache`). Pin by digest when you decide.
 11. **The Chrome extension** (another repository) was not reviewed. With no Access on `/api/v1/*` it needs only an API key, which
     a browser extension must store somewhere the extension can read: how it does that is its own design.
 12. **A personal Oracle account has one owner.** If the account, the VM and the laptop are all lost, the repository, a copy of

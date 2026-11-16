@@ -18,13 +18,14 @@ import java.util.Optional;
  */
 public final class LlmCache {
 
-    private record Entry(String answer, Instant expires) {
+    /** Not called {@code Entry}: inside the anonymous {@code LinkedHashMap} below that name is the inherited {@code Map.Entry}. */
+    private record CachedAnswer(String answer, Instant expires) {
     }
 
     private final int maxEntries;
     private final Duration ttl;
     private final Clock clock;
-    private final Map<String, Entry> entries;
+    private final Map<String, CachedAnswer> entries;
 
     public LlmCache(int maxEntries, Duration ttl, Clock clock) {
         this.maxEntries = Math.max(1, maxEntries);
@@ -32,7 +33,7 @@ public final class LlmCache {
         this.clock = clock;
         this.entries = new LinkedHashMap<>(16, 0.75f, true) {
             @Override
-            protected boolean removeEldestEntry(Map.Entry<String, Entry> eldest) {
+            protected boolean removeEldestEntry(Map.Entry<String, CachedAnswer> eldest) {
                 return size() > LlmCache.this.maxEntries;
             }
         };
@@ -56,7 +57,7 @@ public final class LlmCache {
     }
 
     public synchronized Optional<String> get(String key) {
-        Entry entry = entries.get(key);
+        CachedAnswer entry = entries.get(key);
         if (entry == null) {
             return Optional.empty();
         }
@@ -68,7 +69,7 @@ public final class LlmCache {
     }
 
     public synchronized void put(String key, String answer) {
-        entries.put(key, new Entry(answer, clock.instant().plus(ttl)));
+        entries.put(key, new CachedAnswer(answer, clock.instant().plus(ttl)));
     }
 
     public synchronized int size() {
