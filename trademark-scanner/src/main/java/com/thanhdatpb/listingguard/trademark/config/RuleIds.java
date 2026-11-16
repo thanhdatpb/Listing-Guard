@@ -16,6 +16,12 @@ public final class RuleIds {
     public static final String COLOR_NAME_CONTAINS_MARK = "color_name_contains_mark";
     public static final String PURE_COLOR_DESCRIPTION = "pure_color_description";
 
+    /**
+     * The rule of a client's own watchlist (ADR-031). It is not declared by a ruleset and is not in {@link #ALL}: its settings
+     * are a file of their own, and it runs only when the client has a watchlist. It wins a span against every declared rule.
+     */
+    public static final String WATCHLIST_MATCH = "watchlist_match";
+
     /** Every rule of the pack. */
     public static final List<String> ALL = List.of(CATALOG_EXACT, CATALOG_PHRASE, CATALOG_FUZZY,
             GEO_SPORT_COMBINATION, COLOR_NAME_CONTAINS_MARK, PURE_COLOR_DESCRIPTION);

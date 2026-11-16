@@ -1,0 +1,27 @@
+# Settings of a client's trademark watchlist (ADR-031): the minimum level of a watchlist finding and its messages. The entries
+# themselves are each client's own data, stored in the database; nothing here names a mark.
+#
+# Any change to this file changes its content hash, which is part of the analysis fingerprint of every client that has a
+# watchlist. Bump `version` for every change: a published version is immutable (ADR-002). An operator who wants another minimum
+# level writes a file of their own and points `listing-guard.trademark.watchlist.settings` at it.
+#
+# Messages and suggestions are Vietnamese. They report a reference warning and never say a text is allowed or valid.
+pack_id: trademark-risk
+version: trademark-watchlist-2026-11
+checked_at: 2026-11-16
+
+source:
+  status: unverified
+  note: The client lists its own marks; the level is a product choice of ADR-031, not a marketplace or legal rule.
+
+# The lowest level a watchlist finding is reported at. A finding is raised to the level of any catalog match over the same span.
+minimum_risk: HIGH
+
+# Placeholders: token, field, mark.
+message: "Cụm '{token}' ở {field} trùng với mục '{mark}' trong watchlist của khách hàng."
+# Added when an alias matched. Placeholders: alias, mark.
+alias_note: "Khớp qua biến thể '{alias}' của '{mark}'."
+# Added when the entry has a note. Placeholder: note.
+reason_note: "Ghi chú trong watchlist: {note}"
+# Placeholders: mark, field.
+suggestion: "Xem lại việc dùng '{mark}' ở {field}: mục này do chính khách hàng đưa vào watchlist. Đây chỉ là cảnh báo tham khảo, không phải kết luận pháp lý."

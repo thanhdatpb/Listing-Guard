@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.trademark.rules;
 import com.thanhdatpb.listingguard.trademark.MatchType;
 import com.thanhdatpb.listingguard.trademark.RiskAdjustment;
 import com.thanhdatpb.listingguard.trademark.RiskLevel;
+import com.thanhdatpb.listingguard.trademark.watchlist.WatchlistMatch;
 import java.util.List;
 import java.util.Map;
 
@@ -18,17 +19,27 @@ import java.util.Map;
  * @param placeholders values for the rule's message and suggestion templates
  * @param sourceIds    the ids of the source records of the matched catalog mark, empty when there is no mark
  * @param riskAdjustments why {@code risk} is lower than the level the rule assigns; empty when it is not lower
+ * @param watchlist    the watchlist entry of a {@code watchlist_match} candidate (ADR-031), null for any other
  */
 public record Candidate(String ruleId, RiskLevel risk, String field, int tokenFrom, int tokenTo, int start, int end,
                         String normalizedToken, String mark, MatchType type, Double score,
                         Map<String, String> placeholders, boolean insideColorPhrase, List<String> otherRuleIds,
-                        List<String> sourceIds, List<RiskAdjustment> riskAdjustments) {
+                        List<String> sourceIds, List<RiskAdjustment> riskAdjustments, WatchlistMatch watchlist) {
 
     public Candidate {
         placeholders = Map.copyOf(placeholders);
         otherRuleIds = List.copyOf(otherRuleIds);
         sourceIds = List.copyOf(sourceIds);
         riskAdjustments = List.copyOf(riskAdjustments);
+    }
+
+    /** A candidate of a declared rule (not a watchlist match). */
+    public Candidate(String ruleId, RiskLevel risk, String field, int tokenFrom, int tokenTo, int start, int end,
+                     String normalizedToken, String mark, MatchType type, Double score,
+                     Map<String, String> placeholders, boolean insideColorPhrase, List<String> otherRuleIds,
+                     List<String> sourceIds, List<RiskAdjustment> riskAdjustments) {
+        this(ruleId, risk, field, tokenFrom, tokenTo, start, end, normalizedToken, mark, type, score, placeholders,
+                insideColorPhrase, otherRuleIds, sourceIds, riskAdjustments, null);
     }
 
     /** A candidate whose level is the one its rule assigns. */
@@ -50,12 +61,17 @@ public record Candidate(String ruleId, RiskLevel risk, String field, int tokenFr
 
     public Candidate withInsideColorPhrase(boolean inside) {
         return new Candidate(ruleId, risk, field, tokenFrom, tokenTo, start, end, normalizedToken, mark, type, score,
-                placeholders, inside, otherRuleIds, sourceIds, riskAdjustments);
+                placeholders, inside, otherRuleIds, sourceIds, riskAdjustments, watchlist);
     }
 
     public Candidate withOtherRuleIds(List<String> others) {
         return new Candidate(ruleId, risk, field, tokenFrom, tokenTo, start, end, normalizedToken, mark, type, score,
-                placeholders, insideColorPhrase, others, sourceIds, riskAdjustments);
+                placeholders, insideColorPhrase, others, sourceIds, riskAdjustments, watchlist);
+    }
+
+    public Candidate withRisk(RiskLevel level) {
+        return new Candidate(ruleId, level, field, tokenFrom, tokenTo, start, end, normalizedToken, mark, type, score,
+                placeholders, insideColorPhrase, otherRuleIds, sourceIds, riskAdjustments, watchlist);
     }
 
     boolean overlaps(Candidate other) {

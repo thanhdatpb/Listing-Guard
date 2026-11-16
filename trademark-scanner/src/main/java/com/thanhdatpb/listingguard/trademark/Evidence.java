@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.trademark;
 
+import com.thanhdatpb.listingguard.trademark.watchlist.WatchlistMatch;
 import java.util.List;
 
 /**
@@ -22,17 +23,27 @@ import java.util.List;
  *                           empty when it is not lower
  * @param sourceLinks        public look-up addresses of the source records, only for a source the ruleset has a
  *                           template for; empty otherwise
+ * @param watchlist          the client's watchlist entry the finding comes from (ADR-031); null for any other finding
  */
 public record Evidence(String field, int start, int end, String snippet, String normalizedToken, String matchedMark,
                        MatchType matchType, Double score, String catalogVersion, String ruleId,
                        boolean insideColorPhrase, List<String> otherRuleIds, List<String> sourceIds,
-                       List<RiskAdjustment> riskAdjustments, List<SourceLink> sourceLinks) {
+                       List<RiskAdjustment> riskAdjustments, List<SourceLink> sourceLinks, WatchlistMatch watchlist) {
 
     public Evidence {
         otherRuleIds = List.copyOf(otherRuleIds);
         sourceIds = List.copyOf(sourceIds);
         riskAdjustments = List.copyOf(riskAdjustments);
         sourceLinks = List.copyOf(sourceLinks);
+    }
+
+    /** Evidence of a finding that does not come from a watchlist. */
+    public Evidence(String field, int start, int end, String snippet, String normalizedToken, String matchedMark,
+                    MatchType matchType, Double score, String catalogVersion, String ruleId,
+                    boolean insideColorPhrase, List<String> otherRuleIds, List<String> sourceIds,
+                    List<RiskAdjustment> riskAdjustments, List<SourceLink> sourceLinks) {
+        this(field, start, end, snippet, normalizedToken, matchedMark, matchType, score, catalogVersion, ruleId,
+                insideColorPhrase, otherRuleIds, sourceIds, riskAdjustments, sourceLinks, null);
     }
 
     /** Evidence with no adjustment and no link. */
