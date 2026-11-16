@@ -417,6 +417,20 @@ It never edits a listing, never publishes, and does no SEO.
   part is Warning (`Cảnh báo`); a part that did not run (no catalog, plan, quota) is said in the row and never becomes a silent `Đạt`; the trademark
   disclaimer is on the page and in each row's detail; a cell that starts like a formula gets a leading apostrophe in the pasted block
   and the CSV. No API endpoint, MCP tool or `openapi.json` change.
+  **Free-tier LLM providers and the trademark context judge (ADR-036, Proposed; V39; off by default)** (`api/.../llm/`,
+  `api/.../trademark/judge/`, `trademark-scanner/.../LlmJudgement`, `resources/llm/trademark-judge-2026-11.yaml`; docs/llm.md): `LlmClient`
+  walks an ordered list of OpenAI-compatible providers (Groq, Cloudflare Workers AI, Gemini; `listing-guard.llm.providers`), skips one
+  that is at its per-minute window, its day counter (`llm_usage`, reserved atomically) or a 60 s cool-down after a 429, fails over on
+  any failure, caches answers by the hash of model and prompt, and writes one audit line per call (no content). `listing-text-allowed`
+  and `personal-data-allowed` are `false` for every provider: a call declares its data kinds (`LISTING_TEXT`, `PERSONALIZATION`) and
+  only a provider allowed all of them receives it. The judge looks only at catalog findings at MEDIUM (not HIGH, LOW, watchlist or
+  context rules; at most 8 per check), sends the mark, classes, field and 160 characters each side, and accepts exactly
+  `{"verdict","reason"}` (anything else is `unsure`). `LlmJudgement` (no LLM) can only lower: `likely_descriptive` keeps the finding,
+  MEDIUM to LOW, adds the risk adjustment `llm_descriptive`; it never removes a finding or raises a level. A skipped step (no quota,
+  all failed) makes the result INCOMPLETE with `skippedRuleIds` `llm_context_judge`, not cached, not charged. With the judge active the
+  fingerprint gains `llm_judge` (prompt version and hash, models in order, settings); off, the fingerprint is the old one. Console: label
+  and reason on the editor and bulk items, "LLM requests today" on the home page. `backtest --llm-judge` and `eval-listing --llm-judge`
+  print before and after; the default catch line is MEDIUM, so recall can fall: measure before turning it on (ADR-036 Results).
   **Finding feedback, home page and statistics (ADR-034, Proposed; V37)** (`api/.../feedback/`, `console/ConsoleFeedback*`,
   `ConsoleHomeService`, `ConsoleStatsController`, `templates/console/{feedback,feedback-saved,stats,dashboard}.html`; docs/feedback.md): a
   verdict (`CORRECT`, `FALSE_POSITIVE`, `NOT_USEFUL`) and an optional note of at most 280 characters next to each stored finding of the
@@ -567,6 +581,10 @@ Order of work (the ADRs have the detail; if this file and an ADR differ, the ADR
     `docs/watchlist.md`). Open questions the maintainer decides are at the end of the ADR (the client's own minimum level, Nice classes lowering
     a level, personalization screening reading the list, limiting key creation to administrators, a Sheet connector). Not planned: fuzzy
     matching of a watchlist, a tool that writes the list, reading a Google Sheet by itself.
+20. Free-tier LLM providers and the trademark context judge (ADR-036, Proposed): done as one PR (`feature/llm-trademark-judge`: ADR, V39, `api/.../llm/`,
+    `api/.../trademark/judge/`, `LlmJudgement`, the prompt resource, console label and counter, `--llm-judge` for the two evaluation jobs,
+    `docs/llm.md`). Open questions are at the end of the ADR (the terms of Groq and Cloudflare for client text, a native read of the
+    Vietnamese copy, showing "LLM agrees"). The after-measurement needs a real key and is the maintainer's to run.
 
 PR 0b is complete: a new pack may now register its ruleset. `pack_id` and `analysis_version` are `NOT NULL`, `pack_id`
 has no default, and the registry and cache identities include the pack (`docs/deployment.md`).
