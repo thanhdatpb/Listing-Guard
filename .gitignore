@@ -66,6 +66,13 @@ batch/out/
 # Health report (ADR-018): the reports a run of the health-report job writes are never committed (they name clients and counts)
 health-report/out/
 
+# Backtest and labelled evaluation (ADR-032): the claim files and the reports made from them are never committed (they hold
+# client listings and claim records); the mappings in eval/backtest/mappings/ and the sample set in eval/listing/ are
+eval/backtest/input/*
+!eval/backtest/input/.gitkeep
+eval/backtest/out/
+eval/listing/out/
+
 # Policy change monitor reports can contain short excerpts of copyrighted policy text.
 policy-monitor/out/
 
