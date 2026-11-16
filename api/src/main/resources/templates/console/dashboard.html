@@ -107,7 +107,7 @@
                         <span class="lg-mark" aria-hidden="true"></span>
                         <div class="lg-feed__body">
                             <div class="lg-feed__top">
-                                <code class="lg-code" th:text="${item.sku != null} ? ${item.sku} : ${item.ruleId}"></code>
+                                <code class="lg-code lg-feed__label" th:text="${item.label()}"></code>
                                 <span class="lg-pill" th:classappend="'lg-pill--' + ${item.css()}"
                                       th:text="${item.css() == 'error'} ? #{home.attention.error} : #{home.attention.trademark}"></span>
                             </div>
@@ -248,19 +248,18 @@
         </div>
     </th:block>
 
-    <!-- The plan and the month's usage, with or without data. -->
-    <section class="lg-card" id="home-plan" aria-labelledby="plan-heading">
+    <!-- The plan and the month's usage, with or without data; where plans are off there is nothing to show and no card. -->
+    <section class="lg-card" id="home-plan" aria-labelledby="plan-heading" th:if="${usage.enforced}">
         <div class="lg-card__head">
             <h2 id="plan-heading" class="lg-card__title" th:text="#{dashboard.plan.heading}"></h2>
         </div>
         <ul class="lg-kv">
             <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{dashboard.plan(${usage.plan})}"></span></li>
             <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{dashboard.usage(${#strings.toString(usage.used)})}"></span></li>
-            <li class="lg-kv__item" th:if="${usage.enforced and usage.monthlyQuota != null}"><span class="lg-kv__label"
+            <li class="lg-kv__item" th:if="${usage.monthlyQuota != null}"><span class="lg-kv__label"
                 th:text="#{dashboard.quota(${#strings.toString(usage.monthlyQuota)}, ${#strings.toString(usage.remaining)})}"></span></li>
-            <li class="lg-kv__item" th:if="${usage.enforced and usage.monthlyQuota == null}"><span class="lg-kv__label" th:text="#{dashboard.quota.unlimited}"></span></li>
-            <li class="lg-kv__item" th:unless="${usage.enforced}"><span class="lg-kv__label" th:text="#{dashboard.notenforced}"></span></li>
-            <li class="lg-kv__item"><span class="lg-kv__label"><span th:text="#{dashboard.reset}"></span> <time th:text="${usage.resetAt}"></time></span></li>
+            <li class="lg-kv__item" th:if="${usage.monthlyQuota == null}"><span class="lg-kv__label" th:text="#{dashboard.quota.unlimited}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label"><span th:text="#{dashboard.reset}"></span> <time th:with="pattern=#{format.date}" th:datetime="${usage.resetAt}" th:text="${#temporals.format(usage.resetAt, pattern)}"></time></span></li>
         </ul>
     </section>
 </main>

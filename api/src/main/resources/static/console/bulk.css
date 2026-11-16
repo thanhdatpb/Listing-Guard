@@ -18,6 +18,12 @@
 .lg-bulk__filters[hidden] { display: none; }
 .lg-bulk__after { margin-top: var(--space-4); }
 
+/* the title of the listing, one line, only in this answer; a narrow screen has no room for it */
+.lg-table td.lg-col-title { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
+@media (max-width: 860px) {
+  .lg-col-title { display: none; }
+}
+
 /* the detail that opens under a row */
 .lg-detail__trademark { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--line-soft); }
 .lg-detail__trademark .lg-meter__label { margin: 0; font-size: 15px; line-height: 24px; }

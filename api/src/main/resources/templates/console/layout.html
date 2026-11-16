@@ -97,7 +97,7 @@
                 <span class="app-account__avatar" aria-hidden="true" th:text="${consoleAccount.initial}"></span>
                 <span class="app-account__who">
                     <span class="app-account__client" th:if="${!#strings.isEmpty(consoleAccount.client)}" th:text="${consoleAccount.client}"></span>
-                    <span th:text="${consoleAccount.email}" th:title="${consoleAccount.email}"></span>
+                    <span th:classappend="${#strings.isEmpty(consoleAccount.client)} ? 'app-account__client'" th:text="${consoleAccount.email}" th:title="${consoleAccount.email}"></span>
                 </span>
             </div>
             <div class="app-side__actions">

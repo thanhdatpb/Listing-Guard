@@ -48,10 +48,33 @@ public record HomeView(LocalDate weekFrom, LocalDate today, boolean empty, long 
     }
 
     /**
-     * One result to look at. {@code sku} is null when the result was not checked with a SKU (the editor, the API); {@code message} is
-     * the finding's own text, printed as the API gave it.
+     * One result to look at. {@code sku} is null when the result was not checked with a SKU (the editor, the API); {@code subject} is
+     * the value the finding is about, as stored with it (the title for a title rule, the span for a trademark finding), or null; {@code
+     * message} is the finding's own text, printed as the API gave it. The same listing and the same rule is one result, however often
+     * it was checked.
      */
-    public record Attention(AttentionKind kind, String sku, String ruleId, String message, String marketplace, Instant checkedAt) {
+    public record Attention(AttentionKind kind, String sku, String subject, String ruleId, String message, String marketplace,
+                            Instant checkedAt) {
+
+        /** How long the label may be: a SKU as it is, the value a finding is about cut at a word. */
+        static final int LABEL_CHARS = 60;
+
+        /** What names the result: its SKU, else the value its finding is about (a title, a tag) cut short, else the rule id. */
+        public String label() {
+            if (sku != null && !sku.isBlank()) {
+                return sku;
+            }
+            if (subject == null || subject.isBlank()) {
+                return ruleId;
+            }
+            String line = subject.replaceAll("\\s+", " ").strip();
+            if (line.codePointCount(0, line.length()) <= LABEL_CHARS) {
+                return line;
+            }
+            String cut = line.substring(0, line.offsetByCodePoints(0, LABEL_CHARS - 1));
+            int space = cut.lastIndexOf(' ');
+            return (space > LABEL_CHARS / 2 ? cut.substring(0, space) : cut).stripTrailing() + "\u2026";
+        }
 
         /** The CSS and message key of the state: error or trademark. */
         public String css() {

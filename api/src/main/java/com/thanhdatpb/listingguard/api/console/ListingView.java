@@ -64,6 +64,22 @@ public record ListingView(List<Segment> title, int titleChars, Integer titleMax,
         return new ListingView(title, titleChars, titleMax, itemsKind, items, itemsMax, description);
     }
 
+    /** The title as one line of plain text, cut at a word to at most {@code max} characters and ended with an ellipsis. */
+    public String shortTitle(int max) {
+        StringBuilder text = new StringBuilder();
+        title.forEach(segment -> text.append(segment.text()));
+        String line = text.toString().replaceAll("\\s+", " ").strip();
+        if (line.codePointCount(0, line.length()) <= max) {
+            return line;
+        }
+        String cut = line.substring(0, line.offsetByCodePoints(0, max - 1));
+        int space = cut.lastIndexOf(' ');
+        if (space > max / 2) {
+            cut = cut.substring(0, space);
+        }
+        return cut.stripTrailing() + "\u2026";
+    }
+
     /** True when there is anything to show besides an empty title. */
     public boolean hasContent() {
         return titleChars > 0 || !items.isEmpty() || !description.isEmpty();

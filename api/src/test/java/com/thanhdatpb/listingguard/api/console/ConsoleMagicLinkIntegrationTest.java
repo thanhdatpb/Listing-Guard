@@ -130,7 +130,8 @@ class ConsoleMagicLinkIntegrationTest {
         mvc.perform(get("/console").session(authenticatedSession))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(normalizedEmail)))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("FREE")));
+                // the client the sign-in made up is an identifier, not a name: the page never shows it
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.matchesRegex("(?s).*web-[0-9a-f]{24}.*"))));
 
         mvc.perform(post("/login").with(csrf()).param("email", email))
                 .andExpect(status().isOk())

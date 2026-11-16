@@ -16,6 +16,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.api.client.ClientProvisioning;
 import com.thanhdatpb.listingguard.api.client.ClientRepository;
+import com.thanhdatpb.listingguard.api.console.HomeView.Attention;
+import com.thanhdatpb.listingguard.api.console.HomeView.AttentionKind;
 import com.thanhdatpb.listingguard.api.feedback.FindingFeedbackService;
 import com.thanhdatpb.listingguard.api.plan.PlanCode;
 import com.thanhdatpb.listingguard.api.plan.PlanTestClockConfig;
@@ -25,6 +27,7 @@ import com.thanhdatpb.listingguard.api.trademark.TrademarkReadyTestConfig;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -223,7 +226,7 @@ class ConsoleFeedbackIntegrationTest {
 
         assertThat(page).doesNotContain("class=\"lg-chart\"").doesNotContain("id=\"home-chart\"");
         assertThat(page).contains("id=\"home-empty\"").contains("href=\"/console/check\"").contains("href=\"/console/bulk\"")
-                .contains("id=\"home-plan\"").doesNotContain("id=\"home-cards\"").doesNotContain("id=\"home-attention\"")
+                .doesNotContain("id=\"home-plan\"").doesNotContain("id=\"home-cards\"").doesNotContain("id=\"home-attention\"")
                 .doesNotContain("id=\"home-data\"");
         // the empty state is an invitation: its one brand button goes to the bulk check, and the header button is the plain one
         String empty = between(page, "id=\"home-empty\"", "</section>");
@@ -263,18 +266,43 @@ class ConsoleFeedbackIntegrationTest {
         ConsoleUser stranger = member(other);
         checkInEditor(user, client);
         checkInEditor(stranger, other);
-        String rule = jdbc.queryForObject("SELECT f.rule_id FROM finding f JOIN listing_check c ON c.id = f.check_id "
-                + "WHERE c.client_id = ? AND f.severity = 'ERROR' ORDER BY f.id LIMIT 1", String.class, client.id());
+        Map<String, Object> first = jdbc.queryForMap("SELECT f.rule_id, f.value FROM finding f JOIN listing_check c ON c.id = f.check_id "
+                + "WHERE c.client_id = ? AND f.severity = 'ERROR' ORDER BY f.id LIMIT 1", client.id());
+        // no SKU was given: the row is named by what the finding is about, cut short, and by the rule id only when it is about nothing
+        String label = new Attention(AttentionKind.ERROR, null, (String) first.get("value"), (String) first.get("rule_id"), "", "ETSY",
+                Instant.now()).label();
 
         String page = html(mvc.perform(get("/console").with(signedIn(user))).andExpect(status().isOk()));
 
         String attention = between(page, "id=\"home-attention\"", "</section>");
-        assertThat(attention).contains("class=\"lg-mark\"").contains("lg-pill lg-pill--error").contains("ETSY").contains(rule);
+        assertThat(attention).contains("class=\"lg-mark\"").contains("lg-pill lg-pill--error").contains("ETSY")
+                .contains(label);
+        assertThat(label.codePointCount(0, label.length())).isLessThanOrEqualTo(60);
         assertThat(countOf(attention, "class=\"lg-feed__item\"")).as("only this client's results").isEqualTo(1);
         String data = between(page, "id=\"home-data\"", "</section>");
         assertThat(data).contains("id=\"data-catalog\"").contains("id=\"data-watchlist\"").contains("0 marks enabled")
                 .contains("Not run yet").containsPattern("etsy-20\\d\\d-\\d\\d");
         assertThat(page).contains("id=\"home-top\"").contains("class=\"lg-pill lg-pill--clean\"");
+    }
+
+    @Test
+    void aListingCheckedAgainIsOneResultOnTheHomePageNotOneForEachCheck() throws Exception {
+        TestClient client = client();
+        ConsoleUser user = member(client);
+        checkInEditor(user, client);
+        checkInEditor(user, client);
+        checkInEditor(user, client);
+        int events = jdbc.queryForObject("SELECT count(*) FROM check_history_event WHERE client_id = ?", Integer.class, client.id());
+        assertThat(events).as("every check is an event, the same text or not").isGreaterThanOrEqualTo(3);
+
+        String page = html(mvc.perform(get("/console").with(signedIn(user))).andExpect(status().isOk()));
+
+        String attention = between(page, "id=\"home-attention\"", "</section>");
+        int errorRules = jdbc.queryForObject("SELECT count(DISTINCT f.rule_id) FROM finding f JOIN listing_check c ON c.id = f.check_id "
+                + "WHERE c.client_id = ? AND f.severity = 'ERROR'", Integer.class, client.id());
+        assertThat(errorRules).isPositive();
+        // each check lists its first error only, and the same listing with the same rule is one row however often it was checked
+        assertThat(countOf(attention, "class=\"lg-feed__item\"")).isEqualTo(1);
     }
 
     @Test

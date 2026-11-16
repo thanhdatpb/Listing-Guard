@@ -215,6 +215,7 @@
                 <tr>
                     <th scope="col" class="lg-num" th:text="#{bulk.table.line}"></th>
                     <th scope="col" th:text="#{bulk.table.sku}"></th>
+                    <th scope="col" class="lg-col-title" th:text="#{bulk.table.title}"></th>
                     <th scope="col" th:text="#{bulk.table.status}"></th>
                     <th scope="col" class="lg-num" th:text="#{bulk.table.findings}"></th>
                     <th scope="col" th:text="#{bulk.table.main}"></th>
@@ -226,6 +227,7 @@
                 <tr th:attr="data-group=${row.status.group()},id='row-' + ${row.index}" th:classappend="'row-' + ${row.status.css()}">
                     <td class="lg-num" th:text="${row.line}"></td>
                     <td class="lg-sku"><code class="lg-code" th:if="${row.sku != null}" th:text="${row.sku}"></code><span class="lg-text-muted" th:if="${row.sku == null}">&mdash;</span></td>
+                    <td class="lg-col-title" th:text="${row.detail != null and row.detail.listing != null} ? ${row.detail.listing.shortTitle(60)}"></td>
                     <td><span class="lg-pill" th:classappend="${row.status.name() == 'ERROR'} ? 'lg-pill--error' : (${row.status.name() == 'WARNING'} ? 'lg-pill--warn' : (${row.status.name() == 'OK'} ? 'lg-pill--clean'))" th:text="${row.statusLabel}"></span></td>
                     <td class="lg-num" th:text="${row.findings}"></td>
                     <td class="lg-main">
@@ -239,7 +241,7 @@
                            th:attr="aria-label=#{bulk.row.detail.aria(${row.line})}" th:text="#{bulk.row.detail}"></a></td>
                 </tr>
                 <tr class="lg-detail-row" th:attr="id='bulk-detail-' + ${row.index},data-detail-of=${row.index}" th:if="${row.status.name() != 'EMPTY'}">
-                    <td colspan="6">
+                    <td colspan="7">
                         <div th:replace="~{console/bulk-fragments :: rowDetail(${row}, ${result.disclaimer})}"></div>
                         <p class="lg-small"><a th:href="'#row-' + ${row.index}" th:text="#{bulk.row.close}"></a></p>
                     </td>

@@ -39,6 +39,47 @@ public record FindingCard(String kind, String level, String pillLabel, String pi
     public record Fix(String action, String description, String proposedValue) {
     }
 
+    /** How long the heading of a card may be: about two lines of a card. */
+    static final int TITLE_CHARS = 90;
+
+    /**
+     * The heading of the card: the first sentence of the message, cut at a word when it is longer than {@link #TITLE_CHARS}. What is left
+     * of the message goes in the body ({@link #more()}); nothing is dropped.
+     */
+    public String title() {
+        String text = message == null ? "" : message.strip();
+        int end = firstSentenceEnd(text);
+        String first = end < 0 ? text : text.substring(0, end);
+        if (first.codePointCount(0, first.length()) <= TITLE_CHARS) {
+            return first;
+        }
+        String cut = first.substring(0, first.offsetByCodePoints(0, TITLE_CHARS - 1));
+        int space = cut.lastIndexOf(' ');
+        return (space > TITLE_CHARS / 2 ? cut.substring(0, space) : cut).stripTrailing() + "\u2026";
+    }
+
+    /** What the heading leaves of the message: the sentences after the first, or the whole message when the heading was cut; else null. */
+    public String more() {
+        String text = message == null ? "" : message.strip();
+        int end = firstSentenceEnd(text);
+        String first = end < 0 ? text : text.substring(0, end);
+        if (first.codePointCount(0, first.length()) > TITLE_CHARS) {
+            return text;
+        }
+        return end < 0 ? null : text.substring(end).strip();
+    }
+
+    /** The index just after the first sentence (a full stop, ! or ? followed by a space), or -1 when the text is one sentence. */
+    private static int firstSentenceEnd(String text) {
+        for (int i = 0; i + 1 < text.length(); i++) {
+            char c = text.charAt(i);
+            if ((c == '.' || c == '!' || c == '?') && Character.isWhitespace(text.charAt(i + 1))) {
+                return i + 1;
+            }
+        }
+        return -1;
+    }
+
     /** True for a finding in the error ground (the highlight is red); trademark risk and warnings are the warning ground. */
     public boolean isError() {
         return "error".equals(level);
