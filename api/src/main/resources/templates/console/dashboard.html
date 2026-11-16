@@ -30,22 +30,9 @@
     </div>
 
     <!-- The catalog changed since a scope was last re-audited (ADR-035): said as a warning, with the way to the page. -->
-    <section class="lg-banner lg-banner--warning lg-section" id="reaudit-notice" role="status" aria-labelledby="reaudit-notice-heading"
-             th:if="${reauditNotice != null}">
-        <div class="lg-banner__body">
-            <h2 id="reaudit-notice-heading" class="lg-banner__title" th:text="#{home.reaudit.heading}"></h2>
-            <p th:text="#{home.reaudit.text(${reauditNotice.catalogVersion})}"></p>
-            <ul>
-                <li th:each="item : ${reauditNotice.stale}">
-                    <span th:text="${item.marketplace}"></span>
-                    <span th:text="${item.account.isEmpty()} ? #{reaudit.account.none} : ${item.account}"></span>:
-                    <span th:text="#{home.reaudit.last(${#strings.substring(#strings.toString(item.startedAt), 0, 10)}, ${item.catalogVersion == null} ? #{reaudit.catalog.none} : ${item.catalogVersion})}"></span>
-                </li>
-            </ul>
-            <p th:if="${reauditNotice.more > 0}" th:text="#{home.reaudit.more(${#strings.toString(reauditNotice.more)})}"></p>
-        </div>
-        <a class="lg-btn lg-btn--small" th:href="@{/console/reaudit}" th:text="#{home.reaudit.link}"></a>
-    </section>
+    <th:block th:if="${reauditNotice != null}">
+        <div th:replace="~{console/reaudit-fragments :: due(${reauditNotice}, @{/console/reaudit})}"></div>
+    </th:block>
 
     <!-- No result and no verdict in eight weeks: how to start, not a page of zeros. -->
     <section class="lg-empty lg-section" id="home-empty" th:if="${home.empty}" aria-labelledby="empty-heading">
