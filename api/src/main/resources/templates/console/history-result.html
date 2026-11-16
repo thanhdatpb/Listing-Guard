@@ -5,30 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{history.result.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/console.css}">
     <th:block th:replace="~{console/layout :: htmx}"></th:block>
 </head>
 <body>
+<!-- A stored result opened from the history (ADR-033, ADR-041): what the check was and the findings it stored, each as the finding card of
+     every other page, with the reader's own feedback buttons. The listing text was never stored, so there is no listing here. No text is
+     written here (ADR-028): every sentence is a message. -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('history')}"></header>
-<main class="layout">
+<main class="lg-page" id="history-result">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{history.result.heading}"></h1>
-    <dl>
-        <dt th:text="#{history.col.marketplace}"></dt><dd th:text="${marketplace}"></dd>
-        <dt th:text="#{history.pack}"></dt><dd th:text="${pack}"></dd>
-        <dt th:text="#{history.id}"></dt><dd th:text="${checkId}"></dd>
-        <dt th:text="#{history.col.status}"></dt><dd th:text="${status}"></dd>
-    </dl>
-    <p><a th:href="@{/console/check/edit(marketplace=${marketplace})}" th:text="#{history.edit}"></a></p>
-    <section th:if="${findings.isEmpty()}"><p class="muted" th:text="#{history.no.findings}"></p></section>
-    <article th:each="finding : ${findings}" class="finding">
-        <h2 th:text="${finding.ruleId()}"></h2>
-        <p><span th:text="${finding.level()}"></span> <span th:text="${finding.field()}"></span></p>
-        <p th:text="${finding.message()}"></p>
-        <div th:replace="~{console/feedback :: widget(${finding.target()})}"></div>
-    </article>
-    <p><a th:href="@{/console/history}" th:text="#{history.back}"></a></p>
+    <div class="lg-page__head">
+        <div>
+            <p class="lg-page__crumb"><a th:href="@{/console/history}" th:text="#{history.back}"></a></p>
+            <h1 th:text="#{history.result.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{history.result.sub}"></p>
+        </div>
+        <div class="lg-actions">
+            <a class="lg-btn" th:href="@{/console/check/edit(marketplace=${marketplace})}" th:text="#{history.edit}"></a>
+        </div>
+    </div>
+
+    <section class="lg-card lg-section" id="history-facts" th:attr="aria-label=#{history.facts.aria}">
+        <ul class="lg-kv">
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{history.col.marketplace}"></span><span class="lg-kv__value" th:text="${marketplace}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{history.pack}"></span>
+                <span class="lg-kv__value" th:switch="${pack}">
+                    <th:block th:case="'listing-rules'" th:text="#{history.pack.rules}"></th:block>
+                    <th:block th:case="'trademark-risk'" th:text="#{history.pack.trademark}"></th:block>
+                    <th:block th:case="'variation-checks'" th:text="#{history.pack.variation}"></th:block>
+                </span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{history.col.status}"></span><span class="lg-kv__value"><span th:replace="~{console/history-fragments :: status(${status})}"></span></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{history.id}"></span><code class="lg-code" th:text="${checkId}"></code></li>
+        </ul>
+    </section>
+
+    <section id="history-findings" aria-labelledby="history-findings-heading">
+        <h2 id="history-findings-heading" class="lg-section-title lg-section" th:text="#{history.result.findings(${#strings.toString(cards.size())})}"></h2>
+        <div class="lg-empty" id="history-no-findings" th:if="${cards.isEmpty()}">
+            <h3 class="lg-empty__title" th:text="#{history.no.findings}"></h3>
+            <p class="lg-empty__text" th:text="#{history.no.findings.text}"></p>
+        </div>
+        <th:block th:unless="${cards.isEmpty()}">
+            <div th:replace="~{console/findings :: cards(${cards})}"></div>
+        </th:block>
+    </section>
 </main>
 </body>
 </html>

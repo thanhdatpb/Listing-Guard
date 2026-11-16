@@ -5,76 +5,117 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="#{history.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-    <link rel="stylesheet" th:href="@{/console/console.css}">
 </head>
 <body>
+<!-- The history of checks (ADR-033, ADR-041): a row of filters that works without a script (a plain GET form), the table of what was
+     stored, and the pager. The page keeps no listing text: only the counts, the SKU a bulk row had and who checked. No text is written
+     here (ADR-028): every sentence is a message. -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('history')}"></header>
-<main class="layout">
+<main class="lg-page" id="history-page">
     <span id="main" tabindex="-1"></span>
-    <h1 th:text="#{history.heading}"></h1>
-    <p class="muted" th:text="#{history.intro}"></p>
-    <form method="get" th:action="@{/console/history}" class="filters">
-        <label for="from" th:text="#{history.from}"></label><input id="from" type="date" name="from" th:value="${from}">
-        <label for="to" th:text="#{history.to}"></label><input id="to" type="date" name="to" th:value="${to}">
-        <label for="status" th:text="#{history.status}"></label>
-        <select id="status" name="status">
-            <option value="" th:text="#{history.status.any}" th:selected="${status == ''}"></option>
-            <option value="COMPLETED" th:text="#{history.status.completed}" th:selected="${status == 'COMPLETED'}"></option>
-            <option value="COMPLETE" th:text="#{history.status.complete}" th:selected="${status == 'COMPLETE'}"></option>
-            <option value="INCOMPLETE" th:text="#{history.status.incomplete}" th:selected="${status == 'INCOMPLETE'}"></option>
-            <option value="FAILED" th:text="#{history.status.failed}" th:selected="${status == 'FAILED'}"></option>
-            <option value="PENDING" th:text="#{history.status.pending}" th:selected="${status == 'PENDING'}"></option>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{history.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{history.intro}"></p>
+        </div>
+    </div>
+
+    <form class="lg-filters" id="history-filters" method="get" role="search" th:action="@{/console/history}"
+          th:aria-label="#{history.filters.aria}">
+        <select class="lg-select" name="period" th:aria-label="#{history.period}">
+            <option value="all" th:selected="${filters.period == 'all'}" th:text="#{history.period.all}"></option>
+            <option value="7" th:selected="${filters.period == '7'}" th:text="#{history.period.week}"></option>
+            <option value="30" th:selected="${filters.period == '30'}" th:text="#{history.period.month}"></option>
+            <option value="90" th:selected="${filters.period == '90'}" th:text="#{history.period.quarter}"></option>
+            <option value="custom" selected th:if="${filters.period == 'custom'}"
+                    th:text="${!filters.from.isEmpty() and !filters.to.isEmpty()} ? #{history.period.range(${filters.from}, ${filters.to})} : (${!filters.from.isEmpty()} ? #{history.period.since(${filters.from})} : #{history.period.until(${filters.to})})"></option>
         </select>
-        <label for="marketplace" th:text="#{history.marketplace}"></label>
-        <select id="marketplace" name="marketplace">
-            <option value="" th:text="#{history.marketplace.any}" th:selected="${marketplace == ''}"></option>
-            <option value="ETSY" th:text="#{edit.marketplace.etsy}" th:selected="${marketplace == 'ETSY'}"></option>
-            <option value="AMAZON" th:text="#{edit.marketplace.amazon}" th:selected="${marketplace == 'AMAZON'}"></option>
+        <th:block th:if="${filters.period == 'custom'}">
+            <input type="hidden" name="from" th:value="${filters.from}">
+            <input type="hidden" name="to" th:value="${filters.to}">
+        </th:block>
+        <select class="lg-select" name="status" th:aria-label="#{history.status}">
+            <option value="" th:text="#{history.status.any}"></option>
+            <option value="COMPLETED" th:selected="${filters.status == 'COMPLETED'}" th:text="#{history.status.completed}"></option>
+            <option value="COMPLETE" th:selected="${filters.status == 'COMPLETE'}" th:text="#{history.status.complete}"></option>
+            <option value="INCOMPLETE" th:selected="${filters.status == 'INCOMPLETE'}" th:text="#{history.status.incomplete}"></option>
+            <option value="FAILED" th:selected="${filters.status == 'FAILED'}" th:text="#{history.status.failed}"></option>
+            <option value="PENDING" th:selected="${filters.status == 'PENDING'}" th:text="#{history.status.pending}"></option>
         </select>
-        <label for="checker" th:text="#{history.checker}"></label>
-        <input id="checker" name="checker" type="search" th:value="${checker}">
-        <button type="submit" th:text="#{history.filter}"></button>
+        <select class="lg-select" name="marketplace" th:aria-label="#{history.marketplace}">
+            <option value="" th:text="#{history.marketplace.any}"></option>
+            <option value="ETSY" th:selected="${filters.marketplace == 'ETSY'}" th:text="#{edit.marketplace.etsy}"></option>
+            <option value="AMAZON" th:selected="${filters.marketplace == 'AMAZON'}" th:text="#{edit.marketplace.amazon}"></option>
+        </select>
+        <select class="lg-select" name="checker" th:aria-label="#{history.checker}">
+            <option value="" th:text="#{history.checker.any}"></option>
+            <option th:each="who : ${checkers}" th:value="${who}" th:selected="${who == filters.checker}" th:text="${who}"></option>
+        </select>
+        <input class="lg-input lg-filters__search" type="search" name="sku" th:value="${filters.sku}" autocomplete="off"
+               th:placeholder="#{history.sku.placeholder}" th:aria-label="#{history.sku.aria}">
+        <button type="submit" class="lg-btn lg-btn--small" th:text="#{history.filter}"></button>
+        <a class="lg-btn lg-btn--link" id="history-reset" th:if="${filters.active()}" th:href="@{/console/history}" th:text="#{history.reset}"></a>
     </form>
-    <p th:if="${history.rows().isEmpty()}" class="muted" th:text="#{history.empty}"></p>
-    <div class="report-scroll" th:if="${!history.rows().isEmpty()}">
-        <table>
-            <thead><tr>
-                <th th:text="#{history.col.time}"></th><th th:text="#{history.col.checker}"></th>
-                <th th:text="#{history.col.marketplace}"></th><th th:text="#{history.col.rows}"></th>
-                <th th:text="#{history.col.sku}"></th><th th:text="#{history.col.errors}"></th>
-                <th th:text="#{history.col.trademarks}"></th><th th:text="#{history.col.feedback}"></th>
-                <th th:text="#{history.col.status}"></th><th th:text="#{history.col.result}"></th>
-            </tr></thead>
+
+    <div class="lg-empty" id="history-empty" th:if="${history.rows().isEmpty()}">
+        <h2 class="lg-empty__title" th:text="${filters.active()} ? #{history.empty.filtered} : #{history.empty.none}"></h2>
+        <p class="lg-empty__text" th:text="${filters.active()} ? #{history.empty.filtered.text} : #{history.empty.none.text}"></p>
+        <p th:unless="${filters.active()}"><a class="lg-btn lg-btn--primary" th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a></p>
+    </div>
+
+    <div class="lg-table-wrap" th:unless="${history.rows().isEmpty()}" th:with="datetime=#{format.datetime}">
+        <table class="lg-table lg-table--scroll" id="history-table">
+            <caption class="lg-sr-only" th:text="#{history.table.caption}"></caption>
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{history.col.time}"></th>
+                <th scope="col" th:text="#{history.col.checker}"></th>
+                <th scope="col" th:text="#{history.col.marketplace}"></th>
+                <th scope="col" th:text="#{history.col.sku}"></th>
+                <th scope="col" class="lg-num" th:text="#{history.col.rows}"></th>
+                <th scope="col" th:text="#{history.col.errors}"></th>
+                <th scope="col" th:text="#{history.col.trademarks}"></th>
+                <th scope="col" th:text="#{history.col.status}"></th>
+                <th scope="col" th:text="#{history.col.feedback}"></th>
+                <th scope="col"><span class="lg-sr-only" th:text="#{history.col.result}"></span></th>
+            </tr>
+            </thead>
             <tbody>
             <tr th:each="row : ${history.rows()}">
-                <td th:text="${#temporals.format(row.checkedAt(), 'yyyy-MM-dd HH:mm')}"></td>
-                <td th:text="${row.checker()}"></td><td th:text="${row.marketplace()}"></td>
-                <td th:text="${#numbers.formatInteger(row.rowCount(), 1)}"></td>
-                <td th:text="${row.sku() == null ? '—' : row.sku()}"></td>
-                <td th:text="${#numbers.formatInteger(row.errors(), 1)}"></td>
-                <td th:text="${#numbers.formatInteger(row.trademarks(), 1)}"></td>
-                <td><span th:if="${row.reviewed()}" th:text="#{history.feedback.reviewed}"></span>
-                    <span th:unless="${row.reviewed()}" th:text="#{history.feedback.none}"></span></td>
-                <td th:text="${row.status()}"></td>
-                <td>
-                    <a th:href="@{/console/history/{pack}/{id}(pack=${row.pack()},id=${row.checkId()})}"
-                       th:text="#{history.open}"></a>
-                    <a th:href="@{/console/check/edit(marketplace=${row.marketplace()})}"
-                       th:text="#{history.edit}"></a>
+                <td class="lg-nowrap" th:text="${#temporals.format(row.checkedAt(), datetime)}"></td>
+                <td class="lg-wrap" th:text="${row.checker()}"></td>
+                <td th:text="${row.marketplace()}"></td>
+                <td class="lg-sku"><code class="lg-code" th:if="${row.sku() != null}" th:text="${row.sku()}"></code><span class="lg-text-muted" th:if="${row.sku() == null}">&mdash;</span></td>
+                <td class="lg-num" th:text="${#numbers.formatInteger(row.rowCount(), 1)}"></td>
+                <td><span class="lg-pill lg-pill--error" th:if="${row.errors() > 0}" th:text="${#numbers.formatInteger(row.errors(), 1)}"></span><span class="lg-text-muted" th:if="${row.errors() == 0}">0</span></td>
+                <td><span class="lg-pill lg-pill--trademark" th:if="${row.trademarks() > 0}" th:text="${#numbers.formatInteger(row.trademarks(), 1)}"></span><span class="lg-text-muted" th:if="${row.trademarks() == 0}">0</span></td>
+                <td><span th:replace="~{console/history-fragments :: status(${row.status()})}"></span></td>
+                <td class="lg-text-muted">
+                    <th:block th:if="${row.feedbackTotal() == 0}">&mdash;</th:block>
+                    <th:block th:if="${row.feedbackTotal() > 0 and row.feedbackGiven() == 0}" th:text="#{history.feedback.none}"></th:block>
+                    <th:block th:if="${row.feedbackGiven() > 0}" th:text="#{history.feedback.given(${#strings.toString(row.feedbackGiven())}, ${#strings.toString(row.feedbackTotal())})}"></th:block>
                 </td>
+                <td><a th:href="@{/console/history/{pack}/{id}(pack=${row.pack()},id=${row.checkId()})}" th:text="#{history.open}"
+                       th:aria-label="#{history.open.aria(${#temporals.format(row.checkedAt(), datetime)})}"></a></td>
             </tr>
             </tbody>
         </table>
     </div>
-    <nav th:if="${history.pages() > 1}" th:aria-label="#{history.pagination}">
-        <a th:if="${history.page() > 0}" th:href="@{/console/history(from=${from},to=${to},status=${status},marketplace=${marketplace},checker=${checker},page=${history.page()-1})}"
-           th:text="#{history.previous}"></a>
-        <span th:text="#{history.page(${history.page()+1},${history.pages()})}"></span>
-        <a th:if="${history.page()+1 < history.pages()}" th:href="@{/console/history(from=${from},to=${to},status=${status},marketplace=${marketplace},checker=${checker},page=${history.page()+1})}"
-           th:text="#{history.next}"></a>
-    </nav>
-    <p class="muted small" th:text="#{history.privacy}"></p>
+
+    <div class="lg-pager" th:unless="${history.rows().isEmpty()}">
+        <p class="lg-small lg-text-muted" id="history-shown"
+           th:text="#{history.shown(${#strings.toString(history.first())}, ${#strings.toString(history.last())}, ${#strings.toString(history.total())})}"></p>
+        <nav class="lg-actions" th:if="${history.pages() > 1}" th:aria-label="#{history.pagination}">
+            <a class="lg-btn lg-btn--small" rel="prev" th:if="${history.page() > 0}" th:text="#{history.previous}"
+               th:href="@{/console/history(period=${filters.period},from=${filters.from},to=${filters.to},status=${filters.status},marketplace=${filters.marketplace},checker=${filters.checker},sku=${filters.sku},page=${history.page() - 1})}"></a>
+            <span class="lg-btn lg-btn--small" aria-disabled="true" th:if="${history.page() == 0}" th:text="#{history.previous}"></span>
+            <span class="lg-small lg-text-muted" th:text="#{history.page(${history.page() + 1}, ${history.pages()})}"></span>
+            <a class="lg-btn lg-btn--small" rel="next" th:if="${history.page() + 1 < history.pages()}" th:text="#{history.next}"
+               th:href="@{/console/history(period=${filters.period},from=${filters.from},to=${filters.to},status=${filters.status},marketplace=${filters.marketplace},checker=${filters.checker},sku=${filters.sku},page=${history.page() + 1})}"></a>
+            <span class="lg-btn lg-btn--small" aria-disabled="true" th:if="${history.page() + 1 >= history.pages()}" th:text="#{history.next}"></span>
+        </nav>
+    </div>
 </main>
 </body>
 </html>

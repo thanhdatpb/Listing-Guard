@@ -677,3 +677,15 @@ body:has(> .lg-auth) { display: flex; flex-direction: column; min-height: 100vh;
 .lg-auth__foot { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line-soft); display: flex; justify-content: flex-end; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
 .lg-auth__foot .lang { display: flex; gap: var(--space-1); }
 .lg-auth__foot .lang a[aria-current="true"] { color: var(--ink); font-weight: 600; text-decoration: none; }
+
+/* ---------- manage pages: the filter row, the pager, table helpers (ADR-042) ---------- */
+
+/* A row of filters over a table. A control is as small as a chip; every one has a name for a screen reader (aria-label). */
+.lg-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-4); }
+.lg-filters .lg-select, .lg-filters .lg-input { display: inline-block; width: auto; max-width: 100%; min-height: 32px; padding: 4px var(--space-3); border-radius: var(--radius-sm); font-size: 13px; line-height: 18px; }
+.lg-filters .lg-filters__search { width: 14rem; }
+/* Under a table: how much is shown, and the way to the next page. */
+.lg-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); }
+.lg-pager p { margin: 0; }
+.lg-nowrap { white-space: nowrap; }
+.lg-wrap { overflow-wrap: anywhere; }
