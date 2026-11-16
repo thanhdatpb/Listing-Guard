@@ -26,6 +26,12 @@ public record BacktestOptions(Path input, Path mapping, String marketplace, Stri
                               String markColumn, Path out, Integer maxRows, Severity catchSeverity,
                               RiskLevel catchTrademarkRisk, double variantThreshold) {
 
+    /** The same options with another output directory: the second run of {@code --llm-judge} (ADR-036). */
+    public BacktestOptions withOut(Path directory) {
+        return new BacktestOptions(input, mapping, marketplace, claimedColumn, issueColumn, markColumn, directory, maxRows,
+                catchSeverity, catchTrademarkRisk, variantThreshold);
+    }
+
     static final Severity DEFAULT_CATCH_SEVERITY = Severity.WARNING;
     static final RiskLevel DEFAULT_CATCH_TRADEMARK_RISK = RiskLevel.MEDIUM;
     static final double DEFAULT_VARIANT_THRESHOLD = 0.6;
@@ -34,10 +40,10 @@ public record BacktestOptions(Path input, Path mapping, String marketplace, Stri
             Usage:
               --input=<file.csv> --mapping=<mapping.yaml> --marketplace=ETSY|AMAZON --claimed-column=<column>
               [--issue-column=<column>] [--mark-column=<column>] [--out=<directory>] [--max-rows=<n>]
-              [--catch-severity=ERROR|WARNING|INFO] [--catch-trademark-risk=MEDIUM|HIGH] [--variant-threshold=<0..1>]""";
+              [--catch-severity=ERROR|WARNING|INFO] [--catch-trademark-risk=MEDIUM|HIGH] [--variant-threshold=<0..1>] [--llm-judge]""";
 
     private static final Set<String> KNOWN = Set.of("input", "mapping", "marketplace", "claimed-column", "issue-column",
-            "mark-column", "out", "max-rows", "catch-severity", "catch-trademark-risk", "variant-threshold");
+            "mark-column", "out", "max-rows", "catch-severity", "catch-trademark-risk", "variant-threshold", "llm-judge");
 
     /**
      * @param defaultOut the directory used when {@code --out} is not given

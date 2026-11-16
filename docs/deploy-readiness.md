@@ -156,12 +156,13 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 | Console | `LISTING_GUARD_CONSOLE_ENABLED` false, `LISTING_GUARD_CONSOLE_BASE_URL`, `LISTING_GUARD_CONSOLE_AUTH_MODE` MAGIC_LINK (or CLOUDFLARE_ACCESS, BOTH), `LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN`, `..._ACCESS_AUD`, `..._ACCESS_CERTS_URL`, `..._ACCESS_CERT_CACHE_TTL` 1h, `..._ACCESS_ALLOWED_DOMAINS`, `..._ACCESS_ALLOWED_EMAILS`, `..._ACCESS_AUTO_CREATE` false, `..._ACCESS_DEFAULT_CLIENT_NAME` (the Access settings only for CLOUDFLARE_ACCESS or BOTH), `LISTING_GUARD_CONSOLE_MAIL_FROM`, `LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS` 5, `SPRING_MAIL_HOST` (the mail settings only for MAGIC_LINK or BOTH), `SPRING_MAIL_PORT` 587, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (secret), `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` true, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` true. The cookie is always Secure (`LISTING_GUARD_CONSOLE_COOKIE_SECURE` is fixed to `"true"`) |
 | Features | `LISTING_GUARD_PLANS_ENABLED` false, `LISTING_GUARD_FIXES_ENABLED` false |
 | Embeddings | `LISTING_GUARD_EMBEDDING_PROVIDER` none, `LISTING_GUARD_EMBEDDING_API_KEY` (secret; with provider `api` the API does not start while it is empty) |
+| LLM judge (ADR-036, `docs/llm.md`; off) | `LISTING_GUARD_LLM_ENABLED` false, `LISTING_GUARD_LLM_JUDGE_ENABLED` false, `LISTING_GUARD_LLM_GROQ_KEY`, `LISTING_GUARD_LLM_CLOUDFLARE_KEY`, `LISTING_GUARD_LLM_CLOUDFLARE_ACCOUNT_ID`, `LISTING_GUARD_LLM_GEMINI_KEY` (secrets, all empty); `LISTING_GUARD_LLM_<GROQ\|CLOUDFLARE\|GEMINI>_LISTING_TEXT_ALLOWED` false (a provider receives no listing text until set). With it on and no key the API does not start |
 | Policy monitor | `POLICY_MONITOR_STALE_DAYS` 90, `POLICY_MONITOR_KEEP_REPORTS` 12 |
 | Shared network | `LISTING_GUARD_SHARED_NETWORK`, only with `docker-compose.prod.shared-network.yml` |
 
 Secrets (never in Git, a command line, a ticket or a log): `POSTGRES_PASSWORD`, `TUNNEL_TOKEN`, `BACKUP_S3_SECRET_ACCESS_KEY`
 and its access key, `SPRING_MAIL_PASSWORD`, `LISTING_GUARD_EMBEDDING_API_KEY`, `LISTING_GUARD_USPTO_ODP_API_KEY`,
-`LISTING_GUARD_TSDR_API_KEY`, the Cloudflare service token's secret, and every client API key.
+`LISTING_GUARD_TSDR_API_KEY`, `LISTING_GUARD_LLM_GROQ_KEY`, `LISTING_GUARD_LLM_CLOUDFLARE_KEY`, `LISTING_GUARD_LLM_GEMINI_KEY`, the Cloudflare service token's secret, and every client API key.
 
 ### What was missing or off, compared with the template and the runbook
 

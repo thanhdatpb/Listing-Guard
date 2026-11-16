@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.evaluation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.thanhdatpb.listingguard.api.listing.Normalizer;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckService;
+import com.thanhdatpb.listingguard.api.trademark.judge.TrademarkContextJudge;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
@@ -65,6 +66,7 @@ public final class ListingAnalyzer {
     private final RuleEngine engine;
     private final Function<String, RulesetConfig> rulesets;
     private final ScannerLookup scanners;
+    private final TrademarkContextJudge judge;
 
     /**
      * @param normalizers the normalizer of a marketplace code
@@ -73,10 +75,21 @@ public final class ListingAnalyzer {
      */
     public ListingAnalyzer(Function<String, Normalizer> normalizers, RuleEngine engine,
                            Function<String, RulesetConfig> rulesets, ScannerLookup scanners) {
+        this(normalizers, engine, rulesets, scanners, null);
+    }
+
+    private ListingAnalyzer(Function<String, Normalizer> normalizers, RuleEngine engine,
+                            Function<String, RulesetConfig> rulesets, ScannerLookup scanners, TrademarkContextJudge judge) {
+        this.judge = judge;
         this.normalizers = normalizers;
         this.engine = engine;
         this.rulesets = rulesets;
         this.scanners = scanners;
+    }
+
+    /** The same analysis with the trademark context judge (ADR-036) applied to the scan result; used by {@code --llm-judge}. */
+    public ListingAnalyzer withJudge(TrademarkContextJudge contextJudge) {
+        return new ListingAnalyzer(normalizers, engine, rulesets, scanners, contextJudge);
     }
 
     /**
@@ -109,6 +122,10 @@ public final class ListingAnalyzer {
         try {
             scanner = scanners.scanner(code);
             result = scanner.scan(input);
+            if (judge != null) {
+                // the same step a stored check takes (ADR-036), only for a measurement run that asked for it
+                result = judge.judge(input, result, scanner.catalog());
+            }
             trademarkState = PartState.DONE;
         } catch (TrademarkUnavailableException e) {
             trademarkState = PartState.NOT_CONFIGURED;
