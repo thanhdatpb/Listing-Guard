@@ -94,7 +94,7 @@ Before you rely on it:
   been committed. The optional server-side policy analyzer has no real model call or endpoint yet.
 
 What is not built yet is listed in the [Roadmap](#roadmap). Changes between versions are in
-[docs/releases/v0.8.0.md](releases/v0.8.0.md).
+[docs/releases/v0.9.0.md](releases/v0.9.0.md).
 
 ## Architecture
 
@@ -145,7 +145,7 @@ Client backend -- X-API-Key --> Listing Guard API (Spring Boot)
   your Java backend -> typed calls, typed exceptions, bounded retry -> HTTP with X-API-Key to the API above
 
   MCP server (its own jar, `mcp-server/`; optional; no database, no internal service)
-  AI agent -- STDIO (default) or Streamable HTTP on loopback only --> seven tools
+  AI agent -- STDIO (default) or Streamable HTTP on loopback only --> nine tools
        -> raw calls of the Java client SDK (no retry) to the Listing Guard API above; its answers come back unchanged
 
   Policy ingest job (profile `ingest`)
@@ -167,7 +167,7 @@ Modules:
 | `rag-analyzer/` | Policy manifest, HTML/PDF parsers, structural chunker, `EmbeddingProvider` (none, Ollama, hashing for tests), `PolicyRetriever`, retrieval metrics, and the `LlmProvider` contract with a scripted test provider and a `CitationVerifier` (no call to a real model is implemented). No Spring. |
 | `api/` | Spring Boot REST app (Java 21, PostgreSQL 16) and optional Thymeleaf console, Flyway migrations, Etsy/Amazon normalizers, API-key client authentication and isolation, listing, trademark, variation, personalization and image check endpoints, report/capabilities/limits/usage endpoints, result retention, PostgreSQL trademark catalog (`pg_trgm`), `trademark-import`, `uspto-sync`, `uspto-convert`, `batch-check` and `health-report` jobs, policy ingest and pgvector retrieval, optional `ApiEmbeddingProvider` |
 | `client/` | Java client SDK (ADR-023, artifact `listing-guard-client`): `ListingGuardClient` with typed calls of the seven read and check endpoints, blocking and `CompletableFuture`, typed problem exceptions, a bounded retry, a raw call, its own request and response records that follow `docs/api/openapi.json`. Java 21, the JDK HTTP client and Jackson only; no Spring, no other module. |
-| `mcp-server/` | MCP server for AI agents (ADR-017): seven tools that call the REST API with a client's key and return its answers unchanged; STDIO by default, optional Streamable HTTP on loopback. The official MCP Java SDK (no Spring); its API calls go through the Java client SDK (`client/`, the one module it depends on; ADR-023), no database. |
+| `mcp-server/` | MCP server for AI agents (ADR-017): nine tools that call the REST API with a client's key and return its answers unchanged; STDIO by default, optional Streamable HTTP on loopback. The official MCP Java SDK (no Spring); its API calls go through the Java client SDK (`client/`, the one module it depends on; ADR-023), no database. |
 | `eval/` | Evaluation sets and results (`eval/retrieval/`) |
 | `catalogs/` | `manifest.yaml` (committed) and `raw/` (local trademark data files, git-ignored) |
 | `batch/` | `mappings/` (example column mappings, committed); `input/` and `out/` (your exports and the reports, git-ignored) |
@@ -177,7 +177,7 @@ Modules:
 | `docs/api/` | `openapi.json`, the committed API contract (a test fails when it drifts from the code); `input-schema.json`, the listing formats as JSON Schema; `baseline/`, the contract of the latest release; `breaking-changes.yaml`, the reviewed exceptions (ADR-022) |
 | `docs/integration-guide.md` | How a backend calls the API: auth, flow, field paths, errors |
 | `docs/batch-check.md` | How to check an export file and read the reports |
-| `docs/mcp.md` | How to use the checks from an AI agent: Claude Code and Claude Desktop setup, the seven tools, errors, limits |
+| `docs/mcp.md` | How to use the checks from an AI agent: Claude Code and Claude Desktop setup, the nine tools, errors, limits |
 | `docs/deployment.md` | Production deployment, upgrades, and the migration notes |
 | `docs/releases/` | Release notes, one file per version |
 
@@ -353,10 +353,10 @@ Implemented capabilities are summarized in [Status](#status). The next confirmed
 - [Input schema](input-schema.md): accepted Etsy and Amazon listing fields, and the request of the variation checks.
 - [Batch check](batch-check.md): check an export file (Etsy CSV, Amazon flat file) and read the reports.
 - [Java client SDK](../client/README.md): call the API from a Java backend with `listing-guard-client`: dependency from GitHub Packages, the calls, the settings and the exceptions.
-- [MCP server](mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the seven tools, errors and limits.
+- [MCP server](mcp.md): use the checks from an AI agent (Claude Code, Claude Desktop): setup, the nine tools, errors and limits.
 - [Deployment](deployment.md): production setup, backup, upgrades, SMTP configuration for the optional console, migration notes and trademark catalog import.
 - [Oracle ARM deployment](deploy-oracle.md): deploy the production API and PostgreSQL on an Oracle Cloud Ampere A1 VM behind Cloudflare Tunnel.
-- [Release notes](releases/v0.8.0.md): what changed in each version and what to do when upgrading.
+- [Release notes](releases/v0.9.0.md): what changed in each version and what to do when upgrading.
 - [ADR-001: Rule configuration](adr/ADR-001-rule-config.md)
 - [ADR-002: Ruleset versioning](adr/ADR-002-ruleset-versioning.md)
 - [ADR-003: Chunking strategy](adr/ADR-003-chunking-strategy.md)

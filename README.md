@@ -16,6 +16,8 @@ Input format adapters: [docs/adapters.md](docs/adapters.md)
 
 Self-hosted pre-publish compliance API for Etsy and Amazon listings: deterministic rules, explainable trademark risk, built for sellers, tools and AI agents.
 
+**Latest release: [v0.9.0](docs/releases/v0.9.0.md)** (image `ghcr.io/thanhdatpb/listing-guard:0.9.0`, `linux/amd64` and `linux/arm64`). v0.7.0 and v0.8.0 were never tagged; their notes are merged into v0.9.0. Deploy by tag, never `latest`.
+
 ![System architecture: clients and integrations call the Listing Guard API, which uses versioned rulesets, catalog data, PostgreSQL and operational jobs.](docs/images/architecture-overview.svg)
 
 The API checks listings and returns findings with their source, field and evidence. Separate endpoints screen variation families, buyer personalization text and listing images.
@@ -28,16 +30,29 @@ Listing Guard suggests and reports. It never edits or publishes a listing and do
 
 ## What it checks
 
+State of v0.9.0. "Ready" means it works and its tests pass, within the evidence status of the last column; nothing here has run on ARM64 hardware, on Oracle or behind Cloudflare yet.
+
 | Endpoint or capability | What it does | Availability | Evidence status |
 |---|---|---|---|
-| `POST /api/v1/checks` | Deterministic Etsy and Amazon listing rules | Ready | Each rule carries `verified`, `secondary` or `unverified` sourcing |
-| `POST /api/v1/trademark-checks` | Explainable mark matches against the configured versioned catalog | Requires a `READY` catalog | Reference warning, not a legal conclusion; trademark rules and product classes are unverified |
+| `POST /api/v1/checks` | Deterministic Etsy and Amazon listing rules | Ready | Each rule carries `verified`, `secondary` or `unverified` sourcing; Amazon rules are WARNING only |
+| `POST /api/v1/listing-edits` | Compares a listing before and after a revision: changed fields, new, changed and remaining findings ([guide](docs/edit-mode.md)) | Ready | Runs the listing, trademark and optional variation packs, so their evidence status applies; comparison text is not stored |
+| `POST /api/v1/trademark-checks` | Explainable mark matches against the configured versioned catalog | Needs a `READY` catalog (`503` otherwise, `200 INCOMPLETE` for a client with a watchlist entry) | Reference warning, not a legal conclusion; trademark rules and product classes are unverified; the false-positive rate on the real catalog is not measured |
 | `GET`/`PUT /api/v1/trademark-watchlist` | A client's own list of marks (team names, nicknames, slogans), scanned by every trademark check; works with no catalog ([guide](docs/watchlist.md)) | Ready | The client's own data; findings are marked `WATCHLIST`, `INCOMPLETE` without a catalog |
-| `POST /api/v1/variation-checks` | Checks parent/child variation structure, combinations and SKUs | Ready | No rule is verified; findings are WARNING or INFO, never ERROR |
-| `POST /api/v1/personalization-screenings` | Screens buyer-entered text against a print profile and the trademark catalog | Ready | Profile values are placeholders; text is personal data and is not stored or repeated |
-| `POST /api/v1/image-checks` | Checks image properties for Etsy or Amazon | Off by default | Shipped marketplace thresholds are unset; results are INCOMPLETE and images are not recognized for marks or text |
-| `GET /api/v1/rulesets/{marketplace}/limits`, `GET /api/v1/capabilities`, `GET /api/v1/reports/summary` | Reads limits, deployment capabilities and stored-result counts | Ready | Read-only; reports do not read listing text |
-| `POST /api/v1/policy-checks` | Planned policy-grounded analysis with verified citations | Planned, off by default | No real LLM call or endpoint yet; see [ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md) |
+| `POST /api/v1/variation-checks` | Checks parent/child variation structure, combinations and SKUs | Ready as hints | No rule is verified; findings are WARNING or INFO, never ERROR |
+| `POST /api/v1/personalization-screenings` | Screens buyer-entered text against a print profile and the trademark catalog | Runs, but **placeholder profiles** | The shipped print profiles and personalization rules use invented values; text is personal data and is not stored or repeated |
+| `POST /api/v1/image-checks` | Checks image properties for Etsy or Amazon | Off by default | Shipped marketplace thresholds are unset; results are INCOMPLETE; images are not recognized for marks, logos or text; not safe for an untrusted caller |
+| `POST /api/v1/feedback`, `GET /api/v1/feedback/stats` | Records a verdict on a finding and reads the counts ([guide](docs/feedback.md)) | Ready | What reviewers reported, not a measured precision; no listing text is stored |
+| `GET /api/v1/rulesets/{marketplace}/limits`, `GET /api/v1/capabilities`, `GET /api/v1/input-adapters`, `GET /api/v1/usage`, `GET /api/v1/reports/summary` | Reads limits, deployment capabilities, input formats, plan and usage, and stored-result counts | Ready | Read-only; reports do not read listing text; the Shopify input format is experimental |
+| `POST /api/v1/policy-checks` | Planned policy-grounded analysis with verified citations | **Planned**; the endpoint does not exist | No real LLM call or endpoint yet; see [ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md) |
+
+| Beyond the endpoints | Availability | Evidence status |
+|---|---|---|
+| Console (check, bulk check, history, re-audit, watchlist, statistics, report, API keys; Vietnamese and English) | Optional, off by default | Integration tests and a look at screenshots; not tried with a real SMTP server or Cloudflare Access team; the Vietnamese copy needs a native reader |
+| [Periodic re-audit](docs/reaudit.md) | Ready in the console | The first run of a scope has nothing to compare with |
+| [LLM judge and rewrite suggestions](docs/llm.md) | **Off by default**; free tiers | Not measured on real claims; a verified suggestion is not legal clearance |
+| `hf-convert`, `trademark-import`, `batch-check`, `backtest`, `policy-diff` | Ready as jobs | `hf-convert` ran on one build of the dataset; `backtest` has not been run on a real labelled file |
+| `uspto-convert`, `uspto-sync`, `tsdr-status` | Offline modes only | Unverified against real USPTO data; the downloads are off and unverified |
+| MCP server (nine read-only tools) and Java SDK | Ready | The MCP HTTP transport has no authentication |
 
 Rule sources stay labeled as they are in the rulesets; no unverified limit is presented as official. The trademark result includes its disclaimer and is not legal advice. The image checker does not identify logos, text or marks. A missing finding is not marketplace approval.
 
@@ -55,7 +70,7 @@ Rule sources stay labeled as they are in the rulesets; no unverified limit is pr
 
 ## Giao diện
 
-The console is the page a seller or a lead works in: Vietnamese by default and English with a switch, light and dark, built on one set of
+The console is the page a seller or a lead works in: English by default (set `LISTING_GUARD_CONSOLE_DEFAULT_LOCALE=vi` for a Vietnamese deployment) with a switch, light and dark, built on one set of
 design tokens ([ADR-040](docs/adr/ADR-040-console-visual-identity-and-design-system.md),
 [ADR-041](docs/adr/ADR-041-console-work-pages.md), [ADR-042](docs/adr/ADR-042-console-manage-pages.md)). Screenshots use invented listings.
 
@@ -91,7 +106,7 @@ History, the watchlist, statistics, the report and API keys are on the same syst
 
 ## Use it from AI agents
 
-![A user asks an AI agent to use a planned Agent Skill and the MCP server, which checks listings without editing or publishing; its exact eight tools call the Java client SDK and Listing Guard API, while compatibility and evaluation support blocks are shown below.](docs/images/agent-integration.svg)
+![A user asks an AI agent to use a planned Agent Skill and the MCP server, which checks listings without editing or publishing; its exact nine tools call the Java client SDK and Listing Guard API, while compatibility and evaluation support blocks are shown below.](docs/images/agent-integration.svg)
 
 Build the MCP jar and configure a client key and API URL. STDIO is the default transport; its HTTP transport has no authentication and must stay on loopback or a private network.
 
@@ -102,7 +117,7 @@ export LISTING_GUARD_MCP_BASE_URL='https://listing-api.example.com'
 java -jar mcp-server/target/listing-guard-mcp.jar
 ```
 
-The eight tools are `check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`, `get_capabilities` and `get_watchlist`. Listing access is read-only: check calls can store API results and may use quota, but no tool edits or publishes a listing. Successful API responses are passed through unchanged; the model does not decide what a finding means. See the [MCP guide](docs/mcp.md).
+The nine tools are `check_listing`, `check_trademark`, `check_variations`, `check_listing_edit`, `screen_personalization`, `get_limits`, `get_usage`, `get_capabilities` and `get_watchlist`. Listing access is read-only: check calls can store API results and may use quota, but no tool edits or publishes a listing. Successful API responses are passed through unchanged; the model does not decide what a finding means. See the [MCP guide](docs/mcp.md).
 
 ## Ecosystem
 
@@ -134,10 +149,12 @@ The second request needs an operator configured catalog; without one it returns 
 
 ## Deploy
 
-See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production setup, Access, backups, upgrades and health checks. General production settings are in [deployment](docs/deployment.md). Before the first deployment read [deploy readiness](docs/deploy-readiness.md): what is on or off by default, the environment variables, the resource budget, a security checklist, a smoke test and the manual steps in order. The release notes of the version to deploy are in [docs/releases](docs/releases/v0.8.0.md).
+See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production setup, Access, backups, upgrades and health checks. General production settings are in [deployment](docs/deployment.md). Before the first deployment read [deploy readiness](docs/deploy-readiness.md): what is on or off by default, the environment variables, the resource budget, a security checklist, a smoke test and the manual steps in order. The release notes of the version to deploy are in [docs/releases](docs/releases/v0.9.0.md).
 
 ## Roadmap
 
+- Decide a generic and short word policy for a real catalog: on the Hugging Face catalog all 20 sample listings came back `HIGH` ([measurement](docs/deploy-readiness.md#the-catalog-measured-on-the-real-hugging-face-build)), then run `backtest` on a labelled file.
+- Run the smoke test on the Oracle A1 (ARM64 hardware) and measure a trademark check there.
 - Verify the USPTO conversion and run the trademark evaluation on real data ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md)).
 - Verify the TSDR status check against the real TSDR once a key exists, and decide how its dead-mark report feeds the next catalog sync ([ADR-009](docs/adr/ADR-009-trademark-risk-scanner.md#tsdr-status-check-job-tsdr-status)).
 - Review official image thresholds and build bounded image decoding and upload staging ([ADR-008](docs/adr/ADR-008-image-compliance-checker.md)).
@@ -162,7 +179,7 @@ See the [detailed status and project guide](docs/overview.md) for implemented be
 - [Oracle A1 deployment](docs/deploy-oracle.md)
 - [Deploy readiness](docs/deploy-readiness.md)
 - [Architecture decisions](docs/adr/)
-- [Release notes](docs/releases/v0.8.0.md)
+- [Release notes](docs/releases/v0.9.0.md)
 
 ## License
 

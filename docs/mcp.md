@@ -11,8 +11,8 @@ Listing Guard through the [Model Context Protocol](https://modelcontextprotocol.
 - **The model does not decide.** Every conclusion is the answer of the Listing Guard API, handed to the agent unchanged: its
   findings, its `disclaimer`, `rulesetVersion`, `catalogVersion`, `analysisVersion` and `completeness`. An `INCOMPLETE`
   result is not a clean result and an `UNKNOWN` risk is not `LOW`; the server never turns one into the other.
-- **It only checks.** Eight tools, none writes: no tool edits a listing, applies a fix, publishes or changes a plan. It makes
-  `GET` and `POST` calls to eight paths of the API and nothing else.
+- **It only checks.** Nine tools, none writes: no tool edits a listing, applies a fix, publishes or changes a plan. It makes
+  `GET` and `POST` calls to nine paths of the API and nothing else.
 - **It is a client of the API, nothing more.** It has no database and calls no internal service. It sends the client's
   `X-API-Key`, so key validity, the per-client rate limit, the plan and the monthly quota
   ([ADR-007](adr/ADR-007-multi-client-model.md), [ADR-013](adr/ADR-013-client-plans-and-monthly-quota.md)) apply exactly as
@@ -152,7 +152,7 @@ Ask in your own words; the agent picks the tool and sends the listing in the mar
 - "Does this deployment have a trademark catalog, and is it the demo one?" (`get_capabilities`)
 - "Which names are on our own trademark watchlist, and why?" (`get_watchlist`)
 
-## The eight tools
+## The nine tools
 
 | Tool | API call | Arguments | Counts against the quota (where plans are on) |
 |---|---|---|---|
@@ -160,6 +160,7 @@ Ask in your own words; the agent picks the tool and sends the listing in the mar
 | `check_trademark` | `POST /api/v1/trademark-checks` | `marketplace`, `listing`, optional `product_type` | one unit per new complete result |
 | `check_variations` | `POST /api/v1/variation-checks` | `marketplace`, optional `parent`, `variation_properties`, `children` | one unit per new complete result |
 | `screen_personalization` | `POST /api/v1/personalization-screenings` | `marketplace`, `values`, optional `print_profile`, `product_type` | one unit per new complete result |
+| `check_listing_edit` | `POST /api/v1/listing-edits` | `marketplace`, `before`, `after`, optional `beforeVariations`, `afterVariations` | the packs it runs count as they do for their own endpoints; the comparison text is not stored ([edit-mode.md](edit-mode.md)) |
 | `get_limits` | `GET /api/v1/rulesets/{marketplace}/limits` | `marketplace`, optional `product_type` | no |
 | `get_usage` | `GET /api/v1/usage` | none | no |
 | `get_capabilities` | `GET /api/v1/capabilities` | none | no |

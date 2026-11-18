@@ -206,8 +206,9 @@ It never edits a listing, never publishes, and does no SEO.
   with `RetryPolicy.none()` and turns the SDK's `ListingGuardTransportException` into the server's own codes. Official MCP Java SDK
   `io.modelcontextprotocol.sdk` **2.1.0** pinned exactly (`mcp-core` + `mcp-json-jackson2`; the aggregate `mcp` pulls Jackson 3;
   2.2.0-M2 is a milestone and is not used), **no Spring** (the Spring AI starter needs Spring Boot 4 and is not used; the repository itself is on Boot 4.1, ADR-020), the JDK
-  `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Eight tools
-  (`check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`, `get_capabilities`
+  `HttpClient`, Tomcat embed only for the optional HTTP transport, the Shade plugin for `target/listing-guard-mcp.jar`. Nine tools
+  (`check_listing`, `check_trademark`, `check_variations`, `check_listing_edit` (`POST /api/v1/listing-edits`, ADR-033),
+  `screen_personalization`, `get_limits`, `get_usage`, `get_capabilities`
   (`GET /api/v1/capabilities`, no arguments, read only), `get_watchlist` (`GET /api/v1/trademark-watchlist`, no arguments, read only,
   ADR-031); `check_trademark` takes an optional `product_type`, passed on unchanged;
   `Endpoint` is the closed list of API calls, each an SDK `Operation`, only `GET` and `POST`, no tool takes a path or a URL);
@@ -821,9 +822,16 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   does not build the image, so check with `docker build .` (the missing `listing-input-adapters` line made every release build fail
   until v0.8.0). Runtime folders of a deployment (`backups/`, `logs/`, `catalogs/raw/`, `policy-monitor/`, ...) stay in `.gitignore`
   and `.dockerignore`. A new setting that a deployment must control is forwarded by `docker-compose.prod.yml`, listed (commented)
-  in `deploy/env.prod.example` and in the table of `docs/deploy-readiness.md`; a new one-shot job gets a `mem_limit`. **v0.8.0 is
-  prepared** (`docs/releases/v0.8.0.md`, `Released YYYY-MM-DD` still to fill; **no tag exists yet**; **v0.7.0 is never tagged**: its
-  notes are folded into v0.8.0 and `v0.7.0.md` only points there). CI has an `image` job that runs `docker build` (linux/amd64, not
+  in `deploy/env.prod.example` and in the table of `docs/deploy-readiness.md`; a new one-shot job gets a `mem_limit`. **Release status:
+  v0.9.0 is prepared** (`docs/releases/v0.9.0.md`, `Released YYYY-MM-DD` still to fill; PR `chore/release-v0.9.0`; **the last tag is
+  v0.6.0 and no v0.9.0 tag exists until the maintainer pushes it**; **v0.7.0 and v0.8.0 are never tagged**: their notes and everything
+  since are in v0.9.0, and `v0.7.0.md` and `v0.8.0.md` only point there). The pre-release checks (full `verify`, contract check, image
+  build, production Compose smoke test, catalog latency) are recorded in `docs/deploy-readiness.md`, section "v0.9.0". **Tag only from
+  a commit with that PR merged**, then the maintainer follows the "after the tag" list (check both workflows, the amd64 and arm64
+  manifests, the GitHub Release files, the SDK on GitHub Packages, and move the ADR-022 baseline to v0.9.0 in a small PR; the
+  baseline moves only after the tag, never in the release PR). Never make a statement a measurement did not support: the trademark
+  check time and false-positive rate on the real catalog, and anything on ARM64 hardware, Oracle or Cloudflare, stay "not measured"
+  until someone measures them. CI has an `image` job that runs `docker build` (linux/amd64, not
   pushed) on every pull request, so a `Dockerfile` that misses a module fails the PR. **Deployment decisions** (ADR-019, 2026-11-13):
   personal Oracle account, Tokyo, Always Free, 2 OCPU / 12 GB, no reserved IP, public GHCR package, 1 USD budget alert, Cloudflare
   Access only in front of `/console/*` (the maintainer's e-mail) and `/health`, and **none in front of `/api/v1/*`** (the API key and
@@ -831,7 +839,8 @@ On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
   were behind Access. Open: limit console sign-ins by `CF-Connecting-IP` (trusted only from the tunnel connector) and optional Access
   service-token settings in the MCP server (`docs/deploy-readiness.md` section 7). `cloudflared` is pinned in
   `docker-compose.prod.cloudflared.yml` with its source in a comment; update it from the releases page, never to `latest`.
-  `docs/releases/unreleased.md` is a stub for the changes after it. After a tag the maintainer moves the ADR-022 baseline.
+  `docs/releases/unreleased.md` is an empty frame ("Changes on main since v0.9.0") for the changes after it. After a tag the
+  maintainer moves the ADR-022 baseline.
 - **Hugging Face source** (ADR-030): DuckDB stays in `hf-convert` (never a dependency of `api` or any module the API image
   builds) and the API image stays the Dockerfile's last stage. Never read a column whose name you did not see in the dataset's own
   files (`profile/null_rates.csv` lists them); a new column or a new dataset needs that first. The filters file is immutable and
