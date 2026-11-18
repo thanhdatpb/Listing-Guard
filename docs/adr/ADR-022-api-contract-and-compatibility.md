@@ -107,8 +107,8 @@ working, is deprecated (section 6) and is removed in `/api/v2`, or in `/api/v1` 
 
 The new module `contract-tools` (Java 21 and Jackson 2 only: no Spring, no database, no network, no Node or Go runtime) compares
 the current document with the **baseline**: `docs/api/baseline/openapi-v<version>.json`, a byte copy of `docs/api/openapi.json` at
-the latest published release tag. Today that is `v0.6.0` (v0.7.0 was never tagged and its notes are folded into the v0.8.0 notes; the platform part of them says the
-document did not change since v0.6.0). The folder holds exactly one OpenAPI baseline. When it also holds
+the latest published release tag. Today that is `v0.6.0` (v0.7.0 and v0.8.0 were never tagged and their notes are folded into the v0.9.0 notes; the platform part of
+them says the document did not change since v0.6.0). The folder holds exactly one OpenAPI baseline. When it also holds
 `input-schema-v<same version>.json`, `docs/api/input-schema.json` is compared with it by the same rules; the first release that
 ships the input schema provides that baseline.
 
@@ -364,7 +364,9 @@ against the schema with a JSON Schema validator (`com.networknt:json-schema-vali
   (it only binds with branch protection that requires code owner reviews)?
 - Should the v0.6.0 Release get `openapi.json` attached by hand? It has no `input-schema.json` and its tag predates this ADR.
 - Should a renamed schema (`schema-renamed`) be breaking for the planned Java SDK, if it is generated from the file?
-- When `v0.8.0` is tagged, the baseline moves to it (section 8); v0.7.0 will not be tagged (its notes are folded into v0.8.0).
+- When `v0.9.0` is tagged, the baseline moves to it in a pull request of its own (section 8), never in the release pull request,
+  because the baseline is a byte copy of a release that has been published; v0.7.0 and v0.8.0 will not be tagged (their notes are
+  folded into v0.9.0).
 
 ## Accepted breaking changes
 

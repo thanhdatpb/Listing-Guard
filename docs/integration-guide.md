@@ -641,7 +641,7 @@ Additive changes are safe only for a tolerant reader:
 Every response under `/api/v1` carries the release of the server that answered, success or problem, `401` and `429` included:
 
 ```text
-X-Listing-Guard-Version: 0.8.0
+X-Listing-Guard-Version: 0.9.0
 ```
 
 A build without a release version (a local build) says `dev`. Log it with the request id and show it in a diagnostics view; use
@@ -676,7 +676,7 @@ From the first release cut after ADR-022, each GitHub Release has these assets, 
 | `compatibility-report.md` | the changes since the previous release: breaking (declared), additive, other |
 
 ```bash
-TAG=v0.8.0
+TAG=v0.9.0
 BASE=https://github.com/thanhdatpb/Listing-Guard/releases/download/$TAG
 curl -fsSL -o openapi.json "$BASE/openapi.json"
 curl -fsSL -o input-schema.json "$BASE/input-schema.json"
