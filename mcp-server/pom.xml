@@ -16,7 +16,7 @@
 
     <properties>
         <!-- The highest stable release of the official Java SDK on 2026-11-07 (2.2.0-M2 is a milestone: not used). ADR-017. -->
-        <mcp-sdk.version>2.1.0</mcp-sdk.version>
+        <mcp-sdk.version>2.2.0</mcp-sdk.version>
         <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
     </properties>
 

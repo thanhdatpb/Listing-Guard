@@ -30,7 +30,7 @@
 
     <properties>
         <!-- Plugin versions, each released more than two weeks before 2026-11-12 (checked on Maven Central). -->
-        <flatten-maven-plugin.version>1.8.0</flatten-maven-plugin.version>
+        <flatten-maven-plugin.version>1.9.0</flatten-maven-plugin.version>
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <!-- The version the Maven 3.10 default lifecycle binds for the other modules; declared because the manifest is set here. -->
