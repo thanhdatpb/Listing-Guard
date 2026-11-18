@@ -1,8 +1,10 @@
 # Deploy readiness
 
 The pre-deploy review of the first production deployment on one Oracle Cloud Always Free A1 VM behind Cloudflare Tunnel
-([ADR-019](adr/ADR-019-oracle-a1-cloudflare-tunnel.md), runbook [deploy-oracle.md](deploy-oracle.md)), written for release
-v0.8.0 on 2026-11-13. It adds no feature. It says what is on and what is not, which variables decide it, whether the VM is big
+([ADR-019](adr/ADR-019-oracle-a1-cloudflare-tunnel.md), runbook [deploy-oracle.md](deploy-oracle.md)), first written for the
+release that became v0.8.0 on 2026-11-13 and brought up to date for **v0.9.0** on 2026-11-18 (the checks made for v0.9.0, with their
+results, are in [section 8](#8-v090-pre-release-checks-and-results); sections 1 to 7 keep the review of 2026-11-13 where it still
+holds). It adds no feature. It says what is on and what is not, which variables decide it, whether the VM is big
 enough, what to check before the address is public, how to smoke-test the deployment, and which steps only you can do, in order.
 
 ## Decisions of the maintainer
@@ -66,6 +68,9 @@ and the per-client rate limit are its only protection ([the decision](#decisions
 | `POST /api/v1/variation-checks`, `GET .../{id}` | on | none | an API key | real as hints: no rule is `verified`, so no finding is ERROR |
 | `POST /api/v1/personalization-screenings`, `GET .../{id}` | on | none | an API key; a catalog for its trademark part | placeholder: the shipped print profiles are invented; without a catalog the character rules run and the result is `INCOMPLETE` (not stored for reuse, not charged) |
 | `POST /api/v1/image-checks`, `GET .../{id}` | **off** (`503 image-checks-not-configured`) | `LISTING_GUARD_IMAGE_ENABLED`, **which `docker-compose.prod.yml` does not pass on** | an API key | **not usable yet**: every marketplace threshold is null, so every check is `INCOMPLETE`; the bounded decoder and upload staging of ADR-008 are not built, so it must not be enabled for a caller you do not trust |
+| `POST /api/v1/listing-edits` | on | none | an API key; a catalog for the trademark part (or a watchlist entry) | real as far as the packs it runs: listing rules, trademark (an `INCOMPLETE` answer instead of `503` for a client with a watchlist entry), optional variation; the comparison text is not stored |
+| `GET`, `PUT /api/v1/trademark-watchlist` | on | none | an API key | real: the client's own data; works with no catalog (the check is then `INCOMPLETE`) |
+| `POST /api/v1/feedback`, `GET /api/v1/feedback/stats` | on | none | an API key | real: what reviewers reported, not a measured precision |
 | `GET /api/v1/usage` | on | none | an API key | real (costs no unit) |
 | `GET /api/v1/rulesets/{marketplace}/limits` | on | none | an API key | real (read only) |
 | `GET /api/v1/capabilities` | on | none | an API key | real: says which packs are available and the catalog state |
@@ -95,11 +100,17 @@ the Access mode reach the container ([section 2](#2-environment-variables)).
 | Page | What it does |
 |---|---|
 | `GET /login`, `POST /login`, `GET /login/verify`, `POST /login/verify`, `/logout` | magic-link sign-in (5 per e-mail and 30 per remote IP per 15 minutes; see [the remote IP issue](#7-open-items)) |
-| `GET /console` | dashboard |
-| `GET /console/check`, `POST /console/check`, `POST /console/check/apply` | the Check listing editor (verified fixes, readiness, trademark panel; costs quota like the API) |
+| `GET /console` | home: the week in figures, what needs attention, the data the checks ran on |
+| `GET /console/check`, `POST /console/check`, `POST /console/check/apply` | the Check listing editor and edit mode (verified fixes, readiness, trademark panel, before and after; costs quota like the API); the *Gợi ý sửa* button only with the LLM rewrite on |
+| `GET /console/bulk` and its `POST` paths | the bulk check: paste from a Sheet or upload (`LISTING_GUARD_CONSOLE_BULK_MAX_ROWS` 200, `..._MAX_BYTES` 1MB) |
+| `GET /console/history` | the client's retained check results, with filters |
+| `GET /console/reaudit` | the periodic re-audit of the listings on sale |
+| `GET /console/watchlist` | the client's own watchlist; only an `ADMIN` account changes it |
+| `GET /console/stats` | verdicts per rule and per reviewer (feedback) |
 | `GET /console/api-keys`, `POST /console/api-keys`, `GET\|POST /console/api-keys/{id}/revoke` | list, create and revoke the account's keys (`LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS`, 5) |
 | `GET /console/report` | the listing health report of the account's client |
 | `/console/*.css`, `/console/*.js` | static files behind the sign-in |
+| `GET /brand/**` | the product's own tokens, fonts, logos and base sheet: **public, no sign-in and no key**, no data of a client; cached for a year |
 
 ### Jobs (one-shot containers, never part of the API)
 
@@ -116,6 +127,7 @@ Run with `docker compose -f docker-compose.prod.yml --profile prod --profile <pr
 | `uspto-sync` / `uspto-sync` | on demand; cron line **commented** | `USPTO_SYNC_DOWNLOAD_ENABLED` (off), `LISTING_GUARD_USPTO_ODP_API_KEY`, `USPTO_SYNC_LICENSE` (required) | USPTO files; for the download an ODP key | offline mode only; the ODP download is **unverified**, no key yet |
 | `tsdr-status` / `tsdr-status` | on demand; cron line **commented** | `TSDR_DOWNLOAD_ENABLED` (off), `LISTING_GUARD_TSDR_API_KEY` | a served catalog; for calls a TSDR key | offline mode only; key header and field names **unverified**, no key yet |
 | `policy-diff` / `policy-diff` | on demand; cron line **commented** | `POLICY_MONITOR_*` | policy files you saved under `policies/raw/` | real mechanics; needs your files |
+| `backtest` / `tools` (ADR-032) | on demand | `TRADEMARK_CATALOG_VERSION` or `TRADEMARK_FOLLOW_ACTIVATION`; `LISTING_GUARD_LLM_*` for `--llm-judge` | a labelled CSV you supply, copied to `eval/backtest/input/` for the run only; the database | mechanics real; **never run on a real labelled file** |
 | `deploy/oracle/backup.sh` | **daily 02:15 and weekly Sunday 02:45 UTC, in the sample crontab** | `BACKUP_*` | optional R2 and the AWS CLI | real (rehearsed here on a throwaway database) |
 | `deploy/oracle/restore.sh` | on demand | `COMPOSE_FILE` | a dump | real (rehearsed here) |
 | `ingest`, `eval-retrieval`, `ollama` | **not in the production Compose file** | development only | an embedding provider | not for this deployment |
@@ -126,7 +138,7 @@ Run with `docker compose -f docker-compose.prod.yml --profile prod --profile <pr
 |---|---|---|
 | Cloudflare Tunnel (`cloudflared`) | optional override file, needs `TUNNEL_TOKEN` | image tag **`2026.11.0`** is pinned (latest stable on 2026-11-13); check the releases page before each deployment ([deploy-oracle.md](deploy-oracle.md#update-cloudflared)) |
 | Java SDK `listing-guard-client` | published to GitHub Packages by the release workflow on a `v*.*.*` tag | reading needs a token with `read:packages`; it can send Access service-token headers, which this deployment does not need |
-| MCP server (`mcp-server`, 7 tools) | a jar you build or attach to the release; STDIO by default | **sends only `X-API-Key`**, which is why `/api/v1/*` has no Access application: it reaches the API with the key alone |
+| MCP server (`mcp-server`, 9 tools) | a jar you build or attach to the release; STDIO by default | **sends only `X-API-Key`**, which is why `/api/v1/*` has no Access application: it reaches the API with the key alone |
 | Official agent skill (`skills/listing-guard`) | in the repository | needs the MCP server |
 | Chrome extension | another repository | **not reviewed here**; with no Access on `/api/v1/*` it needs only an API key (how the extension keeps that key is its own matter) |
 
@@ -139,7 +151,7 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 
 | Variable | Notes |
 |---|---|
-| `LISTING_GUARD_VERSION` | a published image tag **without** `v`, for example `0.8.0`; use no tag through `0.5.0` (amd64 only) |
+| `LISTING_GUARD_VERSION` | a published image tag **without** `v`: `0.9.0` for this release, never `latest`; use no tag through `0.5.0` (amd64 only) |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | strong, unique; the password is a secret |
 | `API_PORT` | an unused port, bound to `127.0.0.1` only |
 | `TUNNEL_TOKEN` | **required with `docker-compose.prod.cloudflared.yml`**; a secret |
@@ -156,7 +168,7 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 | Console | `LISTING_GUARD_CONSOLE_ENABLED` false, `LISTING_GUARD_CONSOLE_BASE_URL`, `LISTING_GUARD_CONSOLE_AUTH_MODE` MAGIC_LINK (or CLOUDFLARE_ACCESS, BOTH), `LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN`, `..._ACCESS_AUD`, `..._ACCESS_CERTS_URL`, `..._ACCESS_CERT_CACHE_TTL` 1h, `..._ACCESS_ALLOWED_DOMAINS`, `..._ACCESS_ALLOWED_EMAILS`, `..._ACCESS_AUTO_CREATE` false, `..._ACCESS_DEFAULT_CLIENT_NAME` (the Access settings only for CLOUDFLARE_ACCESS or BOTH), `LISTING_GUARD_CONSOLE_MAIL_FROM`, `LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS` 5, `SPRING_MAIL_HOST` (the mail settings only for MAGIC_LINK or BOTH), `SPRING_MAIL_PORT` 587, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (secret), `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` true, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` true. The cookie is always Secure (`LISTING_GUARD_CONSOLE_COOKIE_SECURE` is fixed to `"true"`) |
 | Features | `LISTING_GUARD_PLANS_ENABLED` false, `LISTING_GUARD_FIXES_ENABLED` false |
 | Embeddings | `LISTING_GUARD_EMBEDDING_PROVIDER` none, `LISTING_GUARD_EMBEDDING_API_KEY` (secret; with provider `api` the API does not start while it is empty) |
-| LLM judge (ADR-036, `docs/llm.md`; off) | `LISTING_GUARD_LLM_ENABLED` false, `LISTING_GUARD_LLM_JUDGE_ENABLED` false, `LISTING_GUARD_LLM_GROQ_KEY`, `LISTING_GUARD_LLM_CLOUDFLARE_KEY`, `LISTING_GUARD_LLM_CLOUDFLARE_ACCOUNT_ID`, `LISTING_GUARD_LLM_GEMINI_KEY` (secrets, all empty); `LISTING_GUARD_LLM_<GROQ\|CLOUDFLARE\|GEMINI>_LISTING_TEXT_ALLOWED` false (a provider receives no listing text until set). With it on and no key the API does not start |
+| LLM judge and rewrite (ADR-036, 037, `docs/llm.md`; off) | `LISTING_GUARD_LLM_ENABLED` false, `LISTING_GUARD_LLM_JUDGE_ENABLED` false, `LISTING_GUARD_LLM_REWRITE_ENABLED` false, `LISTING_GUARD_LLM_REWRITE_MAX_PER_HOUR` 20, `LISTING_GUARD_LLM_GROQ_KEY`, `LISTING_GUARD_LLM_CLOUDFLARE_KEY`, `LISTING_GUARD_LLM_CLOUDFLARE_ACCOUNT_ID`, `LISTING_GUARD_LLM_GEMINI_KEY` (secrets, all empty); `LISTING_GUARD_LLM_<GROQ\|CLOUDFLARE\|GEMINI>_LISTING_TEXT_ALLOWED` false (a provider receives no listing text until set). With it on and no key the API does not start |
 | Policy monitor | `POLICY_MONITOR_STALE_DAYS` 90, `POLICY_MONITOR_KEEP_REPORTS` 12 |
 | Shared network | `LISTING_GUARD_SHARED_NETWORK`, only with `docker-compose.prod.shared-network.yml` |
 
@@ -267,7 +279,7 @@ docker compose --profile prod ps                                   # api and pos
 curl -fsS $BASE/health                                             # 200 {"status":"UP"}
 curl -sS -o /dev/null -w '%{http_code}\n' $BASE/api/v1/usage       # 401 (no key)
 curl -sS -H "$H" $BASE/api/v1/capabilities                         # 200; trademark-risk available:false until a catalog is READY
-curl -sSI -H "$H" $BASE/api/v1/usage | grep -i x-listing-guard-version   # the release you deployed, for example 0.8.0
+curl -sSI -H "$H" $BASE/api/v1/usage | grep -i x-listing-guard-version   # the release you deployed, for example 0.9.0
 curl -sS -H "$H" $BASE/api/v1/usage                                # 200 {"enforced":false,"plan":"FREE",...}
 curl -sS -H "$H" "$BASE/api/v1/rulesets/ETSY/limits"               # 200; rulesetVersion etsy-2026-12, title_length 140 VERIFIED
 curl -sS -H "$H" -H 'Content-Type: application/json' -d '{"marketplace":"ETSY","listing":{"title":"Handmade Mug","description":"A ceramic mug.","tags":["mug","Mug","gift_idea"],"price":{"amount":1999,"divisor":100,"currency_code":"USD"},"taxonomy_path":["Home & Living","Mugs"]}}' $BASE/api/v1/checks
@@ -293,26 +305,38 @@ the same e-mail on the console's own sign-in, open the link in the mail, press *
 **API keys**, create and revoke a key, and read **Report**.
 
 **After a restart or an upgrade:** `docker compose --profile prod logs --tail=100 api` shows `Started`, no `ERROR`; the migration
-count in `flyway_schema_history` is 35 for v0.8.0.
+count in `flyway_schema_history` is 42 for v0.9.0.
 
-## 6. Release v0.8.0 and the manual steps, in order
+## 6. Release v0.9.0 and the manual steps, in order
 
-Release notes: [releases/v0.8.0.md](releases/v0.8.0.md). **No tag has been created**, and none is planned for v0.7.0: its notes are
-folded into v0.8.0 (decision of 2026-11-13). Order matters because the image must exist before the VM can pull it.
+Release notes: [releases/v0.9.0.md](releases/v0.9.0.md). **The last tag is `v0.6.0`; no `v0.9.0` tag exists until the maintainer pushes
+it**, and none is planned for v0.7.0 or v0.8.0: their notes are folded into v0.9.0. The checks made for this release are in
+[section 8](#8-v090-pre-release-checks-and-results). Order matters because the image must exist before the VM can pull it.
 
 **GitHub (before any server)**
 
-1. Merge this pull request (it holds the `Dockerfile` fix: **no tag may be pushed from a commit without it**).
-2. Fill the `Released YYYY-MM-DD` line of `docs/releases/v0.8.0.md` and tag **`v0.8.0` only**.
-3. Push the tag, wait for the `Release image` and `release-client` workflows (the `linux/amd64` and `linux/arm64` manifests, the
-   SDK), then publish the draft GitHub Release that `publish-contract` creates. Attach `listing-guard-mcp-0.8.0.jar` by hand
+1. Merge the release pull request (`chore/release-v0.9.0`; it holds the `Dockerfile` fix and the notes: **no tag may be pushed from a
+   commit without them**).
+2. Fill the `Released YYYY-MM-DD` line of `docs/releases/v0.9.0.md` (a small commit on `main`, or before the merge) and tag
+   **`v0.9.0` only**:
+
+   ```bash
+   git switch main && git pull --ff-only
+   git tag -a v0.9.0 -m "Listing Guard v0.9.0"
+   git push origin v0.9.0
+   ```
+
+3. Wait for the `Release image` and `release-client` workflows (the `linux/amd64` and `linux/arm64` manifests, the contract assets,
+   the SDK), then publish the draft GitHub Release that `publish-contract` creates. Attach `listing-guard-mcp-0.9.0.jar` by hand
    (`./mvnw -B -pl mcp-server -am package`).
 4. **Make the GHCR package public** (decision): the package exists only after the first publish, so open its settings on GitHub
    afterwards and set the visibility. Prove it from a machine that is not logged in to GHCR:
-   `docker pull ghcr.io/thanhdatpb/listing-guard:0.8.0`.
-5. After the tag, move the API baseline in a pull request (copy `docs/api/openapi.json` and `input-schema.json` of the tag into
-   `docs/api/baseline/`, delete the old files, set `baseline:` in `docs/api/breaking-changes.yaml` to `v0.8.0` with no
-   exceptions; ADR-022).
+   `docker pull ghcr.io/thanhdatpb/listing-guard:0.9.0`, and `docker buildx imagetools inspect ghcr.io/thanhdatpb/listing-guard:0.9.0`
+   must list both `linux/amd64` and `linux/arm64`.
+5. After the tag, move the API baseline in a small pull request (copy `docs/api/openapi.json` and `input-schema.json` of the tag into
+   `docs/api/baseline/` as `openapi-v0.9.0.json` and `input-schema-v0.9.0.json`, delete the old files, set `baseline:` in
+   `docs/api/breaking-changes.yaml` to `v0.9.0` with no exceptions; ADR-022). Never in the release pull request: the baseline is a
+   byte copy of a release that has been published.
 
 **Oracle**
 
@@ -325,7 +349,7 @@ folded into v0.8.0 (decision of 2026-11-13). Order matters because the image mus
 8. Log in, get the repository onto the VM, run `sudo ./deploy/oracle/bootstrap.sh`, then **prove the `deploy` account logs in
    by key before you close the first session**.
 9. Copy the repository into `/opt/listing-guard` and `chown` as in [deploy-oracle.md §3](deploy-oracle.md#3-bootstrap-the-host-and-prepare-the-release-files).
-10. Create `.env` from `deploy/env.prod.example` (`chmod 600`): the required variables, `LISTING_GUARD_VERSION=0.8.0`,
+10. Create `.env` from `deploy/env.prod.example` (`chmod 600`): the required variables, `LISTING_GUARD_VERSION=0.9.0`,
     `COMPOSE_FILE=docker-compose.prod.yml:docker-compose.prod.cloudflared.yml`.
 
 **Cloudflare**
@@ -415,3 +439,114 @@ work left open by the decision to keep Access off `/api/v1/*`.
     `.env` kept off the VM and the R2 backups are the only way back. Keep the `.env` copy and the R2 credentials in a password
     manager you can open without the laptop.
 13. **ADR-019 is still `Proposed`.** Its questions are answered (the decisions of 2026-11-13); change its status when you accept it.
+14. **A real catalog makes nearly every listing `HIGH`** (found on 2026-11-18, [section 8](#8-v090-pre-release-checks-and-results)). Decide
+    how the catalog is served to staff before you turn it on: a generic and short word policy (`generic_words`, `common_word`), the
+    `product_type`, or the client watchlist alone.
+15. **The API logs a generated Spring Security password at every start** (`Using generated security password`). It gives no access
+    (tried against `/api/v1/*`, `/console/` and `/v3/api-docs`: `401` and `302`), but a secret-looking line in a production log
+    is noise that a log scan will flag; excluding `UserDetailsServiceAutoConfiguration` is a small code change, not made here.
+16. **`deploy/oracle/restore.sh` fails over a database that is newer than the dump**: it runs `pg_restore --clean --if-exists
+    --exit-on-error`, which cannot drop the old catalog tables that the V31, V32 and V34 foreign keys now depend on. Restore a
+    pre-upgrade dump into an empty database ([deploy-oracle.md](deploy-oracle.md#upgrade-from-an-older-release-to-090)).
+
+## 8. v0.9.0: pre-release checks and results
+
+Made on 2026-11-18 on the branch `chore/release-v0.9.0` (main at `9ac1f3a`, PR #118 merged), on a Windows 11 machine with Docker
+Desktop (**linux/amd64**, 12 CPUs, 10 GB for the Docker VM). Nothing here ran on ARM64 hardware, on Oracle or behind Cloudflare. The
+throwaway `.env` was made from `deploy/env.prod.example` (placeholders replaced, console on with a local Mailpit); no real secret was
+used. Each row says what was run, so that you can repeat it.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | `./mvnw -B verify`, all 14 modules, PostgreSQL 16 in Testcontainers | **BUILD SUCCESS**, 12 min 50 s (the API module 10 min 51 s), **3,239 tests, 0 failures, 0 errors, 0 skipped**. It includes the ADR-022 compatibility check, `ListingEvalGateTest` and the Java client SDK tests. |
+| 2 | `./mvnw -B -pl contract-tools verify` against the `v0.6.0` baseline | Passed (105 tests): 44 additive changes, 4 other non-breaking, and the 3 breaking changes **of the document** that `docs/api/breaking-changes.yaml` already declares (no wire change; see the [release notes](releases/v0.9.0.md#endpoints-and-contract)). The baseline was not touched. |
+| 3 | `docker build --platform linux/amd64 --build-arg LISTING_GUARD_RELEASE=0.9.0 .` | Built; 662 MB, JRE 21.0.13. A container started from it answered `X-Listing-Guard-Version: 0.9.0`. |
+| 4 | `.github/workflows/release-image.yml` read against the tag flow | `on: push: tags: v*.*.*`. `docker/metadata-action` takes `type=match,pattern=v(.*),group=1` (so `v0.9.0` gives `0.9.0`) and `latest`. **Both** image builds pass `LISTING_GUARD_RELEASE=${{ steps.metadata.outputs.version }}`; the Dockerfile turns it into `-Dlisting-guard.release`, which `build-info` writes into the jar. The push step builds `platforms: linux/amd64,linux/arm64` after a Trivy scan (critical, fixed only) of the amd64 image. `publish-contract` checks that the baseline `v0.6.0` is a tag and an ancestor, runs `contract-tools verify` and attaches the four contract files to the GitHub Release (a draft made from `docs/releases/v0.9.0.md` when none exists). `release-client` takes the version from the tag. |
+| 5 | `docker compose config` for `docker-compose.prod.yml` (all profiles), `+ cloudflared`, `+ cloudflared + shared-network` | Valid in all three. The defaults it printed keep everything off: `LISTING_GUARD_LLM_*` false, plans, fixes, console, TSDR finding status, activation log false; Swagger false. |
+| 6 | Production Compose run with the `.env` made from the sample: `up -d`, admin job, smoke test | A fresh database applied **42 migrations**; started in 11.5 s; API 410 to 520 MiB of its 2 GiB, PostgreSQL 105 MiB at rest. **36 of 36** requests of the smoke test passed (the table below). A first run showed 3 failures; all three were faults of my script (the bulk form, the console account having its own client, `reports/summary` needing `from` and `to`), not of the API. |
+| 7 | Every variable that `docker-compose.prod.yml` reads is in `deploy/env.prod.example` | After this change, yes. It was **not** true before: the LLM variables, `LISTING_GUARD_LLM_REWRITE_*` (read by the application, **not forwarded by Compose**, so the rewrite button could not be switched on from `.env`) and four `HF_*` variables were missing. They are added (commented, off) and forwarded. |
+| 8 | A real catalog: import, activate, latency, roll back | See [below](#the-catalog-measured-on-the-real-hugging-face-build). |
+| 9 | Upgrade rehearsal: published `0.6.0` image, a stored check, `pg_dump`, then `0.9.0` | See [below](#upgrade-and-rollback-rehearsal). |
+| 10 | Console in `CLOUDFLARE_ACCESS` mode, no SMTP, a fake team domain | The API started; `/login` offers no e-mail form; `GET /console/` with no assertion, with an unsigned `Cf-Access-Authenticated-User-Email` and with a garbage `Cf-Access-Jwt-Assertion` all answered `302 /login?access=denied`. A real Cloudflare team and a signed assertion were not tried. |
+| 11 | The `linux/arm64` image **under QEMU emulation on amd64** | Built; started in 123 s and served `/health`, `X-Listing-Guard-Version: 0.9.0` and two trademark checks (3.8 and 5.7 s). **This is emulation, not ARM hardware, and its speed says nothing about the A1.** |
+
+**Smoke test of row 6** (`/health`, the API, the public brand files, the console in the e-mail link mode, every console page, one listing check, one bulk check, the watchlist, the re-audit, the report), run with the script of the review against `http://127.0.0.1:<API_PORT>`:
+
+| Request | Answer |
+|---|---|
+| `GET /health` | `200 {"status":"UP"}` |
+| `GET /api/v1/usage` with no key, with a key | `401`, `200`; `X-Listing-Guard-Version: 0.9.0` |
+| `GET /api/v1/capabilities` | `200`; `image-checks` `available: false`, trademark catalog `DISABLED` |
+| `POST /api/v1/checks` (the README mug), twice | `200 COMPLETED`, 4 errors and 1 warning; the second answer `cached: true` |
+| `POST /api/v1/trademark-checks` with no catalog | `503 trademark-not-configured` |
+| `GET /brand/tokens.css`, `/brand/app.css`, `/brand/favicon.ico` with no sign-in and no key | `200`, `Cache-Control: max-age=31536000, public, immutable` |
+| `GET /console/` with no session | `302 /login` |
+| Console sign-in: `POST /login`, the e-mail (Mailpit), `POST /login/verify` | `302 /console`; the pages home, check, bulk, history, re-audit, watchlist, stats, report and API keys all `200` (the console in `vi`) |
+| `POST /console/check` (Check listing) | `200`, findings shown |
+| Bulk check: paste three rows, `prepare`, `run` | `200`; the rows A1, A2, A3 and the summary pills |
+| Console issues an API key; `PUT /api/v1/trademark-watchlist`; the console Watchlist page; a trademark check | `200`; the entry is listed; the check finds `watchlist_match` with no catalog |
+| Re-audit: an Etsy export of two listings uploaded twice | `200` both times, the result page rendered (the comparison with the first run was not checked beyond that) |
+| `GET /console/history`, `/console/report`, `GET /api/v1/reports/summary?from=...&to=...` | `200` |
+
+### The catalog, measured on the real Hugging Face build
+
+The file was the one `hf-convert` made on 2026-11-16 (`hf-uspto-2026-10.jsonl`, 1,224,122 marks, build data through 2026-10-31, sha256
+`9cad195f...`), imported from a copy of `catalogs/` by the production Compose `trademark-import` job at its default 1 GB cap. This
+machine, amd64, nothing else running.
+
+- **Import**: 1 min 28 s from `docker compose run` to the end (includes the container's start), 1,224,122 records read, 183,343 merged,
+  **1,040,779 entries** loaded. A second version with `include_classes: [25]` (357,461 entries) took about 30 s. The database was
+  404 MB with both (`trademark_entry` and its indexes 392 MB).
+- **Activation**: `admin catalog activate <version>`, and the API served it (`READY`) **41 s later** with no restart
+  (`TRADEMARK_FOLLOW_ACTIVATION=true`, the log is read every minute). A second activation was served after 24 s; `admin catalog
+  rollback` brought the first version back after 54 s. `catalog list` showed both versions and the activation history as
+  [deploy-oracle.md section 8b](deploy-oracle.md#8b-a-trademark-catalog-from-the-hugging-face-rebuild-convert-elsewhere-copy-import-activate)
+  describes.
+- **Time of a trademark check**, `POST /api/v1/trademark-checks`, **20 distinct sample listings** (an invented title, a one-sentence
+  description and five tags each), one at a time after three warm-up requests, on the full catalog:
+  **average 972 ms, median 936 ms, p95 1,128 ms** (the 19th of 20), fastest 837 ms, slowest 1,186 ms. The same listing again is
+  answered from the cache in **11 to 12 ms**. A shorter listing (a one-line description) took about 0.35 to 0.55 s. **This is
+  amd64 on a 12-CPU laptop, one request at a time.** It is not the A1 (2 OCPUs shared with PostgreSQL), not under concurrent load,
+  and not a sizing result.
+- **What the checks returned: every sample listing is `HIGH`.** 20 of 20 had `riskLevel` `HIGH`, with 12 findings on average with a
+  neutral one-line description (7.8 of them `HIGH`) and 27 on average with a description of one ordinary sentence (17.8 `HIGH`). Ten
+  of the twenty carry no brand name at all (a candle, a cutting board, a dog collar). The `HIGH` findings are exact matches of single
+  ordinary words that are registered or pending marks: `MUG`, `BLUE`, `SHIRT`, `GOLD`, `ART`, `BAG`, `HAND`, and, when the description
+  is a sentence, `TO`, `IN`, `MADE`, `SHIPS`. A plain "Handmade Mug" listing is `HIGH` too. `product_type=mug` lowered the mug listings (16 to 9 and 15 to 6 `HIGH` findings) and no more. The cause
+  is in the data and the rules: the converter sets no `common_word`, the `generic_words` list of the ruleset ships empty, and a
+  one-word exact match is `HIGH`. **This is an indication from 20 invented listings, not a measured false-positive rate** (nobody
+  labelled which findings are right), but it says that serving this catalog as it is gives staff a `HIGH` on everything. The client
+  watchlist does not have the problem. It is in the [open items](#7-open-items) (14).
+
+### Upgrade and rollback rehearsal
+
+A throwaway database: the published image `ghcr.io/thanhdatpb/listing-guard:0.6.0` (27 migrations), a client, one Etsy and one Amazon check,
+then `pg_dump -Fc`, then the new image on the same database.
+
+| Step | Result |
+|---|---|
+| Start `0.9.0` on the `0.6.0` database | Flyway applied **15 migrations, V28 to V42, in about 1 s** on this small database; started in 8 s; `flyway_schema_history` 42 rows; the `X-Listing-Guard-Version` header says `0.9.0`. Real data would take longer (V28 and V38 change tables of stored results; V28 uses constant defaults, no rewrite). |
+| The old results | `GET /api/v1/checks/{id}` of the check made by `0.6.0` answered `200`; the same Etsy request was `cached: true` (`etsy-2026-12` unchanged); the Amazon one was computed again (`amazon-2026-12c`). As the notes say. |
+| **`0.6.0` again on the V42 schema, no restore** | It started, `/health` `200`, the cached checks were answered, and with `LISTING_GUARD_PLANS_ENABLED=true` and the client on `SELLER` (so the `image-checks` plan row is read) `/api/v1/usage` and a check answered `200`. Flyway did not object to the 15 migrations it does not know. **Small data, a handful of endpoints, the console not tried: a promising result, not a promise.** |
+| **Restore the pre-upgrade dump over the upgraded database** with the flags of `deploy/oracle/restore.sh` (`--clean --if-exists --exit-on-error`) | **Failed**: `cannot drop constraint trademark_catalog_version_pkey ... other objects depend on it` (the V31, V32 and V34 foreign keys). The script would leave the API stopped. |
+| Restore the dump into a **freshly created empty database** (`DROP DATABASE ... WITH (FORCE)`, `CREATE DATABASE`, `pg_restore --no-owner --exit-on-error`) and start `0.6.0` | Worked: 27 migrations, `/health` `200`, the old check readable. This is the procedure [deploy-oracle.md](deploy-oracle.md#upgrade-from-an-older-release-to-090) now gives. |
+
+### Changed by this review
+
+`LISTING_GUARD_LLM_REWRITE_ENABLED` and `..._MAX_PER_HOUR` forwarded by `docker-compose.prod.yml`; the LLM variables and four `HF_*`
+variables added to `deploy/env.prod.example`; [deploy-oracle.md](deploy-oracle.md) gained the upgrade and rollback steps, section 8b
+(a catalog converted on another machine) and section 10 (the LLM, off); README, the release notes and this page now describe v0.9.0.
+No code and no behavior of the API changed.
+
+### Not measured
+
+The false-positive rate on the real catalog; the time of a check on the A1, under load or with a second request in flight;
+anything on ARM64 hardware (the emulated run above is not that); the memory of a heavy job next to the API on 12 GB; the disk after a
+second month's catalog; Oracle, Cloudflare Access with a real team and a real SMTP server; the console in a real browser on this
+build (the screenshots of ADR-042 were taken at 375, 768 and 1280 px); `backtest` on a labelled file; the LLM with a real key;
+the real USPTO download and TSDR.
+
+**A problem of the build, not of the code:** the first `./mvnw verify` of this review failed in the API module because the Red Hat
+Java language server of VS Code had written its own compiled classes (with `Unresolved compilation problems`) into
+`api/target/classes` while branches were being switched, and Maven kept them. Deleting the module `target/` folders and building
+again fixed it. Close the editor's Java server, or delete `target/`, before the verify that gates a tag.

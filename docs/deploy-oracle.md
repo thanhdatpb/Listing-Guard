@@ -5,7 +5,10 @@ public ingress; no host port 80, 443 or 8080 is opened. The Compose API port rem
 health checks. PostgreSQL and the tunnel have no published ports.
 
 New releases publish `linux/amd64` and `linux/arm64` images. Images tagged through `v0.5.0` are amd64-only; do not
-use one of those tags on the A1 VM. The `docs/deployment.md` runbook covers migration details and the general
+use one of those tags on the A1 VM. **The release to deploy is `0.9.0`** ([release notes](releases/v0.9.0.md); v0.7.0 and v0.8.0
+were never tagged). Pull by that tag and never by `latest`: `LISTING_GUARD_VERSION=0.9.0` in `.env`. Its `linux/arm64` image
+has not been run on ARM hardware yet, so the first start on the A1 is also its first test: do the smoke test of
+[deploy-readiness.md](deploy-readiness.md#5-smoke-test-after-deploy) right after it. The `docs/deployment.md` runbook covers migration details and the general
 production compose setup. [docs/deploy-readiness.md](deploy-readiness.md) is the pre-deploy review: what is on or off by
 default, the environment variables, the resource budget, the security checklist, a smoke test and the manual steps in order.
 
@@ -82,7 +85,8 @@ cp deploy/env.prod.example .env
 chmod 600 .env
 ```
 
-Set `LISTING_GUARD_VERSION` to a published version **without** its leading `v`, strong unique database credentials,
+Set `LISTING_GUARD_VERSION` to a published version **without** its leading `v` (`0.9.0`; a fixed tag, never `latest`, so that a
+restart or `pull` can never change the version under you), strong unique database credentials,
 and an unused loopback `API_PORT`. The sample resource settings are sized for 2 OCPUs / 12 GB: API memory 2 GB with
 `-XX:MaxRAMPercentage=75.0`, PostgreSQL memory 4 GB, 2 GB shared buffers, 16 MB `work_mem`, and 50 connections.
 Increase `API_MEM_LIMIT`, `POSTGRES_MEM_LIMIT`, `POSTGRES_SHARED_BUFFERS`, `POSTGRES_WORK_MEM` and
@@ -409,6 +413,55 @@ The Compose files selected by `COMPOSE_FILE` remain in effect, including the Tun
 Flyway applies migrations automatically; read the release notes and the migration guidance in
 [`deployment.md`](deployment.md) before an upgrade with migration changes.
 
+### Upgrade from an older release to 0.9.0
+
+Applies to a host that already runs `0.6.0` (the only earlier tag that matters; there is no `0.7.0` or `0.8.0` image). A new host
+skips it: its empty database runs all 42 migrations at the first start.
+
+1. **Back up first, and keep the dump off the VM.** Migrations V28 to V42 run at the first start of the new API and do not undo
+   themselves. Take the dump, check it is readable, and copy it to R2 or another machine:
+
+   ```bash
+   sudo -u deploy /opt/listing-guard/deploy/oracle/backup.sh
+   ls -lh /opt/listing-guard/backups | tail -3
+   docker compose --profile prod exec postgres sh -c 'pg_restore --list /dev/stdin' < backups/<the new dump>.dump | head -5
+   ```
+
+2. Update the versioned files of the repository to the `v0.9.0` tag (the Compose files and `deploy/`; never overwrite `.env`,
+   `catalogs/raw/`, `backups/` or other runtime data), compare `deploy/env.prod.example` with your `.env` for the variables
+   listed in the [release notes](releases/v0.9.0.md#environment-variables) (every default is off), and set
+   `LISTING_GUARD_VERSION=0.9.0`.
+3. `docker compose --profile prod pull api`, then `docker compose --profile prod up -d --no-deps api`. Watch the log: Flyway
+   applies V28 to V42 and the API reports `Started`. `curl --fail http://127.0.0.1:<API_PORT>/health`, and
+   `curl -sI -H "X-API-Key: $KEY" http://127.0.0.1:<API_PORT>/api/v1/usage | grep -i x-listing-guard-version` must say `0.9.0`.
+4. If you use the console, sign in once. V38 gave each account a role: the only account of a `web-...` client is an `ADMIN`, any other
+   is a `MEMBER` (promote one with `docker compose --profile prod --profile admin run --rm admin account role <email> ADMIN`).
+
+**Rolling back to `0.6.0`.** The migrations of 0.9.0 only add tables, columns and indexes, and loosen three constraints (V29, V35,
+V38). In a rehearsal on 2026-11-18 the published `0.6.0` image **started on the migrated database** and served its stored checks
+(also with plans on), so an in-place return is possible, **but that was one try on a small database and a few endpoints**
+(not the console, not a catalog): the safe path is the backup. **`deploy/oracle/restore.sh` does not work over an upgraded
+database**: it restores with `--clean`, and `pg_restore` stops with `cannot drop constraint trademark_catalog_version_pkey ...
+other objects depend on it`, leaving the API stopped. Restore into an **empty database** instead:
+
+```bash
+cd /opt/listing-guard
+docker compose --profile prod stop api
+docker compose --profile prod exec -T postgres sh -c 'export PGPASSWORD="$POSTGRES_PASSWORD"; \
+  psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 \
+       -c "DROP DATABASE \"$POSTGRES_DB\" WITH (FORCE)" -c "CREATE DATABASE \"$POSTGRES_DB\""'
+docker compose --profile prod exec -T postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" \
+  pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error' < backups/<the dump of step 1>.dump
+# set LISTING_GUARD_VERSION=0.6.0 in .env, then:
+docker compose --profile prod up -d --no-deps api
+curl --fail http://127.0.0.1:<API_PORT>/health
+```
+
+This **replaces the database with the dump** (that is its point): everything stored after the backup is gone, the watchlist, history,
+re-audit runs and feedback of 0.9.0 included. Do it only with the dump in hand, and never on the only copy of the data. To go back
+**only** the trademark catalog, see
+[8b](#8b-a-trademark-catalog-from-the-hugging-face-rebuild-convert-elsewhere-copy-import-activate); it needs no database restore.
+
 ### Update cloudflared
 
 `docker-compose.prod.cloudflared.yml` pins the connector's tag (never `latest`). The tag in the file is **`2026.11.0`**, the latest
@@ -611,6 +664,98 @@ through a status map that is itself unverified. Nothing reads the report back; d
 is yours. `TSDR_FINDING_STATUS_ENABLED=true` (off by default) adds the last status and its check date to each trademark finding
 of the API; turn it on only after real statuses are stored. The api container must be restarted for it to take effect.
 
+## 8b. A trademark catalog from the Hugging Face rebuild: convert elsewhere, copy, import, activate
+
+Without a USPTO key, the catalog of this deployment comes from `hf-convert` ([ADR-030](adr/ADR-030-hugging-face-uspto-parquet-source.md)),
+which turns the public Parquet rebuild of the USPTO data into one `jsonl-1` file. **Convert on another machine and copy only the
+`.jsonl` file to the VM**: the conversion needs 2 GB of DuckDB memory plus 0.5 GB of heap (a 3 GB container), 775 MB of download
+and no database, and on the 12 GB host it would sit next to the API and PostgreSQL. The VM then only runs `trademark-import`
+(about 0.5 GB). **Read the status first:** the data is a third party's rebuild whose terms nobody has checked for you (its card
+says US government work, public domain); the filters, the status reading and the class list are `unverified`; and the catalog is a
+snapshot. **And expect a lot of `HIGH`:** with this catalog served as it is, 20 of 20 sample listings (ten with no brand name) came
+back `HIGH`, because single ordinary words (`MUG`, `BLUE`, `SHIRT`, `TO`, `IN`) are registered marks and nothing yet marks them
+as common (`common_word` is never set, `generic_words` is empty); see
+[deploy-readiness.md, section 8](deploy-readiness.md#the-catalog-measured-on-the-real-hugging-face-build). Import and test it, but
+**do not point staff at it** until you have decided a word policy; the client watchlist (a `PUT` or the console page) needs no catalog. Measured numbers (dev machine, not the A1) are in [ADR-030](adr/ADR-030-hugging-face-uspto-parquet-source.md#measurements-dev-machine-2026-11-16).
+
+**1. On the other machine** (a laptop with Docker, or Java 21 and Maven; no database; 3 GB free memory; about 1 GB of disk):
+
+```bash
+git clone --branch v0.9.0 https://github.com/thanhdatpb/Listing-Guard.git && cd Listing-Guard
+REV=50e430b4c021614e1302bddb45a4afcdcb7823f2          # the dataset commit read on 2026-11-16; pin the one you read
+B=https://huggingface.co/datasets/illeatmyhat/uspto-trademarks/resolve/$REV
+for f in profile/build_lineage.json lookups/status_codes.csv lookups/_sources.json \
+         data/intl_class/data_0.parquet data/case_file/data_0.parquet; do
+  mkdir -p "catalogs/raw/hf/$(dirname $f)" && curl -fL --retry 3 "$B/$f" -o "catalogs/raw/hf/$f"
+done
+docker compose --profile tools run --rm --build hf-convert --input=hf --output=hf-uspto-2026-10.jsonl
+```
+
+Read `catalogs/raw/hf-uspto-2026-10.jsonl.report.json`: `completeness` must be `COMPLETE` (an `INCOMPLETE` run still writes the
+file but says why: do not deploy it before you read the problems). The job prints the `sha256` and a manifest entry; keep both.
+At the build of 2026-11-02 the default filters wrote 1,224,122 marks (104 MB).
+
+**2. Copy the file and the manifest entry to the VM.** Not the Parquet files, not the repository's `catalogs/raw/hf/` folder:
+
+```bash
+scp catalogs/raw/hf-uspto-2026-10.jsonl deploy@<vm>:/opt/listing-guard/catalogs/raw/
+ssh deploy@<vm> 'sha256sum /opt/listing-guard/catalogs/raw/hf-uspto-2026-10.jsonl'   # must equal the printed sha256
+```
+
+On the VM, the file must be readable by uid 10001 (`chmod 644`, and `catalogs/raw` owned by 10001 as in section 3). Put the printed
+entry in `/opt/listing-guard/catalogs/manifest.yaml` as the list `catalogs:` (replace the empty `catalogs: []` at the end of the
+file; the commented example in it is this entry). Its `sha256` must equal the file's: a different hash refuses the whole catalog.
+
+**3. Import** on the VM (the file is read as a stream; about 5 minutes and 292 MB of database per version on the dev machine, the
+`JOB_MEM_LIMIT` of 1 GB is enough there; do not run it next to another heavy job):
+
+```bash
+docker compose --profile prod --profile tools run --rm trademark-import --catalog=hf-uspto-2026-10
+# logs: Trademark catalog version hf-uspto-2026-10-<digest> (IMPORTED | ALREADY_IMPORTED)
+docker compose --profile prod --profile admin run --rm admin catalog list      # the stored versions
+```
+
+Running it again with the same file and filters changes nothing; a different file makes a new version and never edits an old one.
+
+**4. Activate it**, with the activation log (recommended: a new version and a rollback need no restart of the API). In `.env`:
+
+```dotenv
+TRADEMARK_FOLLOW_ACTIVATION=true
+TRADEMARK_CATALOG_VERSION=            # must be empty with the line above, or the API does not start
+```
+
+```bash
+docker compose --profile prod up -d --no-deps api                 # once, to read the two lines
+docker compose --profile prod --profile admin run --rm admin catalog activate hf-uspto-2026-10-<digest> --note="first catalog"
+# within a minute:
+curl -sS -H "X-API-Key: $LISTING_GUARD_API_KEY" http://127.0.0.1:<API_PORT>/api/v1/capabilities   # trademarkCatalog READY, demo false
+```
+
+Then send one trademark check and read the answer (the smoke test of [deploy-readiness.md](deploy-readiness.md#5-smoke-test-after-deploy)).
+*The simpler alternative without the log:* leave `TRADEMARK_FOLLOW_ACTIVATION=false`, set `TRADEMARK_CATALOG_VERSION=<the printed
+version>` in `.env` and recreate the API; a new version or a rollback is then a change of that line and a recreate.
+
+**5. A new build** (the dataset is rebuilt monthly): convert it on the other machine into a new file name (for example
+`hf-uspto-2026-11.jsonl`, from a fresh download folder), copy it, add a new manifest entry, import it as a new version, check it
+(`catalog list` shows the entries of each version: a much smaller one is a warning), then activate it. Never edit an imported
+file or an old manifest entry.
+
+**Rolling back the catalog.** Each version is immutable and stays stored, so the way back is to serve the previous one:
+
+```bash
+docker compose --profile prod --profile admin run --rm admin catalog rollback                 # the version activated before the current one
+docker compose --profile prod --profile admin run --rm admin catalog rollback --to=<version>  # or name one
+```
+
+The API follows within a minute (`TRADEMARK_FOLLOW_ACTIVATION=true`); with the pinned alternative, set the previous
+`TRADEMARK_CATALOG_VERSION` and recreate the API. After a rollback `uspto-sync` stops activating by itself until
+`catalog activate <version>` ends it (a deployment that does not use the sync is not affected). **There is nothing to roll back
+to after the first activation**: to serve no catalog again set `TRADEMARK_FOLLOW_ACTIVATION=false` with an empty
+`TRADEMARK_CATALOG_VERSION` and recreate the API; trademark checks then answer `503 trademark-not-configured` (a client with a
+watchlist entry still gets an `INCOMPLETE` answer). Disk: every retained version is a full copy of its entries in PostgreSQL and in
+every backup, R2 included; the sync deletes only the versions it made, so versions you imported by hand stay until you decide to
+remove them (the admin job has no command that deletes a version yet).
+
 ## 9. Review saved marketplace policies (`policy-diff`)
 
 The monthly policy review uses the deterministic `policy-diff` profile (ADR-026). It reads only the local manifest and saved
@@ -636,3 +781,27 @@ Review those rules manually and create a new ruleset version if a change is need
 `deploy/oracle/crontab.example` runs only the comparison after an operator has saved pages and updated the manifest; it does
 not retrieve marketplace content. `POLICY_MONITOR_STALE_DAYS` controls the stale-save threshold (default 90).
 `POLICY_MONITOR_KEEP_REPORTS` controls report retention (default 12); each successful run removes older timestamped report folders.
+
+## 10. Optional: free-tier LLM providers (off by default)
+
+Everything in this section is **off in the sample `.env`**: with `LISTING_GUARD_LLM_ENABLED=false` no key is read and no request is
+made, and a check returns what it returned before, with the same `analysisVersion`. Do not switch it on for the first deployment.
+The guide is [llm.md](llm.md) ([ADR-036](adr/ADR-036-free-tier-llm-providers-and-trademark-context-judge.md),
+[ADR-037](adr/ADR-037-llm-rewrite-suggestions-verified-by-rules.md)).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LISTING_GUARD_LLM_ENABLED` | `false` | The shared client. With it on and no provider key the API refuses to start. |
+| `LISTING_GUARD_LLM_JUDGE_ENABLED` | `false` | The trademark context judge: lowers a MEDIUM catalog finding to LOW when the model says the word is descriptive. Measure it first (`backtest --llm-judge`): a demotion can lose a claimed listing. |
+| `LISTING_GUARD_LLM_REWRITE_ENABLED`, `LISTING_GUARD_LLM_REWRITE_MAX_PER_HOUR` | `false`, `20` | The console button *Gợi ý sửa*. With it on, the title, tags and findings of a listing go to the provider each time a seller presses it. |
+| `LISTING_GUARD_LLM_GROQ_KEY`, `LISTING_GUARD_LLM_CLOUDFLARE_KEY` and `..._CLOUDFLARE_ACCOUNT_ID`, `LISTING_GUARD_LLM_GEMINI_KEY` | empty | Secrets (never in Git, a command line or a log). A provider without a key is skipped. |
+| `LISTING_GUARD_LLM_GROQ_LISTING_TEXT_ALLOWED`, `..._CLOUDFLARE_...`, `..._GEMINI_...` | `false` | A provider receives no listing text until its flag is `true`; set it only after reading its terms (Gemini's free usage may be used by Google to improve its products). |
+
+The requests per minute and per day, the models and the base URLs are settings of `application.yml` (`listing-guard.llm.providers`),
+not variables; the free limits are small (the shipped Gemini limit is 5 a minute and 15 a day), and when no provider has quota the
+step is skipped and the result is `INCOMPLETE`. V41 and V42 count requests and rewrite runs; they store no text.
+
+**Settings that have no variable.** The client watchlist (`listing-guard.trademark.watchlist.*`: 500 entries, 20 aliases), the
+periodic re-audit (`listing-guard.console.reaudit.keep-runs`, 20 runs per scope), the feedback buttons and the value dashboard have
+no environment variable and need none: their defaults apply and `docker-compose.prod.yml` does not forward them. The rate limit,
+the retention periods and `LISTING_GUARD_IMAGE_ENABLED` are not forwarded either, so the image checks stay off.
