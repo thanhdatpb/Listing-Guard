@@ -65,6 +65,10 @@ public class EditorCheckService {
         this.messages = messages;
     }
 
+    boolean trademarkAvailable(UUID clientId) {
+        return trademarks.available(clientId);
+    }
+
     public EditorResult check(UUID clientId, EditorMarketplace marketplace, ObjectNode listingJson) {
         CheckRequest request = new CheckRequest(marketplace.code(), listingJson);
         Listing listing = normalizers.get(marketplace.code()).normalize(listingJson);

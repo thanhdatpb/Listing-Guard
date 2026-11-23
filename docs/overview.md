@@ -64,6 +64,10 @@ Working end to end:
   report keep following that flag. An **API keys** page lists, creates and revokes the keys of the signed-in account (the
   secret is shown once; at most `listing-guard.console.max-active-keys`, default 5, active keys; no plan check and no
   migration), and while the trademark catalog is the fictional DEMO one every page carries a banner that says so.
+  Màn hình Check listing hướng dẫn theo ba bước gồm chọn sàn và danh mục hoặc loại sản phẩm, nhập thông tin, rồi xem
+  pack và kiểm tra. Các trường nâng cao nằm sau nút mở rộng dùng được bằng bàn phím. Lỗi định dạng có liên kết
+  về trường tương ứng. Tổng kết Console ưu tiên lỗi quy tắc, kết quả thiếu, rồi cảnh báo cần xem xét trước khi hiện
+  trạng thái đạt. Hai panel vẫn cho biết kết quả từng pack, kể cả khi pack thiếu catalog, bị giới hạn theo gói hoặc hết quota.
   Every page is in English or Vietnamese ([ADR-028](adr/ADR-028-console-localization.md)): the default is
   `listing-guard.console.default-locale`, a reader switches with the links in the corner (a cookie), each finding gets one
   sentence saying what its rule checks, and the API's responses do not change.

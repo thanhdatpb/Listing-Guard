@@ -60,3 +60,7 @@
 .sim-description { margin-top: 0.5rem; max-height: 12rem; overflow: auto; font-size: 0.9rem; white-space: pre-line; overflow-wrap: anywhere; }
 /* the part past the limit is set apart by background and underline, not by color alone */
 mark.beyond { background: var(--warning-subtle); color: inherit; text-decoration: underline wavy var(--danger); text-underline-offset: 3px; }
+
+.lg-editor__packs { margin-block: var(--space-3); padding-inline-start: var(--space-6); }
+.lg-editor__packs li + li { margin-block-start: var(--space-2); }
+.lg-editor__packs li span { display: block; }

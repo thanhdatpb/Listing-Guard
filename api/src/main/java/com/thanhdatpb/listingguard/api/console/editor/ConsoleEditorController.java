@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.console.editor;
 import com.thanhdatpb.listingguard.api.console.ConsoleFeedbackSupport;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
+import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetLimitsService;
 import com.thanhdatpb.listingguard.ruleengine.readiness.ReadinessScorer;
@@ -96,7 +97,6 @@ public class ConsoleEditorController {
                 selected.isEtsy() ? limits.tagCountMax() : limits.bulletCountMax()));
         model.addAttribute("readinessMax", readiness.config().baseScore());
         feedback.populate(model, user, result.targets());
-        model.addAttribute("otherOpen", result.requiredFieldsFinding() || form.hasOtherFields());
         return VIEW;
     }
 
@@ -134,10 +134,13 @@ public class ConsoleEditorController {
         EditorLimits limits = EditorLimits.of(rulesetLimits.limits(marketplace.code(), form.productType()).limits());
         model.addAttribute("limits", limits);
         model.addAttribute("preview", EditorPreview.of(form, limits.titleMax()));
-        model.addAttribute("cost", EditorCost.of(plans.usage(user.clientId())));
+        var usage = plans.usage(user.clientId());
+        EditorCost cost = EditorCost.of(usage);
+        model.addAttribute("cost", cost);
+        model.addAttribute("listingPackIncluded", usage.packs().contains(Pack.LISTING_RULES.id()));
+        model.addAttribute("trademarkAvailable", cost.trademarkIncluded() && checks.trademarkAvailable(user.clientId()));
         model.addAttribute("fieldErrors", errors);
-        // collapsed by default; open when a field could not be read, or when it already holds what the seller typed
-        model.addAttribute("otherOpen", !errors.isEmpty() || form.hasOtherFields());
+        model.addAttribute("otherOpen", form.hasOtherFields());
     }
 
     /** The refusals of the form as the page prints them: {@link EditorListingMapper} gives the key of each message. */

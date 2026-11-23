@@ -29,6 +29,7 @@
 
     <div class="lg-split lg-split--even">
     <section class="lg-card editor" aria-labelledby="editor-heading">
+        <h2 class="lg-section-title" th:text="#{editor.step.marketplace}"></h2>
         <nav class="lg-seg" th:aria-label="#{editor.marketplace.aria}">
             <a class="lg-seg__item" th:each="m : ${marketplaces}" th:href="@{/console/check(marketplace=${m.code})}" th:text="${m.label}"
                th:aria-current="${m == marketplace} ? 'page'"></a>
@@ -40,28 +41,41 @@
         <form id="editor-form" method="post" th:action="@{/console/check}" th:object="${form}" novalidate
               th:attr="data-i18n-chars=#{js.counter.chars},data-i18n-chars-nolimit=#{js.counter.chars.nolimit},data-i18n-bytes=#{js.counter.bytes},data-i18n-bytes-nolimit=#{js.counter.bytes.nolimit},data-i18n-entries=#{js.counter.entries},data-i18n-entries-nolimit=#{js.counter.entries.nolimit},data-i18n-longest=#{js.counter.longest},data-i18n-over=#{js.counter.over}">
             <input type="hidden" th:field="*{marketplace}">
+            <section id="editor-errors" tabindex="-1" data-status="ERROR" class="lg-banner lg-banner--error" role="alert" th:if="${!fieldErrors.isEmpty()}">
+                <p th:text="#{editor.validation.summary}"></p>
+                <ul>
+                    <li th:each="error : ${fieldErrors}">
+                        <a th:href="'#' + ${error.key}" th:text="${error.value}"></a>
+                    </li>
+                </ul>
+            </section>
+            <div class="lg-field" th:if="${marketplace.amazon}">
+                <label class="lg-field__label" for="productType" th:text="#{editor.producttype.label}"></label>
+                <input type="text" class="lg-input" th:field="*{productType}" autocomplete="off" aria-describedby="productType-hint">
+                <p class="lg-field__hint" id="productType-hint" th:text="#{editor.producttype.hint}"></p>
+            </div>
+
+            <div class="lg-field" th:if="${marketplace.etsy}">
+                <label class="lg-field__label" for="category" th:text="#{editor.category.label}"></label>
+                <input type="text" class="lg-input" th:field="*{category}" autocomplete="off">
+            </div>
+
+            <h2 class="lg-section-title" th:text="#{editor.step.fields}"></h2>
+            <p class="lg-field__hint" th:text="${marketplace.etsy} ? #{editor.step.fields.etsy} : #{editor.step.fields.amazon}"></p>
+
 
             <div class="lg-field">
                 <label class="lg-field__label" for="title" th:text="#{editor.title.label}"></label>
-                <input type="text" class="lg-input" th:field="*{title}" autocomplete="off">
-                <p class="lg-field__hint counter" data-counter-for="title" data-mode="chars"
+                <input type="text" class="lg-input" th:field="*{title}" autocomplete="off" th:aria-describedby="${limits.titleMax != null} ? 'title-counter'">
+                <p class="lg-field__hint counter" id="title-counter" data-counter-for="title" data-mode="chars"
                    th:if="${limits.titleMax != null}" th:attr="data-limit=${limits.titleMax}"
                    th:text="#{editor.counter.limit.chars(${#strings.toString(limits.titleMax)})}"></p>
             </div>
 
-            <div class="lg-field" th:if="${marketplace.etsy}">
-                <label class="lg-field__label" for="tags"><span th:text="#{editor.tags.label}"></span> <span class="lg-text-muted" th:text="#{editor.oneperline}"></span></label>
-                <textarea class="lg-textarea" th:field="*{tags}" rows="6"></textarea>
-                <p class="lg-field__hint counter" data-counter-for="tags" data-mode="list"
-                   th:if="${limits.tagCountMax != null or limits.tagLengthMax != null}"
-                   th:attr="data-limit-count=${limits.tagCountMax},data-limit-each=${limits.tagLengthMax}"
-                   th:text="(${limits.tagCountMax != null} ? #{editor.tags.counter.count(${#strings.toString(limits.tagCountMax)})} : #{editor.tags.counter.plain}) + (${limits.tagLengthMax != null} ? #{editor.counter.each(${#strings.toString(limits.tagLengthMax)})} : '')"></p>
-            </div>
-
             <div class="lg-field" th:if="${marketplace.amazon}">
                 <label class="lg-field__label" for="bulletPoints"><span th:text="#{editor.bullets.label}"></span> <span class="lg-text-muted" th:text="#{editor.oneperline}"></span></label>
-                <textarea class="lg-textarea" th:field="*{bulletPoints}" rows="6"></textarea>
-                <p class="lg-field__hint counter" data-counter-for="bulletPoints" data-mode="list"
+                <textarea class="lg-textarea" th:field="*{bulletPoints}" th:aria-describedby="${limits.bulletCountMax != null or limits.bulletLengthMax != null} ? 'bulletPoints-counter'" rows="6"></textarea>
+                <p class="lg-field__hint counter" id="bulletPoints-counter" data-counter-for="bulletPoints" data-mode="list"
                    th:if="${limits.bulletCountMax != null or limits.bulletLengthMax != null}"
                    th:attr="data-limit-count=${limits.bulletCountMax},data-limit-each=${limits.bulletLengthMax}"
                    th:text="(${limits.bulletCountMax != null} ? #{editor.bullets.counter.count(${#strings.toString(limits.bulletCountMax)})} : #{editor.bullets.counter.plain}) + (${limits.bulletLengthMax != null} ? #{editor.counter.each(${#strings.toString(limits.bulletLengthMax)})} : '')"></p>
@@ -72,9 +86,51 @@
                 <textarea class="lg-textarea" th:field="*{description}" rows="8"></textarea>
             </div>
 
+            <div class="lg-field" th:if="${marketplace.etsy}">
+                <label class="lg-field__label" for="whoMade" th:text="#{editor.whomade.label}"></label>
+                <input type="text" class="lg-input" th:field="*{whoMade}" autocomplete="off" aria-describedby="whoMade-hint">
+                <p class="lg-field__hint" id="whoMade-hint">
+                    <span th:text="#{editor.whomade.hint.before}"></span> <code>i_did</code><span th:text="#{editor.codes.hint.after}"></span>
+                </p>
+            </div>
+
+            <div class="lg-field" th:if="${marketplace.etsy}">
+                <label class="lg-field__label" for="whenMade" th:text="#{editor.whenmade.label}"></label>
+                <input type="text" class="lg-input" th:field="*{whenMade}" autocomplete="off" aria-describedby="whenMade-hint">
+                <p class="lg-field__hint" id="whenMade-hint">
+                    <span th:text="#{editor.whenmade.hint.before}"></span> <code>made_to_order</code><span th:text="#{editor.codes.hint.after}"></span>
+                </p>
+            </div>
+            <div class="lg-field">
+                <label class="lg-field__label" for="price" th:text="#{editor.price.label}"></label>
+                <input type="text" class="lg-input" th:field="*{price}" inputmode="decimal" autocomplete="off"
+                       th:aria-describedby="${fieldErrors.containsKey('price')} ? 'price-hint price-error' : 'price-hint'"
+                       th:aria-invalid="${fieldErrors.containsKey('price')}">
+                <p class="lg-field__hint" id="price-hint" th:text="#{editor.price.hint}"></p>
+                <p class="lg-field__error" id="price-error" th:if="${fieldErrors.containsKey('price')}" th:text="${fieldErrors['price']}"></p>
+            </div>
+
+            <div class="lg-field">
+                <label class="lg-field__label" for="quantity" th:text="#{editor.quantity.label}"></label>
+                <input type="text" class="lg-input" th:field="*{quantity}" inputmode="numeric" autocomplete="off"
+                       th:aria-describedby="${fieldErrors.containsKey('quantity')} ? 'quantity-hint quantity-error' : 'quantity-hint'"
+                       th:aria-invalid="${fieldErrors.containsKey('quantity')}">
+                <p class="lg-field__hint" id="quantity-hint" th:text="#{editor.quantity.hint}"></p>
+                <p class="lg-field__error" id="quantity-error" th:if="${fieldErrors.containsKey('quantity')}" th:text="${fieldErrors['quantity']}"></p>
+            </div>
+
             <details id="other-fields" class="lg-disclosure lg-editor__other" th:open="${otherOpen}">
                 <summary th:text="#{editor.other.summary}"></summary>
                 <p class="lg-field__hint" th:text="#{editor.other.intro}"></p>
+
+                <div class="lg-field" th:if="${marketplace.etsy}">
+                    <label class="lg-field__label" for="tags"><span th:text="#{editor.tags.label}"></span> <span class="lg-text-muted" th:text="#{editor.oneperline}"></span></label>
+                    <textarea class="lg-textarea" th:field="*{tags}" th:aria-describedby="${limits.tagCountMax != null or limits.tagLengthMax != null} ? 'tags-counter'" rows="6"></textarea>
+                    <p class="lg-field__hint counter" id="tags-counter" data-counter-for="tags" data-mode="list"
+                       th:if="${limits.tagCountMax != null or limits.tagLengthMax != null}"
+                       th:attr="data-limit-count=${limits.tagCountMax},data-limit-each=${limits.tagLengthMax}"
+                       th:text="(${limits.tagCountMax != null} ? #{editor.tags.counter.count(${#strings.toString(limits.tagCountMax)})} : #{editor.tags.counter.plain}) + (${limits.tagLengthMax != null} ? #{editor.counter.each(${#strings.toString(limits.tagLengthMax)})} : '')"></p>
+                </div>
 
                 <div class="lg-field" th:if="${marketplace.amazon}">
                     <label class="lg-field__label" for="brand" th:text="#{editor.brand.label}"></label>
@@ -83,58 +139,26 @@
 
                 <div class="lg-field" th:if="${marketplace.amazon}">
                     <label class="lg-field__label" for="searchTerms" th:text="#{editor.searchterms.label}"></label>
-                    <textarea class="lg-textarea" th:field="*{searchTerms}" rows="2"></textarea>
-                    <p class="lg-field__hint counter" data-counter-for="searchTerms" data-mode="bytes"
+                    <textarea class="lg-textarea" th:field="*{searchTerms}" th:aria-describedby="${limits.searchTermsMaxBytes != null} ? 'searchTerms-counter'" rows="2"></textarea>
+                    <p class="lg-field__hint counter" id="searchTerms-counter" data-counter-for="searchTerms" data-mode="bytes"
                        th:if="${limits.searchTermsMaxBytes != null}" th:attr="data-limit=${limits.searchTermsMaxBytes}"
                        th:text="#{editor.counter.limit.bytes(${#strings.toString(limits.searchTermsMaxBytes)})}"></p>
                 </div>
 
-                <div class="lg-field" th:if="${marketplace.amazon}">
-                    <label class="lg-field__label" for="productType" th:text="#{editor.producttype.label}"></label>
-                    <input type="text" class="lg-input" th:field="*{productType}" autocomplete="off" aria-describedby="productType-hint">
-                    <p class="lg-field__hint" id="productType-hint" th:text="#{editor.producttype.hint}"></p>
-                </div>
-
-                <div class="lg-field" th:if="${marketplace.etsy}">
-                    <label class="lg-field__label" for="category" th:text="#{editor.category.label}"></label>
-                    <input type="text" class="lg-input" th:field="*{category}" autocomplete="off">
-                </div>
-
-                <div class="lg-field">
-                    <label class="lg-field__label" for="price" th:text="#{editor.price.label}"></label>
-                    <input type="text" class="lg-input" th:field="*{price}" inputmode="decimal" autocomplete="off"
-                           aria-describedby="price-hint"
-                           th:attrappend="aria-invalid=${fieldErrors.containsKey('price')} ? 'true'">
-                    <p class="lg-field__hint" id="price-hint" th:text="#{editor.price.hint}"></p>
-                    <p class="lg-field__error" role="alert" th:if="${fieldErrors.containsKey('price')}" th:text="${fieldErrors['price']}"></p>
-                </div>
-
-                <div class="lg-field">
-                    <label class="lg-field__label" for="quantity" th:text="#{editor.quantity.label}"></label>
-                    <input type="text" class="lg-input" th:field="*{quantity}" inputmode="numeric" autocomplete="off"
-                           aria-describedby="quantity-hint"
-                           th:attrappend="aria-invalid=${fieldErrors.containsKey('quantity')} ? 'true'">
-                    <p class="lg-field__hint" id="quantity-hint" th:text="#{editor.quantity.hint}"></p>
-                    <p class="lg-field__error" role="alert" th:if="${fieldErrors.containsKey('quantity')}" th:text="${fieldErrors['quantity']}"></p>
-                </div>
-
-                <div class="lg-field" th:if="${marketplace.etsy}">
-                    <label class="lg-field__label" for="whoMade" th:text="#{editor.whomade.label}"></label>
-                    <input type="text" class="lg-input" th:field="*{whoMade}" autocomplete="off" aria-describedby="whoMade-hint">
-                    <p class="lg-field__hint" id="whoMade-hint">
-                        <span th:text="#{editor.whomade.hint.before}"></span> <code>i_did</code><span th:text="#{editor.codes.hint.after}"></span>
-                    </p>
-                </div>
-
-                <div class="lg-field" th:if="${marketplace.etsy}">
-                    <label class="lg-field__label" for="whenMade" th:text="#{editor.whenmade.label}"></label>
-                    <input type="text" class="lg-input" th:field="*{whenMade}" autocomplete="off" aria-describedby="whenMade-hint">
-                    <p class="lg-field__hint" id="whenMade-hint">
-                        <span th:text="#{editor.whenmade.hint.before}"></span> <code>made_to_order</code><span th:text="#{editor.codes.hint.after}"></span>
-                    </p>
-                </div>
             </details>
 
+            <h2 class="lg-section-title" th:text="#{editor.step.check}"></h2>
+            <ul class="lg-editor__packs" id="check-packs">
+                <li><strong th:text="#{editor.pack.rules}"></strong>
+                    <span th:text="#{editor.pack.rules.sources}"></span>
+                    <span id="listing-pack-availability" th:if="${!listingPackIncluded}" th:text="#{editor.pack.plan}"></span>
+                </li>
+                <li><strong th:text="#{editor.trademark.heading}"></strong>
+                    <span th:text="#{editor.pack.trademark.sources}"></span>
+                    <span id="trademark-pack-availability" th:if="${!cost.trademarkIncluded or !trademarkAvailable}"
+                          th:text="${!cost.trademarkIncluded} ? #{editor.pack.plan} : #{editor.pack.catalog}"></span>
+                </li>
+            </ul>
             <div class="lg-actions lg-editor__actions">
                 <button type="submit" class="lg-btn lg-btn--primary" id="check-button" th:text="#{editor.check}"></button>
                 <p class="lg-field__hint lg-editor__cost" id="cost">
@@ -160,6 +184,10 @@
             <p th:text="${notice}"></p>
         </div>
         <th:block th:if="${result != null}">
+            <p id="guided-check-status" class="lg-pill"
+               th:attr="data-status=${result.status()}"
+               th:classappend="${result.status().name() == 'ERROR'} ? 'lg-pill--error' : (${result.status().name() == 'PASSED'} ? 'lg-pill--clean' : 'lg-pill--warn')"
+               th:text="#{${result.status().messageKey()}}"></p>
             <!-- The listing as it was checked, then its readiness: one card, because the score is about this text. -->
             <div class="lg-card" id="listing-card">
                 <div class="lg-card__head">

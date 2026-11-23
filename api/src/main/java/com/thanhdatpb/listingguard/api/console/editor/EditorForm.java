@@ -43,8 +43,7 @@ public record EditorForm(
 
     /** True when any field the "Other listing fields" section holds has text. */
     public boolean hasOtherFields() {
-        return !(price.isBlank() && quantity.isBlank() && category.isBlank() && whoMade.isBlank()
-                && whenMade.isBlank() && brand.isBlank() && searchTerms.isBlank() && productType.isBlank());
+        return !(tags.isBlank() && brand.isBlank() && searchTerms.isBlank());
     }
 
     public EditorForm withTitle(String value) {

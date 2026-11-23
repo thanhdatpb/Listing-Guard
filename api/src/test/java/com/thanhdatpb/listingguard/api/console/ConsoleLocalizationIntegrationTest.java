@@ -200,6 +200,15 @@ class ConsoleLocalizationIntegrationTest {
     }
 
     @Test
+    void theAmazonGuideAndPackSourcesAreTranslated() throws Exception {
+        ConsoleUser user = userOf(client());
+        String english = html(in(get("/console/check").param("marketplace", "AMAZON").with(signedIn(user)), "en"));
+        String vietnamese = html(in(get("/console/check").param("marketplace", "AMAZON").with(signedIn(user)), "vi"));
+        assertThat(english).contains("Marketplace and category", "Review and check", "Unverified rules");
+        assertThat(vietnamese).contains("Sàn và danh mục", "Xem lại và kiểm tra", "Quy tắc chưa xác minh");
+    }
+
+    @Test
     void aFindingShowsWhatItsRuleChecksInTheLanguageOfThePageWhileTheFindingItselfIsUnchanged() throws Exception {
         ConsoleUser user = userOf(client());
         Map<String, String> form = etsyForm("a".repeat(150));

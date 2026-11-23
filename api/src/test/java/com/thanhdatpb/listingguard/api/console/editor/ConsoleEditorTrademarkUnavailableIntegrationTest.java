@@ -106,7 +106,7 @@ class ConsoleEditorTrademarkUnavailableIntegrationTest {
         String html = mvc.perform(get("/console/check").with(signedIn(userOf(client()))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("Plan limits are not enforced in this deployment").doesNotContain("Cost: up to");
+        assertThat(html).contains("Plan limits are not enforced in this deployment", "Unavailable with the current catalog and watchlist.").doesNotContain("Cost: up to");
     }
 
     @Test
