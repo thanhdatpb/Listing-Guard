@@ -1,0 +1,32 @@
+id	group	label	title
+brand-exact	BRAND_USE	POSITIVE	Zibblefrax Ceramic Mug
+brand-fuzzy	BRAND_USE	POSITIVE	Grumblefluxx Ceramic Mug
+brand-phrase	BRAND_USE	POSITIVE	Wobblefrump Lantern Goods Ceramic Mug
+description-lantern	DESCRIPTIVE	NEGATIVE	Ceramic Lantern Mug, Handmade Kitchen Goods
+description-blue	DESCRIPTIVE	NEGATIVE	Soft blue cotton apron
+description-stone	DESCRIPTIVE	NEGATIVE	Natural stone wall ornament
+hard-partial	HARD_NEGATIVE	NEGATIVE	Lantern Goods Ceramic Sign
+hard-cancelled	HARD_NEGATIVE	NEGATIVE	Ancient Dribblefrop Wool Scarf
+ambiguous	AMBIGUOUS	UNLABELLED	Plimbusto Style Workshop Gift
+no-catalog	MISSING_CATALOG	UNLABELLED	Zibblefrax Ceramic Mug
+no-title	MISSING_DATA	UNLABELLED	<absent>
+all-high-01	ALL_HIGH	UNLABELLED	Zibblefrax workshop apron
+all-high-02	ALL_HIGH	UNLABELLED	Zibblefrax workshop bag
+all-high-03	ALL_HIGH	UNLABELLED	Zibblefrax workshop banner
+all-high-04	ALL_HIGH	UNLABELLED	Zibblefrax workshop belt
+all-high-05	ALL_HIGH	UNLABELLED	Zibblefrax workshop blanket
+all-high-06	ALL_HIGH	UNLABELLED	Zibblefrax workshop bowl
+all-high-07	ALL_HIGH	UNLABELLED	Zibblefrax workshop cap
+all-high-08	ALL_HIGH	UNLABELLED	Zibblefrax workshop card
+all-high-09	ALL_HIGH	UNLABELLED	Zibblefrax workshop coaster
+all-high-10	ALL_HIGH	UNLABELLED	Zibblefrax workshop cup
+all-high-11	ALL_HIGH	UNLABELLED	Zibblefrax workshop flag
+all-high-12	ALL_HIGH	UNLABELLED	Zibblefrax workshop hat
+all-high-13	ALL_HIGH	UNLABELLED	Zibblefrax workshop jacket
+all-high-14	ALL_HIGH	UNLABELLED	Zibblefrax workshop mat
+all-high-15	ALL_HIGH	UNLABELLED	Zibblefrax workshop mug
+all-high-16	ALL_HIGH	UNLABELLED	Zibblefrax workshop pillow
+all-high-17	ALL_HIGH	UNLABELLED	Zibblefrax workshop poster
+all-high-18	ALL_HIGH	UNLABELLED	Zibblefrax workshop scarf
+all-high-19	ALL_HIGH	UNLABELLED	Zibblefrax workshop shirt
+all-high-20	ALL_HIGH	UNLABELLED	Zibblefrax workshop towel
