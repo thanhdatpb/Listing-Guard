@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk AS build
+FROM --platform=$BUILDPLATFORM eclipse-temurin:24-jdk AS build
 WORKDIR /workspace
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
@@ -28,7 +28,7 @@ FROM build AS hf-convert-build
 RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw -B -q -DskipTests -pl hf-convert -am package
 
-FROM --platform=$TARGETPLATFORM eclipse-temurin:21-jre AS hf-convert
+FROM --platform=$TARGETPLATFORM eclipse-temurin:24-jre AS hf-convert
 RUN useradd --system --uid 10001 --no-create-home app
 WORKDIR /app
 COPY --from=hf-convert-build /workspace/hf-convert/target/listing-guard-hf-convert.jar hf-convert.jar
@@ -36,7 +36,7 @@ USER app
 ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "/app/hf-convert.jar"]
 
 # The API image: the last stage, so the default target.
-FROM --platform=$TARGETPLATFORM eclipse-temurin:21-jre
+FROM --platform=$TARGETPLATFORM eclipse-temurin:24-jre
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends curl \
