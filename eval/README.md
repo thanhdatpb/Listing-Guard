@@ -70,3 +70,35 @@ How the checks do on real listings whose fate is known (claimed or taken down, o
 Nothing here runs in production. The retrieval code (`EvalSet`, `RetrievalEvaluator`, `RetrievalMetrics`) lives in `rag-analyzer`
 and its job in `api` (profile `eval-retrieval`); the listing evaluation and the backtest live in `api/.../evaluation/` (profiles
 `eval-listing` and `backtest`).
+
+## Đánh giá trademark theo listing (LG-01)
+
+`listing/trademark/cases.tsv` có 31 mẫu Etsy tự viết. Tất cả tên nhãn hiệu cần đối chiếu đều thuộc catalog DEMO.
+Bộ mẫu chỉ lưu mã, nhóm, nhãn và tiêu đề giả định. `<absent>` biểu thị tiêu đề bị thiếu.
+
+- **8 mẫu có nhãn tổng hợp.** `POSITIVE` biểu thị tình huống giả định có tín hiệu sử dụng nhãn hiệu DEMO.
+  `NEGATIVE` là đối chứng mô tả hoặc hard negative. Từ MEDIUM trở lên được tính là cảnh báo, theo cùng
+  ngưỡng mặc định với backtest.
+- **23 mẫu chưa gán nhãn.** Các mẫu mơ hồ, thiếu catalog, thiếu tiêu đề và nhóm 20 mẫu tái hiện hiện tượng
+  toàn bộ kết quả HIGH không tham gia confusion matrix. Nhóm 20 mẫu đều dùng cùng một nhãn hiệu giả định
+  với các tiêu đề khác nhau. Nhóm này mô tả hiện tượng 20/20 bằng dữ liệu tổng hợp, không tái sử dụng 20 listing
+  gốc và không suy ra các cảnh báo đó đúng hay sai về pháp lý.
+
+Chạy offline từ thư mục gốc với JDK 21 và Maven wrapper cùng các dependency đã có trong cache:
+
+```bash
+./mvnw -o -B -pl api -am test -Dtest=ListingEvalGateTest,TrademarkEvalGateTest -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+`TrademarkEvalGateTest` dùng lại `ListingAnalyzer`, ruleset đã cấu hình và catalog DEMO trong bộ nhớ.
+Lệnh không cần Docker, cơ sở dữ liệu, catalog triển khai hoặc dịch vụ AI. Báo cáo được tạo tại
+`api/target/eval-listing/trademark.md` và được đính kèm vào tóm tắt CI. Báo cáo có SHA-256 bộ mẫu, phiên bản
+ruleset/catalog, fingerprint scanner, confusion matrix từng nhóm, precision/recall, FPR, tỷ lệ HIGH, tỷ lệ
+cảnh báo sai trong số cảnh báo có nhãn và độ bao phủ. Mẫu thiếu catalog được ghi là `NOT_CONFIGURED`.
+Mẫu thiếu tiêu đề vẫn ghi kết quả thực tế của scanner và không được chấm là mẫu âm.
+
+CI kiểm tra hash trước khi tính toán. Cổng hồi quy đòi hỏi chấm được tất cả mẫu có nhãn, tối thiểu ba đối chứng
+dương và năm đối chứng âm đúng, và không có FP/FN trên tập cố định. Kiểm tra 20/20 HIGH là phép đặc tả hành vi
+hiện tại, cần được xem xét cùng thay đổi nếu hành vi đó được sửa có chủ đích. Bộ 31 mẫu không phải bộ held-out
+200 mẫu của A4 trong [ADR-009](../docs/adr/ADR-009-trademark-risk-scanner.md) và không ước lượng hiệu quả ngoài thực tế.
+Mọi thay đổi bộ mẫu cần được xem xét cùng hash mới và kết quả chạy thực tế.

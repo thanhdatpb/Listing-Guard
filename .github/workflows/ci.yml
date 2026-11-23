@@ -41,6 +41,10 @@ jobs:
         if: always() && hashFiles('api/target/eval-listing/report.md') != ''
         run: cat api/target/eval-listing/report.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Synthetic trademark evaluation report
+        if: always() && hashFiles('api/target/eval-listing/trademark.md') != ''
+        run: cat api/target/eval-listing/trademark.md >> "$GITHUB_STEP_SUMMARY"
+
       # The release-client workflow builds the SDK's Javadoc and sources jars; build them here too, so a Javadoc error is
       # found before a tag is pushed.
       - name: Java client SDK release jars

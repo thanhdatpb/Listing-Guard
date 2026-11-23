@@ -16,3 +16,6 @@ api/src/main/resources/static/brand/tokens.css text eol=lf
 api/src/main/resources/static/brand/fonts/*.woff2 binary
 api/src/main/resources/static/brand/icons/*.png binary
 api/src/main/resources/static/brand/favicon.ico binary
+
+# The synthetic trademark fixture is pinned by its byte hash.
+eval/listing/trademark/cases.tsv text eol=lf
