@@ -5,6 +5,7 @@ import com.thanhdatpb.listingguard.api.review.ReviewCaseException;
 import com.thanhdatpb.listingguard.api.review.ReviewCaseService;
 import com.thanhdatpb.listingguard.api.review.ReviewCaseStatus;
 import com.thanhdatpb.listingguard.api.review.ReviewDecision;
+import com.thanhdatpb.listingguard.api.review.VerifiedCases;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Clock;
@@ -51,12 +52,14 @@ public class ConsoleReviewQueueController {
 
     private final ReviewCaseService cases;
     private final Clock clock;
+    private final VerifiedCases verifiedCases;
     private final ConsoleMessages messages;
 
-    public ConsoleReviewQueueController(ReviewCaseService cases, Clock clock, ConsoleMessages messages) {
+    public ConsoleReviewQueueController(ReviewCaseService cases, Clock clock, ConsoleMessages messages, VerifiedCases verifiedCases) {
         this.cases = cases;
         this.clock = clock;
         this.messages = messages;
+        this.verifiedCases = verifiedCases;
     }
 
     @ModelAttribute
@@ -109,7 +112,34 @@ public class ConsoleReviewQueueController {
             model.addAttribute("transitions", transitions);
             model.addAttribute("requestId", UUID.randomUUID());
         }
+        if (verifiedCases.enabled() && cases.canReviewInConsole(user)) {
+            try {
+                model.addAttribute("verifiedView", verifiedCases.view(user, id));
+            } catch (DataAccessException e) {
+                model.addAttribute("verifiedUnavailable", true);
+            }
+        }
         return "console/review-case";
+    }
+
+    @PostMapping("/{id}/verified")
+    public String verify(@AuthenticationPrincipal ConsoleUser user, @PathVariable UUID id,
+                         @RequestParam(defaultValue = "false") boolean confirmed) {
+        if (!confirmed) {
+            throw new IllegalArgumentException("A verification must be confirmed.");
+        }
+        verifiedCases.verify(user, id);
+        return "redirect:/console/review-queue/{id}";
+    }
+
+    @PostMapping("/{id}/verified/revoke")
+    public String revoke(@AuthenticationPrincipal ConsoleUser user, @PathVariable UUID id,
+                         @RequestParam(defaultValue = "false") boolean confirmed) {
+        if (!confirmed) {
+            throw new IllegalArgumentException("A revocation must be confirmed.");
+        }
+        verifiedCases.revoke(user, id);
+        return "redirect:/console/review-queue/{id}";
     }
 
     @GetMapping("/{id}/evidence")

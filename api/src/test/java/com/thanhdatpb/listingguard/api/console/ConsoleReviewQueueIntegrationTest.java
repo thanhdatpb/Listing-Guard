@@ -28,6 +28,9 @@ import java.util.UUID;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -46,10 +49,12 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
         "listing-guard.console.base-url=https://console.example.test",
         "listing-guard.console.mail-from=noreply@example.test",
         "listing-guard.review-cases.enabled=true",
+        "listing-guard.verified-cases.enabled=true",
         "spring.mail.host=mail.example.test"
 })
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
+@ExtendWith(OutputCaptureExtension.class)
 @Import({TestcontainersConfig.class, TrademarkReadyTestConfig.class})
 class ConsoleReviewQueueIntegrationTest {
     private static final String QUEUE = "/console/review-queue";
@@ -169,6 +174,134 @@ class ConsoleReviewQueueIntegrationTest {
         mvc.perform(get(QUEUE).with(signedIn(user)).param("age", "invalid")).andExpect(status().isBadRequest());
     }
 
+    @Test
+    void verificationIsExplicitTenantScopedAndReplaySafeWithAnAudit(CapturedOutput output) throws Exception {
+        TestClient tenant = client();
+        ConsoleUser reviewer = userOf(tenant);
+        ConsoleUser reader = userOf(tenant);
+        UUID actor = grant(reviewer);
+        insertAccount(reader, "ADMIN");
+        ConsoleUser outsider = userOf(client());
+        grant(outsider);
+        String privateTitle = "Synthetic private fixture marker";
+        String id = createCase(tenant, "/api/v1/checks", "listing-rules", privateTitle);
+        String page = QUEUE + "/" + id;
+        UUID caseId = UUID.fromString(id);
+
+        mvc.perform(verifiedAction(outsider, id, "").with(csrf())).andExpect(status().isNotFound());
+        mvc.perform(verifiedAction(reader, id, "").with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(verifiedAction(reviewer, id, "")).andExpect(status().isForbidden());
+        mvc.perform(verifiedAction(reviewer, id, "").with(csrf())).andExpect(status().isConflict());
+        mvc.perform(verifiedAction(reviewer, UUID.randomUUID().toString(), "").with(csrf())).andExpect(status().isNotFound());
+
+        String checkId = jdbc.queryForObject("SELECT check_id::text FROM review_case WHERE client_id = ? AND id = ?",
+                String.class, tenant.id(), caseId);
+        mvc.perform(post("/api/v1/feedback").header(HEADER, tenant.key()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.createObjectNode().put("pack", "listing-rules").put("checkId", checkId)
+                        .put("findingIndex", 0).put("verdict", "FALSE_POSITIVE").put("note", privateTitle).toString()))
+                .andExpect(status().isOk());
+        resolve(reviewer, id);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM verified_case WHERE client_id = ?", Integer.class, tenant.id())).isZero();
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mvc.perform(verifiedAction(reviewer, id, "").with(csrf()).param("reviewerId", UUID.randomUUID().toString()))
+                    .andExpect(status().is3xxRedirection()).andExpect(header().string("Location", page));
+        }
+        Document localized = html(mvc.perform(get(page).with(signedIn(reviewer)).param("lang", "vi")));
+        assertThat(localized.text()).contains("Case tương tự đã xác minh").doesNotContain(privateTitle);
+        assertThat(localized.select("[aria-label=Lịch sử xác minh] li")).hasSize(1);
+        assertThat(html(mvc.perform(get(page).with(signedIn(reader)))).select("#verified-heading")).isEmpty();
+        mvc.perform(verifiedAction(outsider, id, "/revoke").with(csrf())).andExpect(status().isNotFound());
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mvc.perform(verifiedAction(reviewer, id, "/revoke").with(csrf())).andExpect(status().is3xxRedirection());
+        }
+        var events = jdbc.queryForList("SELECT action, actor_id FROM verified_case_event WHERE client_id = ? ORDER BY revision", tenant.id());
+        assertThat(events).hasSize(2).allSatisfy(event -> assertThat(event).containsEntry("actor_id", actor));
+        assertThat(events).extracting(event -> event.get("action")).containsExactly("VERIFIED", "REVOKED");
+        assertThat(jdbc.queryForMap("SELECT * FROM verified_case WHERE client_id = ?", tenant.id()))
+                .containsEntry("severity", jdbc.queryForObject("SELECT severity FROM review_case WHERE client_id = ? AND id = ?",
+                        String.class, tenant.id(), caseId)).containsEntry("reason", "FIX_CONFIRMED");
+        assertThat(output.getAll()).doesNotContain(privateTitle);
+    }
+
+    @Test
+    void labeledSimilarityFixtureMeasuresRankAndExcludesOtherTenantsRevokedExpiredAndWrongRule() throws Exception {
+        TestClient tenant = client();
+        ConsoleUser reviewer = userOf(tenant);
+        grant(reviewer);
+        String target = createCase(tenant, "/api/v1/checks", "listing-rules", "Synthetic query mug");
+        Document empty = html(mvc.perform(get(QUEUE + "/" + target).with(signedIn(reviewer)).param("lang", "en")));
+        assertThat(empty.text()).contains("No similar verified cases are available.");
+
+        List<String> relevant = new ArrayList<>();
+        List<String> differentVersion = new ArrayList<>();
+        for (int index = 0; index < 7; index++) {
+            String id = verifiedReference(tenant, reviewer, index);
+            if (index < 2) {
+                relevant.add(id);
+            } else {
+                differentVersion.add(id);
+                jdbc.update("UPDATE verified_case SET analysis_version='fixture-earlier-version' WHERE client_id=? AND case_id=?",
+                        tenant.id(), UUID.fromString(id));
+            }
+        }
+        String revoked = verifiedReference(tenant, reviewer, 7);
+        mvc.perform(verifiedAction(reviewer, revoked, "/revoke").with(csrf())).andExpect(status().is3xxRedirection());
+        String expired = verifiedReference(tenant, reviewer, 8);
+        jdbc.update("""
+                UPDATE verified_case SET verified_at = now() - interval '2 days', expires_at = now() - interval '1 day'
+                WHERE client_id = ? AND case_id = ?
+                """, tenant.id(), UUID.fromString(expired));
+        String differentRule = verifiedReference(tenant, reviewer, 9);
+        jdbc.update("UPDATE verified_case SET rule_id = 'fixture-different-rule' WHERE client_id = ? AND case_id = ?",
+                tenant.id(), UUID.fromString(differentRule));
+        TestClient other = client();
+        ConsoleUser outsider = userOf(other);
+        grant(outsider);
+        String foreign = verifiedReference(other, outsider, 10);
+
+        long started = System.nanoTime();
+        Document result = html(mvc.perform(get(QUEUE + "/" + target).with(signedIn(reviewer)).param("lang", "en")));
+        double elapsed = (System.nanoTime() - started) / 1_000_000.0;
+        List<String> matches = result.select("[data-reference-id]").eachAttr("data-reference-id");
+        assertThat(matches).hasSize(5).doesNotContain(revoked, expired, differentRule, foreign, target);
+        assertThat(matches.subList(0, 2)).containsExactlyInAnyOrderElementsOf(relevant);
+        assertThat(matches.subList(2, 5)).allMatch(differentVersion::contains);
+        assertThat(result.text()).contains("Analysis or source version differs.");
+        long hits = matches.stream().filter(relevant::contains).count();
+        double recall = (double) hits / relevant.size();
+        double precision = (double) hits / matches.size();
+        assertThat(recall).isEqualTo(1.0);
+        assertThat(precision).isEqualTo(0.4);
+        System.out.printf(java.util.Locale.ROOT, "Verified-case fixture Recall@5=%.3f Precision@5=%.3f elapsed_ms=%.3f%n",
+                recall, precision, elapsed);
+    }
+
+    private UUID grant(ConsoleUser user) {
+        UUID actor = insertAccount(user, "MEMBER");
+        jdbc.update("INSERT INTO console_review_grant (account_id, client_id) VALUES (?, ?)", actor, user.clientId());
+        return actor;
+    }
+
+    private void resolve(ConsoleUser user, String id) throws Exception {
+        String page = QUEUE + "/" + id;
+        mvc.perform(decision(user, page, UUID.randomUUID(), 0, "IN_REVIEW").with(csrf()).param("confirmed", "true"))
+                .andExpect(status().is3xxRedirection());
+        mvc.perform(decision(user, page, UUID.randomUUID(), 1, "RESOLVED").with(csrf()).param("confirmed", "true"))
+                .andExpect(status().is3xxRedirection());
+    }
+
+    private String verifiedReference(TestClient tenant, ConsoleUser user, int index) throws Exception {
+        String id = createCase(tenant, "/api/v1/checks", "listing-rules", "Synthetic reference mug " + index);
+        resolve(user, id);
+        mvc.perform(verifiedAction(user, id, "").with(csrf())).andExpect(status().is3xxRedirection());
+        return id;
+    }
+
+    private MockHttpServletRequestBuilder verifiedAction(ConsoleUser user, String id, String suffix) {
+        return post(QUEUE + "/" + id + "/verified" + suffix).with(signedIn(user)).param("confirmed", "true");
+    }
+
     private TestClient client() {
         return newClient(provisioning, clients, PlanCode.PRO);
     }
@@ -189,7 +322,7 @@ class ConsoleReviewQueueIntegrationTest {
     }
 
     private String createCase(TestClient tenant, String endpoint, String pack, String title) throws Exception {
-        jdbc.update("INSERT INTO review_case_writer (api_key_id) SELECT id FROM api_key WHERE client_id = ?", tenant.id());
+        jdbc.update("INSERT INTO review_case_writer (api_key_id) SELECT id FROM api_key WHERE client_id = ? ON CONFLICT DO NOTHING", tenant.id());
         String check = json(mvc.perform(post(endpoint).header(HEADER, tenant.key()).contentType(MediaType.APPLICATION_JSON)
                 .content(body(title)))).path("checkId").asText();
         return json(mvc.perform(post("/api/v1/review-cases").header(HEADER, tenant.key()).contentType(MediaType.APPLICATION_JSON)
