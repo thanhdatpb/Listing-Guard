@@ -13,20 +13,5 @@
 #     reason: Why the change is needed and why no additive form works.
 #     adr: ADR-022-api-contract-and-compatibility.md
 format: listing-guard/breaking-changes/v1
-baseline: v0.6.0
-exceptions:
-  # v0.6.0's document pointed TrademarkCheckResult.findings at FindingView, the finding of POST /api/v1/checks. The fix after
-  # v0.6.0 ("the findings of a trademark check have their own schema", docs/releases/unreleased.md) points it at
-  # TrademarkCheckFindingView. The responses never carried these three members in a trademark finding; only the document did. (`source` is not one of them any more: ADR-031 gave a trademark finding a `source` of its own, CATALOG, CONTEXT or WATCHLIST.)
-  - rule: response-property-removed
-    location: schema TrademarkCheckFindingView (was FindingView).fix
-    reason: Documentation fix. A trademark finding never had fix; the v0.6.0 document described the wrong schema.
-    adr: ADR-022-api-contract-and-compatibility.md
-  - rule: response-property-removed
-    location: schema TrademarkCheckFindingView (was FindingView).severity
-    reason: Documentation fix. A trademark finding has risk, never severity; the v0.6.0 document described the wrong schema.
-    adr: ADR-022-api-contract-and-compatibility.md
-  - rule: response-property-removed
-    location: schema TrademarkCheckFindingView (was FindingView).value
-    reason: Documentation fix. A trademark finding has snippet, never value; the v0.6.0 document described the wrong schema.
-    adr: ADR-022-api-contract-and-compatibility.md
+baseline: v0.10.0
+exceptions: []
