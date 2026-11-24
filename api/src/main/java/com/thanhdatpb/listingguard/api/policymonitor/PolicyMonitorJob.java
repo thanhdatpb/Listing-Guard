@@ -45,6 +45,10 @@ public final class PolicyMonitorJob {
     }
 
     public Path run(boolean dryRun, Path outputOverride) {
+        return run(dryRun, outputOverride, report -> { });
+    }
+
+    Path run(boolean dryRun, Path outputOverride, java.util.function.Consumer<PolicyDiffEngine.RunFile> publish) {
         List<PolicyDiffEngine.RuleSource> sources = rulesets.locations().stream().map(resourceLoader::getResource)
                 .map(this::ruleSource).toList();
         PolicyDiffEngine.RunFile report = engine.run(properties.manifest(), properties.rawDir(), sources,
@@ -57,6 +61,7 @@ public final class PolicyMonitorJob {
             mapper.writerWithDefaultPrettyPrinter().writeValue(dir.resolve("report.json").toFile(), report);
             Files.writeString(dir.resolve("report.html"), PolicyMonitorHtml.render(report), StandardCharsets.UTF_8);
             retainRecentReports(outRoot, properties.keepReports());
+            publish.accept(report);
         } catch (FileAlreadyExistsException e) {
             throw new IllegalStateException("The report directory " + dir + " already exists; no report was overwritten.", e);
         } catch (IOException e) {

@@ -20,15 +20,17 @@ public class PolicyMonitorRunner implements ApplicationRunner {
     private final ResourceLoader resourceLoader;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final PolicyImpactReports impacts;
 
     public PolicyMonitorRunner(PolicyMonitorSnapshotStore snapshots, PolicyMonitorProperties properties, RulesetProperties rulesets,
-                               ResourceLoader resourceLoader, ObjectMapper mapper, Clock clock) {
+                               ResourceLoader resourceLoader, ObjectMapper mapper, Clock clock, PolicyImpactReports impacts) {
         this.snapshots = snapshots;
         this.properties = properties;
         this.rulesets = rulesets;
         this.resourceLoader = resourceLoader;
         this.mapper = mapper;
         this.clock = clock;
+        this.impacts = impacts;
     }
 
     @Override
@@ -36,8 +38,18 @@ public class PolicyMonitorRunner implements ApplicationRunner {
         boolean dryRun = args.containsOption("dry-run");
         Path output = args.containsOption("out") && !args.getOptionValues("out").isEmpty()
                 ? Path.of(args.getOptionValues("out").getFirst()) : null;
+        var approval = args.getOptionValues("impact-approval");
+        if (approval != null && (!dryRun || approval.size() != 1)) {
+            throw new IllegalArgumentException("Use --dry-run and one --impact-approval=/path/to/approval.json");
+        }
+        var approved = approval == null ? java.util.Map.<String, PolicyImpact.Approval>of()
+                : PolicyImpact.loadApprovals(Path.of(approval.getFirst()), mapper);
         Path report = new PolicyMonitorJob(new PolicyDiffEngine(snapshots, clock), properties, rulesets,
-                resourceLoader, mapper, clock).run(dryRun, output);
+                resourceLoader, mapper, clock).run(dryRun, output, run -> {
+                    if (approval != null) {
+                        impacts.publish(run, approved);
+                    }
+                });
         System.out.println("Policy diff report written to " + report.toAbsolutePath() + (dryRun ? " (dry run; snapshot unchanged)." : "."));
     }
 }

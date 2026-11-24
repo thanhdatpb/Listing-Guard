@@ -41,14 +41,14 @@ public final class PolicyDiffEngine {
     }
 
     public record SectionChange(String type, String path, String oldHash, String newHash, String excerpt) {}
-    public record DocumentChange(String type, String url, String title, String oldVersion, String newVersion,
+    public record DocumentChange(String type, String marketplace, String url, String title, String oldVersion, String newVersion,
                                  String oldHash, String newHash, boolean documentHashChanged,
                                  List<SectionChange> sections) {
         public DocumentChange { sections = List.copyOf(sections); }
     }
     public record Alert(String code, String url, String message) {}
     public record RuleReview(String marketplace, String rulesetVersion, String ruleId, String sourceStatus,
-                             String sourceUrl, String section) {}
+                             String sourceUrl, String section, String category) {}
     public record RuleSource(String name, String yaml) {}
     public record RunFile(Instant generatedAt, boolean dryRun, List<DocumentChange> changes, List<Alert> alerts,
                           List<RuleReview> rulesToReview) {
@@ -107,7 +107,7 @@ public final class PolicyDiffEngine {
         for (String oldUrl : before.keySet()) {
             if (!current.containsKey(oldUrl)) {
                 DocumentSnapshot old = before.get(oldUrl);
-                changes.add(new DocumentChange("DOCUMENT_REMOVED", oldUrl, old.title(), old.version(), null,
+                changes.add(new DocumentChange("DOCUMENT_REMOVED", old.marketplace(), oldUrl, old.title(), old.version(), null,
                         old.documentHash(), null, true, old.sections().stream().map(section -> new SectionChange("SECTION_REMOVED",
                                 section.path(), section.hash(), null, null)).toList()));
             }
@@ -129,13 +129,13 @@ public final class PolicyDiffEngine {
             if (old == null) {
                 List<SectionChange> added = now.sections().stream().map(section -> new SectionChange("SECTION_ADDED", section.path(),
                         null, section.hash(), excerpt(item.getValue().sectionText().get(section.path())))).toList();
-                changes.add(new DocumentChange("DOCUMENT_NEW", url, now.title(), null, now.version(), null, now.documentHash(), true, added));
+                changes.add(new DocumentChange("DOCUMENT_NEW", now.marketplace(), url, now.title(), null, now.version(), null, now.documentHash(), true, added));
                 continue;
             }
             List<SectionChange> sectionChanges = sectionChanges(old, item.getValue());
             if (old.version().equals(now.version()) && old.documentHash().equals(now.documentHash()) && sectionChanges.isEmpty()) continue;
             String type = old.version().equals(now.version()) ? "DOCUMENT_CHANGED" : "VERSION_CHANGED";
-            changes.add(new DocumentChange(type, url, now.title(), old.version(), now.version(), old.documentHash(), now.documentHash(),
+            changes.add(new DocumentChange(type, now.marketplace(), url, now.title(), old.version(), now.version(), old.documentHash(), now.documentHash(),
                     !old.documentHash().equals(now.documentHash()), sectionChanges));
         }
         return changes;
@@ -172,29 +172,36 @@ public final class PolicyDiffEngine {
                 var fields = rules.fields();
                 while (fields.hasNext()) {
                     var rule = fields.next();
-                    JsonNode source = rule.getValue().path("source");
-                    String status = source.path("status").asText("unknown");
-                    List<String> urls = new ArrayList<>();
-                    JsonNode urlsNode = source.path("urls");
-                    if (urlsNode.isArray()) urlsNode.forEach(url -> urls.add(url.asText()));
-                    else if (urlsNode.isTextual()) urls.add(urlsNode.asText());
-                    String sourceSection = source.path("section").asText("");
-                    for (Map.Entry<String, List<DocumentChange>> document : changedByUrl.entrySet()) {
-                        if (!urls.stream().anyMatch(sourceUrl -> urlKey(sourceUrl).equals(urlKey(document.getKey())))) continue;
-                        List<String> changedSections = document.getValue().stream().flatMap(change -> change.sections().stream())
-                                .filter(change -> change.type().startsWith("SECTION_")).map(SectionChange::path).toList();
-                        if (!sourceSection.isBlank() && !changedSections.stream().anyMatch(section -> section.equals(sourceSection)
-                                || section.endsWith(" > " + sourceSection))) continue;
-                        RuleReview review = new RuleReview(marketplace, version, rule.getKey(), status, document.getKey(),
-                                sourceSection.isBlank() ? null : sourceSection);
-                        result.put(marketplace + "/" + version + "/" + rule.getKey() + "/" + document.getKey(), review);
-                    }
+                    mapSource(changedByUrl, result, marketplace, version, rule.getKey(), null, rule.getValue().path("source"));
+                    rule.getValue().path("categories").fields().forEachRemaining(category ->
+                            mapSource(changedByUrl, result, marketplace, version, rule.getKey(), category.getKey(),
+                                    category.getValue().path("source")));
                 }
             } catch (IOException e) {
                 throw new IllegalArgumentException("Cannot read ruleset " + ruleset.name(), e);
             }
         }
         return List.copyOf(result.values());
+    }
+
+    private static void mapSource(Map<String, List<DocumentChange>> changedByUrl, Map<String, RuleReview> result,
+                                  String marketplace, String version, String ruleId, String category, JsonNode source) {
+        String status = source.path("status").asText("unknown");
+        List<String> urls = new ArrayList<>();
+        JsonNode urlsNode = source.path("urls");
+        if (urlsNode.isArray()) urlsNode.forEach(url -> urls.add(url.asText()));
+        else if (urlsNode.isTextual()) urls.add(urlsNode.asText());
+        String sourceSection = source.path("section").asText("");
+        for (Map.Entry<String, List<DocumentChange>> document : changedByUrl.entrySet()) {
+            if (!urls.stream().anyMatch(sourceUrl -> urlKey(sourceUrl).equals(urlKey(document.getKey())))) continue;
+            List<String> changedSections = document.getValue().stream().flatMap(change -> change.sections().stream())
+                    .filter(change -> change.type().startsWith("SECTION_")).map(SectionChange::path).toList();
+            if (!sourceSection.isBlank() && !changedSections.stream().anyMatch(section -> section.equals(sourceSection)
+                    || section.endsWith(" > " + sourceSection))) continue;
+            RuleReview review = new RuleReview(marketplace, version, ruleId, status, document.getKey(),
+                    sourceSection.isBlank() ? null : sourceSection, category);
+            result.put(marketplace + "/" + version + "/" + ruleId + "/" + document.getKey() + "/" + category, review);
+        }
     }
 
     private static String urlKey(String text) {
