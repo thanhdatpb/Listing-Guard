@@ -13,8 +13,13 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.rag.analysis.PolicyAnalyzer;
+import com.thanhdatpb.listingguard.rag.llm.LlmProvider;
+import com.thanhdatpb.listingguard.rag.llm.LlmRequest;
+import com.thanhdatpb.listingguard.rag.llm.LlmResponse;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingProvider;
 import com.thanhdatpb.listingguard.rag.embedding.HashingEmbeddingProvider;
@@ -135,6 +140,45 @@ class AnalyzerPolicyRetrievalIntegrationTest {
                 .content(body("Synthetic non-sensitive mug"))).andExpect(status().isOk());
         verify(embeddings, times(2)).embed(anyList(), eq(EmbeddingProvider.Kind.QUERY));
         assertThat(output.getAll()).doesNotContain(PRIVATE);
+    }
+
+    @Test
+    void policyAnalysisUsesTheActualRetrievedSnapshotAndNeverLogsModelOrListingText(CapturedOutput output) {
+        seedCorpus(true);
+        JsonMapper json = new JsonMapper();
+        LlmProvider fake = new LlmProvider() {
+            @Override
+            public String modelId() {
+                return "fake:policy-v1";
+            }
+
+            @Override
+            public LlmResponse complete(LlmRequest request) {
+                try {
+                    var evidence = json.readTree(request.user()).path("evidence").path(0);
+                    var result = json.createObjectNode();
+                    result.putArray("findings").addObject().put("ruleId", "policy.production_partner")
+                            .put("severity", "WARNING").put("field", "description").putNull("value")
+                            .put("message", "synthetic-private-model-message").put("suggestion", "Model suggestion")
+                            .putObject("citation").put("chunkId", evidence.path("chunkId").asLong())
+                            .put("sourceHash", evidence.path("sourceHash").asText()).put("quote", TOPIC)
+                            .put("start", 0).put("end", TOPIC.length());
+                    return new LlmResponse(result.toString(), 30, 15, "stop");
+                } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                    throw new AssertionError("Invalid request test fixture", e);
+                }
+            }
+        };
+        var service = new PolicyAnalysisService(retrieval, fake, CLOCK);
+        var result = service.analyze("ETSY", "vi", LISTING);
+        assertThat(result.status()).isEqualTo(PolicyAnalyzer.Status.REVIEW_REQUIRED);
+        assertThat(result.findings()).singleElement().satisfies(finding -> {
+            assertThat(finding.message()).startsWith("Cần đối chiếu");
+            assertThat(finding.citation().quote()).isEqualTo(TOPIC);
+            assertThat(finding.citation().evidence().sourceHash()).isEqualTo("a".repeat(64));
+        });
+        assertThat(output.getAll()).doesNotContain(PRIVATE, "synthetic-private-model-message");
+        assertThat(result.toString()).doesNotContain(PRIVATE, "synthetic-private-model-message");
     }
 
     private long seedCorpus(boolean chunks) {

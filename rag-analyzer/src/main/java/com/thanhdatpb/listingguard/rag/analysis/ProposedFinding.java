@@ -14,5 +14,13 @@ public record ProposedFinding(
         String message,
         String suggestion,
         long chunkId,
-        String quote) {
+        String quote,
+        Coordinates coordinates) {
+
+    public ProposedFinding(String ruleId, Severity severity, String field, String value, String message,
+                           String suggestion, long chunkId, String quote) {
+        this(ruleId, severity, field, value, message, suggestion, chunkId, quote, null);
+    }
+
+    public record Coordinates(int start, int end, String sourceHash) { }
 }
