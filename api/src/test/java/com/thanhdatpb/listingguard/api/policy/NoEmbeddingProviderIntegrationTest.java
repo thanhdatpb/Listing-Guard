@@ -32,6 +32,15 @@ import org.springframework.test.web.servlet.MockMvc;
 @Import(TestcontainersConfig.class)
 class NoEmbeddingProviderIntegrationTest {
 
+    @Test
+    void policyApiIsDisabledByDefault() throws Exception {
+        mvc.perform(post("/api/v1/policy-checks").header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"marketplace":"ETSY","listing":{}}
+                        """))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("policy-checks-disabled"));
+    }
+
     @Autowired
     EmbeddingProvider embeddings;
 

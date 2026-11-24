@@ -80,8 +80,7 @@ public final class PolicyAnalyzer {
         if (Thread.currentThread().isInterrupted()) {
             return Result.incomplete(Reason.ANALYZER_TIMEOUT);
         }
-        var descriptor = new Descriptor(retrieval, PolicyAnalyzerPrompt.VERSION, PolicyAnalyzerPrompt.hash(settings),
-                provider.modelId(), ALGORITHM, language);
+        var descriptor = describe(profile, retrieval, language);
         String version = analysisVersion(descriptor);
         ParseResult parsed;
         try {
@@ -173,7 +172,12 @@ public final class PolicyAnalyzer {
                 finding.citation());
     }
 
-    private static String analysisVersion(Descriptor descriptor) {
+    public Descriptor describe(AnalyzerProfile profile, AnalyzerDescriptor retrieval, String language) {
+        return new Descriptor(retrieval, PolicyAnalyzerPrompt.VERSION, PolicyAnalyzerPrompt.hash(profile.settings()),
+                provider.modelId(), ALGORITHM, language);
+    }
+
+    public static String analysisVersion(Descriptor descriptor) {
         try {
             return "policy-analyzer:" + AnalyzerProfile.sha256(JSON.writeValueAsBytes(descriptor)).substring(0, 16);
         } catch (JsonProcessingException e) {

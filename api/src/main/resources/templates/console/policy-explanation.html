@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="explanation(field)" class="lg-card" data-policy-panel hidden
+     th:attr="data-policy-url=@{/console/check/edit/policy-checks},
+              data-i18n-loading=#{js.policy.loading},data-i18n-error=#{js.policy.error},
+              data-i18n-timeout=#{js.policy.timeout},data-i18n-insufficient=#{js.policy.insufficient},
+              data-i18n-partial=#{js.policy.partial},data-i18n-source=#{js.policy.source},
+              data-i18n-version=#{js.policy.version},data-i18n-analyzed=#{js.policy.analyzed},
+              data-i18n-ready=#{js.policy.ready}">
+    <p class="lg-small lg-text-muted" th:text="#{policy.cost}"></p>
+    <button class="lg-btn" type="button" data-policy-explain th:attr="data-field=${field}" th:text="#{policy.explain}"></button>
+    <p class="lg-small" role="status" data-policy-status></p>
+    <div data-policy-evidence></div>
+</div>
+</body>
+</html>

@@ -113,39 +113,12 @@ public class AnalyzerPolicyRetrieval {
     }
 
     private Result retrieveSnapshot(List<String> queries) {
-        jdbc.execute("SET LOCAL statement_timeout = '5s'");
+        var corpus = loadCorpus();
+        if (corpus.status() != Status.READY) {
+            return incomplete(corpus.status());
+        }
         var settings = profile.settings();
-        List<String> orderedFiles = settings.sources().keySet().stream().sorted().toList();
-        String parameters = "?,".repeat(orderedFiles.size() - 1) + "?";
-        List<Object> bindings = new ArrayList<>();
-        bindings.add(settings.marketplace());
-        bindings.addAll(orderedFiles);
-        List<Document> documents = jdbc.query("""
-                SELECT d.id, d.source_file, d.title, left(d.url, 2049) AS url, d.version, d.source_hash, d.fetched_at, d.pipeline_version,
-                       EXISTS (SELECT 1 FROM policy_chunk c WHERE c.document_id = d.id) AS has_chunks
-                FROM policy_document d WHERE d.marketplace_code = ? AND d.source_file IN (
-                """ + parameters + ") ORDER BY d.source_file COLLATE \"C\"", (rs, row) ->
-                new Document(rs.getLong("id"), rs.getString("source_file"), rs.getString("title"), rs.getString("url"),
-                        rs.getString("version"), rs.getString("source_hash"), rs.getObject("fetched_at", LocalDate.class),
-                        rs.getString("pipeline_version"), rs.getBoolean("has_chunks")), bindings.toArray());
-        if (documents.size() != settings.sources().size()) {
-            return incomplete(Status.MISSING_CORPUS);
-        }
-        LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
-        for (Document document : documents) {
-            Status status = validateDocument(document, today);
-            if (status != Status.READY) {
-                return incomplete(status);
-            }
-        }
-
-        String pipeline = PolicyIngestService.pipelineVersion(policyProperties.chunking(), embeddings.modelId());
-        for (Document document : documents) {
-            if (PolicyIngestService.embeddedWith(document.pipelineVersion(), embeddings.modelId())
-                    && !pipeline.equals(document.pipelineVersion())) {
-                return incomplete(Status.CORPUS_PIPELINE_MISMATCH);
-            }
-        }
+        var documents = corpus.documents();
         var groups = retriever.searchAll(settings.marketplace(), queries, settings.topK(), documents.stream().map(Document::id).toList());
         Map<String, Document> byFile = documents.stream().collect(Collectors.toMap(Document::file, Function.identity()));
         var ranked = groups.stream().flatMap(List::stream).sorted(BEST_FIRST).toList();
@@ -170,12 +143,64 @@ public class AnalyzerPolicyRetrieval {
         if (accepted.isEmpty()) {
             return incomplete(Status.NO_USABLE_EVIDENCE);
         }
+        return new Result(Status.READY, corpus.descriptor(), accepted);
+    }
+
+    java.util.Optional<AnalyzerDescriptor> currentDescriptor() {
+        try {
+            return java.util.Optional.ofNullable(snapshot.execute(ignored -> loadCorpus().descriptor()));
+        } catch (DataAccessException | TransactionException e) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    private record Corpus(List<Document> documents, Status status, AnalyzerDescriptor descriptor) { }
+
+    private Corpus loadCorpus() {
+        jdbc.execute("SET LOCAL statement_timeout = '5s'");
+        var settings = profile.settings();
+        List<String> orderedFiles = settings.sources().keySet().stream().sorted().toList();
+        String parameters = "?,".repeat(orderedFiles.size() - 1) + "?";
+        List<Object> bindings = new ArrayList<>();
+        bindings.add(settings.marketplace());
+        bindings.addAll(orderedFiles);
+        List<Document> documents = jdbc.query("""
+                SELECT d.id, d.source_file, d.title, left(d.url, 2049) AS url, d.version, d.source_hash, d.fetched_at, d.pipeline_version,
+                       EXISTS (SELECT 1 FROM policy_chunk c WHERE c.document_id = d.id) AS has_chunks
+                FROM policy_document d WHERE d.marketplace_code = ? AND d.source_file IN (
+                """ + parameters + ") ORDER BY d.source_file COLLATE \"C\"", (rs, row) ->
+                new Document(rs.getLong("id"), rs.getString("source_file"), rs.getString("title"), rs.getString("url"),
+                        rs.getString("version"), rs.getString("source_hash"), rs.getObject("fetched_at", LocalDate.class),
+                        rs.getString("pipeline_version"), rs.getBoolean("has_chunks")), bindings.toArray());
+        if (documents.size() != settings.sources().size()) {
+            return new Corpus(List.of(), Status.MISSING_CORPUS, null);
+        }
+        LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
+        for (Document document : documents) {
+            Status status = validateDocument(document, today);
+            if (status != Status.READY) {
+                return new Corpus(List.of(), status, null);
+            }
+        }
+
+        String pipeline = PolicyIngestService.pipelineVersion(policyProperties.chunking(), embeddings.modelId());
+        for (Document document : documents) {
+            if (PolicyIngestService.embeddedWith(document.pipelineVersion(), embeddings.modelId())
+                    && !pipeline.equals(document.pipelineVersion())) {
+                return new Corpus(List.of(), Status.CORPUS_PIPELINE_MISMATCH, null);
+            }
+        }
+        for (Document document : documents) {
+            if (!PolicyIngestService.embeddedWith(document.pipelineVersion(), embeddings.modelId())) {
+                return new Corpus(List.of(), Status.CORPUS_MODEL_MISMATCH, null);
+            }
+        }
         String fingerprint = documents.stream().map(doc -> String.join("\t", doc.file(), doc.hash(), doc.version()))
                 .collect(Collectors.joining("\n"));
         var descriptor = new AnalyzerDescriptor(settings.version(), profile.hash(),
                 AnalyzerProfile.sha256(fingerprint.getBytes(StandardCharsets.UTF_8)), PolicyChunker.VERSION,
                 embeddings.modelId(), pipeline, ALGORITHM);
-        return new Result(Status.READY, descriptor, accepted);
+        return new Corpus(documents, Status.READY, descriptor);
     }
 
     private Status validateDocument(Document doc, LocalDate today) {

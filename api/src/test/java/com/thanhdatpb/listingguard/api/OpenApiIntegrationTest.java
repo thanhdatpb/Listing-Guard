@@ -113,7 +113,7 @@ class OpenApiIntegrationTest {
                 "/api/v1/rulesets/{marketplace}/limits", "/api/v1/reports/summary", "/api/v1/capabilities",
                 "/api/v1/input-adapters", "/api/v1/feedback", "/api/v1/feedback/stats", "/api/v1/listing-edits",
                 "/api/v1/review-cases", "/api/v1/review-cases/{id}", "/api/v1/review-cases/{id}/decisions",
-                "/api/v1/review-cases/{id}/events", "/health");
+                "/api/v1/review-cases/{id}/events", "/api/v1/policy-checks", "/api/v1/policy-checks/{id}", "/health");
         // feedback (ADR-034): explicit operation ids, so no generated id of another operation moves
         assertThat(spec.at("/paths/~1api~1v1~1feedback/post/operationId").asText()).isEqualTo("recordFeedback");
         assertThat(spec.at("/paths/~1api~1v1~1feedback~1stats/get/operationId").asText()).isEqualTo("getFeedbackStats");

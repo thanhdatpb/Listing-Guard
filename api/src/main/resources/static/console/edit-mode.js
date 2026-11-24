@@ -9,18 +9,20 @@
   const draft = form.elements.after;
   let revision = 0;
   let pending = false;
+  let policyRequest;
   const snapshot = () => [form.elements.marketplace.value, form.elements.before.value, draft.value].join('\u0000');
   let checked = snapshot();
 
   function invalidate() {
     revision++;
+    policyRequest?.abort();
     unchecked.hidden = false;
     output.replaceChildren();
     error.textContent = '';
   }
 
   function revealFixes() {
-    output.querySelectorAll('[data-draft-fix]').forEach(button => { button.hidden = false; });
+    output.querySelectorAll('[data-draft-fix],[data-policy-panel]').forEach(control => { control.hidden = false; });
   }
 
   form.addEventListener('input', invalidate);
@@ -61,6 +63,78 @@
       draft.focus();
     }
   });
+
+  output.addEventListener('click', async event => {
+    const button = event.target.closest('[data-policy-explain]');
+    if (!button || policyRequest || checked !== snapshot()) return;
+    const panel = button.closest('[data-policy-panel]');
+    const status = panel.querySelector('[data-policy-status]');
+    const evidence = panel.querySelector('[data-policy-evidence]');
+    const submitted = revision;
+    const controller = new AbortController();
+    policyRequest = controller;
+    button.disabled = true;
+    evidence.replaceChildren();
+    status.textContent = panel.dataset.i18nLoading;
+    const timer = setTimeout(() => controller.abort(), 45000);
+    try {
+      const response = await fetch(panel.dataset.policyUrl, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': form.elements._csrf.value },
+        body: JSON.stringify({
+          marketplace: form.elements.marketplace.value,
+          language: document.documentElement.lang === 'vi' ? 'vi' : 'en',
+          listing: JSON.parse(draft.value)
+        })
+      });
+      if (!response.ok || response.redirected) throw new Error();
+      const result = await response.json();
+      if (submitted !== revision || checked !== snapshot()) return;
+      const analysis = result.analysis;
+      const field = button.dataset.field.replace(/\[\d+]$/, '');
+      const matching = analysis.findings.filter(item => item.field === field);
+      if (['LLM_TIMEOUT', 'ANALYZER_TIMEOUT'].includes(analysis.reason)) {
+        status.textContent = panel.dataset.i18nTimeout;
+      } else if (['LLM_ERROR', 'LLM_INVALID_OUTPUT', 'LLM_REFUSED', 'LLM_TRUNCATED', 'RETRIEVAL_FAILED'].includes(analysis.reason)) {
+        status.textContent = panel.dataset.i18nError;
+      } else if (matching.length === 0) {
+        status.textContent = panel.dataset.i18nInsufficient;
+      } else {
+        status.textContent = analysis.status === 'INCOMPLETE' ? panel.dataset.i18nPartial : panel.dataset.i18nReady;
+        appendText(evidence, 'p', panel.dataset.i18nAnalyzed + ' ' + result.analyzedAt);
+        for (const item of matching) {
+          appendText(evidence, 'p', item.message);
+          appendText(evidence, 'blockquote', item.citation.quote);
+          appendText(evidence, 'p', panel.dataset.i18nVersion + ' ' + item.citation.version);
+          try {
+            const source = new URL(item.citation.url);
+            if (source.protocol === 'https:' && source.hostname === 'www.etsy.com' && !source.username && !source.password) {
+              const link = appendText(evidence, 'a', panel.dataset.i18nSource);
+              link.href = source.href;
+            }
+          } catch {
+            // A malformed URL provides no link.
+          }
+        }
+      }
+    } catch {
+      if (submitted === revision) {
+        status.textContent = controller.signal.aborted ? panel.dataset.i18nTimeout : panel.dataset.i18nError;
+      }
+    } finally {
+      clearTimeout(timer);
+      policyRequest = undefined;
+      button.disabled = false;
+    }
+  });
+
+  function appendText(parent, tag, value) {
+    const element = document.createElement(tag);
+    element.textContent = value;
+    parent.append(element);
+    return element;
+  }
 
   form.addEventListener('submit', async event => {
     event.preventDefault();

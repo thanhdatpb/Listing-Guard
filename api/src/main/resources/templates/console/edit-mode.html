@@ -88,6 +88,10 @@
             <div class="lg-findings">
                 <th:block th:each="item : ${result.newFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}">
                     <article th:replace="~{console/findings :: card(${card})}"></article>
+                    <th:block th:if="${policyAiEnabled and item.pack() == 'listing-rules' and item.after() != null and card.field != null
+                                  and card.field.matches('title|description|category|who_made|when_made|tags.*|materials.*')}">
+                        <div th:replace="~{console/policy-explanation :: explanation(${card.field})}"></div>
+                    </th:block>
                     <button th:if="${item.pack() == 'listing-rules' and item.after() != null and card.fix != null}"
                             type="button" class="lg-btn" data-draft-fix hidden
                             th:attr="data-field=${card.field},data-value=${card.value},data-action=${card.fix.action},data-proposed=${card.fix.proposedValue}"
@@ -104,6 +108,10 @@
             <div class="lg-findings">
                 <th:block th:each="item : ${result.modifiedFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}">
                     <article th:replace="~{console/findings :: card(${card})}"></article>
+                    <th:block th:if="${policyAiEnabled and item.pack() == 'listing-rules' and item.after() != null and card.field != null
+                                  and card.field.matches('title|description|category|who_made|when_made|tags.*|materials.*')}">
+                        <div th:replace="~{console/policy-explanation :: explanation(${card.field})}"></div>
+                    </th:block>
                     <button th:if="${item.pack() == 'listing-rules' and item.after() != null and card.fix != null}"
                             type="button" class="lg-btn" data-draft-fix hidden
                             th:attr="data-field=${card.field},data-value=${card.value},data-action=${card.fix.action},data-proposed=${card.fix.proposedValue}"
@@ -120,6 +128,10 @@
             <div class="lg-findings">
                 <th:block th:each="item : ${result.remainingFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}">
                     <article th:replace="~{console/findings :: card(${card})}"></article>
+                    <th:block th:if="${policyAiEnabled and item.pack() == 'listing-rules' and item.after() != null and card.field != null
+                                  and card.field.matches('title|description|category|who_made|when_made|tags.*|materials.*')}">
+                        <div th:replace="~{console/policy-explanation :: explanation(${card.field})}"></div>
+                    </th:block>
                     <button th:if="${item.pack() == 'listing-rules' and item.after() != null and card.fix != null}"
                             type="button" class="lg-btn" data-draft-fix hidden
                             th:attr="data-field=${card.field},data-value=${card.value},data-action=${card.fix.action},data-proposed=${card.fix.proposedValue}"

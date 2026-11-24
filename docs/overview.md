@@ -47,7 +47,7 @@ Working end to end:
   stored result counts one unit per endpoint (a cached one costs nothing, so a full check of one listing is two units, three
   with a variation family), and
   over the limit the API answers `429 quota-exceeded` (a pack outside the plan: `403 plan-not-allowed`). The packs
-  `policy-analyzer` and `sheet-connector` are reserved in the plans and not enforced yet. There is no billing or payment;
+  The opt-in Policy Checks API enforces `policy-analyzer`. The `sheet-connector` pack is reserved. There is no billing or payment;
   see [deployment](deployment.md#client-plans-and-the-monthly-quota-adr-013).
 - Fix suggestions and a publish readiness score ([ADR-014](adr/ADR-014-listing-workspace.md)), **off by default**
   (`listing-guard.fixes.enabled=false`). When enabled, `/checks` returns verified fix proposals and a readiness score;
@@ -102,7 +102,8 @@ Before you rely on it:
   labeled English and Vietnamese queries. Evaluation on the real corpus still requires the permitted source snapshots.
   The optional policy LLM adapter is available behind configuration. The internal retrieval service uses a pinned Etsy
   analyzer profile and bounds the query batch and the returned evidence. The internal analyzer verifies citations and returns
-  evidence for manual review. The analyzer endpoint is still pending.
+  evidence for manual review. Etsy Policy Checks and the Console workbench are opt-in.
+  See [Policy Checks API and AI workbench](implementation/policy-ai-workbench.md).
   See [Policy analyzer verification](implementation/policy-analyzer-verification.md).
   See [Analyzer profile and bounded retrieval](implementation/policy-analyzer-profile-retrieval.md).
   See [Policy LLM adapter](implementation/policy-llm-provider.md).
