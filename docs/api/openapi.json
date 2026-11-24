@@ -66,6 +66,21 @@
         },
         "type" : "object"
       },
+      "AuditPage" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ReviewAuditEvent"
+            },
+            "type" : "array"
+          },
+          "nextAfterRevision" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          }
+        },
+        "type" : "object"
+      },
       "Capabilities" : {
         "properties" : {
           "fixes" : {
@@ -260,6 +275,36 @@
           "text" : {
             "description" : "A sentence that says it in words.",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CreateRequest" : {
+        "properties" : {
+          "checkId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "findingIndex" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "pack" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "checkId", "findingIndex", "pack" ],
+        "type" : "object"
+      },
+      "Detail" : {
+        "properties" : {
+          "evidenceAvailable" : {
+            "type" : "boolean"
+          },
+          "reviewCase" : {
+            "$ref" : "#/components/schemas/ReviewCase"
           }
         },
         "type" : "object"
@@ -1060,6 +1105,20 @@
         },
         "type" : "object"
       },
+      "Page" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ReviewCase"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
       "PeriodView" : {
         "properties" : {
           "days" : {
@@ -1410,6 +1469,114 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "ReviewAuditEvent" : {
+        "properties" : {
+          "actorId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "occurredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "previousStatus" : {
+            "enum" : [ "OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED" ],
+            "type" : [ "string", "null" ]
+          },
+          "reason" : {
+            "enum" : [ "FIX_CONFIRMED", "NO_ACTION_REQUIRED" ],
+            "type" : [ "string", "null" ]
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "revision" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "status" : {
+            "enum" : [ "OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ReviewCase" : {
+        "properties" : {
+          "checkId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "findingIndex" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "marketplace" : {
+            "enum" : [ "ETSY", "AMAZON" ],
+            "type" : "string"
+          },
+          "pack" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "enum" : [ "FIX_CONFIRMED", "NO_ACTION_REQUIRED" ],
+            "type" : [ "string", "null" ]
+          },
+          "reviewerId" : {
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "revision" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "severity" : {
+            "enum" : [ "ERROR", "WARNING", "INFO", "HIGH", "MEDIUM", "LOW" ],
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED" ],
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ReviewDecision" : {
+        "properties" : {
+          "expectedRevision" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "reason" : {
+            "enum" : [ "FIX_CONFIRMED", "NO_ACTION_REQUIRED" ],
+            "type" : [ "string", "null" ]
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "expectedRevision", "requestId", "status" ],
         "type" : "object"
       },
       "ReviewerFeedbackView" : {
@@ -6069,6 +6236,772 @@
         },
         "summary" : "Read the health report of the calling client over a period",
         "tags" : [ "Reports" ]
+      }
+    },
+    "/api/v1/review-cases" : {
+      "get" : {
+        "description" : "Filters use exact enum names. The cursor is scoped to the client, filters and sort. Limit is 1 to 100.",
+        "operationId" : "listReviewCases",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "marketplace",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "ETSY", "AMAZON" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "severity",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "ERROR", "WARNING", "INFO", "HIGH", "MEDIUM", "LOW" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "createdBefore",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "createdAfter",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : "NEWEST",
+            "enum" : [ "NEWEST", "OLDEST" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 25,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Page"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request or pagination parameters.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Feature disabled or no accessible record at that address.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "API request rate limit exceeded.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "List the calling client's review cases",
+        "tags" : [ "review-case-controller" ]
+      },
+      "post" : {
+        "description" : "Requires a separately granted API key. Does not charge quota or change the underlying finding.",
+        "operationId" : "createReviewCase",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request or pagination parameters.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The API key has no review write grant.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Feature disabled or no accessible record at that address.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Request body exceeds the API limit.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "API request rate limit exceeded.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "Create or return a review case for one stored finding",
+        "tags" : [ "review-case-controller" ]
+      }
+    },
+    "/api/v1/review-cases/{id}" : {
+      "get" : {
+        "operationId" : "getReviewCase",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request or pagination parameters.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Feature disabled or no accessible record at that address.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "API request rate limit exceeded.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "Read one review case and its evidence availability",
+        "tags" : [ "review-case-controller" ]
+      }
+    },
+    "/api/v1/review-cases/{id}/decisions" : {
+      "post" : {
+        "description" : "Requires a separately granted API key and the expected revision. Replay with the same request ID and payload returns the original event. Decisions track internal work and are not legal approvals.",
+        "operationId" : "recordReviewDecision",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReviewDecision"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request or pagination parameters.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The API key has no review write grant.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Feature disabled or no accessible record at that address.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Stale revision, invalid transition, conflicting replay or unavailable evidence.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Request body exceeds the API limit.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "API request rate limit exceeded.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "Record an authorized review decision",
+        "tags" : [ "review-case-controller" ]
+      }
+    },
+    "/api/v1/review-cases/{id}/events" : {
+      "get" : {
+        "description" : "Use nextAfterRevision as afterRevision to get the next page. Limit is 1 to 100.",
+        "operationId" : "listReviewEvents",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "afterRevision",
+          "required" : false,
+          "schema" : {
+            "default" : -1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 25,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuditPage"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request or pagination parameters.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Feature disabled or no accessible record at that address.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "API request rate limit exceeded.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "List audit events in revision order",
+        "tags" : [ "review-case-controller" ]
       }
     },
     "/api/v1/rulesets/{marketplace}/limits" : {
