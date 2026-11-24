@@ -9,6 +9,7 @@ import com.thanhdatpb.listingguard.api.edit.ListingEditRequest;
 import com.thanhdatpb.listingguard.api.edit.ListingEditResult;
 import com.thanhdatpb.listingguard.api.edit.ListingEditService;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
+import com.thanhdatpb.listingguard.api.policy.PolicyChecks;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -29,14 +30,16 @@ public class ConsoleListingEditController {
     private final ConsoleFeedbackSupport feedback;
     private final com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history;
     private final ObjectMapper mapper;
+    private final PolicyChecks policyChecks;
 
     public ConsoleListingEditController(ListingEditService edits, ConsoleFeedbackSupport feedback,
                                         com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history,
-                                        ObjectMapper mapper) {
+                                        ObjectMapper mapper, PolicyChecks policyChecks) {
         this.edits = edits;
         this.feedback = feedback;
         this.history = history;
         this.mapper = mapper;
+        this.policyChecks = policyChecks;
     }
 
     @GetMapping("/console/check/edit")
@@ -83,6 +86,7 @@ public class ConsoleListingEditController {
     private String populate(ConsoleUser user, String marketplace, String before, String after, Model model) {
         model.addAttribute("email", user.email());
         model.addAttribute("marketplace", marketplace);
+        model.addAttribute("policyAiEnabled", "ETSY".equalsIgnoreCase(marketplace) && policyChecks.enabled());
         model.addAttribute("before", before);
         model.addAttribute("after", after);
         return VIEW;

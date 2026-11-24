@@ -66,6 +66,32 @@
         },
         "type" : "object"
       },
+      "AnalyzerDescriptor" : {
+        "properties" : {
+          "algorithmVersion" : {
+            "type" : "string"
+          },
+          "chunkerVersion" : {
+            "type" : "string"
+          },
+          "corpusFingerprint" : {
+            "type" : "string"
+          },
+          "embeddingModel" : {
+            "type" : "string"
+          },
+          "pipelineVersion" : {
+            "type" : "string"
+          },
+          "profileHash" : {
+            "type" : "string"
+          },
+          "profileVersion" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AuditPage" : {
         "properties" : {
           "items" : {
@@ -259,6 +285,29 @@
         },
         "type" : "object"
       },
+      "Citation" : {
+        "properties" : {
+          "evidence" : {
+            "$ref" : "#/components/schemas/EvidenceReference"
+          },
+          "quote" : {
+            "type" : "string"
+          },
+          "sectionPath" : {
+            "type" : "string"
+          },
+          "sourceFile" : {
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "CoverageView" : {
         "properties" : {
           "complete" : {
@@ -298,6 +347,29 @@
         "required" : [ "checkId", "findingIndex", "pack" ],
         "type" : "object"
       },
+      "Descriptor" : {
+        "properties" : {
+          "algorithmVersion" : {
+            "type" : "string"
+          },
+          "llmModel" : {
+            "type" : "string"
+          },
+          "promptHash" : {
+            "type" : "string"
+          },
+          "promptVersion" : {
+            "type" : "string"
+          },
+          "queryLanguage" : {
+            "type" : "string"
+          },
+          "retrieval" : {
+            "$ref" : "#/components/schemas/AnalyzerDescriptor"
+          }
+        },
+        "type" : "object"
+      },
       "Detail" : {
         "properties" : {
           "evidenceAvailable" : {
@@ -305,6 +377,33 @@
           },
           "reviewCase" : {
             "$ref" : "#/components/schemas/ReviewCase"
+          }
+        },
+        "type" : "object"
+      },
+      "EvidenceReference" : {
+        "properties" : {
+          "chunkId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "documentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "end" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sourceHash" : {
+            "type" : "string"
+          },
+          "sourceLocale" : {
+            "type" : "string"
+          },
+          "start" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -1299,6 +1398,108 @@
             "description" : "True when plans are on: packs are limited by plan and new results count against a monthly quota (read `GET /api/v1/usage` for the calling client). False: nothing is limited.",
             "example" : false,
             "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "PolicyCheckAnalysis" : {
+        "properties" : {
+          "analysisVersion" : {
+            "type" : [ "string", "null" ]
+          },
+          "descriptor" : {
+            "$ref" : "#/components/schemas/Descriptor",
+            "type" : "null"
+          },
+          "findings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PolicyFinding"
+            },
+            "type" : "array"
+          },
+          "reason" : {
+            "enum" : [ "NONE", "NO_POLICY_CONTEXT", "INVALID_PROVENANCE", "STALE_POLICY_SOURCE", "UNSUPPORTED_LOCALE", "UNSUPPORTED_MARKETPLACE", "POLICY_VERSION_MISMATCH", "NO_VERIFIED_FINDINGS", "PARTIAL_VERIFICATION", "LLM_TIMEOUT", "LLM_ERROR", "LLM_INVALID_OUTPUT", "LLM_TRUNCATED", "LLM_REFUSED", "ANALYZER_BUSY", "ANALYZER_TIMEOUT", "RETRIEVAL_FAILED" ],
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "REVIEW_REQUIRED", "INCOMPLETE", "INSUFFICIENT_EVIDENCE" ],
+            "type" : "string"
+          },
+          "verification" : {
+            "$ref" : "#/components/schemas/VerificationStats"
+          }
+        },
+        "type" : "object"
+      },
+      "PolicyCheckRequest" : {
+        "properties" : {
+          "language" : {
+            "default" : "en",
+            "pattern" : "en|vi",
+            "type" : "string"
+          },
+          "listing" : {
+            "$ref" : "#/components/schemas/JsonNode",
+            "type" : "object"
+          },
+          "marketplace" : {
+            "example" : "ETSY",
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "listing", "marketplace" ],
+        "type" : "object"
+      },
+      "PolicyCheckResult" : {
+        "properties" : {
+          "analysis" : {
+            "$ref" : "#/components/schemas/PolicyCheckAnalysis"
+          },
+          "analyzedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "cached" : {
+            "type" : "boolean"
+          },
+          "checkId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "marketplace" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PolicyFinding" : {
+        "properties" : {
+          "citation" : {
+            "$ref" : "#/components/schemas/Citation"
+          },
+          "field" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "ruleId" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "enum" : [ "ERROR", "WARNING", "INFO" ],
+            "type" : "string"
+          },
+          "suggestion" : {
+            "type" : "string"
+          },
+          "value" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -2728,6 +2929,30 @@
             "description" : "Verdicts given in the period.",
             "example" : 40,
             "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "VerificationStats" : {
+        "properties" : {
+          "dropped" : {
+            "additionalProperties" : {
+              "format" : "int32",
+              "type" : "integer"
+            },
+            "type" : "object"
+          },
+          "kept" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "proposed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "severityClamped" : {
+            "format" : "int32",
             "type" : "integer"
           }
         },
@@ -5703,6 +5928,317 @@
         },
         "summary" : "Read a stored personalization screening",
         "tags" : [ "Personalization screening" ]
+      }
+    },
+    "/api/v1/policy-checks" : {
+      "post" : {
+        "description" : "Opt-in Etsy analysis. A cache miss can call paid providers. Empty, partial and failed analyses never clear a listing.",
+        "operationId" : "createPolicyCheck",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PolicyCheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PolicyCheckResult"
+                }
+              }
+            },
+            "description" : "Policy analysis status and any verified excerpts.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The plan does not include policy analysis.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Disabled, expired or no accessible policy check.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unsupported marketplace.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate, plan quota or policy budget exhausted.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Analyzer busy.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "Retrieve verified policy evidence for manual review",
+        "tags" : [ "policy-check-controller" ]
+      }
+    },
+    "/api/v1/policy-checks/{id}" : {
+      "get" : {
+        "operationId" : "getPolicyCheck",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PolicyCheckResult"
+                }
+              }
+            },
+            "description" : "Retained policy check.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Disabled, expired or no accessible policy check.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rate, plan quota or policy budget exhausted.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "Read a retained policy check for the calling client",
+        "tags" : [ "policy-check-controller" ]
       }
     },
     "/api/v1/reports/summary" : {

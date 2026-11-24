@@ -35,6 +35,11 @@ public class PolicyAnalysisService {
         this.clock = clock;
     }
 
+    public java.util.Optional<String> cacheVersion(String language) {
+        return retrieval.currentDescriptor()
+                .map(descriptor -> PolicyAnalyzer.analysisVersion(analyzer.describe(retrieval.profile(), descriptor, language)));
+    }
+
     public Result analyze(String marketplace, String language, Listing listing) {
         if (!permits.tryAcquire()) {
             return Result.incomplete(Reason.ANALYZER_BUSY);

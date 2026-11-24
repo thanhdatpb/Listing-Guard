@@ -2,19 +2,30 @@ package com.thanhdatpb.listingguard.api.policy;
 
 import static com.thanhdatpb.listingguard.api.ApiTestKeys.HEADER;
 import static com.thanhdatpb.listingguard.api.ApiTestKeys.KEY_1;
+import static com.thanhdatpb.listingguard.api.ApiTestKeys.KEY_2;
+import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.signedIn;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static com.thanhdatpb.listingguard.api.plan.PlanTestSupport.body;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
+import com.thanhdatpb.listingguard.api.console.ConsoleUser;
+import com.thanhdatpb.listingguard.api.plan.PlanTestClockConfig;
+import com.thanhdatpb.listingguard.api.plan.PlanTestSupport.MutableClock;
+import com.thanhdatpb.listingguard.rag.llm.LlmException;
 import com.thanhdatpb.listingguard.core.listing.Listing;
 import com.thanhdatpb.listingguard.rag.analysis.PolicyAnalyzer;
 import com.thanhdatpb.listingguard.rag.llm.LlmProvider;
@@ -30,6 +41,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,12 +55,19 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "listing-guard.analyzer.enabled=true", "listing-guard.analyzer.retention-days=2",
+        "listing-guard.analyzer.daily-attempt-limit=10", "listing-guard.plans.enabled=true",
+        "listing-guard.console.enabled=true", "listing-guard.console.base-url=https://console.example.test",
+        "listing-guard.console.mail-from=noreply@example.test", "spring.mail.host=mail.example.test"
+})
 @AutoConfigureMockMvc
-@Import(TestcontainersConfig.class)
+@Import({TestcontainersConfig.class, PlanTestClockConfig.class})
 @ExtendWith(OutputCaptureExtension.class)
 class AnalyzerPolicyRetrievalIntegrationTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-24T00:00:00Z"), ZoneOffset.UTC);
@@ -65,11 +84,22 @@ class AnalyzerPolicyRetrievalIntegrationTest {
     @Autowired private PolicyProperties policyProperties;
     @Autowired private PolicyIngestService ingest;
     @MockitoSpyBean private EmbeddingProvider embeddings;
+    @MockitoBean(name = "policyLlmProvider") private LlmProvider policyProvider;
+    @MockitoBean private JavaMailSender mail;
+    @Autowired private MutableClock appClock;
+    private static final JsonMapper JSON = new JsonMapper();
+    private static final String API = "/api/v1/policy-checks";
     private AnalyzerPolicyRetrieval retrieval;
 
     @BeforeEach
     void resetCorpus() {
+        appClock.set(CLOCK.instant());
         jdbc.update("DELETE FROM policy_document");
+        jdbc.update("DELETE FROM policy_check");
+        jdbc.update("DELETE FROM llm_usage WHERE provider_id = 'policy-analyzer'");
+        jdbc.update("DELETE FROM client_usage");
+        jdbc.update("UPDATE client SET plan_code = 'PRO' WHERE name = 'client-a'");
+        when(policyProvider.modelId()).thenReturn("fake:policy-v1");
         retrieval = new AnalyzerPolicyRetrieval(jdbc, pgvector, embeddings, CLOCK, transactions, policyProperties);
     }
 
@@ -145,7 +175,6 @@ class AnalyzerPolicyRetrievalIntegrationTest {
     @Test
     void policyAnalysisUsesTheActualRetrievedSnapshotAndNeverLogsModelOrListingText(CapturedOutput output) {
         seedCorpus(true);
-        JsonMapper json = new JsonMapper();
         LlmProvider fake = new LlmProvider() {
             @Override
             public String modelId() {
@@ -154,19 +183,7 @@ class AnalyzerPolicyRetrievalIntegrationTest {
 
             @Override
             public LlmResponse complete(LlmRequest request) {
-                try {
-                    var evidence = json.readTree(request.user()).path("evidence").path(0);
-                    var result = json.createObjectNode();
-                    result.putArray("findings").addObject().put("ruleId", "policy.production_partner")
-                            .put("severity", "WARNING").put("field", "description").putNull("value")
-                            .put("message", "synthetic-private-model-message").put("suggestion", "Model suggestion")
-                            .putObject("citation").put("chunkId", evidence.path("chunkId").asLong())
-                            .put("sourceHash", evidence.path("sourceHash").asText()).put("quote", TOPIC)
-                            .put("start", 0).put("end", TOPIC.length());
-                    return new LlmResponse(result.toString(), 30, 15, "stop");
-                } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-                    throw new AssertionError("Invalid request test fixture", e);
-                }
+                return completion(request, false);
             }
         };
         var service = new PolicyAnalysisService(retrieval, fake, CLOCK);
@@ -179,6 +196,103 @@ class AnalyzerPolicyRetrievalIntegrationTest {
         });
         assertThat(output.getAll()).doesNotContain(PRIVATE, "synthetic-private-model-message");
         assertThat(result.toString()).doesNotContain(PRIVATE, "synthetic-private-model-message");
+    }
+
+    @Test
+    void apiEnforcesTenantQuotaAndReturnsOnlyVerifiedEvidenceWithCacheAndExpiry(CapturedOutput output) throws Exception {
+        seedCorpus(true);
+        when(policyProvider.complete(any())).thenAnswer(call -> completion(call.getArgument(0), false));
+        String body = body("Synthetic " + PRIVATE);
+        mvc.perform(post(API).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized());
+        mvc.perform(post(API).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"marketplace\":\"ETSY\",\"listing\":[]}")).andExpect(status().isBadRequest());
+        mvc.perform(post(API).header(HEADER, KEY_2).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        var first = mvc.perform(post(API).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.cached").value(false))
+                .andExpect(jsonPath("$.analysis.status").value("REVIEW_REQUIRED"))
+                .andExpect(jsonPath("$.analysis.findings[0].citation.quote").value(TOPIC)).andReturn();
+        String id = JSON.readTree(first.getResponse().getContentAsByteArray()).path("checkId").asText();
+        mvc.perform(get(API + "/" + id).header(HEADER, KEY_2)).andExpect(status().isNotFound());
+        mvc.perform(get(API + "/" + id).header(HEADER, KEY_1)).andExpect(status().isOk());
+        mvc.perform(post(API).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.checkId").value(id)).andExpect(jsonPath("$.cached").value(true));
+        verify(policyProvider, times(1)).complete(any());
+        verify(embeddings, times(1)).embed(anyList(), eq(EmbeddingProvider.Kind.QUERY));
+        jdbc.update("UPDATE plan SET monthly_quota = 1 WHERE code='PRO'");
+        try {
+            mvc.perform(post(API).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON).content(body("Different listing")))
+                    .andExpect(status().isTooManyRequests());
+        } finally {
+            jdbc.update("UPDATE plan SET monthly_quota = 6000 WHERE code='PRO'");
+        }
+        assertThat(jdbc.queryForObject("SELECT result::text FROM policy_check", String.class))
+                .doesNotContain(PRIVATE, "synthetic-private-model-message");
+        assertThat(output.getAll()).doesNotContain(PRIVATE, "synthetic-private-model-message");
+        appClock.set(CLOCK.instant().plusSeconds(3 * 86_400));
+        mvc.perform(get(API + "/" + id).header(HEADER, KEY_1)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void apiDoesNotCacheMissingCorpusTimeoutOrBadCitations() throws Exception {
+        String body = body("Synthetic policy check");
+        mvc.perform(post(API).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.analysis.status").value("INCOMPLETE"))
+                .andExpect(jsonPath("$.analysis.reason").value("NO_POLICY_CONTEXT"));
+        verify(policyProvider, never()).complete(any());
+        seedCorpus(true);
+        when(policyProvider.complete(any())).thenThrow(new LlmException(LlmException.Kind.TIMEOUT, PRIVATE))
+                .thenAnswer(call -> completion(call.getArgument(0), true));
+        mvc.perform(post(API).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.analysis.reason").value("LLM_TIMEOUT"));
+        mvc.perform(post(API).header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.cached").value(false))
+                .andExpect(jsonPath("$.analysis.status").value("INCOMPLETE"))
+                .andExpect(jsonPath("$.analysis.findings").isEmpty());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM policy_check WHERE cache_version IS NULL", Integer.class)).isEqualTo(3);
+    }
+
+    @Test
+    void consoleUsesSessionAndCsrfAndDisplaysOptInInBothLanguagesWithoutCallingProviderOnRecheck() throws Exception {
+        seedCorpus(true);
+        when(policyProvider.complete(any())).thenAnswer(call -> completion(call.getArgument(0), false));
+        UUID client = jdbc.queryForObject("SELECT id FROM client WHERE name='client-a'", UUID.class);
+        ConsoleUser user = new ConsoleUser("policy-workbench@example.test", client);
+        jdbc.update("INSERT INTO account (email, client_id) VALUES (?, ?) ON CONFLICT (email) DO NOTHING", user.email(), client);
+        String endpoint = "/console/check/edit/policy-checks";
+        mvc.perform(post(endpoint).with(signedIn(user)).contentType(MediaType.APPLICATION_JSON).content(body("Mug")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(endpoint).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body("Mug")))
+                .andExpect(status().is3xxRedirection());
+        for (String language : List.of("en", "vi")) {
+            String html = mvc.perform(post("/console/check/edit").with(signedIn(user)).with(csrf())
+                    .param("marketplace", "ETSY").cookie(new jakarta.servlet.http.Cookie("lg_lang", language))
+                    .param("before", "{\"title\":\"Synthetic original title\"}")
+                    .param("after", "{\"title\":\"x\"}"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+            assertThat(html).contains("data-policy-explain", "role=\"status\"",
+                    language.equals("vi") ? "Giải thích cảnh báo bằng AI" : "Explain this warning with AI");
+        }
+        verify(policyProvider, never()).complete(any());
+        mvc.perform(post(endpoint).with(signedIn(user)).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content(body("Mug")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.analysis.status").value("REVIEW_REQUIRED"));
+    }
+
+    private static LlmResponse completion(LlmRequest request, boolean badCitation) {
+        try {
+            var evidence = JSON.readTree(request.user()).path("evidence").path(0);
+            var result = JSON.createObjectNode();
+            result.putArray("findings").addObject().put("ruleId", "policy.production_partner")
+                    .put("severity", "WARNING").put("field", "description").putNull("value")
+                    .put("message", "synthetic-private-model-message").put("suggestion", "Model suggestion")
+                    .putObject("citation").put("chunkId", badCitation ? -1 : evidence.path("chunkId").asLong())
+                    .put("sourceHash", evidence.path("sourceHash").asText()).put("quote", TOPIC)
+                    .put("start", 0).put("end", TOPIC.length());
+            return new LlmResponse(result.toString(), 30, 15, "stop");
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new AssertionError("Invalid request test fixture", e);
+        }
     }
 
     private long seedCorpus(boolean chunks) {
