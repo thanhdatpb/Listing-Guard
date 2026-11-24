@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.api.console;
 
 import com.thanhdatpb.listingguard.api.brand.BrandAssets;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -25,7 +26,11 @@ public class ConsoleModelAdvice {
     private final boolean demoCatalog;
     private final String assetVersion;
 
-    public ConsoleModelAdvice(TrademarkProperties trademark, BrandAssets assets) {
+    private final boolean reviewQueueEnabled;
+
+    public ConsoleModelAdvice(TrademarkProperties trademark, BrandAssets assets,
+                              @Value("${listing-guard.review-cases.enabled:false}") boolean reviewQueueEnabled) {
+        this.reviewQueueEnabled = reviewQueueEnabled;
         this.demoCatalog = trademark.demoCatalog();
         this.assetVersion = assets.version();
     }
@@ -37,6 +42,11 @@ public class ConsoleModelAdvice {
     @ModelAttribute("demoCatalog")
     public boolean demoCatalog() {
         return demoCatalog;
+    }
+
+    @ModelAttribute("reviewQueueEnabled")
+    public boolean reviewQueueEnabled() {
+        return reviewQueueEnabled;
     }
 
     @ModelAttribute("assetVersion")

@@ -2,7 +2,7 @@ package com.thanhdatpb.listingguard.api.review;
 
 import org.springframework.http.HttpStatus;
 
-final class ReviewCaseException extends RuntimeException {
+public final class ReviewCaseException extends RuntimeException {
     private final HttpStatus status;
     private final String code;
 
@@ -12,7 +12,7 @@ final class ReviewCaseException extends RuntimeException {
         this.code = code;
     }
 
-    HttpStatus status() {
+    public HttpStatus status() {
         return status;
     }
 

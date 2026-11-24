@@ -34,6 +34,29 @@ class MigrationReviewCasesTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM review_case", Integer.class)).isZero();
         assertThatThrownBy(() -> jdbc.update("INSERT INTO review_case_writer (api_key_id) VALUES (?)", UUID.randomUUID()))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+
+        UUID account = jdbc.queryForObject("""
+                INSERT INTO account (email, client_id) VALUES ('reviewer@example.test', ?) RETURNING id
+                """, UUID.class, client);
+        UUID reviewCase = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO review_case (client_id, id, pack_id, check_id, finding_position, marketplace_code, severity,
+                                         status, revision)
+                VALUES (?, ?, 'listing-rules', ?, 0, 'ETSY', 'ERROR', 'OPEN', 0)
+                """, client, reviewCase, UUID.randomUUID());
+        jdbc.update("""
+                INSERT INTO review_case_event (client_id, case_id, revision, actor_id, status, occurred_at)
+                SELECT ?, ?, 0, id, 'OPEN', now() FROM api_key WHERE client_id = ?
+                """, client, reviewCase, client);
+
+        flyway("44").migrate();
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM console_review_grant", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT actor_kind FROM review_case_event WHERE client_id = ? AND case_id = ?",
+                String.class, client, reviewCase)).isEqualTo("API_KEY");
+        jdbc.update("INSERT INTO console_review_grant (account_id, client_id) VALUES (?, ?)", account, client);
+        jdbc.update("DELETE FROM account WHERE id = ?", account);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM console_review_grant", Integer.class)).isZero();
     }
 
     private static Flyway flyway(String target) {

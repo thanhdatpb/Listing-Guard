@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{review.case}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('')}"></header>
+<main class="lg-page" id="review-case">
+    <span id="main" tabindex="-1"></span>
+    <a th:href="@{/console/review-queue}" th:text="#{review.back}"></a>
+    <p class="lg-banner lg-banner--success" role="status" th:if="${decisionSaved}" th:text="#{review.saved}"></p>
+    <section class="lg-card lg-section" th:if="${detail != null}" th:with="item=${detail.reviewCase}">
+        <h1 th:text="#{review.case}"></h1>
+        <p th:text="${item.id}"></p>
+        <dl>
+            <dt th:text="#{review.status}"></dt><dd th:text="${reviewStatusLabels[item.status]}"></dd>
+            <dt th:text="#{review.severity}"></dt><dd th:text="${item.severity}"></dd>
+            <dt th:text="#{review.check}"></dt><dd th:text="${item.checkId}"></dd>
+            <dt th:text="#{review.pack}"></dt><dd th:text="${item.pack}"></dd>
+        </dl>
+        <a th:if="${detail.evidenceAvailable}" th:href="@{/console/review-queue/{id}/evidence(id=${item.id})}"
+           th:text="#{review.evidence}"></a>
+        <p th:unless="${detail.evidenceAvailable}" class="lg-banner lg-banner--warning" th:text="#{review.error.missing}"></p>
+        <p th:if="${transitions != null and !canReview}" th:text="#{review.readonly}"></p>
+        <p th:text="#{review.notice}"></p>
+        <form th:if="${canReview}" class="lg-form" method="post"
+              th:action="@{/console/review-queue/{id}/decisions(id=${item.id})}">
+            <input type="hidden" name="requestId" th:value="${requestId}">
+            <input type="hidden" name="revision" th:value="${item.revision}">
+            <div class="lg-field">
+                <label class="lg-field__label" for="review-status" th:text="#{review.decision}"></label>
+                <select class="lg-select" id="review-status" name="status" required>
+                    <option value="" selected th:text="#{review.choose}"></option>
+                    <option th:each="status : ${transitions}" th:value="${status}" th:text="${reviewStatusLabels[status]}"></option>
+                </select>
+            </div>
+            <label><input name="confirmed" value="true" type="checkbox" required> <span th:text="#{review.confirm}"></span></label>
+            <div><button type="submit" class="lg-btn lg-btn--primary" th:text="#{review.save}"></button></div>
+        </form>
+    </section>
+    <section class="lg-card lg-section" th:if="${evidence != null}">
+        <h1 th:text="#{review.evidence}"></h1>
+        <dl>
+            <dt th:text="#{review.rule}"></dt><dd th:text="${evidence.ruleId}"></dd>
+            <dt th:text="#{review.source}"></dt><dd th:text="${evidence.source}"></dd>
+            <dt th:text="#{review.version}"></dt><dd th:text="${evidence.analysisVersion}"></dd>
+            <dt th:text="#{review.severity}"></dt><dd th:text="${evidence.level}"></dd>
+        </dl>
+        <a th:href="@{/console/review-queue/{id}(id=${caseId})}" th:text="#{review.case}"></a>
+    </section>
+</main>
+</body>
+</html>

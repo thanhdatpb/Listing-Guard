@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.api.review;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import com.thanhdatpb.listingguard.api.client.AuthenticatedClient;
+import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackFindings;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import java.sql.ResultSet;
@@ -9,7 +10,9 @@ import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,10 @@ public class ReviewCaseService {
     public record Page(List<ReviewCase> items, @Schema(nullable = true) String nextCursor) { }
     public record Detail(ReviewCase reviewCase, boolean evidenceAvailable) { }
     public record AuditPage(List<ReviewAuditEvent> items, @Schema(nullable = true) Integer nextAfterRevision) { }
+
+    private enum ActorKind { API_KEY, CONSOLE_ACCOUNT }
+    private record Replay(ReviewAuditEvent event, ActorKind kind) { }
+    public record Counts(long open, long resolved) { }
 
     private final JdbcTemplate jdbc;
     private final FeedbackFindings findings;
@@ -106,23 +113,61 @@ public class ReviewCaseService {
             return byTarget(client.id(), target);
         }
         ReviewCase created = inserted.getFirst();
-        append(client.id(), created.id(), new ReviewAuditEvent(0, null, actor, null, ReviewCaseStatus.OPEN, null,
+        append(client.id(), created.id(), ActorKind.API_KEY, new ReviewAuditEvent(0, null, actor, null, ReviewCaseStatus.OPEN, null,
                 created.createdAt()));
         return created;
     }
 
     @Transactional
     public ReviewAuditEvent decide(AuthenticatedClient client, UUID id, ReviewDecision decision) {
-        // Lock only after an ownership check and a live grant check.
-        find(client.id(), id, false);
-        UUID actor = requireWriter(client);
-        ReviewCase current = find(client.id(), id, true);
-        List<ReviewAuditEvent> replay = jdbc.query(SELECT_EVENT + " AND request_id = ?", ReviewCaseService::readEvent,
-                client.id(), id, decision.requestId());
+        return decide(client.id(), id, decision, ActorKind.API_KEY, () -> requireWriter(client));
+    }
+
+    @Transactional
+    public ReviewAuditEvent decideInConsole(ConsoleUser user, UUID id, ReviewDecision decision) {
+        return decide(user.clientId(), id, decision, ActorKind.CONSOLE_ACCOUNT, () -> consoleReviewer(user, true)
+                .orElseThrow(() -> new ReviewCaseException(HttpStatus.FORBIDDEN, "review-write-forbidden",
+                        "This Console account is not authorized to decide review cases.")));
+    }
+
+    public boolean canReviewInConsole(ConsoleUser user) {
+        return consoleReviewer(user, false).isPresent();
+    }
+
+    private Optional<UUID> consoleReviewer(ConsoleUser user, boolean lock) {
+        return jdbc.query("""
+                SELECT a.id FROM account a
+                JOIN console_review_grant g ON g.account_id = a.id AND g.client_id = a.client_id
+                JOIN client c ON c.id = a.client_id
+                WHERE a.client_id = ? AND a.email = ? AND c.active
+                """ + (lock ? " FOR SHARE OF a, g, c" : ""),
+                (rs, row) -> rs.getObject(1, UUID.class), user.clientId(), user.email()).stream().findFirst();
+    }
+
+    public Counts counts(UUID client) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FILTER (WHERE status = 'OPEN'), count(*) FILTER (WHERE status = 'RESOLVED')
+                FROM review_case WHERE client_id = ? AND status IN ('OPEN', 'RESOLVED')
+                """, (rs, row) -> new Counts(rs.getLong(1), rs.getLong(2)), client);
+    }
+
+    public FeedbackFindings.Resolved retainedEvidence(UUID client, UUID id) {
+        return findings.resolve(client, target(find(client, id, false))).orElseThrow(() ->
+                new ReviewCaseException(HttpStatus.NOT_FOUND, "finding-not-found", "No retained finding at that address."));
+    }
+
+    private ReviewAuditEvent decide(UUID client, UUID id, ReviewDecision decision, ActorKind kind, Supplier<UUID> reviewer) {
+        // Check ownership before authorization, and hold the live grant while committing the decision.
+        find(client, id, false);
+        UUID actor = reviewer.get();
+        ReviewCase current = find(client, id, true);
+        List<Replay> replay = jdbc.query(SELECT_EVENT + " AND request_id = ?",
+                (rs, row) -> new Replay(readEvent(rs, row), ActorKind.valueOf(rs.getString("actor_kind"))),
+                client, id, decision.requestId());
         if (!replay.isEmpty()) {
-            ReviewAuditEvent event = replay.getFirst();
-            if (event.actorId().equals(actor) && event.status() == decision.status() && event.reason() == decision.reason()
-                    && event.revision() - 1 == decision.expectedRevision()) {
+            ReviewAuditEvent event = replay.getFirst().event();
+            if (replay.getFirst().kind() == kind && event.actorId().equals(actor) && event.status() == decision.status()
+                    && event.reason() == decision.reason() && event.revision() - 1 == decision.expectedRevision()) {
                 return event;
             }
             throw conflict("review-request-conflict", "This request ID is already in use.");
@@ -137,7 +182,7 @@ public class ReviewCaseService {
             throw new ReviewCaseException(HttpStatus.BAD_REQUEST, "review-invalid-reason",
                     "The reason is not allowed for the requested status.");
         }
-        if (findings.resolve(client.id(), target(current)).isEmpty()) {
+        if (findings.resolve(client, target(current)).isEmpty()) {
             throw conflict("review-evidence-unavailable", "The review case evidence is no longer available.");
         }
 
@@ -149,10 +194,10 @@ public class ReviewCaseService {
                 WHERE client_id = ? AND id = ? AND revision = ?
                 RETURNING updated_at
                 """, OffsetDateTime.class, decision.status().name(), actor, name(decision.reason()), revision,
-                client.id(), id, current.revision());
+                client, id, current.revision());
         ReviewAuditEvent event = new ReviewAuditEvent(revision, decision.requestId(), actor,
                 current.status(), decision.status(), decision.reason(), occurredAt);
-        append(client.id(), id, event);
+        append(client, id, kind, event);
         return event;
     }
 
@@ -194,13 +239,13 @@ public class ReviewCaseService {
                 new ReviewCaseException(HttpStatus.NOT_FOUND, "review-case-not-found", "No review case at that address."));
     }
 
-    private void append(UUID client, UUID id, ReviewAuditEvent event) {
+    private void append(UUID client, UUID id, ActorKind kind, ReviewAuditEvent event) {
         jdbc.update("""
                 INSERT INTO review_case_event
-                    (client_id, case_id, revision, request_id, actor_id, previous_status, status, reason, occurred_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (client_id, case_id, revision, request_id, actor_id, previous_status, status, reason, occurred_at, actor_kind)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, client, id, event.revision(), event.requestId(), event.actorId(),
-                name(event.previousStatus()), event.status().name(), name(event.reason()), event.occurredAt());
+                name(event.previousStatus()), event.status().name(), name(event.reason()), event.occurredAt(), kind.name());
     }
 
     private static ReviewCase readCase(ResultSet rs, int row) throws SQLException {

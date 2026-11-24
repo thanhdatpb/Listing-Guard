@@ -76,6 +76,36 @@ ADR-044 vẫn ở trạng thái Proposed. Bản này chưa áp dụng mốc 180 
 xác nhận phù hợp production. Audit được giữ cùng hồ sơ cho đến khi có chính sách được duyệt. Tắt
 tính năng dừng truy cập route. Có thể rollback ứng dụng và giữ migration additive đã chạy.
 
-LG-06 có thể dùng endpoint danh sách, chi tiết và sự kiện làm hợp đồng đọc. Để ghi quyết định từ
-Console dưới danh tính từng người, cần quy định ánh xạ grant từ principal Console đã xác thực. Không
-đưa key có quyền ghi vào trình duyệt hoặc dùng một key chung để thay thế quyền của reviewer.
+## Hàng đợi review trong Console
+
+Bật `listing-guard.console.enabled` và `listing-guard.review-cases.enabled`, rồi mở **History → Review Queue**
+(`/console/review-queue`). Console dùng cùng dịch vụ và hợp đồng nghiệp vụ với ReviewCase API, qua phiên đăng
+nhập Console. API hiện vẫn là nơi tạo hồ sơ. Hàng đợi lọc theo marketplace, trạng thái xử lý, mức cảnh báo và
+tuổi hồ sơ. Các trang tiếp theo giữ mốc thời gian của bộ lọc và sắp xếp theo `created_at DESC, id DESC`.
+Hai chỉ số đếm riêng `OPEN` và `RESOLVED` trên toàn client. Chưa có ngưỡng quá hạn được cấu hình.
+
+Hồ sơ hiển thị mức cảnh báo gốc, trạng thái xử lý và địa chỉ check. Liên kết bằng chứng chỉ trả ID quy tắc,
+nguồn, mức cảnh báo và `analysisVersion` của finding còn lưu. Nếu check đã hết hạn hoặc thuộc client khác,
+route bằng chứng trả 404. Hồ sơ của client vẫn hiện metadata và ẩn thao tác quyết định khi bằng chứng không
+còn. Quyết định chỉ ghi tiến độ xử lý nội bộ.
+
+### Cấp quyền reviewer Console
+
+Mặc định cả `ADMIN` và `MEMBER` chỉ đọc. Người vận hành cấp từng tài khoản trong đúng client qua V44. Dùng
+tham số UUID với công cụ quản trị cơ sở dữ liệu. Truy vấn sau cấp quyền cho đúng cặp, hoặc không ghi dòng nào
+nếu cặp không tồn tại.
+
+```sql
+INSERT INTO console_review_grant (account_id, client_id)
+SELECT id, client_id FROM account WHERE id = :account_id AND client_id = :client_id
+ON CONFLICT (account_id) DO NOTHING;
+```
+
+Thu hồi bằng `DELETE FROM console_review_grant WHERE account_id = :account_id AND client_id = :client_id`.
+Phiên đã đăng nhập cũng mất quyền ghi từ yêu cầu tiếp theo. Người dùng chọn trạng thái, xác nhận và gửi form
+có CSRF token. Revision và request ID dùng chung cơ chế phát hiện xung đột và gửi lại của API. Audit ghi UUID
+tài khoản từ principal, với `actor_kind = CONSOLE_ACCOUNT`. Các sự kiện từ API dùng `API_KEY`, kể cả các
+dòng đã có trước V44. DTO API giữ nguyên và `actorId` vẫn là UUID mờ.
+
+Có thể tắt ReviewCase để ẩn liên kết và dừng cả Console lẫn API. Khi rollback ứng dụng, giữ V44 additive và
+xử lý các grant bằng công cụ quản trị. ADR-044 vẫn Proposed. Mốc lưu audit 180 ngày chưa áp dụng.
