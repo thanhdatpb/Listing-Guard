@@ -1610,3 +1610,8 @@ Mapping a client's own listing format to the standard input format (that is done
 rules that differ per client, an admin UI, billing, policy-grounded LLM findings, feedback on findings,
 logo, text and watermark detection in images (the image checks look at format, size and pixels only, and are not in the health report, `batch-check` or the MCP server), compatibility or descriptive-use rules for trademarks, a client-specific trademark catalog, configured product-type-specific Amazon limits (no overrides are configured until sources are
 verified), and stores other than the US one.
+
+## Review cases
+
+API ReviewCase theo dõi quyết định xử lý nội bộ cho một finding đã lưu. Xem [hướng dẫn ReviewCase](review-cases.md)
+để biết cấu hình bật tính năng, quyền ghi, phân trang, revision, lỗi và audit.

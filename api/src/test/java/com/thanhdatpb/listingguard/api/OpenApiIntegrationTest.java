@@ -50,6 +50,14 @@ class OpenApiIntegrationTest {
     }
 
     @Test
+    void reviewCasesAreDisabledByDefault() throws Exception {
+        mvc.perform(get("/api/v1/review-cases").header(HEADER, KEY_1))
+                .andExpect(status().isNotFound())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                        .value("review-cases-disabled"));
+    }
+
+    @Test
     void swaggerUiIsOffByDefault() throws Exception {
         mvc.perform(get("/swagger-ui/index.html").header(HEADER, KEY_1)).andExpect(status().isNotFound());
         mvc.perform(get("/swagger-ui.html").header(HEADER, KEY_1)).andExpect(status().isNotFound());
@@ -103,7 +111,9 @@ class OpenApiIntegrationTest {
                 "/api/v1/personalization-screenings", "/api/v1/personalization-screenings/{id}",
                 "/api/v1/image-checks", "/api/v1/image-checks/{id}",
                 "/api/v1/rulesets/{marketplace}/limits", "/api/v1/reports/summary", "/api/v1/capabilities",
-                "/api/v1/input-adapters", "/api/v1/feedback", "/api/v1/feedback/stats", "/api/v1/listing-edits", "/health");
+                "/api/v1/input-adapters", "/api/v1/feedback", "/api/v1/feedback/stats", "/api/v1/listing-edits",
+                "/api/v1/review-cases", "/api/v1/review-cases/{id}", "/api/v1/review-cases/{id}/decisions",
+                "/api/v1/review-cases/{id}/events", "/health");
         // feedback (ADR-034): explicit operation ids, so no generated id of another operation moves
         assertThat(spec.at("/paths/~1api~1v1~1feedback/post/operationId").asText()).isEqualTo("recordFeedback");
         assertThat(spec.at("/paths/~1api~1v1~1feedback~1stats/get/operationId").asText()).isEqualTo("getFeedbackStats");

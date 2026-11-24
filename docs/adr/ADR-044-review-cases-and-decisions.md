@@ -72,4 +72,16 @@ cập nhật cạnh tranh. Xác minh lỗi chuyển trạng thái theo RFC 7807,
 cho phép, migration Flyway trên cơ sở dữ liệu cũ và mới, và tương thích OpenAPI. Kiểm thử feedback và
 re-audit hiện có phải giữ nguyên kết quả.
 
-Thay đổi hiện tại chỉ ghi ADR. Chờ quyết định ở trên trước khi thêm schema, quyền hoặc endpoint.
+PR LG-05 chỉ ghi ADR. Phần dưới ghi lại giới hạn của triển khai thử nghiệm LG-05B.
+
+## Phạm vi triển khai thử nghiệm LG-05B
+
+| Vấn đề | Phương án đã chọn | Phương án để sau |
+| --- | --- | --- |
+| Quyền ghi | Key thực được cấp grant riêng bởi người vận hành, từ chối mặc định. Actor là ID key nội bộ lấy từ principal. | Cấp tự động theo plan hoặc vai trò Console, hay dùng key chung để thay thế danh tính cá nhân. |
+| Audit | Lưu sự kiện metadata cùng giao dịch, không có job xóa và tính năng mặc định tắt. | Chỉ áp dụng mốc 180 ngày hoặc cơ chế dọn dữ liệu khi đã duyệt chính sách. |
+| Check hết hạn | Giữ metadata, chặn quyết định mới, cho phép đọc lại audit khi còn quyền. | Khôi phục dữ liệu check đã hết hạn hoặc diễn giải dữ liệu thiếu là đã xử lý. |
+
+V43 và API thử nghiệm tuân theo phạm vi trên. Các route tồn tại trong OpenAPI. Khi tính năng tắt,
+yêu cầu hợp lệ đã xác thực nhận `404 review-cases-disabled`. Chi tiết ở [hướng dẫn API](../review-cases.md).
+Mục này ghi nhận triển khai thử nghiệm và giữ trạng thái Proposed cho đến khi maintainer phê duyệt.
