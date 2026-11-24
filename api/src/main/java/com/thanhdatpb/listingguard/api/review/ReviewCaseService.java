@@ -33,6 +33,8 @@ public class ReviewCaseService {
     private record Replay(ReviewAuditEvent event, ActorKind kind) { }
     public record Counts(long open, long resolved) { }
 
+    public record Completion(long total, long completed, long resolved, Long meanResolutionMinutes) { }
+
     private final JdbcTemplate jdbc;
     private final FeedbackFindings findings;
 
@@ -94,12 +96,20 @@ public class ReviewCaseService {
 
     @Transactional
     public ReviewCase create(AuthenticatedClient client, FeedbackTarget target) {
-        UUID actor = requireWriter(client);
-        ReviewCase existing = byTarget(client.id(), target);
+        return create(client.id(), ActorKind.API_KEY, requireWriter(client), target);
+    }
+
+    @Transactional
+    public ReviewCase createInConsole(ConsoleUser user, FeedbackTarget target) {
+        return create(user.clientId(), ActorKind.CONSOLE_ACCOUNT, requireConsoleReviewer(user), target);
+    }
+
+    private ReviewCase create(UUID clientId, ActorKind actorKind, UUID actor, FeedbackTarget target) {
+        ReviewCase existing = byTarget(clientId, target);
         if (existing != null) {
             return existing;
         }
-        FeedbackFindings.Resolved finding = findings.resolve(client.id(), target).orElseThrow(() ->
+        FeedbackFindings.Resolved finding = findings.resolve(clientId, target).orElseThrow(() ->
                 new ReviewCaseException(HttpStatus.NOT_FOUND, "finding-not-found", "No retained finding at that address."));
         List<ReviewCase> inserted = jdbc.query("""
                 INSERT INTO review_case
@@ -107,13 +117,13 @@ public class ReviewCaseService {
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', 0)
                 ON CONFLICT (client_id, pack_id, check_id, finding_position) DO NOTHING
                 RETURNING *
-                """, ReviewCaseService::readCase, client.id(), UUID.randomUUID(), target.pack(), target.checkId(),
+                """, ReviewCaseService::readCase, clientId, UUID.randomUUID(), target.pack(), target.checkId(),
                 target.position(), finding.marketplace(), finding.level());
         if (inserted.isEmpty()) {
-            return byTarget(client.id(), target);
+            return byTarget(clientId, target);
         }
         ReviewCase created = inserted.getFirst();
-        append(client.id(), created.id(), ActorKind.API_KEY, new ReviewAuditEvent(0, null, actor, null, ReviewCaseStatus.OPEN, null,
+        append(clientId, created.id(), actorKind, new ReviewAuditEvent(0, null, actor, null, ReviewCaseStatus.OPEN, null,
                 created.createdAt()));
         return created;
     }
@@ -160,6 +170,18 @@ public class ReviewCaseService {
                 SELECT count(*) FILTER (WHERE status = 'OPEN'), count(*) FILTER (WHERE status = 'RESOLVED')
                 FROM review_case WHERE client_id = ? AND status IN ('OPEN', 'RESOLVED')
                 """, (rs, row) -> new Counts(rs.getLong(1), rs.getLong(2)), client);
+    }
+
+    public Completion completion(UUID client) {
+        return jdbc.queryForObject("""
+                SELECT count(*) AS total,
+                       count(*) FILTER (WHERE status IN ('RESOLVED', 'DISMISSED')) AS completed,
+                       count(*) FILTER (WHERE status = 'RESOLVED') AS resolved,
+                       round(avg(extract(epoch FROM updated_at - created_at) / 60)
+                             FILTER (WHERE status = 'RESOLVED'))::bigint AS resolution_minutes
+                FROM review_case WHERE client_id = ?
+                """, (rs, row) -> new Completion(rs.getLong("total"), rs.getLong("completed"), rs.getLong("resolved"),
+                rs.getObject("resolution_minutes", Long.class)), client);
     }
 
     public FeedbackFindings.Resolved retainedEvidence(UUID client, UUID id) {

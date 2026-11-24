@@ -72,6 +72,8 @@ Working end to end:
   kết quả cũ khỏi màn hình và đánh dấu bản nháp chưa kiểm tra. Hai pack có trạng thái riêng; pack chưa hoàn tất
   không được dùng để kết luận đã xử lý một finding. Dữ liệu đang nhập vẫn còn trên màn hình khi yêu cầu thất bại.
   Có thể kiểm tra phản hồi cũ, gửi lặp, lỗi mạng và timeout bằng `python scripts/test-console-edit-mode.py` với Playwright và Chromium.
+  [Mức sẵn sàng POD](implementation/pod-readiness.md) kiểm tra hồ sơ áo thun và đồ trang trí cá nhân hóa trên Etsy và Amazon.
+  Console hiển thị riêng quy định sàn, nhãn hiệu và sản xuất. Hồ sơ thiếu giới hạn nhà in đã xác minh vẫn là `INCOMPLETE`.
   Every page is in English or Vietnamese ([ADR-028](adr/ADR-028-console-localization.md)): the default is
   `listing-guard.console.default-locale`, a reader switches with the links in the corner (a cookie), each finding gets one
   sentence saying what its rule checks, and the API's responses do not change.

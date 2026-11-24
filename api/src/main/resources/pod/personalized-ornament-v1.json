@@ -1,0 +1,8 @@
+{
+  "id": "personalized-ornament",
+  "version": 1,
+  "marketplaces": ["ETSY", "AMAZON"],
+  "variationRules": ["sku"],
+  "printArea": {"sourceStatus": "UNVERIFIED"},
+  "personalizationFields": ["text"]
+}

@@ -165,7 +165,7 @@ public class EditorCheckService {
         return new EditorResult.RuleItem(finding.ruleId(), finding.field(), finding.message(), finding.suggestion(),
                 finding.value(), EditorEvidence.ofValue(finding.value()),
                 fix == null ? null : new EditorResult.Fix(fix.action().name(), fix.description(), fix.proposedValue()), fixId,
-                target);
+                target, finding.source().name());
     }
 
     private EditorResult.Trademark trademark(UUID clientId, CheckRequest request, Listing listing, List<ListingView.Mark> marks) {
@@ -236,7 +236,7 @@ public class EditorCheckService {
         return new EditorResult.TrademarkItem(finding.ruleId(), finding.risk().name(), finding.field(),
                 finding.matchType().name(), finding.mark(), finding.message(), finding.suggestion(),
                 EditorEvidence.ofSpan(text, finding.start(), finding.end(), finding.snippet()), target,
-                ConsoleLlmLabel.reason(finding.riskAdjustments()));
+                ConsoleLlmLabel.reason(finding.riskAdjustments()), finding.source().name(), finding.sourceIds());
     }
 
     private static EditorResult.Trademark panel(EditorResult.TrademarkKind kind, String big, String headline, String detail,

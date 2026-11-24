@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="reviewForm(target)">
+        <form th:if="${canReviewPod == true and target != null}" th:action="@{/console/pod-readiness/review}" method="post">
+            <input type="hidden" name="pack" th:value="${target.pack}">
+            <input type="hidden" name="checkId" th:value="${target.checkId}">
+            <input type="hidden" name="position" th:value="${target.position}">
+            <label><input type="checkbox" name="confirmed" value="true" required>
+                <span th:text="#{pod.review.confirm}"></span></label>
+            <button type="submit" class="lg-btn" th:text="#{pod.review.open}"></button>
+        </form>
+    </th:block>
+</body>
+</html>
