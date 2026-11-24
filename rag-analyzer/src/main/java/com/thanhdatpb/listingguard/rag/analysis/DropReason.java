@@ -9,6 +9,8 @@ public enum DropReason {
     /** Too short, or contains an ellipsis. */
     QUOTE_LENGTH,
     VALUE_NOT_FOUND,
+    INVALID_OFFSETS,
+    SOURCE_HASH_MISMATCH,
     SCHEMA_INVALID;
 
     /** The name used in logs and the response, for example {@code quote_not_found}. */

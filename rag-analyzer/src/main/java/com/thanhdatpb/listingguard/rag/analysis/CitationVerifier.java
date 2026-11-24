@@ -50,6 +50,11 @@ public final class CitationVerifier {
      */
     public VerificationResult verify(
             ParseResult parsed, Collection<RetrievedChunk> retrieved, Map<String, List<String>> listing) {
+        return verify(parsed, retrieved, listing, Map.of());
+    }
+
+    VerificationResult verify(ParseResult parsed, Collection<RetrievedChunk> retrieved, Map<String, List<String>> listing,
+                              Map<Long, AnalysisEvidence> provenance) {
         Map<Long, RetrievedChunk> chunks = new HashMap<>();
         Map<Long, String> chunkText = new HashMap<>();
         for (RetrievedChunk chunk : retrieved) {
@@ -72,6 +77,23 @@ public final class CitationVerifier {
                 continue;
             }
             RetrievedChunk chunk = chunks.get(p.chunkId());
+            String verifiedQuote = p.quote();
+            PolicyFinding.EvidenceReference reference = null;
+            if (p.coordinates() != null) {
+                var span = p.coordinates();
+                var evidence = provenance.get(p.chunkId());
+                if (evidence == null || !evidence.sourceHash().equals(span.sourceHash())) {
+                    dropped.merge(DropReason.SOURCE_HASH_MISMATCH, 1, Integer::sum);
+                    continue;
+                }
+                if (!matchesSpan(chunk.content(), p.quote(), span.start(), span.end())) {
+                    dropped.merge(DropReason.INVALID_OFFSETS, 1, Integer::sum);
+                    continue;
+                }
+                verifiedQuote = chunk.content().substring(span.start(), span.end());
+                reference = new PolicyFinding.EvidenceReference(chunk.chunkId(), evidence.documentId(), span.start(),
+                        span.end(), evidence.sourceHash(), evidence.sourceLocale());
+            }
             Severity severity = p.severity();
             if (severity == Severity.ERROR) {
                 severity = Severity.WARNING;
@@ -80,12 +102,19 @@ public final class CitationVerifier {
             kept.add(new PolicyFinding(
                     p.ruleId(), severity, p.field(), p.value(), p.message(), p.suggestion(),
                     new PolicyFinding.Citation(
-                            chunk.sourceFile(), chunk.sectionPath(), chunk.url(), chunk.version(), p.quote())));
+                            chunk.sourceFile(), chunk.sectionPath(), chunk.url(), chunk.version(), verifiedQuote, reference)));
         }
         VerificationStats stats = new VerificationStats(parsed.proposed(), kept.size(), dropped, clamped);
         LOG.info("citation verification: proposed={} kept={} dropped={} severityClamped={}",
                 stats.proposed(), stats.kept(), stats.dropped(), stats.severityClamped());
         return new VerificationResult(kept, stats);
+    }
+
+    private static boolean matchesSpan(String content, String quote, int start, int end) {
+        return start >= 0 && end > start && end <= content.length()
+                && !Character.isLowSurrogate(content.charAt(start))
+                && !Character.isHighSurrogate(content.charAt(end - 1))
+                && content.regionMatches(start, quote, 0, end - start) && quote.length() == end - start;
     }
 
     private DropReason check(

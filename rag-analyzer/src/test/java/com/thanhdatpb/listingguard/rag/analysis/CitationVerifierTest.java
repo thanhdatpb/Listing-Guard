@@ -180,6 +180,8 @@ class CitationVerifierTest {
                 DropReason.QUOTE_LENGTH, 1,
                 DropReason.QUOTE_NOT_FOUND, 1,
                 DropReason.VALUE_NOT_FOUND, 1,
+                DropReason.INVALID_OFFSETS, 0,
+                DropReason.SOURCE_HASH_MISMATCH, 0,
                 DropReason.SCHEMA_INVALID, 1));
         assertThat(result.findings()).extracting(f -> f.citation().sourceFile())
                 .containsExactly(PARTNER.sourceFile(), MOCKUP.sourceFile());

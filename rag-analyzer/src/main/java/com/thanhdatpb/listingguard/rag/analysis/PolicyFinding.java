@@ -29,6 +29,14 @@ public record PolicyFinding(
      * @param version     the policy document's "Last updated" date
      * @param quote       the model's quote, verified to occur in the cited chunk after normalization
      */
-    public record Citation(String sourceFile, String sectionPath, String url, String version, String quote) {
+    public record Citation(String sourceFile, String sectionPath, String url, String version, String quote,
+                           EvidenceReference evidence) {
+        public Citation(String sourceFile, String sectionPath, String url, String version, String quote) {
+            this(sourceFile, sectionPath, url, version, quote, null);
+        }
+    }
+
+    /** Identifies the verified span in the original chunk, with the snapshot's trusted source hash and locale. */
+    public record EvidenceReference(long chunkId, long documentId, int start, int end, String sourceHash, String sourceLocale) {
     }
 }

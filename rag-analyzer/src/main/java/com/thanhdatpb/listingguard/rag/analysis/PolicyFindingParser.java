@@ -30,6 +30,9 @@ public final class PolicyFindingParser {
     private final Set<String> fields;
     private final int maxFindings;
     private final int maxTextLength;
+    private final boolean strict;
+    private static final Set<String> ITEM_FIELDS = Set.of("ruleId", "severity", "field", "value", "message", "suggestion", "citation");
+    private static final Set<String> CITATION_FIELDS = Set.of("chunkId", "quote", "start", "end", "sourceHash");
 
     /**
      * @param topics        allowed topics, so {@code ruleId} must be {@code policy.<topic>} for one of them
@@ -38,6 +41,10 @@ public final class PolicyFindingParser {
      * @param maxTextLength most characters (code points) in {@code message} and in {@code suggestion}, positive
      */
     public PolicyFindingParser(Set<String> topics, Set<String> fields, int maxFindings, int maxTextLength) {
+        this(topics, fields, maxFindings, maxTextLength, false);
+    }
+
+    PolicyFindingParser(Set<String> topics, Set<String> fields, int maxFindings, int maxTextLength, boolean strict) {
         if (topics.isEmpty() || fields.isEmpty()) {
             throw new IllegalArgumentException("topics and fields must not be empty");
         }
@@ -48,6 +55,7 @@ public final class PolicyFindingParser {
         this.fields = Set.copyOf(fields);
         this.maxFindings = maxFindings;
         this.maxTextLength = maxTextLength;
+        this.strict = strict;
     }
 
     public ParseResult parse(String text) {
@@ -58,7 +66,7 @@ public final class PolicyFindingParser {
         try {
             root = JSON.readTree(text);
         } catch (JsonProcessingException e) {
-            throw new InvalidLlmOutputException("answer is not valid JSON", e);
+            throw new InvalidLlmOutputException("answer is not valid JSON");
         }
         if (root == null || !root.isObject()) {
             throw new InvalidLlmOutputException("answer is not a JSON object");
@@ -66,6 +74,9 @@ public final class PolicyFindingParser {
         JsonNode findings = root.get("findings");
         if (findings == null || !findings.isArray()) {
             throw new InvalidLlmOutputException("answer has no findings array");
+        }
+        if (strict && (root.size() != 1 || findings.size() > maxFindings)) {
+            throw new InvalidLlmOutputException("answer is outside the policy finding schema");
         }
         List<ProposedFinding> valid = new ArrayList<>();
         int index = 0;
@@ -79,7 +90,7 @@ public final class PolicyFindingParser {
     }
 
     private Optional<ProposedFinding> parseItem(JsonNode item) {
-        if (!item.isObject()) {
+        if (!item.isObject() || (strict && !hasFields(item, ITEM_FIELDS))) {
             return Optional.empty();
         }
         String ruleId = text(item, "ruleId");
@@ -89,7 +100,7 @@ public final class PolicyFindingParser {
         }
         Severity severity = severity(text(item, "severity"));
         String field = text(item, "field");
-        if (severity == null || field == null || !fields.contains(field)) {
+        if (severity == null || (strict && severity != Severity.WARNING && severity != Severity.INFO) || field == null || !fields.contains(field)) {
             return Optional.empty();
         }
         JsonNode valueNode = item.get("value");
@@ -99,7 +110,7 @@ public final class PolicyFindingParser {
         }
         if (!valueNode.isNull()) {
             value = text(item, "value");
-            if (value == null || value.isBlank()) {
+            if (value == null || value.isBlank() || (strict && value.length() > maxTextLength)) {
                 return Optional.empty();
             }
         }
@@ -117,8 +128,26 @@ public final class PolicyFindingParser {
         if (chunkId == null || !chunkId.isIntegralNumber() || !chunkId.canConvertToLong() || quote == null) {
             return Optional.empty();
         }
+        ProposedFinding.Coordinates coordinates = null;
+        if (strict) {
+            if (!hasFields(citation, CITATION_FIELDS) || chunkId.longValue() <= 0 || quote.length() > 800) {
+                return Optional.empty();
+            }
+            JsonNode start = citation.get("start");
+            JsonNode end = citation.get("end");
+            String hash = text(citation, "sourceHash");
+            if (!start.isIntegralNumber() || !start.canConvertToInt() || !end.isIntegralNumber() || !end.canConvertToInt()
+                    || hash == null || !hash.matches("[0-9a-f]{64}")) {
+                return Optional.empty();
+            }
+            coordinates = new ProposedFinding.Coordinates(start.intValue(), end.intValue(), hash);
+        }
         return Optional.of(new ProposedFinding(
-                ruleId, severity, field, value, message, suggestion, chunkId.longValue(), quote));
+                ruleId, severity, field, value, message, suggestion, chunkId.longValue(), quote, coordinates));
+    }
+
+    private static boolean hasFields(JsonNode node, Set<String> names) {
+        return node.size() == names.size() && names.stream().allMatch(node::has);
     }
 
     private static String text(JsonNode object, String name) {

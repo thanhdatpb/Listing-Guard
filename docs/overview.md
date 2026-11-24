@@ -101,7 +101,9 @@ Before you rely on it:
 - **Policy retrieval has a synthetic offline benchmark.** The benchmark compares vector and hybrid retrieval with
   labeled English and Vietnamese queries. Evaluation on the real corpus still requires the permitted source snapshots.
   The optional policy LLM adapter is available behind configuration. The internal retrieval service uses a pinned Etsy
-  analyzer profile and bounds the query batch and the returned evidence. The analyzer endpoint is still pending.
+  analyzer profile and bounds the query batch and the returned evidence. The internal analyzer verifies citations and returns
+  evidence for manual review. The analyzer endpoint is still pending.
+  See [Policy analyzer verification](implementation/policy-analyzer-verification.md).
   See [Analyzer profile and bounded retrieval](implementation/policy-analyzer-profile-retrieval.md).
   See [Policy LLM adapter](implementation/policy-llm-provider.md).
   See [Policy retrieval benchmark](implementation/policy-retrieval-benchmark.md).
