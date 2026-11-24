@@ -1,0 +1,29 @@
+# Synthetic relevance labels. They refer only to the test-built pages.
+marketplace: ETSY
+queries:
+  - id: production-partner
+    en: "disclose production partner"
+    vi: "khai báo đối tác sản xuất"
+    expected:
+      - file: disclosure.html
+        section: "Partner disclosure"
+  - id: mockup-photo
+    en: "mockup photo of a mug"
+    vi: "ảnh mô phỏng cốc"
+    expected:
+      - file: images.html
+        section: "Product imagery"
+  - id: design-permission
+    en: "permission to use a design"
+    vi: "quyền sử dụng thiết kế"
+    expected:
+      - file: rights.html
+        section: "Design rights"
+  - id: ambiguous-wording
+    en: "designed by us made with help"
+    vi: "chúng tôi thiết kế và có hỗ trợ"
+    expected:
+      - file: disclosure.html
+        section: "Ambiguous wording"
+      - file: rights.html
+        section: "Design rights"
