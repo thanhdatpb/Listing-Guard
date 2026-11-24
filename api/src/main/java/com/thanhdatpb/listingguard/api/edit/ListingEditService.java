@@ -61,12 +61,69 @@ public class ListingEditService {
             afterVariation = variation(clientId, request.marketplace(), request.afterVariations());
         }
 
-        List<FindingRef> before = findings(beforeRules, beforeTrademark, beforeVariation);
-        List<FindingRef> after = findings(afterRules, afterTrademark, afterVariation);
+        return assemble(request, beforeRules, afterRules, beforeTrademark, afterTrademark, beforeVariation, afterVariation,
+                true, true);
+    }
+
+    public enum PackState { COMPLETE, INCOMPLETE, QUOTA, UNAVAILABLE }
+
+    public record ConsoleComparison(ListingEditResult result, PackState listingRules, PackState trademarkRisk) { }
+
+    /** The console can show a partial comparison without treating missing results as resolved findings. */
+    public ConsoleComparison checkConsole(UUID clientId, ListingEditRequest request) {
+        CheckRequest before = new CheckRequest(request.marketplace(), request.before());
+        CheckRequest after = new CheckRequest(request.marketplace(), request.after());
+        CheckResult beforeRules = null;
+        CheckResult afterRules = null;
+        PackState rulesState;
+        try {
+            beforeRules = checks.checkDetailed(clientId, before);
+            afterRules = checks.checkDetailed(clientId, after);
+            rulesState = ready(beforeRules) && ready(afterRules) ? PackState.COMPLETE : PackState.INCOMPLETE;
+        } catch (com.thanhdatpb.listingguard.api.plan.QuotaExceededException e) {
+            rulesState = PackState.QUOTA;
+        } catch (com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException e) {
+            rulesState = PackState.UNAVAILABLE;
+        }
+
+        TrademarkCheckResult beforeTrademark = null;
+        TrademarkCheckResult afterTrademark = null;
+        PackState trademarkState;
+        try {
+            beforeTrademark = trademarks.check(clientId, before);
+            afterTrademark = trademarks.check(clientId, after);
+            trademarkState = complete(beforeTrademark) && complete(afterTrademark) ? PackState.COMPLETE : PackState.INCOMPLETE;
+        } catch (com.thanhdatpb.listingguard.api.plan.QuotaExceededException e) {
+            trademarkState = PackState.QUOTA;
+        } catch (com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException
+                 | com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException e) {
+            trademarkState = PackState.UNAVAILABLE;
+        }
+        return new ConsoleComparison(assemble(request, beforeRules, afterRules, beforeTrademark, afterTrademark, null, null,
+                rulesState == PackState.COMPLETE, trademarkState == PackState.COMPLETE), rulesState, trademarkState);
+    }
+
+    private static boolean ready(CheckResult result) {
+        return result.readiness() != null && result.readiness().score() != null;
+    }
+
+    private static boolean complete(TrademarkCheckResult result) {
+        return result.completeness() == com.thanhdatpb.listingguard.trademark.Completeness.COMPLETE;
+    }
+
+    private ListingEditResult assemble(ListingEditRequest request, CheckResult beforeRules, CheckResult afterRules,
+                                       TrademarkCheckResult beforeTrademark, TrademarkCheckResult afterTrademark,
+                                       VariationCheckResult beforeVariation, VariationCheckResult afterVariation,
+                                       boolean compareRules, boolean compareTrademark) {
+        List<FindingRef> before = findings(compareRules ? beforeRules : null,
+                compareTrademark ? beforeTrademark : null, beforeVariation);
+        List<FindingRef> after = findings(compareRules ? afterRules : null,
+                compareTrademark ? afterTrademark : null, afterVariation);
         Comparison comparison = compare(before, after);
         return new ListingEditResult(new ListingEditResult.Side(beforeRules, beforeTrademark, beforeVariation),
                 new ListingEditResult.Side(afterRules, afterTrademark, afterVariation),
-                changedFields(request, beforeListing, afterListing), comparison.newFindings(), comparison.modified(), comparison.remaining());
+                changedFields(request, request.before(), request.after()), comparison.newFindings(), comparison.modified(),
+                comparison.remaining());
     }
 
     private VariationCheckResult variation(UUID clientId, String marketplace, ListingEditRequest.VariationFamily family) {
@@ -84,10 +141,10 @@ public class ListingEditService {
 
     private List<FindingRef> findings(CheckResult rules, TrademarkCheckResult trademark, VariationCheckResult variation) {
         List<FindingRef> out = new ArrayList<>();
-        for (int i = 0; i < rules.findings().size(); i++) {
+        for (int i = 0; rules != null && i < rules.findings().size(); i++) {
             out.add(ref(Pack.LISTING_RULES.id(), rules.checkId(), i, mapper.valueToTree(rules.findings().get(i))));
         }
-        for (int i = 0; i < trademark.findings().size(); i++) {
+        for (int i = 0; trademark != null && i < trademark.findings().size(); i++) {
             out.add(ref(Pack.TRADEMARK_RISK.id(), trademark.checkId(), i, mapper.valueToTree(trademark.findings().get(i))));
         }
         if (variation != null) {

@@ -138,7 +138,8 @@ class ListingEditAndHistoryIntegrationTest {
         JsonNode newFinding = find(compared.path("newFindings"), "title_length");
         String afterCheckId = compared.path("after").path("listingRules").path("checkId").asText();
         assertThat(newFinding.path("feedbackTarget").path("checkId").asText()).isEqualTo(afterCheckId);
-        assertThat(html).contains("name=\"pack\" value=\"listing-rules\"")
+        assertThat(html).contains("data-draft-fix", "data-field=\"title\"", "Check completed")
+                .contains("name=\"pack\" value=\"listing-rules\"")
                 .contains("name=\"checkId\" value=\"" + afterCheckId + "\"");
     }
 

@@ -105,7 +105,7 @@ class ConsoleTextInTemplatesTest {
     @Test
     void thereAreTemplatesToScan() {
         assertThat(files(TEMPLATES, ".html")).hasSizeGreaterThanOrEqualTo(10);
-        assertThat(files(SCRIPTS, ".js")).hasSize(4);
+        assertThat(files(SCRIPTS, ".js")).hasSize(5);
     }
 
     @Test

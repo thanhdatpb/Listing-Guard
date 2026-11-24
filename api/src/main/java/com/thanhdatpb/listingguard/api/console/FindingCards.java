@@ -106,9 +106,20 @@ public class FindingCards {
                 ? oldMessage : null;
         String source = "trademark".equals(kind) ? origin(ruleId, mark != null, text(shown, "source"))
                 : "rules".equals(kind) ? sources.listingRule(marketplace, ruleId) : null;
+        var suggestion = shown.get("fix");
+        FindingCard.Fix fix = suggestion instanceof Map<?, ?> values
+                && values.get("action") instanceof String action
+                && values.get("description") instanceof String description
+                ? new FindingCard.Fix(action, description,
+                        values.get("proposedValue") instanceof String proposed ? proposed : null)
+                : null;
+        String value = text(shown, "value");
+        String snippet = value == null ? text(shown, "snippet") : value;
+        FindingCard.Evidence evidence = snippet == null ? null
+                : new FindingCard.Evidence("", snippet, "", false, false);
         FindingCard card = card(kind, levelOf(kind, shown), ruleId, text(shown, "field"), text(shown, "message"),
-                text(shown, "suggestion"), mark == null ? null : messages.get("bulk.item.catalogmark", mark), source, null, null,
-                null, text(shown, "value"), null, before, messages.ruleExplanation(ruleId), item.feedbackTarget());
+                text(shown, "suggestion"), mark == null ? null : messages.get("bulk.item.catalogmark", mark), source, evidence, fix,
+                null, value, null, before, messages.ruleExplanation(ruleId), item.feedbackTarget());
         if (item.after() != null) {
             return card;
         }
