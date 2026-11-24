@@ -16,7 +16,7 @@ Input format adapters: [docs/adapters.md](docs/adapters.md)
 
 Self-hosted pre-publish compliance API for Etsy and Amazon listings: deterministic rules, explainable trademark risk, built for sellers, tools and AI agents.
 
-**Latest release: [v0.9.0](docs/releases/v0.9.0.md)** (image `ghcr.io/thanhdatpb/listing-guard:0.9.0`, `linux/amd64` and `linux/arm64`). v0.7.0 and v0.8.0 were never tagged; their notes are merged into v0.9.0. Deploy by tag, never `latest`.
+**Latest release notes: [v0.10.0](docs/releases/v0.10.0.md)**. The latest published tag is v0.6.0 until v0.10.0 is tagged and the release workflows succeed. The target GHCR image is `ghcr.io/thanhdatpb/listing-guard:0.10.0` for `linux/amd64` and `linux/arm64`. Deploy by version tag.
 
 ![System architecture: clients and integrations call the Listing Guard API, which uses versioned rulesets, catalog data, PostgreSQL and operational jobs.](docs/images/architecture-overview.svg)
 
@@ -30,7 +30,7 @@ Listing Guard suggests and reports. It never edits or publishes a listing and do
 
 ## What it checks
 
-State of v0.9.0. "Ready" means it works and its tests pass, within the evidence status of the last column; nothing here has run on ARM64 hardware, on Oracle or behind Cloudflare yet.
+State of v0.10.0. "Ready" means it works and its tests pass, within the evidence status of the last column; nothing here has run on ARM64 hardware, on Oracle or behind Cloudflare yet.
 
 | Endpoint or capability | What it does | Availability | Evidence status |
 |---|---|---|---|
@@ -43,7 +43,11 @@ State of v0.9.0. "Ready" means it works and its tests pass, within the evidence 
 | `POST /api/v1/image-checks` | Checks image properties for Etsy or Amazon | Off by default | Shipped marketplace thresholds are unset; results are INCOMPLETE; images are not recognized for marks, logos or text; not safe for an untrusted caller |
 | `POST /api/v1/feedback`, `GET /api/v1/feedback/stats` | Records a verdict on a finding and reads the counts ([guide](docs/feedback.md)) | Ready | What reviewers reported, not a measured precision; no listing text is stored |
 | `GET /api/v1/rulesets/{marketplace}/limits`, `GET /api/v1/capabilities`, `GET /api/v1/input-adapters`, `GET /api/v1/usage`, `GET /api/v1/reports/summary` | Reads limits, deployment capabilities, input formats, plan and usage, and stored-result counts | Ready | Read-only; reports do not read listing text; the Shopify input format is experimental |
-| `POST /api/v1/policy-checks` | Planned policy-grounded analysis with verified citations | **Planned**; the endpoint does not exist | No real LLM call or endpoint yet; see [ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md) |
+| `POST /api/v1/policy-checks`, `GET /api/v1/policy-checks/{id}` and AI Workbench | Etsy policy analysis with code-verified citations | **Experimental, off by default** | Scripted providers and offline fixtures tested. Real-provider evaluation and approved retention are pending. |
+| ReviewCase API and Review Queue | Tenant-scoped review, explicit writer grants and audit | **Experimental, off by default** | Console access also requires the Console flag. |
+| Verified cases | Curated cases and tenant-scoped similar-case search | **Experimental, off by default** | Requires Review Queue and reviewer grant. |
+| Policy impact | Proposed reports from approved snapshots and manual re-audit | **Console-dependent, experimental** | The Console is off by default. Reports require operator-supplied snapshots. |
+| POD Readiness | Versioned profiles and separate marketplace, trademark and production results | **Console-dependent, experimental** | The Console is off by default. Shipped manufacturer limits are unverified. |
 
 | Beyond the endpoints | Availability | Evidence status |
 |---|---|---|
@@ -149,7 +153,7 @@ The second request needs an operator configured catalog; without one it returns 
 
 ## Deploy
 
-See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production setup, Access, backups, upgrades and health checks. General production settings are in [deployment](docs/deployment.md). Before the first deployment read [deploy readiness](docs/deploy-readiness.md): what is on or off by default, the environment variables, the resource budget, a security checklist, a smoke test and the manual steps in order. The release notes of the version to deploy are in [docs/releases](docs/releases/v0.9.0.md).
+See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production setup, Access, backups, upgrades and health checks. General production settings are in [deployment](docs/deployment.md). Before the first deployment read [deploy readiness](docs/deploy-readiness.md): what is on or off by default, the environment variables, the resource budget, a security checklist, a smoke test and the manual steps in order. The release notes of the version to deploy are in [docs/releases](docs/releases/v0.10.0.md).
 
 ## Roadmap
 
@@ -179,7 +183,7 @@ See the [detailed status and project guide](docs/overview.md) for implemented be
 - [Oracle A1 deployment](docs/deploy-oracle.md)
 - [Deploy readiness](docs/deploy-readiness.md)
 - [Architecture decisions](docs/adr/)
-- [Release notes](docs/releases/v0.9.0.md)
+- [Release notes](docs/releases/v0.10.0.md)
 
 ## License
 

@@ -263,3 +263,7 @@ Taken by the maintainer after the implementation notes above were written:
 - **The `Vary` headers that a `404` for an unknown route no longer carries are accepted** (open question 5): no CORS is configured.
   The release notes of v0.8.0 (`docs/releases/v0.8.0.md`, "Breaking changes"; the notes of v0.7.0, which was never tagged, are folded into them) say so.
 - **The Jackson 2 pin stays at 2.21.8**, as it is (Decision 5).
+
+## Release runtime
+
+[ADR-045](ADR-045-release-workflows-and-runtime.md) chọn Java 21 LTS cho build image, runtime image, CI và Maven compiler release của v0.10.0.

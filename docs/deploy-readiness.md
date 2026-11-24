@@ -1,7 +1,7 @@
 # Deploy readiness
 
 The pre-deploy review of the first production deployment on one Oracle Cloud Always Free A1 VM behind Cloudflare Tunnel
-([ADR-019](adr/ADR-019-oracle-a1-cloudflare-tunnel.md), runbook [deploy-oracle.md](deploy-oracle.md)), first written for the
+([ADR-019](adr/ADR-019-oracle-a1-cloudflare-tunnel.md), runbook [deploy-oracle.md](deploy-oracle.md)), with release steps for v0.10.0. First written for the
 release that became v0.8.0 on 2026-11-13 and brought up to date for **v0.9.0** on 2026-11-18 (the checks made for v0.9.0, with their
 results, are in [section 8](#8-v090-pre-release-checks-and-results); sections 1 to 7 keep the review of 2026-11-13 where it still
 holds). It adds no feature. It says what is on and what is not, which variables decide it, whether the VM is big
@@ -79,7 +79,7 @@ and the per-client rate limit are its only protection ([the decision](#decisions
 | `GET /v3/api-docs` | on, **needs an API key** | `springdoc.api-docs.enabled` (not passed by Compose) | an API key | real; the start-up logs a springdoc warning that it is enabled |
 | `GET /swagger-ui.html` | **off** | `LISTING_GUARD_SWAGGER_UI`, forced `"false"` by `docker-compose.prod.yml`; the API refuses to start with `true` under `prod` | none | development only |
 | `GET /policies/search` | **off** (`404`) | `LISTING_GUARD_POLICIES_SEARCHENDPOINT_ENABLED`, forced `"false"` in prod | an embedding provider | debug view, never for production |
-| `POST /api/v1/policy-checks` | **does not exist** | none | none | planned (ADR-011): no LLM call or endpoint yet |
+| `POST /api/v1/policy-checks` | **Off by default** | API key, Etsy corpus and approved retention when enabled | Configurable | Review verified citations. Real provider evaluation is pending. |
 
 ### Console pages (the optional Thymeleaf console, ADR-014)
 
@@ -151,7 +151,7 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 
 | Variable | Notes |
 |---|---|
-| `LISTING_GUARD_VERSION` | a published image tag **without** `v`: `0.9.0` for this release, never `latest`; use no tag through `0.5.0` (amd64 only) |
+| `LISTING_GUARD_VERSION` | a published image tag **without** `v`: `0.10.0` for this release, never `latest`; use no tag through `0.5.0` (amd64 only) |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | strong, unique; the password is a secret |
 | `API_PORT` | an unused port, bound to `127.0.0.1` only |
 | `TUNNEL_TOKEN` | **required with `docker-compose.prod.cloudflared.yml`**; a secret |
@@ -279,7 +279,7 @@ docker compose --profile prod ps                                   # api and pos
 curl -fsS $BASE/health                                             # 200 {"status":"UP"}
 curl -sS -o /dev/null -w '%{http_code}\n' $BASE/api/v1/usage       # 401 (no key)
 curl -sS -H "$H" $BASE/api/v1/capabilities                         # 200; trademark-risk available:false until a catalog is READY
-curl -sSI -H "$H" $BASE/api/v1/usage | grep -i x-listing-guard-version   # the release you deployed, for example 0.9.0
+curl -sSI -H "$H" $BASE/api/v1/usage | grep -i x-listing-guard-version   # the release you deployed, for example 0.10.0
 curl -sS -H "$H" $BASE/api/v1/usage                                # 200 {"enforced":false,"plan":"FREE",...}
 curl -sS -H "$H" "$BASE/api/v1/rulesets/ETSY/limits"               # 200; rulesetVersion etsy-2026-12, title_length 140 VERIFIED
 curl -sS -H "$H" -H 'Content-Type: application/json' -d '{"marketplace":"ETSY","listing":{"title":"Handmade Mug","description":"A ceramic mug.","tags":["mug","Mug","gift_idea"],"price":{"amount":1999,"divisor":100,"currency_code":"USD"},"taxonomy_path":["Home & Living","Mugs"]}}' $BASE/api/v1/checks
@@ -305,37 +305,35 @@ the same e-mail on the console's own sign-in, open the link in the mail, press *
 **API keys**, create and revoke a key, and read **Report**.
 
 **After a restart or an upgrade:** `docker compose --profile prod logs --tail=100 api` shows `Started`, no `ERROR`; the migration
-count in `flyway_schema_history` is 42 for v0.9.0.
+count in `flyway_schema_history` is 47 for v0.10.0.
 
-## 6. Release v0.9.0 and the manual steps, in order
+## 6. Release v0.10.0 and the manual steps, in order
 
-Release notes: [releases/v0.9.0.md](releases/v0.9.0.md). **The last tag is `v0.6.0`; no `v0.9.0` tag exists until the maintainer pushes
-it**, and none is planned for v0.7.0 or v0.8.0: their notes are folded into v0.9.0. The checks made for this release are in
+Release notes: [releases/v0.10.0.md](releases/v0.10.0.md). **The last tag is `v0.6.0`; v0.10.0 is pending**, and v0.7.0–v0.9.0 were never tagged: their notes are folded into v0.10.0. The prior rehearsal is in
 [section 8](#8-v090-pre-release-checks-and-results). Order matters because the image must exist before the VM can pull it.
 
 **GitHub (before any server)**
 
-1. Merge the release pull request (`chore/release-v0.9.0`; it holds the `Dockerfile` fix and the notes: **no tag may be pushed from a
+1. Merge the release pull request (`chore/release-v0.10.0`; it holds the `Dockerfile` fix and the notes: **no tag may be pushed from a
    commit without them**).
-2. Fill the `Released YYYY-MM-DD` line of `docs/releases/v0.9.0.md` (a small commit on `main`, or before the merge) and tag
-   **`v0.9.0` only**:
+2. Fill the `Released YYYY-MM-DD` line of `docs/releases/v0.10.0.md` (a small commit on `main`, or before the merge) and tag
+   **`v0.10.0` only**:
 
    ```bash
    git switch main && git pull --ff-only
-   git tag -a v0.9.0 -m "Listing Guard v0.9.0"
-   git push origin v0.9.0
+   git tag -a v0.10.0 -m "Listing Guard v0.10.0"
+   git push origin refs/tags/v0.10.0
    ```
 
-3. Wait for the `Release image` and `release-client` workflows (the `linux/amd64` and `linux/arm64` manifests, the contract assets,
-   the SDK), then publish the draft GitHub Release that `publish-contract` creates. Attach `listing-guard-mcp-0.9.0.jar` by hand
+3. Wait for the `Release image` and `Release client SDK` workflows (the `linux/amd64` and `linux/arm64` manifests, the contract assets,
+   the SDK), then publish the draft GitHub Release that `publish-contract` creates. Attach `listing-guard-mcp-0.10.0.jar` by hand
    (`./mvnw -B -pl mcp-server -am package`).
-4. **Make the GHCR package public** (decision): the package exists only after the first publish, so open its settings on GitHub
-   afterwards and set the visibility. Prove it from a machine that is not logged in to GHCR:
-   `docker pull ghcr.io/thanhdatpb/listing-guard:0.9.0`, and `docker buildx imagetools inspect ghcr.io/thanhdatpb/listing-guard:0.9.0`
+4. **Confirm the GHCR package is public.** Check its visibility in GitHub settings after the workflows finish. Prove it from a machine that is not logged in to GHCR:
+   `docker pull ghcr.io/thanhdatpb/listing-guard:0.10.0`, and `docker buildx imagetools inspect ghcr.io/thanhdatpb/listing-guard:0.10.0`
    must list both `linux/amd64` and `linux/arm64`.
 5. After the tag, move the API baseline in a small pull request (copy `docs/api/openapi.json` and `input-schema.json` of the tag into
-   `docs/api/baseline/` as `openapi-v0.9.0.json` and `input-schema-v0.9.0.json`, delete the old files, set `baseline:` in
-   `docs/api/breaking-changes.yaml` to `v0.9.0` with no exceptions; ADR-022). Never in the release pull request: the baseline is a
+   `docs/api/baseline/` as `openapi-v0.10.0.json` and `input-schema-v0.10.0.json`, delete the old files, set `baseline:` in
+   `docs/api/breaking-changes.yaml` to `v0.10.0` with no exceptions; ADR-022). Never in the release pull request: the baseline is a
    byte copy of a release that has been published.
 
 **Oracle**
@@ -349,7 +347,7 @@ it**, and none is planned for v0.7.0 or v0.8.0: their notes are folded into v0.9
 8. Log in, get the repository onto the VM, run `sudo ./deploy/oracle/bootstrap.sh`, then **prove the `deploy` account logs in
    by key before you close the first session**.
 9. Copy the repository into `/opt/listing-guard` and `chown` as in [deploy-oracle.md §3](deploy-oracle.md#3-bootstrap-the-host-and-prepare-the-release-files).
-10. Create `.env` from `deploy/env.prod.example` (`chmod 600`): the required variables, `LISTING_GUARD_VERSION=0.9.0`,
+10. Create `.env` from `deploy/env.prod.example` (`chmod 600`): the required variables, `LISTING_GUARD_VERSION=0.10.0`,
     `COMPOSE_FILE=docker-compose.prod.yml:docker-compose.prod.cloudflared.yml`.
 
 **Cloudflare**
@@ -459,7 +457,7 @@ used. Each row says what was run, so that you can repeat it.
 | # | Check | Result |
 |---|---|---|
 | 1 | `./mvnw -B verify`, all 14 modules, PostgreSQL 16 in Testcontainers | **BUILD SUCCESS**, 12 min 50 s (the API module 10 min 51 s), **3,239 tests, 0 failures, 0 errors, 0 skipped**. It includes the ADR-022 compatibility check, `ListingEvalGateTest` and the Java client SDK tests. |
-| 2 | `./mvnw -B -pl contract-tools verify` against the `v0.6.0` baseline | Passed (105 tests): 44 additive changes, 4 other non-breaking, and the 3 breaking changes **of the document** that `docs/api/breaking-changes.yaml` already declares (no wire change; see the [release notes](releases/v0.9.0.md#endpoints-and-contract)). The baseline was not touched. |
+| 2 | `./mvnw -B -pl contract-tools verify` against the `v0.6.0` baseline | Passed (105 tests): 44 additive changes, 4 other non-breaking, and the 3 breaking changes **of the document** that `docs/api/breaking-changes.yaml` already declares (no wire change; see the [release notes](releases/v0.10.0.md#endpoints-and-contract)). The baseline was not touched. |
 | 3 | `docker build --platform linux/amd64 --build-arg LISTING_GUARD_RELEASE=0.9.0 .` | Built; 662 MB, JRE 21.0.13. A container started from it answered `X-Listing-Guard-Version: 0.9.0`. |
 | 4 | `.github/workflows/release-image.yml` read against the tag flow | `on: push: tags: v*.*.*`. `docker/metadata-action` takes `type=match,pattern=v(.*),group=1` (so `v0.9.0` gives `0.9.0`) and `latest`. **Both** image builds pass `LISTING_GUARD_RELEASE=${{ steps.metadata.outputs.version }}`; the Dockerfile turns it into `-Dlisting-guard.release`, which `build-info` writes into the jar. The push step builds `platforms: linux/amd64,linux/arm64` after a Trivy scan (critical, fixed only) of the amd64 image. `publish-contract` checks that the baseline `v0.6.0` is a tag and an ancestor, runs `contract-tools verify` and attaches the four contract files to the GitHub Release (a draft made from `docs/releases/v0.9.0.md` when none exists). `release-client` takes the version from the tag. |
 | 5 | `docker compose config` for `docker-compose.prod.yml` (all profiles), `+ cloudflared`, `+ cloudflared + shared-network` | Valid in all three. The defaults it printed keep everything off: `LISTING_GUARD_LLM_*` false, plans, fixes, console, TSDR finding status, activation log false; Swagger false. |

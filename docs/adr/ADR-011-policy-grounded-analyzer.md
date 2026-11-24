@@ -4,11 +4,10 @@
 - Date: 2026-10-30
 - Depends on: [ADR-012](ADR-012-api-embedding-provider.md) (API embeddings); follows the pack and cache-identity
   conventions of [ADR-010](ADR-010-pack-identity-and-analysis-version.md) and ADR-005
-- Implementation order: PR 1 and PR 2 of item 11 are merged (the API embedding provider, and the verification
-  core with `LlmProvider`, `ScriptedLlmProvider` and `CitationVerifier`). The rest is a parallel track that starts
-  after PR A (the trademark scanner, [ADR-009](ADR-009-trademark-risk-scanner.md)): "starts after PR A" applies
-  from PR 3 on. It does not block PR B (the image checker, ADR-008) and does not depend on PR 0b of ADR-010, as
-  item 1 below already states.
+- Implementation status for v0.10.0: steps 1–5 have runtime implementations on main, including
+  the provider, bounded retrieval, verification, Policy Checks API and Console workbench (PRs #130–#134).
+  Step 6's full analyzer evaluation and real-provider results remain pending. The offline retrieval benchmark
+  measures retrieval and provenance, while acceptance also requires the analyzer evaluation listed below.
 - Acceptance convention: Keep Proposed until the implementing PRs are approved and merged. Then set Status to
   Accepted and Date to the merge date.
 
