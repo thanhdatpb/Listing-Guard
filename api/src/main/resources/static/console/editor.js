@@ -67,6 +67,10 @@
   }
 
   function init() {
+    var errors = document.getElementById('editor-errors');
+    if (errors) {
+      errors.focus();
+    }
     var counters = document.querySelectorAll('[data-counter-for]');
     Array.prototype.forEach.call(counters, function (counter) {
       var field = document.getElementById(counter.getAttribute('data-counter-for'));

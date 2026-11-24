@@ -10,12 +10,36 @@ import java.util.Locale;
  * that could not be produced says why instead of leaving a gap.
  *
  * @param rulesRan              false when the listing rules did not run (quota or plan), so there are no rule findings
- * @param requiredFieldsFinding true when a {@code required_fields} finding exists, which opens "Other listing fields"
+ * @param requiredFieldsFinding true when a {@code required_fields} finding exists, in the listing-rules result
  * @param listing               the listing as it was checked, with the text the findings point at marked (ADR-041); the page adds
  *                              the rules' limits to it
  */
 public record EditorResult(Readiness readiness, Trademark trademark, List<Group<RuleItem>> ruleGroups, boolean rulesRan,
                            boolean requiredFieldsFinding, com.thanhdatpb.listingguard.api.console.ListingView listing) {
+
+    public enum Status {
+        PASSED, REVIEW_REQUIRED, INCOMPLETE, ERROR;
+
+        public String messageKey() {
+            return "editor.status." + name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** Console summary. Pack-specific details remain visible alongside it. */
+    public Status status() {
+        if (count("error") > 0) {
+            return Status.ERROR;
+        }
+        if (!rulesRan || readiness.kind() == ReadinessKind.INCOMPLETE || readiness.kind() == ReadinessKind.NOT_RUN
+                || trademark.kind() != TrademarkKind.RESULT || "UNKNOWN".equals(trademark.riskLevel())) {
+            return Status.INCOMPLETE;
+        }
+        if (readiness.kind() == ReadinessKind.NOT_READY || count("warning") > 0 || trademarkCount() > 0
+                || "MEDIUM".equals(trademark.riskLevel()) || "HIGH".equals(trademark.riskLevel())) {
+            return Status.REVIEW_REQUIRED;
+        }
+        return Status.PASSED;
+    }
 
     public enum ReadinessKind {
         READY, NOT_READY, INCOMPLETE, NOT_RUN;

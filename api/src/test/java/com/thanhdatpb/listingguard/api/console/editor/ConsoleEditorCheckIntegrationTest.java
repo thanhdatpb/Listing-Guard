@@ -99,6 +99,7 @@ class ConsoleEditorCheckIntegrationTest {
 
         String readiness = section(html, "readiness-panel");
         String trademark = section(html, "trademark-panel");
+        assertThat(html).contains("data-status=\"REVIEW_REQUIRED\"");
         assertThat(readiness).contains("Ready").containsPattern("class=\"lg-meter__value\">\\d+/\\d+</span>");
         assertThat(trademark).contains("lg-pill--trademark\">HIGH</span>").contains(trademarkRulesets.ruleset().disclaimer());
         // the listing card holds the readiness, the trademark panel comes straight after it, both above any finding
@@ -138,6 +139,7 @@ class ConsoleEditorCheckIntegrationTest {
 
         assertThat(section(html, "readiness-panel")).containsPattern("class=\"lg-meter__value\">\\d+/\\d+</span>");
         String trademark = section(html, "trademark-panel");
+        assertThat(html).contains("data-status=\"INCOMPLETE\"", "Unavailable on your plan.");
         assertThat(trademark).contains("Trademark not checked").contains("does not include the trademark check")
                 .contains("FREE").contains(trademarkRulesets.ruleset().disclaimer());
         assertThat(plansWithTrademark).isNotEmpty().allSatisfy(plan -> assertThat(trademark).contains(plan));
@@ -154,6 +156,7 @@ class ConsoleEditorCheckIntegrationTest {
 
         String again = press(seller, form);
         assertThat(used(seller)).isEqualTo(2);
+        assertThat(again).contains("data-status=\"PASSED\"");
         assertThat(section(again, "readiness-panel")).contains("Ready");
         assertThat(section(again, "trademark-panel")).contains("Risk level");
     }
@@ -186,14 +189,15 @@ class ConsoleEditorCheckIntegrationTest {
     }
 
     @Test
-    void aRequiredFieldsFindingOpensTheOtherListingFields() throws Exception {
-        Map<String, String> form = Map.of("marketplace", "ETSY", "title", "Only a title " + unique());
+    void missingRequiredFieldsAreReportedWithoutOpeningAdvancedFields() throws Exception {
+        Map<String, String> form = Map.of("marketplace", "ETSY");
 
         String html = press(user(PlanCode.FREE), form);
 
         Matcher details = Pattern.compile("<details[^>]*id=\"other-fields\"[^>]*>").matcher(html);
         assertThat(details.find()).isTrue();
-        assertThat(details.group()).contains(" open");
+        assertThat(details.group()).doesNotContain(" open");
+        assertThat(html).contains("data-status=\"ERROR\"");
         assertThat(section(html, "rule-findings")).contains("required_fields");
     }
 
@@ -207,9 +211,8 @@ class ConsoleEditorCheckIntegrationTest {
 
         assertThat(html).contains("Enter the price as a number with a decimal point").contains("aria-invalid=\"true\"");
         assertThat(html).doesNotContain("id=\"readiness-panel\"").doesNotContain("id=\"trademark-panel\"");
-        Matcher details = Pattern.compile("<details[^>]*id=\"other-fields\"[^>]*>").matcher(html);
-        assertThat(details.find()).isTrue();
-        assertThat(details.group()).contains(" open");
+        assertThat(html).contains("id=\"editor-errors\" tabindex=\"-1\" data-status=\"ERROR\"",
+                "href=\"#price\"", "aria-describedby=\"price-hint price-error\"", "id=\"price-error\"");
         assertThat(html).contains(form.get("title"));
         assertThat(PlanTestSupport.countOf(jdbc, "listing_check", seller.clientId())).isZero();
         assertThat(used(seller)).isZero();
