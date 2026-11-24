@@ -7,6 +7,8 @@ public class LlmException extends RuntimeException {
         TIMEOUT,
         RATE_LIMIT,
         BAD_STATUS,
+        INVALID_OUTPUT,
+        REFUSED,
         /** The answer hit {@code maxOutputTokens}, so the JSON is incomplete. */
         TRUNCATED
     }

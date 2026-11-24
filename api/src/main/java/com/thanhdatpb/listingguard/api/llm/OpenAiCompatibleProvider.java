@@ -54,18 +54,7 @@ public final class OpenAiCompatibleProvider implements LlmProvider {
 
     @Override
     public LlmResponse complete(LlmRequest request) {
-        ObjectNode body = json.createObjectNode();
-        body.put("model", model);
-        body.put("temperature", 0);
-        body.put("max_tokens", request.maxOutputTokens());
-        if (jsonMode) {
-            body.putObject("response_format").put("type", "json_object");
-        }
-        ArrayNode messages = body.putArray("messages");
-        messages.addObject().put("role", "system")
-                .put("content", request.system() + "\n\nAnswer with one JSON object that matches this JSON Schema:\n"
-                        + request.jsonSchema());
-        messages.addObject().put("role", "user").put("content", request.user());
+        ObjectNode body = chatPayload(json, model, request, jsonMode);
 
         HttpRequest httpRequest = HttpRequest.newBuilder(endpoint).timeout(request.timeout())
                 .header("Authorization", "Bearer " + key).header("Content-Type", "application/json")
@@ -90,6 +79,22 @@ public final class OpenAiCompatibleProvider implements LlmProvider {
             throw new LlmException(LlmException.Kind.BAD_STATUS, "LLM provider " + id + " answered HTTP " + status);
         }
         return parse(response.body());
+    }
+
+    static ObjectNode chatPayload(ObjectMapper json, String model, LlmRequest request, boolean jsonMode) {
+        ObjectNode body = json.createObjectNode();
+        body.put("model", model);
+        body.put("temperature", 0);
+        body.put("max_tokens", request.maxOutputTokens());
+        if (jsonMode) {
+            body.putObject("response_format").put("type", "json_object");
+        }
+        ArrayNode messages = body.putArray("messages");
+        messages.addObject().put("role", "system")
+                .put("content", request.system() + "\n\nAnswer with one JSON object that matches this JSON Schema:\n"
+                        + request.jsonSchema());
+        messages.addObject().put("role", "user").put("content", request.user());
+        return body;
     }
 
     private LlmResponse parse(byte[] body) {
