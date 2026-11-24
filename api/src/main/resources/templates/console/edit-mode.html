@@ -6,6 +6,7 @@
     <title th:text="#{edit.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
     <th:block th:replace="~{console/layout :: htmx}"></th:block>
+    <script th:src="@{/console/edit-mode.js}" defer></script>
 </head>
 <body>
 <!-- Edit mode (ADR-033, ADR-041): the listing before and after a change side by side, then what the change did to the findings: new ones,
@@ -21,11 +22,8 @@
         </div>
     </div>
     <p class="lg-text-muted lg-small" th:text="#{edit.history.note}"></p>
-    <div class="lg-banner lg-banner--error lg-section" role="alert" th:if="${error == 'edit.error.required'}"><p th:text="#{edit.error.required}"></p></div>
-    <div class="lg-banner lg-banner--error lg-section" role="alert" th:if="${error == 'edit.error.object'}"><p th:text="#{edit.error.object}"></p></div>
-    <div class="lg-banner lg-banner--error lg-section" role="alert" th:if="${error == 'edit.error.invalid'}"><p th:text="#{edit.error.invalid}"></p></div>
-
-    <form class="lg-card lg-section" method="post" th:action="@{/console/check/edit}">
+    <form id="edit-form" class="lg-card lg-section" method="post"
+          th:attr="data-i18n-request-error=#{js.edit.request.error}" th:action="@{/console/check/edit}">
         <div class="lg-field lg-field--narrow">
             <label class="lg-field__label" for="marketplace" th:text="#{edit.marketplace}"></label>
             <select class="lg-select" id="marketplace" name="marketplace">
@@ -48,7 +46,32 @@
         </div>
     </form>
 
+    <p id="edit-unchecked" data-state="UNCHECKED" role="status" class="lg-small lg-text-muted" th:hidden="${result != null}" th:text="#{edit.unchecked}"></p>
+    <p id="edit-request-error" role="alert" class="lg-field__error"></p>
+    <div id="edit-output">
+    <div class="lg-banner lg-banner--error lg-section" role="alert" th:if="${error == 'edit.error.required'}"><p th:text="#{edit.error.required}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" role="alert" th:if="${error == 'edit.error.object'}"><p th:text="#{edit.error.object}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" role="alert" th:if="${error == 'edit.error.invalid'}"><p th:text="#{edit.error.invalid}"></p></div>
+
     <section class="lg-stack" id="edit-result" th:if="${result != null}" aria-live="polite" aria-labelledby="edit-changed-heading">
+        <ul class="lg-card">
+            <li><strong th:text="#{editor.pack.rules}"></strong>
+                <th:block th:switch="${comparison.listingRules().name()}">
+                    <span th:case="'COMPLETE'" th:text="#{edit.pack.complete}"></span>
+                    <span th:case="'INCOMPLETE'" th:text="#{edit.pack.incomplete}"></span>
+                    <span th:case="'QUOTA'" th:text="#{edit.pack.quota}"></span>
+                    <span th:case="'UNAVAILABLE'" th:text="#{edit.pack.unavailable}"></span>
+                </th:block>
+            </li>
+            <li><strong th:text="#{editor.trademark.heading}"></strong>
+                <th:block th:switch="${comparison.trademarkRisk().name()}">
+                    <span th:case="'COMPLETE'" th:text="#{edit.pack.complete}"></span>
+                    <span th:case="'INCOMPLETE'" th:text="#{edit.pack.incomplete}"></span>
+                    <span th:case="'QUOTA'" th:text="#{edit.pack.quota}"></span>
+                    <span th:case="'UNAVAILABLE'" th:text="#{edit.pack.unavailable}"></span>
+                </th:block>
+            </li>
+        </ul>
         <div class="lg-card">
             <h2 id="edit-changed-heading" class="lg-card__title" th:text="#{edit.changed.fields}"></h2>
             <ul class="lg-listing__chips">
@@ -63,17 +86,29 @@
                 <span class="lg-pill" th:text="${result.newFindings().size()}"></span>
             </h2>
             <div class="lg-findings">
-                <th:block th:each="item : ${result.newFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}"><article th:replace="~{console/findings :: card(${card})}"></article></th:block>
+                <th:block th:each="item : ${result.newFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}">
+                    <article th:replace="~{console/findings :: card(${card})}"></article>
+                    <button th:if="${item.pack() == 'listing-rules' and item.after() != null and card.fix != null}"
+                            type="button" class="lg-btn" data-draft-fix hidden
+                            th:attr="data-field=${card.field},data-value=${card.value},data-action=${card.fix.action},data-proposed=${card.fix.proposedValue}"
+                            th:text="#{edit.draft.apply}"></button>
+                </th:block>
             </div>
         </section>
 
         <section class="lg-group" id="edit-modified" aria-labelledby="edit-modified-heading">
             <h2 id="edit-modified-heading" class="lg-group__title">
                 <span th:text="#{edit.group.modified}"></span>
-                <span class="lg-pill lg-pill--clean" th:text="${result.modifiedFindings().size()}"></span>
+                <span class="lg-pill" th:text="${result.modifiedFindings().size()}"></span>
             </h2>
             <div class="lg-findings">
-                <th:block th:each="item : ${result.modifiedFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}"><article th:replace="~{console/findings :: card(${card})}"></article></th:block>
+                <th:block th:each="item : ${result.modifiedFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}">
+                    <article th:replace="~{console/findings :: card(${card})}"></article>
+                    <button th:if="${item.pack() == 'listing-rules' and item.after() != null and card.fix != null}"
+                            type="button" class="lg-btn" data-draft-fix hidden
+                            th:attr="data-field=${card.field},data-value=${card.value},data-action=${card.fix.action},data-proposed=${card.fix.proposedValue}"
+                            th:text="#{edit.draft.apply}"></button>
+                </th:block>
             </div>
         </section>
 
@@ -83,11 +118,18 @@
                 <span class="lg-pill" th:text="${result.remainingFindings().size()}"></span>
             </h2>
             <div class="lg-findings">
-                <th:block th:each="item : ${result.remainingFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}"><article th:replace="~{console/findings :: card(${card})}"></article></th:block>
+                <th:block th:each="item : ${result.remainingFindings()}" th:with="card=${@findingCards.compared(item, marketplace)}">
+                    <article th:replace="~{console/findings :: card(${card})}"></article>
+                    <button th:if="${item.pack() == 'listing-rules' and item.after() != null and card.fix != null}"
+                            type="button" class="lg-btn" data-draft-fix hidden
+                            th:attr="data-field=${card.field},data-value=${card.value},data-action=${card.fix.action},data-proposed=${card.fix.proposedValue}"
+                            th:text="#{edit.draft.apply}"></button>
+                </th:block>
             </div>
         </section>
         <p class="lg-small lg-text-muted" th:text="#{finding.legal}"></p>
     </section>
+    </div>
 </main>
 </body>
 </html>

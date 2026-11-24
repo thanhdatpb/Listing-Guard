@@ -55,12 +55,14 @@ public class ConsoleListingEditController {
         try {
             JsonNode beforeListing = mapper.readTree(before);
             JsonNode afterListing = mapper.readTree(after);
-            if (!beforeListing.isObject() || !afterListing.isObject()) {
+            if (beforeListing == null || afterListing == null || !beforeListing.isObject() || !afterListing.isObject()) {
                 model.addAttribute("error", "edit.error.object");
                 return populate(user, marketplace, before, after, model);
             }
-            ListingEditResult result = edits.check(user.clientId(), new ListingEditRequest(marketplace, beforeListing, afterListing,
+            var comparison = edits.checkConsole(user.clientId(), new ListingEditRequest(marketplace, beforeListing, afterListing,
                     null, null));
+            ListingEditResult result = comparison.result();
+            model.addAttribute("comparison", comparison);
             feedback.accountId(user).ifPresent(account -> {
                 record(user.clientId(), account, result.before());
                 record(user.clientId(), account, result.after());
@@ -71,7 +73,7 @@ public class ConsoleListingEditController {
             result.modifiedFindings().forEach(f -> targets.add(f.feedbackTarget()));
             result.remainingFindings().forEach(f -> targets.add(f.feedbackTarget()));
             feedback.populate(model, user, targets);
-        } catch (JsonProcessingException e) {
+        } catch (JsonProcessingException | IllegalArgumentException e) {
             // Do not echo or log either version: a parser message can contain the listing text.
             model.addAttribute("error", "edit.error.invalid");
         }
@@ -87,9 +89,13 @@ public class ConsoleListingEditController {
     }
 
     private void record(java.util.UUID clientId, java.util.UUID accountId, ListingEditResult.Side side) {
-        history.account(clientId, accountId, com.thanhdatpb.listingguard.api.plan.Pack.LISTING_RULES.id(),
-                side.listingRules().checkId(), side.listingRules().marketplace(), 1, null);
-        history.account(clientId, accountId, com.thanhdatpb.listingguard.api.plan.Pack.TRADEMARK_RISK.id(),
-                side.trademarkRisk().checkId(), side.trademarkRisk().marketplace(), 1, null);
+        if (side.listingRules() != null) {
+            history.account(clientId, accountId, com.thanhdatpb.listingguard.api.plan.Pack.LISTING_RULES.id(),
+                    side.listingRules().checkId(), side.listingRules().marketplace(), 1, null);
+        }
+        if (side.trademarkRisk() != null) {
+            history.account(clientId, accountId, com.thanhdatpb.listingguard.api.plan.Pack.TRADEMARK_RISK.id(),
+                    side.trademarkRisk().checkId(), side.trademarkRisk().marketplace(), 1, null);
+        }
     }
 }

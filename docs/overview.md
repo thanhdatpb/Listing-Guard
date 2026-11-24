@@ -68,6 +68,10 @@ Working end to end:
   pack và kiểm tra. Các trường nâng cao nằm sau nút mở rộng dùng được bằng bàn phím. Lỗi định dạng có liên kết
   về trường tương ứng. Tổng kết Console ưu tiên lỗi quy tắc, kết quả thiếu, rồi cảnh báo cần xem xét trước khi hiện
   trạng thái đạt. Hai panel vẫn cho biết kết quả từng pack, kể cả khi pack thiếu catalog, bị giới hạn theo gói hoặc hết quota.
+  Trong chế độ sửa, có thể đưa gợi ý xác định vào bản nháp rồi kiểm tra lại để so sánh trước và sau. Mỗi lần sửa xóa
+  kết quả cũ khỏi màn hình và đánh dấu bản nháp chưa kiểm tra. Hai pack có trạng thái riêng; pack chưa hoàn tất
+  không được dùng để kết luận đã xử lý một finding. Dữ liệu đang nhập vẫn còn trên màn hình khi yêu cầu thất bại.
+  Có thể kiểm tra phản hồi cũ, gửi lặp, lỗi mạng và timeout bằng `python scripts/test-console-edit-mode.py` với Playwright và Chromium.
   Every page is in English or Vietnamese ([ADR-028](adr/ADR-028-console-localization.md)): the default is
   `listing-guard.console.default-locale`, a reader switches with the links in the corner (a cookie), each finding gets one
   sentence saying what its rule checks, and the API's responses do not change.
