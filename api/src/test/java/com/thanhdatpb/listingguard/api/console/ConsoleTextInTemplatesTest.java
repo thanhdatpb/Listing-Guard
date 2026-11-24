@@ -105,7 +105,8 @@ class ConsoleTextInTemplatesTest {
     @Test
     void thereAreTemplatesToScan() {
         assertThat(files(TEMPLATES, ".html")).hasSizeGreaterThanOrEqualTo(10);
-        assertThat(files(SCRIPTS, ".js")).hasSize(5);
+        assertThat(files(SCRIPTS, ".js")).extracting(path -> path.getFileName().toString())
+                .contains("bulk.js", "edit-mode.js", "editor.js", "keys.js", "review-queue.js", "rewrite.js");
     }
 
     @Test

@@ -18,6 +18,7 @@
         <div>
             <h1 th:text="#{history.heading}"></h1>
             <p class="lg-page__sub" th:text="#{history.intro}"></p>
+            <a class="lg-btn" th:if="${reviewQueueEnabled}" th:href="@{/console/review-queue}" th:text="#{review.heading}"></a>
         </div>
     </div>
 

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{review.heading}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+    <script th:src="@{/console/review-queue.js(v=${assetVersion})}" defer></script>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('')}"></header>
+<main class="lg-page" id="review-queue">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <h1 th:text="#{review.heading}"></h1>
+    </div>
+    <div class="lg-banner lg-banner--error" role="alert" th:if="${reviewError != null}">
+        <p th:if="${reviewError == 400}" th:text="#{review.error.invalid}"></p>
+        <p th:if="${reviewError == 403}" th:text="#{review.readonly}"></p>
+        <p th:if="${reviewError == 404}" th:text="#{review.error.missing}"></p>
+        <p th:if="${reviewError == 409}" th:text="#{review.error.conflict}"></p>
+        <p th:if="${reviewError == 503}" th:text="#{review.error.unavailable}"></p>
+        <a th:href="@{/console/review-queue}" th:text="#{review.back}"></a>
+    </div>
+    <th:block th:if="${reviewError == null}">
+        <section class="lg-grid lg-grid--stats lg-section" th:aria-label="#{review.counts}">
+            <div class="lg-card lg-stat">
+                <p class="lg-stat__label" th:text="#{review.open}"></p>
+                <p class="lg-stat__value" id="review-open-count" th:text="${counts.open}"></p>
+            </div>
+            <div class="lg-card lg-stat">
+                <p class="lg-stat__label" th:text="#{review.resolved}"></p>
+                <p class="lg-stat__value" id="review-resolved-count" th:text="${counts.resolved}"></p>
+            </div>
+        </section>
+        <form class="lg-filters" id="review-filters" method="get" th:action="@{/console/review-queue}"
+              role="search" th:aria-label="#{review.filters}">
+            <select class="lg-select" name="marketplace" th:aria-label="#{history.marketplace}">
+                <option value="" th:text="#{history.marketplace.any}"></option>
+                <option value="ETSY" th:selected="${selectedMarketplace?.name() == 'ETSY'}" th:text="#{edit.marketplace.etsy}"></option>
+                <option value="AMAZON" th:selected="${selectedMarketplace?.name() == 'AMAZON'}" th:text="#{edit.marketplace.amazon}"></option>
+            </select>
+            <select class="lg-select" name="status" th:aria-label="#{review.status}">
+                <option value="" th:text="#{history.status.any}"></option>
+                <option th:each="status : ${statuses}" th:value="${status}" th:text="${reviewStatusLabels[status]}"
+                        th:selected="${selectedStatus == status}"></option>
+            </select>
+            <select class="lg-select" name="severity" th:aria-label="#{review.severity}">
+                <option value="" th:text="#{review.severity.any}"></option>
+                <option th:each="severity : ${severities}" th:value="${severity}" th:text="${severity}"
+                        th:selected="${selectedSeverity == severity}"></option>
+            </select>
+            <select class="lg-select" name="age" th:aria-label="#{review.age}">
+                <option value="ALL" th:selected="${selectedAge == 'ALL'}" th:text="#{history.period.all}"></option>
+                <option value="WEEK" th:selected="${selectedAge == 'WEEK'}" th:text="#{review.age.week}"></option>
+                <option value="MONTH" th:selected="${selectedAge == 'MONTH'}" th:text="#{review.age.month}"></option>
+            </select>
+            <button class="lg-btn lg-btn--primary" type="submit" th:text="#{review.filter}"></button>
+        </form>
+        <p id="review-loading" role="status" class="lg-text-muted" th:attr="data-i18n-loading=#{js.review.loading}"></p>
+        <p class="lg-card lg-section" th:if="${page.items.isEmpty()}" th:text="#{review.empty}"></p>
+        <div class="lg-table-wrap lg-section" th:unless="${page.items.isEmpty()}">
+            <table class="lg-table lg-table--scroll">
+                <caption class="lg-sr-only" th:text="#{review.heading}"></caption>
+                <thead><tr>
+                    <th scope="col" th:text="#{review.case}"></th>
+                    <th scope="col" th:text="#{history.marketplace}"></th>
+                    <th scope="col" th:text="#{review.severity}"></th>
+                    <th scope="col" th:text="#{review.status}"></th>
+                    <th scope="col" th:text="#{review.created}"></th>
+                </tr></thead>
+                <tbody><tr th:each="item : ${page.items}" th:attr="data-case-id=${item.id}">
+                    <td><a th:href="@{/console/review-queue/{id}(id=${item.id})}" th:text="${item.id}"></a></td>
+                    <td th:text="${item.marketplace}"></td>
+                    <td th:text="${item.severity}"></td>
+                    <td th:text="${reviewStatusLabels[item.status]}"></td>
+                    <td><time th:datetime="${item.createdAt}" th:text="${item.createdAt}"></time></td>
+                </tr></tbody>
+            </table>
+        </div>
+        <a class="lg-btn" id="review-next" th:if="${page.nextCursor != null}"
+           th:href="@{/console/review-queue(status=${selectedStatus},marketplace=${selectedMarketplace},severity=${selectedSeverity},age=${selectedAge},cutoff=${cutoff},cursor=${page.nextCursor})}"
+           th:text="#{review.next}"></a>
+    </th:block>
+</main>
+</body>
+</html>
