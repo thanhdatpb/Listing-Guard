@@ -1,8 +1,11 @@
 package com.thanhdatpb.listingguard.api.policy;
 
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingProvider;
+import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
 import com.thanhdatpb.listingguard.rag.retrieval.PolicyRetriever;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.Locale;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -25,8 +28,11 @@ public class PgVectorPolicyRetriever implements PolicyRetriever {
             FROM policy_chunk c
             JOIN policy_document d ON d.id = c.document_id
             WHERE c.marketplace_code = ?
-            ORDER BY c.embedding <=> ?::vector
-            LIMIT ?
+            """;
+    private static final String SORT = " ORDER BY c.embedding <=> ?::vector LIMIT ?";
+    private static final String BOUNDED = """
+             AND c.document_id = ANY (?::bigint[]) AND octet_length(c.content) <= 48000
+             AND octet_length(c.url) <= 8192 AND octet_length(c.section_path) <= 8192
             """;
 
     private final JdbcTemplate jdbc;
@@ -61,14 +67,68 @@ public class PgVectorPolicyRetriever implements PolicyRetriever {
         String vector = PolicyRepository.vectorLiteral(embeddings.embed(query, EmbeddingProvider.Kind.QUERY));
 
         return transactions.execute(status -> {
-            if (iterativeScanSupported()) {
-                jdbc.execute("SET LOCAL hnsw.iterative_scan = strict_order");
-            }
-            return jdbc.query(SEARCH_SQL, (rs, row) -> new RetrievedChunk(
-                    rs.getLong("id"), rs.getDouble("score"), rs.getString("marketplace_code"), rs.getString("title"),
-                    rs.getString("source_file"), rs.getString("section_path"), rs.getString("url"),
-                    rs.getString("version"), rs.getString("content")), vector, code, vector, topK);
+            configureIterativeScan();
+            return rank(code, vector, topK, null);
         });
+    }
+
+    @Override
+    public List<List<RetrievedChunk>> searchAll(String marketplace, List<String> queries, int topK) {
+        return searchAll(marketplace, queries, topK, null);
+    }
+
+    /** Analyzer-only source constraint, applied before ranking and before materializing result text. */
+    List<List<RetrievedChunk>> searchAll(String marketplace, List<String> queries, int topK, List<Long> allowedDocuments) {
+        if (marketplace == null || marketplace.isBlank() || topK < 1 || topK > MAX_TOP_K
+                || queries.isEmpty() || queries.size() > 6
+                || queries.stream().anyMatch(query -> query == null || query.length() > 6_000 || query.isBlank())
+                || (allowedDocuments != null && (allowedDocuments.isEmpty() || allowedDocuments.size() > 16))) {
+            throw new IllegalArgumentException("Invalid policy retrieval batch");
+        }
+        String code = marketplace.trim().toUpperCase(Locale.ROOT);
+        corpusGuard.verify();
+        List<float[]> vectors = embeddings.embed(queries, EmbeddingProvider.Kind.QUERY);
+        if (vectors.size() != queries.size() || vectors.stream().anyMatch(v -> !validVector(v))) {
+            throw new EmbeddingException("Invalid query embedding batch");
+        }
+        String ids = allowedDocuments == null ? null
+                : allowedDocuments.stream().map(String::valueOf).collect(Collectors.joining(",", "{", "}"));
+        return transactions.execute(status -> {
+            configureIterativeScan();
+            List<List<RetrievedChunk>> results = new ArrayList<>(vectors.size());
+            for (float[] vector : vectors) {
+                results.add(rank(code, PolicyRepository.vectorLiteral(vector), topK, ids));
+            }
+            return List.copyOf(results);
+        });
+    }
+
+    private static boolean validVector(float[] vector) {
+        if (vector == null || vector.length != 768) {
+            return false;
+        }
+        for (float value : vector) {
+            if (!Float.isFinite(value)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private List<RetrievedChunk> rank(String marketplace, String vector, int topK, String allowedDocuments) {
+        String scope = allowedDocuments == null ? "" : BOUNDED;
+        Object[] params = allowedDocuments == null ? new Object[]{vector, marketplace, vector, topK}
+                : new Object[]{vector, marketplace, allowedDocuments, vector, topK};
+        return jdbc.query(SEARCH_SQL + scope + SORT, (rs, row) -> new RetrievedChunk(
+                rs.getLong("id"), rs.getDouble("score"), rs.getString("marketplace_code"), rs.getString("title"),
+                rs.getString("source_file"), rs.getString("section_path"), rs.getString("url"),
+                rs.getString("version"), rs.getString("content")), params);
+    }
+
+    private void configureIterativeScan() {
+        if (iterativeScanSupported()) {
+            jdbc.execute("SET LOCAL hnsw.iterative_scan = strict_order");
+        }
     }
 
     /** Iterative index scans exist from pgvector 0.8.0. */

@@ -1,0 +1,42 @@
+version: etsy-policy-2026-11
+marketplace: ETSY
+sourceLocale: en
+topK: 3
+maxChunks: 12
+contextChars: 12000
+listingChars: 6000
+descriptionChars: 4000
+maxSnapshotAgeDays: 90
+minQuoteChars: 20
+maxQuoteChars: 400
+topics: [production_partner, ai_disclosure, mockup_images, prohibited_item, ip_infringement, mature_content, other]
+probes:
+  en:
+    - production partner disclosure and eligibility of items made or designed by the seller
+    - disclosure of AI-generated content or designs
+    - listing photography stock images and mockups
+    - prohibited items and intellectual property in listing titles and tags
+  vi:
+    - khai báo đối tác sản xuất và điều kiện đối với sản phẩm do người bán làm hoặc thiết kế
+    - khai báo nội dung hoặc thiết kế do AI tạo
+    - ảnh sản phẩm ảnh có sẵn và ảnh mô phỏng
+    - hàng cấm và sở hữu trí tuệ trong tiêu đề và thẻ
+sources:
+  seller-policy.html:
+    url: https://www.etsy.com/legal/sellers/
+    version: "2026-10-05"
+  prohibited-items-policy.html:
+    url: https://www.etsy.com/legal/prohibited/
+    version: "2026-10-06"
+  intellectual-property-policy.html:
+    url: https://www.etsy.com/legal/ip/
+    version: "2023-06-15"
+  creativity-standards.html:
+    url: https://www.etsy.com/legal/creativity/
+    version: "2025-06-10"
+  listing-image-requirements.html:
+    url: https://www.etsy.com/legal/policy/listing-image-requirements/253962679005
+    version: "2026-10-22"
+  listing-mature-content.html:
+    url: https://www.etsy.com/legal/policy/listing-mature-content-correctly/242665462117
+    version: "2024-07-30"

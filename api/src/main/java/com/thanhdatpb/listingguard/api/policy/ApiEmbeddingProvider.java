@@ -8,6 +8,9 @@ import com.thanhdatpb.listingguard.rag.embedding.EmbeddingException;
 import com.thanhdatpb.listingguard.rag.embedding.EmbeddingProvider;
 import java.io.IOException;
 import java.net.http.HttpClient;
+import java.net.http.HttpTimeoutException;
+import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -120,7 +123,7 @@ public final class ApiEmbeddingProvider implements EmbeddingProvider {
             request.putObject("content").putArray("parts").addObject().put("text", prefix + text);
             request.putObject("embedContentConfig").put("outputDimensionality", dimensions);
         }
-        String payload = body.toString();
+        byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);
 
         for (int attempt = 0; ; attempt++) {
             try {
@@ -129,7 +132,9 @@ public final class ApiEmbeddingProvider implements EmbeddingProvider {
                 byte[] response = client.post()
                         .uri("/models/{model}:batchEmbedContents", model)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .body(payload)
+                        // A streaming callback keeps query text out of RestClient converter DEBUG logs.
+                        .contentLength(payload.length)
+                        .body(output -> output.write(payload))
                         .retrieve()
                         .body(byte[].class);
                 return parse(readJson(response), batch.size());
@@ -143,6 +148,11 @@ public final class ApiEmbeddingProvider implements EmbeddingProvider {
                 throw new EmbeddingException(scrub("The embedding API answered HTTP " + status + " for model " + model + ": "
                         + excerpt(e.getResponseBodyAsString())));
             } catch (ResourceAccessException e) {
+                for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+                    if (cause instanceof HttpTimeoutException || cause instanceof SocketTimeoutException) {
+                        throw new EmbeddingException("Embedding request timed out", new HttpTimeoutException("Timeout"));
+                    }
+                }
                 throw new EmbeddingException(scrub("Cannot reach the embedding API at " + baseUrl + ": " + e.getMessage()));
             } catch (RestClientException e) {
                 throw new EmbeddingException(scrub("The embedding API returned a response that cannot be read: " + e.getMessage()));
