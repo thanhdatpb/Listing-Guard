@@ -22,6 +22,18 @@ listing-guard:
       #     sunset-at: 2027-07-01T00:00:00Z         # optional
       #     link: https://github.com/thanhdatpb/Listing-Guard/blob/main/docs/integration-guide.md#compatibility-and-versions
       endpoints: []
+  review-cases:
+    enabled: ${LISTING_GUARD_REVIEW_CASES_ENABLED:false}
+  verified-cases:
+    enabled: ${LISTING_GUARD_VERIFIED_CASES_ENABLED:false}
+  analyzer:
+    enabled: ${LISTING_GUARD_ANALYZER_ENABLED:false}
+    retention-days: ${LISTING_GUARD_ANALYZER_RETENTION_DAYS:0}
+    daily-attempt-limit: ${LISTING_GUARD_ANALYZER_DAILY_ATTEMPT_LIMIT:100}
+    llm:
+      base-url: ${LISTING_GUARD_ANALYZER_LLM_BASE_URL:}
+      model: ${LISTING_GUARD_ANALYZER_LLM_MODEL:}
+      json-mode: ${LISTING_GUARD_ANALYZER_LLM_JSON_MODE:true}
   console:
     enabled: ${LISTING_GUARD_CONSOLE_ENABLED:false}
     base-url: ${LISTING_GUARD_CONSOLE_BASE_URL:}

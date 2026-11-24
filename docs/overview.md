@@ -46,7 +46,7 @@ Working end to end:
   (`listing-guard.plans.enabled=false`): the operator sets a client's plan with `admin plan set <client> <plan>`, a new
   stored result counts one unit per endpoint (a cached one costs nothing, so a full check of one listing is two units, three
   with a variation family), and
-  over the limit the API answers `429 quota-exceeded` (a pack outside the plan: `403 plan-not-allowed`). The packs
+  over the limit the API answers `429 quota-exceeded` (a pack outside the plan: `403 plan-not-allowed`).
   The opt-in Policy Checks API enforces `policy-analyzer`. The `sheet-connector` pack is reserved. There is no billing or payment;
   see [deployment](deployment.md#client-plans-and-the-monthly-quota-adr-013).
 - Fix suggestions and a publish readiness score ([ADR-014](adr/ADR-014-listing-workspace.md)), **off by default**
@@ -112,7 +112,14 @@ Before you rely on it:
   See [Policy retrieval benchmark](implementation/policy-retrieval-benchmark.md).
 
 What is not built yet is listed in the [Roadmap](#roadmap). Changes between versions are in
-[docs/releases/v0.9.0.md](releases/v0.9.0.md).
+[docs/releases/v0.10.0.md](releases/v0.10.0.md).
+
+### Experimental review and policy paths
+
+- [ReviewCase and Review Queue](review-cases.md) are off by default. Separate API key and Console grants control writes.
+- [Verified cases](implementation/verified-case-intelligence.md) are off by default and require the Console reviewer workflow.
+- [Policy Checks and AI Workbench](implementation/policy-ai-workbench.md) are off by default. Etsy is supported with a matching corpus, approved retention and configured providers. Real-provider evaluation is pending.
+- [Policy Changes](policy-monitor.md) and [POD Readiness](implementation/pod-readiness.md) are available when the Console is enabled. The shipped POD profiles have unverified print limits.
 
 ## Architecture
 
@@ -385,7 +392,7 @@ Implemented capabilities are summarized in [Status](#status). The next confirmed
 - [ADR-008: Image compliance checker](adr/ADR-008-image-compliance-checker.md) (Proposed; the core, the endpoint, the tables and the plan pack are implemented, off by default; the bounded decode service, the upload staging and every marketplace threshold remain)
 - [ADR-009: Trademark risk scanner](adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3, A2b, A2c, A2d (the `uspto-sync` job and the catalog activation log) and A5 (product classes, source links, generic words) are implemented; the USPTO converter and the ODP download are unverified against real data)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
-- [ADR-011: Policy-grounded analyzer](adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 through 4 are implemented)
+- [ADR-011: Policy-grounded analyzer](adr/ADR-011-policy-grounded-analyzer.md) (Proposed; steps 1–5 are implemented, full analyzer evaluation and real-provider measurements pending)
 - [ADR-012: Embeddings default to an external API](adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)
 - [ADR-013: Client plans and monthly quota](adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
 - [ADR-015: Variation checks](adr/ADR-015-variation-checks.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; it ends with the questions the maintainer has to decide)
@@ -397,3 +404,4 @@ Implemented capabilities are summarized in [Status](#status). The next confirmed
 - [ADR-022: API contract and compatibility policy](adr/ADR-022-api-contract-and-compatibility.md) (Proposed; implemented: what is additive and what is breaking inside `/api/v1`, the compatibility check against the latest release, the reviewed exception file, deprecation with `Deprecation` and `Sunset`, `X-Listing-Guard-Version`, and the contract attached to each release; it ends with the questions the maintainer has to decide)
 - [ADR-023: Java client SDK](adr/ADR-023-java-client-sdk.md) (Proposed; implemented: the `client` module, the MCP server on top of it, a contract test against the OpenAPI document and a release workflow to GitHub Packages; its tolerant reader and version headers follow ADR-022; it ends with the questions the maintainer has to decide)
 - [ADR-014: Listing Workspace](adr/ADR-014-listing-workspace.md) (Accepted; part A, the API and batch integration, and the console with its Check listing editor and API keys page are implemented, all off by default; saved listings and history are not designed yet)
+- [ADR-045: LG-P1–P4 and Java release runtime](adr/ADR-045-release-workflows-and-runtime.md) (Proposed, records the implemented boundaries and the Java 21 choice).

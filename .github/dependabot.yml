@@ -32,6 +32,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Stay on the selected LTS major. A future LTS upgrade requires a dedicated PR.
+      - dependency-name: "eclipse-temurin"
+        update-types:
+          - version-update:semver-major
     groups:
       docker-patch-minor:
         patterns:

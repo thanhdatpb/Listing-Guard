@@ -5,8 +5,8 @@ public ingress; no host port 80, 443 or 8080 is opened. The Compose API port rem
 health checks. PostgreSQL and the tunnel have no published ports.
 
 New releases publish `linux/amd64` and `linux/arm64` images. Images tagged through `v0.5.0` are amd64-only; do not
-use one of those tags on the A1 VM. **The release to deploy is `0.9.0`** ([release notes](releases/v0.9.0.md); v0.7.0 and v0.8.0
-were never tagged). Pull by that tag and never by `latest`: `LISTING_GUARD_VERSION=0.9.0` in `.env`. Its `linux/arm64` image
+use one of those tags on the A1 VM. **The release to deploy is `0.10.0`** ([release notes](releases/v0.10.0.md); v0.7.0 through v0.9.0
+were never tagged). Wait until both tag workflows succeed and the GHCR manifest lists `linux/arm64`. Pull by that tag and never by `latest`: `LISTING_GUARD_VERSION=0.10.0` in `.env`. Its `linux/arm64` image
 has not been run on ARM hardware yet, so the first start on the A1 is also its first test: do the smoke test of
 [deploy-readiness.md](deploy-readiness.md#5-smoke-test-after-deploy) right after it. The `docs/deployment.md` runbook covers migration details and the general
 production compose setup. [docs/deploy-readiness.md](deploy-readiness.md) is the pre-deploy review: what is on or off by
@@ -85,7 +85,7 @@ cp deploy/env.prod.example .env
 chmod 600 .env
 ```
 
-Set `LISTING_GUARD_VERSION` to a published version **without** its leading `v` (`0.9.0`; a fixed tag, never `latest`, so that a
+Set `LISTING_GUARD_VERSION` to a published version **without** its leading `v` (`0.10.0`; a fixed tag, never `latest`, so that a
 restart or `pull` can never change the version under you), strong unique database credentials,
 and an unused loopback `API_PORT`. The sample resource settings are sized for 2 OCPUs / 12 GB: API memory 2 GB with
 `-XX:MaxRAMPercentage=75.0`, PostgreSQL memory 4 GB, 2 GB shared buffers, 16 MB `work_mem`, and 50 connections.
@@ -413,12 +413,12 @@ The Compose files selected by `COMPOSE_FILE` remain in effect, including the Tun
 Flyway applies migrations automatically; read the release notes and the migration guidance in
 [`deployment.md`](deployment.md) before an upgrade with migration changes.
 
-### Upgrade from an older release to 0.9.0
+### Upgrade from 0.6.0 to 0.10.0
 
-Applies to a host that already runs `0.6.0` (the only earlier tag that matters; there is no `0.7.0` or `0.8.0` image). A new host
-skips it: its empty database runs all 42 migrations at the first start.
+Applies to a host that already runs `0.6.0` (the only earlier tag that matters; there is no `0.7.0`, `0.8.0` or `0.9.0` image). A new host
+skips it: its empty database runs all 47 migrations at the first start.
 
-1. **Back up first, and keep the dump off the VM.** Migrations V28 to V42 run at the first start of the new API and do not undo
+1. **Back up first, and keep the dump off the VM.** Migrations V28 to V47 run at the first start of the new API and do not undo
    themselves. Take the dump, check it is readable, and copy it to R2 or another machine:
 
    ```bash
@@ -427,20 +427,19 @@ skips it: its empty database runs all 42 migrations at the first start.
    docker compose --profile prod exec postgres sh -c 'pg_restore --list /dev/stdin' < backups/<the new dump>.dump | head -5
    ```
 
-2. Update the versioned files of the repository to the `v0.9.0` tag (the Compose files and `deploy/`; never overwrite `.env`,
+2. Update the versioned files of the repository to the `v0.10.0` tag (the Compose files and `deploy/`; never overwrite `.env`,
    `catalogs/raw/`, `backups/` or other runtime data), compare `deploy/env.prod.example` with your `.env` for the variables
-   listed in the [release notes](releases/v0.9.0.md#environment-variables) (every default is off), and set
-   `LISTING_GUARD_VERSION=0.9.0`.
+   listed in the [release notes](releases/v0.10.0.md#environment-variables), and set
+   `LISTING_GUARD_VERSION=0.10.0`.
 3. `docker compose --profile prod pull api`, then `docker compose --profile prod up -d --no-deps api`. Watch the log: Flyway
-   applies V28 to V42 and the API reports `Started`. `curl --fail http://127.0.0.1:<API_PORT>/health`, and
-   `curl -sI -H "X-API-Key: $KEY" http://127.0.0.1:<API_PORT>/api/v1/usage | grep -i x-listing-guard-version` must say `0.9.0`.
+   applies V28 to V47 and the API reports `Started`. `curl --fail http://127.0.0.1:<API_PORT>/health`, and
+   `curl -sI -H "X-API-Key: $KEY" http://127.0.0.1:<API_PORT>/api/v1/usage | grep -i x-listing-guard-version` must say `0.10.0`.
 4. If you use the console, sign in once. V38 gave each account a role: the only account of a `web-...` client is an `ADMIN`, any other
    is a `MEMBER` (promote one with `docker compose --profile prod --profile admin run --rm admin account role <email> ADMIN`).
 
-**Rolling back to `0.6.0`.** The migrations of 0.9.0 only add tables, columns and indexes, and loosen three constraints (V29, V35,
-V38). In a rehearsal on 2026-11-18 the published `0.6.0` image **started on the migrated database** and served its stored checks
-(also with plans on), so an in-place return is possible, **but that was one try on a small database and a few endpoints**
-(not the console, not a catalog): the safe path is the backup. **`deploy/oracle/restore.sh` does not work over an upgraded
+**Feature defaults.** ReviewCase, verified cases and Policy Analyzer start disabled. Policy Analyzer also needs approved retention, a matching corpus, and provider configuration. Policy Changes and POD become visible when the optional Console is enabled. POD ships with unverified print limits.
+
+**Rolling back to `0.6.0`.** Restore the pre-upgrade backup. The 2026-11-18 rehearsal only checked the older V42 schema. Rollback after V47 has not been rehearsed. **`deploy/oracle/restore.sh` does not work over an upgraded
 database**: it restores with `--clean`, and `pg_restore` stops with `cannot drop constraint trademark_catalog_version_pkey ...
 other objects depend on it`, leaving the API stopped. Restore into an **empty database** instead:
 
@@ -458,7 +457,7 @@ curl --fail http://127.0.0.1:<API_PORT>/health
 ```
 
 This **replaces the database with the dump** (that is its point): everything stored after the backup is gone, the watchlist, history,
-re-audit runs and feedback of 0.9.0 included. Do it only with the dump in hand, and never on the only copy of the data. To go back
+re-audit runs, feedback and review/policy records included. Do it only with the dump in hand, and never on the only copy of the data. To go back
 **only** the trademark catalog, see
 [8b](#8b-a-trademark-catalog-from-the-hugging-face-rebuild-convert-elsewhere-copy-import-activate); it needs no database restore.
 
@@ -681,7 +680,7 @@ as common (`common_word` is never set, `generic_words` is empty); see
 **1. On the other machine** (a laptop with Docker, or Java 21 and Maven; no database; 3 GB free memory; about 1 GB of disk):
 
 ```bash
-git clone --branch v0.9.0 https://github.com/thanhdatpb/Listing-Guard.git && cd Listing-Guard
+git clone --branch v0.10.0 https://github.com/thanhdatpb/Listing-Guard.git && cd Listing-Guard
 REV=50e430b4c021614e1302bddb45a4afcdcb7823f2          # the dataset commit read on 2026-11-16; pin the one you read
 B=https://huggingface.co/datasets/illeatmyhat/uspto-trademarks/resolve/$REV
 for f in profile/build_lineage.json lookups/status_codes.csv lookups/_sources.json \

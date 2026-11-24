@@ -1,7 +1,9 @@
 # ADR-044 — Hồ sơ và quyết định review
 
 - Trạng thái: Proposed
-- Phạm vi: đề xuất dữ liệu và hợp đồng cho LG-05, chờ maintainer quyết định quyền và thời hạn lưu.
+- Phạm vi: đề xuất dữ liệu và hợp đồng cho LG-05.
+- Implementation v0.10.0: API thử nghiệm và Review Queue đã merge ở #128–#129. Quyền ghi cấp riêng cho API key
+  hoặc tài khoản Console theo [hướng dẫn](../review-cases.md). Chính sách retention cuối cùng vẫn chờ maintainer.
 - Liên quan [ADR-007](ADR-007-multi-client-model.md), [ADR-022](ADR-022-api-contract-and-compatibility.md), [ADR-031](ADR-031-client-trademark-watchlist.md), [ADR-034](ADR-034-finding-feedback-and-value-dashboard.md) và [ADR-035](ADR-035-periodic-reaudit.md).
 
 ## Ranh giới nghiệp vụ
