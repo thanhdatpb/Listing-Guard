@@ -168,8 +168,11 @@ public class PolicyIngestService {
 
     /** Anything that changes chunk boundaries or vectors changes this, so stored documents get redone. */
     String pipelineVersion() {
-        PolicyProperties.Chunking chunking = properties.chunking();
-        return PolicyChunker.VERSION + "|" + chunking.maxChars() + "/" + chunking.minChars() + MODEL_SEPARATOR + embeddings.modelId();
+        return pipelineVersion(properties.chunking(), embeddings.modelId());
+    }
+
+    static String pipelineVersion(PolicyProperties.Chunking chunking, String modelId) {
+        return PolicyChunker.VERSION + "|" + chunking.maxChars() + "/" + chunking.minChars() + MODEL_SEPARATOR + modelId;
     }
 
     /** True when a stored {@code pipeline_version} was built with this embedding model (it always ends with it). */

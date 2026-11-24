@@ -3,6 +3,8 @@ package com.thanhdatpb.listingguard.api.policy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
@@ -103,6 +106,24 @@ class ApiEmbeddingProviderTest {
     }
 
     // ---- batching and request shape --------------------------------------------------------------------------
+
+    @Test
+    void queryBatchDoesNotExposeListingTextInRestClientTrace(CapturedOutput output) {
+        String marker = "synthetic-private-query";
+        Logger logger = (Logger) LoggerFactory.getLogger("org.springframework.web.client");
+        Level previous = logger.getLevel();
+        logger.setLevel(Level.TRACE);
+        try {
+            var provider = new ApiEmbeddingProvider(baseUrl(), MODEL, DIMENSIONS, KEY, 32,
+                    Duration.ofSeconds(2), Duration.ZERO);
+            provider.embed(List.of(marker, "public topic"), Kind.QUERY);
+            assertThat(calls).hasSize(1);
+            assertThat(calls.getFirst().texts()).hasSize(2).first().asString().contains(marker);
+            assertThat(output.getAll()).doesNotContain(marker, KEY);
+        } finally {
+            logger.setLevel(previous);
+        }
+    }
 
     @Test
     void sendsTextsInBatchesOfTheConfiguredSizeAndReturnsOneVectorPerTextInOrder() {

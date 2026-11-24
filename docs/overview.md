@@ -100,7 +100,9 @@ Before you rely on it:
   `secondary` or `unverified`) in its ruleset; see [Rulesets](rulesets.md).
 - **Policy retrieval has a synthetic offline benchmark.** The benchmark compares vector and hybrid retrieval with
   labeled English and Vietnamese queries. Evaluation on the real corpus still requires the permitted source snapshots.
-  The optional policy LLM adapter is available behind configuration. The analyzer endpoint is still pending.
+  The optional policy LLM adapter is available behind configuration. The internal retrieval service uses a pinned Etsy
+  analyzer profile and bounds the query batch and the returned evidence. The analyzer endpoint is still pending.
+  See [Analyzer profile and bounded retrieval](implementation/policy-analyzer-profile-retrieval.md).
   See [Policy LLM adapter](implementation/policy-llm-provider.md).
   See [Policy retrieval benchmark](implementation/policy-retrieval-benchmark.md).
 
@@ -351,7 +353,7 @@ Implemented capabilities are summarized in [Status](#status). The next confirmed
 
 1. Run `uspto-sync`/conversion with real USPTO data and complete the trademark evaluation; both source conversion and matching remain unverified on real data ([ADR-009](adr/ADR-009-trademark-risk-scanner.md)).
 2. Before enabling image checks for untrusted callers, add bounded decoding and private upload staging, then review and publish marketplace thresholds in a new ruleset ([ADR-008](adr/ADR-008-image-compliance-checker.md)).
-3. Measure retrieval on the permitted source corpus, then implement the analysis profile, retrieval assembly, endpoint and analyzer evaluation in order ([ADR-011](adr/ADR-011-policy-grounded-analyzer.md)).
+3. Measure retrieval on the permitted source corpus, then integrate the analyzer endpoint and evaluation in order ([ADR-011](adr/ADR-011-policy-grounded-analyzer.md)).
 4. Add only Amazon product-type overrides whose limits and sources have been verified ([ADR-006](adr/ADR-006-category-rulesets-and-amazon-severity.md)).
 5. If wanted, follow up on variation source verification, wider product-type/theme coverage and evaluation ([ADR-015](adr/ADR-015-variation-checks.md)); replace placeholder print profiles with a real workshop profile ([ADR-016](adr/ADR-016-personalization-screening.md)).
 6. Saved listings/history remain undesigned; billing, plan-based key gating and a Plan & usage page are deferred ([ADR-014](adr/ADR-014-listing-workspace.md)).
@@ -378,7 +380,7 @@ Implemented capabilities are summarized in [Status](#status). The next confirmed
 - [ADR-008: Image compliance checker](adr/ADR-008-image-compliance-checker.md) (Proposed; the core, the endpoint, the tables and the plan pack are implemented, off by default; the bounded decode service, the upload staging and every marketplace threshold remain)
 - [ADR-009: Trademark risk scanner](adr/ADR-009-trademark-risk-scanner.md) (Proposed; PR A1 to A3, A2b, A2c, A2d (the `uspto-sync` job and the catalog activation log) and A5 (product classes, source links, generic words) are implemented; the USPTO converter and the ODP download are unverified against real data)
 - [ADR-010: Pack identity, ruleset registry and composite analysis versions](adr/ADR-010-pack-identity-and-analysis-version.md) (Proposed; PR 0a and 0b are implemented)
-- [ADR-011: Policy-grounded analyzer](adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 through 3 are implemented)
+- [ADR-011: Policy-grounded analyzer](adr/ADR-011-policy-grounded-analyzer.md) (Proposed; PR 1 through 4 are implemented)
 - [ADR-012: Embeddings default to an external API](adr/ADR-012-api-embedding-provider.md) (Accepted; supersedes ADR-004's default provider)
 - [ADR-013: Client plans and monthly quota](adr/ADR-013-client-plans-and-monthly-quota.md) (Proposed; implemented, off by default)
 - [ADR-015: Variation checks](adr/ADR-015-variation-checks.md) (Proposed; implemented: the endpoint, the tables, the plan pack and the ruleset; it ends with the questions the maintainer has to decide)

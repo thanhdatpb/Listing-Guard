@@ -15,6 +15,11 @@ public interface PolicyRetriever {
      */
     List<RetrievedChunk> search(String marketplace, String query, int topK);
 
+    /** Returns one ranked result list per query, preserving query order. */
+    default List<List<RetrievedChunk>> searchAll(String marketplace, List<String> queries, int topK) {
+        return queries.stream().map(query -> search(marketplace, query, topK)).toList();
+    }
+
     /**
      * @param score       cosine similarity, higher is closer (1.0 identical direction)
      * @param document    document title
