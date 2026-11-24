@@ -45,6 +45,34 @@ class PolicyDiffEngineTest {
     }
 
     @Test
+    void includesACategoryOnlyWhenItsOwnSourceMatchesTheChangedSection() throws IOException {
+        writePage("2026-11-10", "sample paragraph", null);
+        writeManifest("2026-11-12", "2026-11-10");
+        String categories = """
+                marketplace: ETSY
+                version: etsy-test
+                rules:
+                  category_rule:
+                    categories:
+                      SAMPLE:
+                        source:
+                          status: secondary
+                          urls: [https://www.etsy.com/legal/sellers/]
+                          section: Seller Policy > Changed
+                      OTHER:
+                        source:
+                          status: secondary
+                          urls: [https://www.etsy.com/legal/sellers/]
+                          section: Unchanged unrelated section
+                """;
+        var result = engine.run(manifest, temp.resolve("raw"), List.of(new PolicyDiffEngine.RuleSource("test", categories)), 90, true);
+        assertThat(result.rulesToReview()).singleElement().satisfies(item -> {
+            assertThat(item.ruleId()).isEqualTo("category_rule");
+            assertThat(item.category()).isEqualTo("SAMPLE");
+        });
+    }
+
+    @Test
     void reportsAddedRemovedChangedSectionsVersionMismatchAndRuleMapping() throws IOException {
         writePage("2026-11-10", "old paragraph", "section to remove");
         writeManifest("2026-01-01", "2026-11-09");

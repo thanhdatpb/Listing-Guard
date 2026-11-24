@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{impact.heading}"></title>
+    <script th:src="@{/console/policy-changes.js}" defer></script>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('reaudit')}"></header>
+<main class="lg-page" id="main" tabindex="-1">
+    <div class="lg-page__head"><h1 th:text="#{impact.heading}"></h1></div>
+    <p th:text="#{impact.notice}"></p>
+    <p th:if="${unavailable}" role="alert" class="lg-banner lg-banner--error" th:text="#{impact.error}"></p>
+    <section th:if="${reports != null}">
+        <form id="impact-filters" class="lg-filters" method="get" th:action="@{/console/policy-changes}">
+            <select class="lg-select" name="marketplace" th:aria-label="#{history.marketplace}">
+                <option value="" th:text="#{history.marketplace.any}"></option>
+                <option th:each="market : ${markets}" th:value="${market}" th:text="${market}"
+                        th:selected="${market == selectedMarket}"></option>
+            </select>
+            <select class="lg-select" name="status" th:aria-label="#{review.status}">
+                <option value="" th:text="#{history.status.any}"></option>
+                <option th:each="entry : ${statuses}" th:value="${entry}" th:text="${impactStatuses[entry]}"
+                        th:selected="${entry == selectedStatus}"></option>
+            </select>
+            <label th:text="#{impact.from}" for="impact-from"></label>
+            <input type="date" id="impact-from" name="from" class="lg-input" th:value="${from}">
+            <label th:text="#{impact.through}" for="impact-through"></label>
+            <input type="date" id="impact-through" name="through" class="lg-input" th:value="${through}">
+            <button type="submit" class="lg-btn lg-btn--primary" th:text="#{review.filter}"></button>
+        </form>
+        <p id="impact-loading" role="status" th:attr="data-i18n-loading=#{js.impact.loading}"></p>
+        <p th:if="${reports.isEmpty()}" th:text="#{impact.empty}"></p>
+        <ul class="lg-stack">
+            <li th:each="entry : ${reports}" class="lg-card">
+                <a th:href="@{/console/policy-changes/{id}(id=${entry.id})}" th:text="${entry.evidence.title}"></a>
+                <span class="lg-pill" th:text="${entry.marketplace}"></span>
+                <span class="lg-pill" th:text="${impactStatuses[entry.status]}"></span>
+                <time th:if="${entry.effectiveDate != null}" th:text="${entry.effectiveDate}"></time>
+            </li>
+        </ul>
+    </section>
+    <section class="lg-card lg-section" th:if="${report != null}" th:with="evidence=${report.evidence}">
+        <a th:href="@{/console/policy-changes}" th:text="#{impact.back}"></a>
+        <h2 th:text="${evidence.title}"></h2>
+        <span class="lg-pill" th:text="${report.marketplace}"></span>
+        <span class="lg-pill" th:text="${impactStatuses[report.status]}"></span>
+        <p th:if="${report.sourceStatus.name() == 'NEEDS_REVIEW'}" th:text="#{impact.pending}"></p>
+        <dl>
+            <dt th:text="#{impact.old}"></dt><dd th:text="${evidence.oldVersion}"></dd>
+            <dt th:text="#{impact.new}"></dt><dd th:text="${evidence.newVersion}"></dd>
+            <dt th:text="#{impact.effective}"></dt>
+            <dd th:if="${report.effectiveDate != null}" th:text="${report.effectiveDate}"></dd>
+            <dd th:if="${report.effectiveDate == null}" th:text="#{impact.unknown}"></dd>
+            <dt th:text="#{review.source}"></dt>
+            <dd>
+                <a th:if="${report.sourceStatus.name() == 'PROPOSED'}" th:href="${evidence.url}" th:text="${evidence.url}"></a>
+                <span th:unless="${report.sourceStatus.name() == 'PROPOSED'}" th:text="${evidence.url}"></span>
+            </dd>
+            <dt th:text="#{impact.hash}"></dt><dd class="lg-wrap" th:text="${evidence.oldHash}"></dd><dd class="lg-wrap" th:text="${evidence.newHash}"></dd>
+        </dl>
+        <h3 th:text="#{impact.sections}"></h3>
+        <p th:if="${evidence.sections.isEmpty()}" th:text="#{impact.no.sections}"></p>
+        <ul>
+            <li th:each="section : ${evidence.sections}">
+                <span th:text="${impactSectionTypes[section.type]}"></span>
+                <p th:if="${section.oldPath != null}" th:text="${section.oldPath}"></p>
+                <p th:if="${section.newPath != null and section.newPath != section.oldPath}" th:text="${section.newPath}"></p>
+            </li>
+        </ul>
+        <h3 th:text="#{impact.rules}"></h3>
+        <p th:if="${evidence.rules.isEmpty()}" th:text="#{impact.no.rules}"></p>
+        <ul>
+            <li th:each="rule : ${evidence.rules}">
+                <span th:text="${rule.ruleId}"></span>
+                <span th:text="${rule.rulesetVersion}"></span>
+                <span th:if="${rule.category != null}" th:text="${rule.category}"></span>
+                <span th:if="${rule.section != null}" th:text="${rule.section}"></span>
+            </li>
+        </ul>
+        <form th:if="${manager and report.decidedAt == null}" class="lg-form" method="post"
+              th:action="@{/console/policy-changes/{id}/decision(id=${report.id})}">
+            <label for="impact-decision" th:text="#{review.decision}"></label>
+            <select class="lg-select" id="impact-decision" name="decision" required>
+                <option value="" th:text="#{review.choose}"></option>
+                <option th:if="${report.sourceStatus.name() == 'PROPOSED'}" value="TEXT_ONLY" th:text="#{impact.text.only}"></option>
+                <option th:if="${report.sourceStatus.name() == 'PROPOSED'}" value="RULE_CHANGE" th:text="#{impact.rule.change}"></option>
+                <option value="DEFERRED" th:text="#{impact.deferred}"></option>
+            </select>
+            <label><input type="checkbox" name="confirmed" value="true" required> <span th:text="#{impact.confirm}"></span></label>
+            <div><button type="submit" class="lg-btn" th:text="#{review.save}"></button></div>
+        </form>
+        <p th:text="#{impact.reaudit.note}"></p>
+        <div class="lg-actions">
+            <a class="lg-btn" th:href="@{/console/reaudit(marketplace=${report.marketplace})}" th:text="#{impact.reaudit}"></a>
+            <a class="lg-btn" th:href="@{/console/check/edit(marketplace=${report.marketplace})}" th:text="#{impact.compare}"></a>
+            <a class="lg-btn" th:href="@{/console/policy-changes/{id}/report.csv(id=${report.id})}" th:text="#{impact.csv}"></a>
+        </div>
+    </section>
+</main>
+</body>
+</html>
