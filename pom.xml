@@ -31,7 +31,7 @@
         <java.version>21</java.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-boot.version>4.1.2</spring-boot.version>
+        <spring-boot.version>4.2.0</spring-boot.version>
         <!--
             Jackson 2 (com.fasterxml.jackson). Its BOM is imported before the Spring Boot BOM so that it wins over the
             Boot BOM's jackson-2-bom (2.21.7 in Boot 4.1.2). Pinned to 2.21.8 for a security reason: the Trivy scan of the
