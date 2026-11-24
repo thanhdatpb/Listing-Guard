@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.List;
+import java.time.ZoneOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,28 +54,36 @@ public class RetrievalEvalRunner implements CommandLineRunner {
         Path dir = Path.of(evalDir);
         EvalSet set = EvalSet.load(dir.resolve("queries.yaml"));
 
-        List<EvalReportWriter.CorpusRow> corpus = jdbc.query("""
-                        SELECT d.source_file, d.title, d.version, d.source_hash, count(c.id) AS chunks
-                        FROM policy_document d LEFT JOIN policy_chunk c ON c.document_id = d.id
-                        WHERE d.marketplace_code = ?
-                        GROUP BY d.id ORDER BY d.source_file
-                        """,
-                (rs, row) -> new EvalReportWriter.CorpusRow(rs.getString("source_file"), rs.getString("title"),
-                        rs.getString("version"), rs.getString("source_hash"), rs.getInt("chunks")),
-                set.marketplace());
-        if (corpus.isEmpty()) {
-            throw new IllegalStateException("No ingested documents for " + set.marketplace() + "; run the ingest job first");
-        }
-
-        RetrievalEvaluator.Evaluation evaluation = new RetrievalEvaluator().run(set, retriever);
-        String markdown = EvalReportWriter.render(evaluation, new EvalReportWriter.RunInfo(Instant.now(), embeddings.modelId(), corpus));
+        String markdown = benchmark(set, retriever, jdbc, Instant.now(), embeddings.modelId());
         try {
             Files.writeString(dir.resolve("results.md"), markdown, StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot write results.md", e);
         }
-        evaluation.groups().forEach(group -> log.info("{}: recall@{}={} mrr={} ({} queries)", group.language(),
-                RetrievalEvaluator.RECALL_K, group.recallAtK(), group.mrr(), group.queries()));
         log.info("Wrote {}", dir.resolve("results.md").toAbsolutePath());
+    }
+
+    static String benchmark(EvalSet set, PolicyRetriever vector, JdbcTemplate jdbc, Instant asOf, String model) {
+        PolicyBenchmarkProvenance provenance = new PolicyBenchmarkProvenance(jdbc, set, asOf.atOffset(ZoneOffset.UTC).toLocalDate());
+        HybridPolicyBenchmark hybrid = new HybridPolicyBenchmark(jdbc);
+        RetrievalEvaluator evaluator = new RetrievalEvaluator();
+        var baseline = evaluator.run(set, vector);
+        var combined = evaluator.run(set, (marketplace, query, topK) -> hybrid.search(marketplace, query, topK, vector));
+
+        StringBuilder report = new StringBuilder("# Policy retrieval benchmark\n\n");
+        report.append("- Evaluated at: ").append(asOf).append(" (UTC)\n")
+                .append("- Marketplace: ").append(EvalReportWriter.cell(set.marketplace())).append('\n')
+                .append("- Embedding model: `").append(EvalReportWriter.cell(model)).append("`\n\n");
+        report.append("Ranking metrics measure retrieval against section labels. They do not verify policy correctness or applicability.\n\n");
+        provenance.appendCorpus(report);
+        report.append("\n## Vector baseline\n\n");
+        provenance.appendMetrics(report, baseline);
+        report.append('\n');
+        EvalReportWriter.appendRankings(report, baseline);
+        report.append("\n## Hybrid (PostgreSQL keyword + pgvector, reciprocal rank fusion)\n\n");
+        provenance.appendMetrics(report, combined);
+        report.append('\n');
+        EvalReportWriter.appendRankings(report, combined);
+        return report.toString();
     }
 }

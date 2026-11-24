@@ -98,8 +98,10 @@ Before you rely on it:
   remain sourced as `unverified`. `batch-check --label-column` is a small-set measurement, not an accuracy score.
 - **Marketplace limits are only as verified as their source.** Each rule records a source status (`verified`,
   `secondary` or `unverified`) in its ruleset; see [Rulesets](rulesets.md).
-- **Policy retrieval has not been evaluated.** An evaluation query set and runner exist, but measured results have not
-  been committed. The optional server-side policy analyzer has no real model call or endpoint yet.
+- **Policy retrieval has a synthetic offline benchmark.** The benchmark compares vector and hybrid retrieval with
+  labeled English and Vietnamese queries. Evaluation on the real corpus still requires the permitted source snapshots.
+  The optional server-side policy analyzer has no real model call or endpoint yet.
+  See [Policy retrieval benchmark](implementation/policy-retrieval-benchmark.md).
 
 What is not built yet is listed in the [Roadmap](#roadmap). Changes between versions are in
 [docs/releases/v0.9.0.md](releases/v0.9.0.md).

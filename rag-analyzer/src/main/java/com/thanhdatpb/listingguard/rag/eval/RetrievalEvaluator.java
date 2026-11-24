@@ -14,7 +14,6 @@ public final class RetrievalEvaluator {
 
     public static final int RECALL_K = 5;
     public static final int RETRIEVE_K = 10;
-    private static final int TOP_SHOWN = 3;
 
     /** @param firstHitRank rank (1 = best) of the first relevant result within the top RETRIEVE_K, if any */
     public record QueryResult(String queryId, String language, String question, EvalSet.Query query,
@@ -38,7 +37,7 @@ public final class RetrievalEvaluator {
                 OptionalInt rank = firstRelevantRank(query, found);
                 ranks.add(rank);
                 results.add(new QueryResult(query.id(), language, question, query, rank,
-                        List.copyOf(found.subList(0, Math.min(TOP_SHOWN, found.size())))));
+                        List.copyOf(found)));
             }
             groups.add(new GroupMetrics(language, ranks.size(),
                     (int) ranks.stream().filter(r -> r.isPresent() && r.getAsInt() <= RECALL_K).count(),
