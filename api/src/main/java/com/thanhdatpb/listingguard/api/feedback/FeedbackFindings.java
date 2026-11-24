@@ -16,7 +16,8 @@ import org.springframework.stereotype.Component;
 public class FeedbackFindings {
 
     /** What a verdict copies of its finding when it is given, so the row keeps its meaning after the result is gone. */
-    public record Resolved(String marketplace, String analysisVersion, String ruleId, FeedbackSource source, String level) {
+    public record Resolved(String marketplace, String analysisVersion, String ruleId, FeedbackSource source, String level,
+                           String rulesetVersion, String catalogVersion, String productType) {
     }
 
     private final JdbcTemplate jdbc;
@@ -30,29 +31,37 @@ public class FeedbackFindings {
         if (target.pack().equals(Pack.LISTING_RULES.id())) {
             // The index of GET /api/v1/checks/{id}: the stored rows in id order (FindingRepository.findByCheckIdOrderByIdAsc).
             rows = jdbc.query("""
-                    SELECT c.marketplace_code, c.analysis_version, f.rule_id, f.severity
+                    SELECT c.marketplace_code, c.analysis_version, f.rule_id, f.severity, r.version AS ruleset_version
                     FROM listing_check c JOIN finding f ON f.check_id = c.id
+                    JOIN ruleset_version r ON r.id = c.ruleset_version_id
                     WHERE c.client_id = ? AND c.id = ? AND c.pack_id = ?
                     ORDER BY f.id OFFSET ? LIMIT 1""",
                     (rs, i) -> rs.getString("rule_id") == null ? null
                             : new Resolved(rs.getString("marketplace_code"), rs.getString("analysis_version"),
-                            rs.getString("rule_id"), FeedbackSource.RULE, rs.getString("severity")),
+                            rs.getString("rule_id"), FeedbackSource.RULE, rs.getString("severity"),
+                            rs.getString("ruleset_version"), null, null),
                     clientId, target.checkId(), Pack.LISTING_RULES.id(), target.position());
         } else if (target.pack().equals(Pack.TRADEMARK_RISK.id())) {
             rows = jdbc.query("""
-                    SELECT c.marketplace_code, c.analysis_version, f.rule_id, f.risk, f.matched_mark IS NOT NULL AS catalog
+                    SELECT c.marketplace_code, c.analysis_version, f.rule_id, f.risk, f.matched_mark IS NOT NULL AS catalog,
+                           r.version AS ruleset_version, v.version AS catalog_version, c.product_type
                     FROM trademark_check c JOIN trademark_check_finding f ON f.check_id = c.id
+                    JOIN ruleset_version r ON r.id = c.ruleset_version_id
+                    LEFT JOIN trademark_catalog_version v ON v.id = c.catalog_version_id
                     WHERE c.client_id = ? AND c.id = ? AND c.expires_at > now() AND f.position = ?""",
                     (rs, i) -> new Resolved(rs.getString("marketplace_code"), rs.getString("analysis_version").trim(),
-                            rs.getString("rule_id"), sourceOfTrademark(rs.getBoolean("catalog")), rs.getString("risk")),
+                            rs.getString("rule_id"), sourceOfTrademark(rs.getBoolean("catalog")), rs.getString("risk"),
+                            rs.getString("ruleset_version"), rs.getString("catalog_version"), rs.getString("product_type")),
                     clientId, target.checkId(), target.position());
         } else {
             rows = jdbc.query("""
-                    SELECT c.marketplace_code, c.analysis_version, f.rule_id, f.severity
+                    SELECT c.marketplace_code, c.analysis_version, f.rule_id, f.severity, r.version AS ruleset_version
                     FROM variation_check c JOIN variation_check_finding f ON f.check_id = c.id
+                    JOIN ruleset_version r ON r.id = c.ruleset_version_id
                     WHERE c.client_id = ? AND c.id = ? AND c.expires_at > now() AND f.position = ?""",
                     (rs, i) -> new Resolved(rs.getString("marketplace_code"), rs.getString("analysis_version").trim(),
-                            rs.getString("rule_id"), FeedbackSource.RULE, rs.getString("severity")),
+                            rs.getString("rule_id"), FeedbackSource.RULE, rs.getString("severity"),
+                            rs.getString("ruleset_version"), null, null),
                     clientId, target.checkId(), target.position());
         }
         return rows.stream().filter(java.util.Objects::nonNull).findFirst();

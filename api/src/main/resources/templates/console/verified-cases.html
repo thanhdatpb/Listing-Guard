@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="panel" class="lg-card lg-section" aria-labelledby="verified-heading"
+         th:with="item=${detail.reviewCase}">
+    <h2 id="verified-heading" class="lg-card__title" th:text="#{verified.heading}"></h2>
+    <p th:text="#{verified.notice}"></p>
+    <p role="alert" class="lg-banner lg-banner--error" th:if="${verifiedUnavailable}" th:text="#{verified.error}"></p>
+    <th:block th:if="${verifiedView != null}">
+        <form th:if="${verifiedView.snapshot == null and detail.evidenceAvailable and item.reason != null}"
+              class="lg-form" method="post" th:action="@{/console/review-queue/{id}/verified(id=${item.id})}">
+            <label><input type="checkbox" name="confirmed" value="true" required> <span th:text="#{verified.confirm}"></span></label>
+            <div><button type="submit" class="lg-btn" th:text="#{verified.save}"></button></div>
+        </form>
+        <section th:if="${verifiedView.snapshot != null}" aria-labelledby="verified-record"
+                 th:with="record=${verifiedView.snapshot}">
+            <h3 id="verified-record" th:text="#{verified.record}"></h3>
+            <p th:if="${record.revokedAt != null}" th:text="#{verified.revoked}"></p>
+            <p th:if="${record.revokedAt == null and verifiedView.expired}" th:text="#{verified.expired}"></p>
+            <dl>
+                <dt th:text="#{verified.record.version}"></dt><dd th:text="${record.metadataVersion}"></dd>
+                <dt th:text="#{verified.until}"></dt><dd th:text="${record.expiresAt}"></dd>
+            </dl>
+            <ul th:aria-label="#{verified.audit}">
+                <li th:each="event : ${verifiedView.events}">
+                    <span th:text="${event.action == 'VERIFIED'} ? #{verified.save} : #{verified.revoked}"></span>
+                    <time th:datetime="${event.occurredAt}" th:text="${event.occurredAt}"></time>
+                </li>
+            </ul>
+            <form th:if="${record.revokedAt == null}" class="lg-form" method="post"
+                  th:action="@{/console/review-queue/{id}/verified/revoke(id=${item.id})}">
+                <label><input type="checkbox" name="confirmed" value="true" required> <span th:text="#{verified.revoke.confirm}"></span></label>
+                <div><button type="submit" class="lg-btn" th:text="#{verified.revoke}"></button></div>
+            </form>
+        </section>
+        <p th:if="${verifiedView.matches == null}" th:text="#{verified.unavailable}"></p>
+        <th:block th:if="${verifiedView.matches != null}">
+            <p th:if="${verifiedView.matches.isEmpty()}" th:text="#{verified.empty}"></p>
+            <ul class="lg-stack" th:unless="${verifiedView.matches.isEmpty()}">
+                <li th:each="match : ${verifiedView.matches}" th:with="entry=${match.snapshot}" th:attr="data-reference-id=${entry.caseId}">
+                    <a th:href="@{/console/review-queue/{id}(id=${entry.caseId})}" th:text="${entry.caseId}"></a>
+                    <dl>
+                        <dt th:text="#{review.rule}"></dt><dd th:text="${entry.ruleId}"></dd>
+                        <dt th:text="#{review.severity}"></dt><dd th:text="${entry.severity}"></dd>
+                        <dt th:text="#{review.status}"></dt><dd th:text="${reviewStatusLabels[entry.outcome]}"></dd>
+                        <dt th:text="#{review.version}"></dt><dd th:text="${entry.analysisVersion}"></dd>
+                        <dt th:text="#{verified.ruleset}"></dt><dd th:text="${entry.rulesetVersion}"></dd>
+                        <dt th:if="${entry.catalogVersion != null}" th:text="#{verified.catalog}"></dt>
+                        <dd th:if="${entry.catalogVersion != null}" th:text="${entry.catalogVersion}"></dd>
+                        <dt th:if="${entry.productType != null}" th:text="#{verified.product}"></dt>
+                        <dd th:if="${entry.productType != null}" th:text="${entry.productType}"></dd>
+                        <dt th:text="#{review.age}"></dt><dd th:text="#{verified.age(${match.ageDays})}"></dd>
+                    </dl>
+                    <ul th:if="${match.versionDiffers or match.severityDiffers or match.productTypeDiffers}"
+                        th:aria-label="#{verified.differences}">
+                        <li th:if="${match.versionDiffers}" th:text="#{verified.diff.version}"></li>
+                        <li th:if="${match.severityDiffers}" th:text="#{verified.diff.severity}"></li>
+                        <li th:if="${match.productTypeDiffers}" th:text="#{verified.diff.product}"></li>
+                    </ul>
+                </li>
+            </ul>
+        </th:block>
+    </th:block>
+</section>
+</body>
+</html>

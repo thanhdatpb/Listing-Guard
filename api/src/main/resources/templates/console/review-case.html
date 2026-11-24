@@ -42,6 +42,9 @@
             <div><button type="submit" class="lg-btn lg-btn--primary" th:text="#{review.save}"></button></div>
         </form>
     </section>
+    <th:block th:if="${detail != null and (verifiedView != null or verifiedUnavailable == true)}">
+        <section th:replace="~{console/verified-cases :: panel}"></section>
+    </th:block>
     <section class="lg-card lg-section" th:if="${evidence != null}">
         <h1 th:text="#{review.evidence}"></h1>
         <dl>

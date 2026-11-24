@@ -125,9 +125,20 @@ public class ReviewCaseService {
 
     @Transactional
     public ReviewAuditEvent decideInConsole(ConsoleUser user, UUID id, ReviewDecision decision) {
-        return decide(user.clientId(), id, decision, ActorKind.CONSOLE_ACCOUNT, () -> consoleReviewer(user, true)
-                .orElseThrow(() -> new ReviewCaseException(HttpStatus.FORBIDDEN, "review-write-forbidden",
-                        "This Console account is not authorized to decide review cases.")));
+        return decide(user.clientId(), id, decision, ActorKind.CONSOLE_ACCOUNT, () -> requireConsoleReviewer(user));
+    }
+
+    UUID requireConsoleReviewer(ConsoleUser user) {
+        return consoleReviewer(user, true).orElseThrow(() ->
+                new ReviewCaseException(HttpStatus.FORBIDDEN, "review-write-forbidden",
+                        "This Console account is not authorized to write review cases."));
+    }
+
+    void requireConsoleReviewerForRead(ConsoleUser user) {
+        if (!canReviewInConsole(user)) {
+            throw new ReviewCaseException(HttpStatus.FORBIDDEN, "review-read-forbidden",
+                    "This Console account is not authorized to read verified cases.");
+        }
     }
 
     public boolean canReviewInConsole(ConsoleUser user) {
