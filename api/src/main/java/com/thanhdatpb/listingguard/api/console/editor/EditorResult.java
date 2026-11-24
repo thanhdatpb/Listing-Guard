@@ -91,7 +91,7 @@ public record EditorResult(Readiness readiness, Trademark trademark, List<Group<
      * the feedback widget answers (ADR-034).
      */
     public record RuleItem(String ruleId, String field, String message, String suggestion, String value, Evidence evidence,
-                           Fix fix, Integer fixId, FeedbackTarget target) {
+                           Fix fix, Integer fixId, FeedbackTarget target, String source) {
     }
 
     /**
@@ -100,7 +100,7 @@ public record EditorResult(Readiness readiness, Trademark trademark, List<Group<
      * LLM label.
      */
     public record TrademarkItem(String ruleId, String risk, String field, String matchType, String mark, String message,
-                                String suggestion, Evidence evidence, FeedbackTarget target, String llmReason) {
+                                String suggestion, Evidence evidence, FeedbackTarget target, String llmReason, String source, List<String> sourceIds) {
     }
 
     /** How many findings of the listing rules have this level ({@code error}, {@code warning} or {@code info}). */

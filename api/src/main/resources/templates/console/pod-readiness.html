@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{pod.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+    <script th:src="@{/console/pod-readiness.js}" defer></script>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('check')}"></header>
+<main class="lg-page" id="main" tabindex="-1">
+    <div class="lg-page__head">
+        <h1 th:text="#{pod.title}"></h1>
+        <a class="lg-btn" th:href="@{/console/check}" th:text="#{editor.heading}"></a>
+    </div>
+    <p th:text="#{pod.scope}"></p>
+    <div class="lg-split lg-split--even">
+        <section class="lg-card" aria-labelledby="pod-inputs">
+            <h2 id="pod-inputs" th:text="#{pod.inputs}"></h2>
+            <p role="alert" class="lg-banner lg-banner--error" th:if="${podError}"
+               th:text="${@consoleMessages.get(podError)}"></p>
+            <ul role="alert" th:if="${fieldErrors != null}">
+                <li th:each="error : ${fieldErrors}"><a th:href="'#' + ${error.key}" th:text="${error.value}"></a></li>
+            </ul>
+            <p role="status" th:if="${notice}" th:text="${notice}"></p>
+            <form id="pod-draft" method="post" th:action="@{/console/pod-readiness}" autocomplete="off">
+                <input type="hidden" name="recheck" th:value="${draft.recheck or result != null or notice != null}">
+                <div class="lg-field">
+                    <label class="lg-field__label" for="marketplace" th:text="#{pod.marketplace.label}"></label>
+                    <select class="lg-select" id="marketplace" name="marketplace">
+                        <option th:each="market : ${marketplaces}" th:value="${market.code}" th:text="${market.label}"
+                                th:selected="${market.code.equalsIgnoreCase(listingForm.marketplace)}"></option>
+                    </select>
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" for="profileKey" th:text="#{pod.profile}"></label>
+                    <select class="lg-select" id="profileKey" name="profileKey" required
+                            th:aria-invalid="${podError == 'pod.error.profile'}">
+                        <option value="" th:text="#{pod.profile.select}"></option>
+                        <option th:each="profile : ${profiles}" th:value="${profile.key()}"
+                                th:selected="${profile.key() == draft.profileKey}"
+                                th:text="${@consoleMessages.get(profile.messageKey()) + ' · v' + profile.version}"></option>
+                    </select>
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" for="title" th:text="#{editor.title.label}"></label>
+                    <input class="lg-input" id="title" name="title" th:value="${listingForm.title}" maxlength="1000">
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" for="description" th:text="#{editor.description.label}"></label>
+                    <textarea class="lg-textarea" id="description" name="description" rows="4"
+                              maxlength="15000" th:text="${listingForm.description}"></textarea>
+                </div>
+                <details>
+                    <summary th:text="#{pod.fields.etsy}"></summary>
+                    <div class="lg-field" th:each="key : ${ {'category', 'whoMade', 'whenMade'} }">
+                        <label class="lg-field__label" th:for="${key}"
+                               th:text="${@consoleMessages.get('editor.' + key.toLowerCase() + '.label')}"></label>
+                        <input class="lg-input" th:id="${key}" th:name="${key}"
+                               th:value="${listingForm[key]}" maxlength="200">
+                    </div>
+                    <div class="lg-field">
+                        <label class="lg-field__label" for="tags" th:text="#{editor.tags.label}"></label>
+                        <textarea class="lg-textarea" id="tags" name="tags" th:text="${listingForm.tags}" rows="3"
+                                  maxlength="2000" aria-describedby="pod-one-per-line"></textarea>
+                        <p id="pod-one-per-line" class="lg-field__hint" th:text="#{editor.oneperline}"></p>
+                    </div>
+                </details>
+                <details>
+                    <summary th:text="#{pod.fields.amazon}"></summary>
+                    <div class="lg-field" th:each="key : ${ {'brand', 'productType', 'searchTerms'} }">
+                        <label class="lg-field__label" th:for="${key}"
+                               th:text="${@consoleMessages.get('editor.' + key.toLowerCase() + '.label')}"></label>
+                        <input class="lg-input" th:id="${key}" th:name="${key}"
+                               th:value="${listingForm[key]}" th:maxlength="${key == 'searchTerms' ? 1000 : 200}">
+                    </div>
+                    <div class="lg-field">
+                        <label class="lg-field__label" for="bulletPoints" th:text="#{editor.bullets.label}"></label>
+                        <textarea class="lg-textarea" id="bulletPoints" name="bulletPoints" th:text="${listingForm.bulletPoints}"
+                                  rows="3" maxlength="5000" aria-describedby="pod-bullets-hint"></textarea>
+                        <p id="pod-bullets-hint" class="lg-field__hint" th:text="#{editor.oneperline}"></p>
+                    </div>
+                    <div class="lg-field">
+                        <label class="lg-field__label" for="parentSku" th:text="#{pod.parent.sku}"></label>
+                        <input class="lg-input" id="parentSku" name="parentSku" th:value="${draft.parentSku}" maxlength="100">
+                    </div>
+                    <div class="lg-field">
+                        <label class="lg-field__label" for="variationTheme" th:text="#{pod.variant.theme}"></label>
+                        <input class="lg-input" id="variationTheme" name="variationTheme"
+                               th:value="${draft.variationTheme}" maxlength="64">
+                    </div>
+                </details>
+                <div class="lg-field" th:each="key : ${ {'price', 'quantity'} }">
+                    <label class="lg-field__label" th:for="${key}" th:text="${@consoleMessages.get('editor.' + key + '.label')}"></label>
+                    <input class="lg-input" th:id="${key}" th:name="${key}" th:value="${listingForm[key]}" maxlength="200"
+                           th:aria-invalid="${fieldErrors != null and fieldErrors.containsKey(key)}">
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" for="variants" th:text="#{pod.variants}"></label>
+                    <textarea class="lg-textarea" id="variants" name="variants" rows="4" maxlength="6000"
+                              aria-describedby="pod-variants-hint" th:text="${draft.variants}"></textarea>
+                    <p class="lg-field__hint" id="pod-variants-hint" th:text="#{pod.variants.hint}"></p>
+                </div>
+                <fieldset class="lg-field" aria-describedby="pod-artwork-hint">
+                    <legend th:text="#{pod.artwork}"></legend>
+                    <div class="lg-field">
+                        <label class="lg-field__label" for="artworkWidth" th:text="#{pod.artwork.width}"></label>
+                        <input class="lg-input" id="artworkWidth" name="artworkWidth" th:value="${draft.artworkWidth}"
+                               maxlength="10" inputmode="decimal">
+                    </div>
+                    <div class="lg-field">
+                        <label class="lg-field__label" for="artworkHeight" th:text="#{pod.artwork.height}"></label>
+                        <input class="lg-input" id="artworkHeight" name="artworkHeight" th:value="${draft.artworkHeight}"
+                               maxlength="10" inputmode="decimal">
+                    </div>
+                    <p class="lg-field__hint" id="pod-artwork-hint" th:text="#{pod.artwork.hint}"></p>
+                </fieldset>
+                <p>
+                    <label><input type="checkbox" name="personalizationConfigured" value="true"
+                                  th:checked="${draft.personalizationConfigured}" aria-describedby="pod-personalization-hint">
+                        <span th:text="#{pod.personalization}"></span></label>
+                </p>
+                <p class="lg-field__hint" id="pod-personalization-hint" th:text="#{pod.personalization.hint}"></p>
+                <p class="lg-field__hint" id="pod-cost" th:text="#{pod.cost}"></p>
+                <button class="lg-btn lg-btn--primary" type="submit" aria-describedby="pod-cost"
+                        th:text="${result != null or notice != null or draft.recheck} ? #{pod.recheck} : #{editor.check}"></button>
+            </form>
+        </section>
+        <section class="lg-card" aria-labelledby="pod-results-heading">
+            <h2 id="pod-results-heading" th:text="#{pod.results}"></h2>
+            <p id="pod-loading" role="status" hidden th:text="#{pod.loading}"></p>
+            <p id="pod-unchecked" role="status" hidden th:text="#{pod.unchecked}"></p>
+            <p th:if="${result == null}" th:text="${podError != null or notice != null} ? #{pod.unchecked} : #{pod.empty}"></p>
+            <div th:if="${release != null}" class="lg-field__hint">
+                <p class="lg-code" th:text="#{pod.version(${release.profile.key()}, ${release.sha256})}"></p>
+                <p th:text="${@consoleMessages.get(release.profile.printArea.messageKey())}"></p>
+                <p class="lg-code" th:if="${release.profile.printArea.sourceReference != null}" th:text="${release.profile.printArea.sourceReference}"></p>
+            </div>
+            <div id="pod-results" th:if="${result != null}">
+                <p th:text="#{pod.checked}"></p>
+                <p th:text="#{pod.incomplete.count(${result.incompleteDimensions()})}"></p>
+                <section aria-labelledby="pod-marketplace">
+                    <h3 id="pod-marketplace" th:text="#{pod.marketplace}"></h3>
+                    <p id="pod-marketplace-status" th:attr="data-status=${result.marketplace}"
+                       th:text="${@consoleMessages.get(result.marketplace.messageKey())}"></p>
+                    <p th:text="${result.editor.readiness.detail}"></p>
+                    <p th:text="#{pod.findings.count(${result.editor.count('error') + result.editor.count('warning') + result.editor.count('info')})}"></p>
+                    <th:block th:each="group : ${result.editor.ruleGroups}">
+                        <article class="lg-card" th:each="item : ${group.items}">
+                            <p><strong th:text="${group.label}"></strong> · <code th:text="${item.ruleId}"></code></p>
+                            <p class="lg-finding__meta"><code th:text="${item.field}"></code> · <span th:text="${item.source}"></span></p>
+                            <p class="lg-finding__evidence" th:if="${item.evidence != null}"><mark th:text="${item.evidence.match}"></mark></p>
+                            <p class="lg-finding__text" th:text="${item.message}"></p>
+                            <p class="lg-finding__text" th:text="${item.suggestion}"></p>
+                            <p th:text="${@consoleMessages.ruleExplanation(item.ruleId)}"></p>
+                            <div th:if="${item.fix != null}" th:with="prefix=${'fix.' + item.fixId + '.'}">
+                                <input type="hidden" form="pod-draft" th:name="${prefix + 'field'}" th:value="${item.field}">
+                                <input type="hidden" form="pod-draft" th:name="${prefix + 'value'}" th:value="${item.value}">
+                                <input type="hidden" form="pod-draft" th:name="${prefix + 'action'}" th:value="${item.fix.action}">
+                                <input type="hidden" form="pod-draft" th:name="${prefix + 'proposed'}" th:value="${item.fix.proposedValue}">
+                                <p th:text="${item.fix.description}"></p>
+                                <p class="lg-code" th:if="${item.fix.proposedValue != null}" th:text="${item.fix.proposedValue}"></p>
+                                <button class="lg-btn" type="submit" form="pod-draft" name="apply" th:value="${item.fixId}"
+                                        th:formaction="@{/console/pod-readiness/apply}" th:text="#{editor.fix.apply}"></button>
+                            </div>
+                            <th:block th:replace="~{console/pod-fragments :: reviewForm(${item.target})}"></th:block>
+                        </article>
+                    </th:block>
+                </section>
+                <section aria-labelledby="pod-ip">
+                    <h3 id="pod-ip" th:text="#{pod.ip}"></h3>
+                    <p id="pod-ip-status" th:attr="data-status=${result.trademark}"
+                       th:text="${@consoleMessages.get(result.trademark.messageKey())}"></p>
+                    <p th:text="${result.editor.trademark.detail}"></p>
+                    <p th:text="${result.editor.trademark.disclaimer}"></p>
+                    <p th:text="#{pod.findings.count(${result.editor.trademarkCount()})}"></p>
+                    <th:block th:each="group : ${result.editor.trademark.groups}">
+                        <article class="lg-card" th:each="item : ${group.items}">
+                            <p><strong th:text="${group.label}"></strong> · <code th:text="${item.ruleId}"></code></p>
+                            <p th:if="${item.mark}" th:text="${item.mark}"></p>
+                            <ul th:if="${!item.sourceIds.isEmpty()}" class="lg-code">
+                                <li th:each="sourceId : ${item.sourceIds}" th:text="${sourceId}"></li>
+                            </ul>
+                            <p class="lg-finding__meta"><code th:text="${item.field}"></code> · <span th:text="${item.source}"></span></p>
+                            <p class="lg-finding__evidence" th:if="${item.evidence != null}"><mark th:text="${item.evidence.match}"></mark></p>
+                            <p class="lg-finding__text" th:text="${item.message}"></p>
+                            <p class="lg-finding__text" th:text="${item.suggestion}"></p>
+                            <th:block th:replace="~{console/pod-fragments :: reviewForm(${item.target})}"></th:block>
+                        </article>
+                    </th:block>
+                </section>
+                <section aria-labelledby="pod-production" th:with="production=${result.production}">
+                    <h3 id="pod-production" th:text="#{pod.production}"></h3>
+                    <p id="pod-production-status" th:attr="data-status=${production.status}"
+                       th:text="${@consoleMessages.get(production.status.messageKey())}"></p>
+                    <ul th:if="${!production.missing.isEmpty() or !production.concerns.isEmpty()}">
+                        <li th:each="key : ${production.missing}" th:text="${@consoleMessages.get(key)}"></li>
+                        <li th:each="key : ${production.concerns}" th:text="${@consoleMessages.get(key)}"></li>
+                    </ul>
+                    <div th:if="${production.variation != null}" th:with="variation=${production.variation}">
+                        <p th:text="#{pod.variant.source(${variation.rulesetVersion})}"></p>
+                        <p th:text="#{pod.findings.count(${variation.findings.size()})}"></p>
+                        <article class="lg-card" th:each="item, row : ${variation.findings}">
+                            <p><code th:text="${item.ruleId}"></code> · <span th:text="${item.sourceStatus}"></span></p>
+                            <p class="lg-finding__meta" th:text="${item.field}"></p>
+                            <p class="lg-finding__evidence" th:if="${item.value != null}"><mark th:text="${item.value}"></mark></p>
+                            <p class="lg-finding__text" th:text="${item.message}"></p>
+                            <p class="lg-finding__text" th:text="${item.suggestion}"></p>
+                            <th:block th:replace="~{console/pod-fragments :: reviewForm(${production.variationTarget(row.index)})}"></th:block>
+                        </article>
+                    </div>
+                    <div th:if="${production.sample != null}" th:with="sample=${production.sample}">
+                        <p th:text="#{pod.sample(${sample.rulesetVersion}, ${sample.printProfile})}"></p>
+                        <p th:text="#{pod.findings.count(${sample.findings.size()})}"></p>
+                        <p th:each="item : ${sample.findings}" th:text="${item.message}"></p>
+                    </div>
+                </section>
+            </div>
+        </section>
+    </div>
+    <section class="lg-card" aria-labelledby="pod-metrics-heading" th:if="${reviewMetrics != null or reviewMetricsUnavailable == true}">
+        <h2 id="pod-metrics-heading" th:text="#{pod.metrics}"></h2>
+        <p th:if="${reviewMetricsUnavailable}" th:text="#{pod.error.unavailable}"></p>
+        <th:block th:if="${reviewMetrics != null}">
+            <p th:text="#{pod.metrics.completed(${reviewMetrics.completed}, ${reviewMetrics.total})}"></p>
+            <p th:if="${reviewMetrics.meanResolutionMinutes != null}"
+               th:text="#{pod.metrics.time(${reviewMetrics.meanResolutionMinutes}, ${reviewMetrics.resolved})}"></p>
+            <p th:unless="${reviewMetrics.meanResolutionMinutes != null}" th:text="#{pod.metrics.no.time}"></p>
+        </th:block>
+    </section>
+</main>
+</body>
+</html>

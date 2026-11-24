@@ -1,0 +1,8 @@
+{
+  "id": "t-shirt",
+  "version": 1,
+  "marketplaces": ["ETSY", "AMAZON"],
+  "variationRules": ["sku", "size", "color"],
+  "printArea": {"sourceStatus": "UNVERIFIED"},
+  "personalizationFields": []
+}
