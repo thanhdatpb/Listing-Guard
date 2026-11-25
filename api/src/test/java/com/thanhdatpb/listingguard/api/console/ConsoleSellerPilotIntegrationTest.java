@@ -173,24 +173,33 @@ class ConsoleSellerPilotIntegrationTest {
     void browserMeasuresRealConsoleWithSyntheticListings() throws Exception {
         UUID client = client(ApiTestKeys.CLIENT_1);
         jdbc.update("DELETE FROM seller_pilot_daily WHERE client_id=?", client);
-        ProcessBuilder browser = new ProcessBuilder("python3", "../scripts/test-console-seller-pilot.py").redirectErrorStream(true);
+        // the output goes to a file: a failing script prints a long page excerpt, and a full pipe nobody reads would hang it
+        java.io.File log = java.io.File.createTempFile("lg-pilot-browser", ".log");
+        ProcessBuilder browser = new ProcessBuilder("python3", "../scripts/test-console-seller-pilot.py").redirectErrorStream(true)
+                .redirectOutput(log);
         browser.environment().put("LG_PILOT_URL", "http://localhost:" + port);
         browser.environment().put("LG_PILOT_TEST_ASSERTION", MEMBER);
         String screenshot = System.getenv("LG_PILOT_SCREENSHOT");
         if (screenshot != null) {
             browser.environment().put("LG_PILOT_SCREENSHOT", Path.of(screenshot).toAbsolutePath().toString());
         }
+        String mappingScreenshot = System.getenv("LG_PILOT_SCREENSHOT_MAPPING");
+        if (mappingScreenshot != null) {
+            browser.environment().put("LG_PILOT_SCREENSHOT_MAPPING", Path.of(mappingScreenshot).toAbsolutePath().toString());
+        }
         Process process = browser.start();
         if (!process.waitFor(90, TimeUnit.SECONDS)) {
             process.destroyForcibly();
-            throw new AssertionError("Playwright did not finish");
+            throw new AssertionError("Playwright did not finish: " + java.nio.file.Files.readString(log.toPath()));
         }
-        String result = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        String result = java.nio.file.Files.readString(log.toPath(), java.nio.charset.StandardCharsets.UTF_8);
         assertThat(process.exitValue()).as(result).isZero();
         assertThat(result).contains("6 clicks");
         System.out.print(result);
-        assertThat(jdbc.queryForObject("SELECT checked FROM seller_pilot_daily WHERE client_id=?", Long.class, client)).isEqualTo(4L);
-        assertThat(jdbc.queryForObject("SELECT low FROM seller_pilot_daily WHERE client_id=?", Long.class, client)).isEqualTo(4L);
+        // eight rows checked twice; the pilot default is the content scope, so every count is under it (ADR-052)
+        assertThat(jdbc.queryForObject("SELECT scope FROM seller_pilot_daily WHERE client_id=?", String.class, client)).isEqualTo("CONTENT");
+        assertThat(jdbc.queryForObject("SELECT checked FROM seller_pilot_daily WHERE client_id=?", Long.class, client)).isEqualTo(16L);
+        assertThat(jdbc.queryForObject("SELECT low FROM seller_pilot_daily WHERE client_id=?", Long.class, client)).isEqualTo(16L);
         assertThat(jdbc.queryForObject("SELECT rechecked FROM seller_pilot_daily WHERE client_id=?", Long.class, client)).isEqualTo(1L);
     }
 
