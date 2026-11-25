@@ -141,6 +141,34 @@ class ConsoleSellerPilotIntegrationTest {
     }
 
     @Test
+    void reportCountsContentChecksApartAndShowsThemOnlyWhenThePeriodHasSome() throws Exception {
+        UUID one = client(ApiTestKeys.CLIENT_1);
+        jdbc.update("DELETE FROM seller_pilot_daily");
+        metrics.record(one, "ETSY", List.of(new PilotMetrics.Observation("HIGH", false)));
+        var today = LocalDate.now(clock.withZone(ZoneOffset.UTC));
+        String period = "?from=" + today + "&to=" + today + "&marketplace=ETSY";
+        String onlyFull = html(get("/console/stats/pilot.csv" + period).header(HEADER, ADMIN));
+        assertThat(onlyFull).contains(today + ",1,1,1.0000,0,0.0000,0,0.0000,0,0")
+                .doesNotContain("Lượt kiểm listing theo ngày (kiểm nội dung)");
+        assertThat(html(get("/console/stats/pilot" + period).header(HEADER, ADMIN)))
+                .doesNotContain("id=\"pilot-daily-content\"").contains("Lượt kiểm listing theo ngày");
+
+        metrics.record(one, "ETSY", com.thanhdatpb.listingguard.api.check.CheckScope.Kind.CONTENT,
+                List.of(new PilotMetrics.Observation("LOW", false), new PilotMetrics.Observation(null, false)));
+
+        String csv = html(get("/console/stats/pilot.csv" + period).header(HEADER, ADMIN));
+        assertThat(csv).as("the full count is not changed by content checks").contains(today + ",1,1,1.0000,0,0.0000,0,0.0000,0,0")
+                .contains("Lượt kiểm listing theo ngày (kiểm nội dung)").contains(today + ",2,0,0.0000,0,0.0000,1,1.0000,1,0");
+        String vietnamese = html(get("/console/stats/pilot" + period).header(HEADER, ADMIN));
+        assertThat(vietnamese).contains("id=\"pilot-daily\"", "id=\"pilot-daily-content\"", "Lượt kiểm listing theo ngày (kiểm đầy đủ)",
+                "Lượt kiểm listing theo ngày (kiểm nội dung)", "không cộng vào lượt kiểm đầy đủ");
+        assertThat(html(get("/console/stats/pilot" + period + "&lang=en").header(HEADER, ADMIN)))
+                .contains("Daily listing checks (full check)", "Daily listing checks (content check)", "never added to the full checks");
+        assertThat(jdbc.queryForList("SELECT scope FROM seller_pilot_daily WHERE client_id = ? ORDER BY scope", String.class, one))
+                .containsExactly("CONTENT", "FULL");
+    }
+
+    @Test
     @EnabledIfEnvironmentVariable(named = "LG_RUN_PILOT_BROWSER", matches = "1")
     void browserMeasuresRealConsoleWithSyntheticListings() throws Exception {
         UUID client = client(ApiTestKeys.CLIENT_1);
