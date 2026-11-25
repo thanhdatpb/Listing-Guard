@@ -22,7 +22,7 @@
     </div>
 </div>
 
-<div class="lg-detail" th:fragment="rowDetail(row, disclaimer)">
+<div class="lg-detail" th:fragment="rowDetail(row)">
     <p class="lg-text-muted" th:if="${row.detail.problem != null}" th:text="#{bulk.detail.unreadable(${row.detail.problem})}"></p>
     <div class="lg-split" th:if="${row.detail.problem == null}">
         <div class="lg-card lg-detail__listing">
@@ -41,7 +41,8 @@
                     <div th:replace="~{console/findings :: meter(null, '&mdash;', ${readinessMax}, #{bulk.detail.notchecked(${row.detail.rules.note})}, #{bulk.detail.readiness.note}, null)}"></div>
                 </th:block>
             </section>
-            <!-- the trademark result and its disclaimer: in every row, next to the findings of the row -->
+            <!-- the trademark result of the row, next to its findings; the disclaimer is one line on the page with a link to the
+                 explanation (ADR-053), not a paragraph in every row -->
             <section class="lg-detail__trademark">
                 <div class="lg-meter__head">
                     <h4 class="lg-meter__label" th:text="#{bulk.detail.trademark}"></h4>
@@ -55,13 +56,6 @@
                 <p class="lg-meter__note" th:if="${row.detail.trademark.kind.name() == 'INCOMPLETE'}" th:text="#{bulk.detail.trademark.incomplete}"></p>
                 <p class="lg-meter__note" th:if="${row.detail.trademark.kind.name() == 'NOT_RUN'}"
                    th:text="#{bulk.detail.notchecked(${row.detail.trademark.note})}"></p>
-                <th:block th:with="note=${@consoleMessages.disclaimerNote(disclaimer)}">
-                    <p class="lg-meter__note" th:if="${note != null}" th:text="${note}"></p>
-                    <p class="lg-meter__note">
-                        <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
-                        <span th:text="${disclaimer}"></span>
-                    </p>
-                </th:block>
             </section>
         </div>
 

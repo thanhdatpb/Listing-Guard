@@ -95,7 +95,7 @@ class ConsoleEditorTrademarkUnavailableIntegrationTest {
 
         String trademark = section(html, "trademark-panel");
         assertThat(trademark).contains("Trademark check unavailable").contains("<span class=\"lg-pill\">Unavailable</span>")
-                .contains(trademarkRulesets.ruleset().disclaimer());
+                .contains("id=\"explain-link\"");
         assertThat(section(html, "readiness-panel")).containsPattern("class=\"lg-meter__value\">\\d+/\\d+</span>");
         assertThat(section(html, "rule-findings")).contains("tag_length");
         assertThat(html).doesNotContain("id=\"trademark-findings\"");

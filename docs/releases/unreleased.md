@@ -117,3 +117,25 @@ thêm `listing_check.scope`, cho phép trạng thái `PARTIAL` và thêm `scope`
 dẫn pilot được chụp lại. Xem [ADR-052](../adr/ADR-052-content-scope-for-sheet-checks.md) và [kiểm tra hàng loạt](../bulk-check.md).
 
 ADR-022: không đổi OpenAPI hay input schema; `./mvnw -B -pl contract-tools verify` không báo khác biệt.
+
+
+## Bộ dựng pilot
+
+Lệnh admin mới `account import <file.csv> [--dry-run] [--create-clients]` nhập tài khoản của pilot từ một file (cột `email`, `role`
+ADMIN/MEMBER, `client`, `display_name` tùy chọn). Chạy lại không nhân đôi, đổi vai trò thì cập nhật vai trò, email thuộc client khác không bị
+chuyển, client chưa có chỉ được tạo khi có `--create-clients`, có dòng lỗi thì liệt kê từng dòng và không ghi gì; không gửi email và không
+lưu `display_name` (tài khoản không có trường đó, không có migration); in danh sách email để dán vào
+`LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS`. Mẫu Sheet watchlist [`docs/samples/watchlist-template.csv`](../samples/watchlist-template.csv) (dữ liệu
+tự đặt, đúng định dạng nhập hiện có) và [hướng dẫn điền](../pilot-watchlist-guide.md), mẫu tài khoản
+[`docs/samples/accounts-template.csv`](../samples/accounts-template.csv) và [checklist dựng pilot](../pilot-setup-checklist.md).
+
+Trang **Sẵn sàng** (`/console/readiness`, nhóm Quản lý, chỉ ADMIN và chỉ khi `listing-guard.console.pilot=true`) liệt kê 13 mục, mỗi mục Đạt hoặc
+Thiếu kèm một dòng hướng dẫn: catalog đang phục vụ, tier, wordlist, ruleset trademark, mục watchlist đang bật, tài khoản theo vai trò (và có được phép đăng nhập
+theo allowlist hay không), phạm vi kiểm mặc định, gợi ý sửa và năm cờ AI. Đọc từ dữ liệu sẵn có, không thêm bảng, cài đặt hay API.
+
+Trang kết quả của kiểm hàng loạt và của editor gộp các đoạn miễn trừ thành một dòng ngắn kèm liên kết **Giải thích kết quả** (`/console/explain`);
+câu miễn trừ của ruleset được in nguyên văn một lần ở trang giải thích. Trước đây câu đó in ở trang và lặp lại ở mọi dòng chi tiết. Các nhãn còn
+bằng tiếng Anh trong bundle tiếng Việt (Title, Tags, Class, Serial, Trademark...) đã được Việt hoá. Xem
+[ADR-053](../adr/ADR-053-pilot-onboarding-kit.md).
+
+ADR-022: không đổi OpenAPI hay input schema.

@@ -827,17 +827,30 @@ docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod confi
 docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod up -d
 ```
 
-Để cấp tài khoản mới theo ADR-027, tạm đặt `LISTING_GUARD_CONSOLE_ACCESS_AUTO_CREATE=true` và
-`LISTING_GUARD_CONSOLE_ACCESS_DEFAULT_CLIENT_NAME=project-global`, rồi tạo lại service `api`. Mỗi người trong allowlist
-đăng nhập một lần. Kiểm tra ba tài khoản đang thuộc đúng client, cấp `ADMIN` cho lead, để seller là `MEMBER`, sau đó đặt
-auto-create về `false` và tạo lại service `api`. Tài khoản đã tồn tại giữ nguyên client cũ, nên kiểm tra trước khi mời dùng.
-Không chia sẻ API key với seller.
+Để cấp tài khoản, dùng `account import` (ADR-053) thay vì lần lượt từng lệnh: soạn một file CSV với các cột `email`, `role`
+(`ADMIN` cho lead, `MEMBER` cho seller), `client` và `display_name` tùy chọn (mẫu: [`samples/accounts-template.csv`](samples/accounts-template.csv)).
+Lệnh chạy lại được (không nhân đôi), không gửi email, không lưu `display_name`, và nếu có dòng lỗi thì liệt kê từng dòng và không ghi gì.
+`--create-clients` cho phép tạo client chưa có (mặc định là lỗi, để tên gõ sai không tạo client thừa); `--dry-run` chỉ báo sẽ làm gì.
+Một email đã thuộc client khác không bị chuyển. Lệnh in dòng email để **dán vào `LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS`**; sau khi dán,
+tạo lại service `api`. Không chia sẻ API key với seller.
 
 ```bash
+docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod --profile admin run --rm \
+  -v "$PWD/accounts.csv:/data/accounts.csv:ro" admin account import /data/accounts.csv --create-clients --dry-run
+docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod --profile admin run --rm \
+  -v "$PWD/accounts.csv:/data/accounts.csv:ro" admin account import /data/accounts.csv --create-clients
 docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod --profile admin run --rm admin account list project-global
-docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod --profile admin run --rm admin account role '<lead-email>' ADMIN
 docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod up -d --force-recreate api
 ```
+
+Cách cũ vẫn dùng được cho một tài khoản lẻ: đặt `LISTING_GUARD_CONSOLE_ACCESS_AUTO_CREATE=true` và
+`LISTING_GUARD_CONSOLE_ACCESS_DEFAULT_CLIENT_NAME=project-global`, để người đó đăng nhập một lần, rồi `account role '<email>' ADMIN` và đặt
+auto-create về `false`.
+
+Sau khi nhập account và watchlist ([hướng dẫn](pilot-watchlist-guide.md)), đăng nhập bằng ADMIN và mở **Quản lý → Sẵn sàng**: trang
+này chỉ có khi `LISTING_GUARD_CONSOLE_PILOT=true` và liệt kê catalog đang phục vụ (phiên bản, có tier, có wordlist), ruleset trademark, số mục
+watchlist đang bật, số tài khoản theo vai trò, phạm vi kiểm mặc định và các cờ AI, mỗi mục là **Đạt** hoặc **Thiếu** kèm một dòng cách làm.
+Thứ tự đầy đủ nằm ở [pilot-setup-checklist.md](pilot-setup-checklist.md).
 
 Kiểm tra nhãn **Pilot**, ngôn ngữ VI, trademark catalog **READY**, bảng Sheet và quyền khác nhau giữa hai vai trò.
 Các cờ policy-checks, policy changes, review queue, verified cases, POD, image, LLM và plans/quota đều tắt trong mẫu.

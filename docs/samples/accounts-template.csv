@@ -1,0 +1,4 @@
+email,role,display_name,client
+lead@pilot.example.test,ADMIN,Lead Project Global,project-global
+seller1@pilot.example.test,MEMBER,Seller 1,project-global
+seller2@pilot.example.test,MEMBER,Seller 2,project-global

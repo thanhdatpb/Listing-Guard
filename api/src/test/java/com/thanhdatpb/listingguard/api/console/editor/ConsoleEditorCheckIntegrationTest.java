@@ -101,7 +101,8 @@ class ConsoleEditorCheckIntegrationTest {
         String trademark = section(html, "trademark-panel");
         assertThat(html).contains("data-status=\"REVIEW_REQUIRED\"");
         assertThat(readiness).contains("Ready").containsPattern("class=\"lg-meter__value\">\\d+/\\d+</span>");
-        assertThat(trademark).contains("lg-pill--trademark\">HIGH</span>").contains(trademarkRulesets.ruleset().disclaimer());
+        assertThat(trademark).contains("lg-pill--trademark\">HIGH</span>").contains("id=\"explain-link\"")
+                .doesNotContain(trademarkRulesets.ruleset().disclaimer());
         // the listing card holds the readiness, the trademark panel comes straight after it, both above any finding
         int listing = html.indexOf("id=\"listing-card\"");
         int readinessAt = html.indexOf("id=\"readiness-panel\"");
@@ -141,7 +142,7 @@ class ConsoleEditorCheckIntegrationTest {
         String trademark = section(html, "trademark-panel");
         assertThat(html).contains("data-status=\"INCOMPLETE\"", "Unavailable on your plan.");
         assertThat(trademark).contains("Trademark not checked").contains("does not include the trademark check")
-                .contains("FREE").contains(trademarkRulesets.ruleset().disclaimer());
+                .contains("FREE").contains("id=\"explain-link\"");
         assertThat(plansWithTrademark).isNotEmpty().allSatisfy(plan -> assertThat(trademark).contains(plan));
         assertThat(used(free)).isEqualTo(1);
     }

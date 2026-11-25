@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{explain.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- "Giải thích kết quả" (ADR-053): what the result pages of the bulk check and the editor say in one short line, said in full. The text of
+     the trademark disclaimer is the ruleset's own, printed unchanged (with the note that says in which language it is written, when the
+     page is in another); nothing here is stored and every sentence is a message (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('explain')}"></header>
+<main class="lg-page" id="explain-page">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{explain.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{bulk.intro}"></p>
+        </div>
+    </div>
+
+    <section class="lg-card lg-section" id="explain-ok" aria-labelledby="explain-ok-heading">
+        <h2 class="lg-card__title" id="explain-ok-heading" th:text="#{explain.ok.heading}"></h2>
+        <p th:text="#{bulk.result.note}"></p>
+        <p th:text="#{explain.content}"></p>
+    </section>
+
+    <section class="lg-card lg-section" id="explain-trademark" aria-labelledby="explain-trademark-heading">
+        <h2 class="lg-card__title" id="explain-trademark-heading" th:text="#{explain.trademark.heading}"></h2>
+        <th:block th:with="note=${@consoleMessages.disclaimerNote(disclaimer)}">
+            <p id="disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
+            <p id="disclaimer">
+                <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
+                <span th:text="${disclaimer}"></span>
+            </p>
+        </th:block>
+    </section>
+
+    <section class="lg-card lg-section" id="explain-readiness" aria-labelledby="explain-readiness-heading">
+        <h2 class="lg-card__title" id="explain-readiness-heading" th:text="#{explain.readiness.heading}"></h2>
+        <p th:text="#{bulk.detail.readiness.note}"></p>
+    </section>
+</main>
+</body>
+</html>

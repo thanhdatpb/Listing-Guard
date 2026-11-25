@@ -57,6 +57,6 @@ public class ConsolePilot implements WebMvcConfigurer {
             }
         }).addPathPatterns("/console/watchlist", "/console/watchlist/**", "/console/stats", "/console/stats.csv",
                 "/console/stats/pilot", "/console/stats/pilot.csv", "/console/api-keys", "/console/api-keys/**",
-                "/console/report", "/console/report/**", "/console/report.*");
+                "/console/report", "/console/report/**", "/console/report.*", "/console/readiness");
     }
 }

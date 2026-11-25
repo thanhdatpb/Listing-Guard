@@ -289,6 +289,13 @@ contract tools and release workflow continue to discover exactly one active base
   contract change** (the page, the Sheet block and the CSV name it; the pilot counts it apart, `seller_pilot_daily.scope`). The default is
   content under `console.pilot` and full otherwise (`listing-guard.console.bulk.default-scope`), the seller's remembered choice wins, a built-in
   adapter file and every other caller are full, and `analysisVersion` of a full result is still exactly the ruleset's version.
+- **Pilot onboarding kit** (ADR-053): `account import` writes only `email`, `client` and `role` (an account has no `display_name`: read it,
+  never store it), is all or nothing and idempotent, never moves an e-mail to another client, creates a client only with `--create-clients`,
+  sends nothing and logs ids, never an e-mail. The "Sẵn sàng" page (`/console/readiness`) exists only under `console.pilot`, shows an ADMIN
+  its own client's counts, reads existing data (no table, no setting, no API) and says "OK" only for what it read. The result pages of the
+  bulk check and the editor have the one short line `result.short` and the link to `/console/explain`, where the ruleset's disclaimer is
+  printed unchanged: **never reword the disclaimer, never put a second wording of it on a page, and never drop it from the explanation
+  page** (the re-audit, report and POD pages still print it in full). A label that a seller reads is Vietnamese in the vi bundle.
 - **Finding feedback** (ADR-034): a verdict changes no finding, rule, result, cache, `analysisVersion` or charge, and no query of it takes
   `requirePack`, `requireQuota` or `charge`. **Never store, log, export or return the text of a listing with a verdict**: the row copies only
   the rule id, source, level and `analysisVersion`; the note is the reviewer's own words, shown only to its author, and **no statistic, CSV,
