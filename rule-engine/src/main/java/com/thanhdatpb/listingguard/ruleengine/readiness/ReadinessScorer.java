@@ -11,7 +11,8 @@ import java.util.Map;
  * {@link ReadinessConfig}; none is written here.
  *
  * <p>An incomplete run (a rule failed) has no score and is not ready, because a missing finding may be a rule that did
- * not run. A listing with an ERROR is not ready and its score is capped at {@code not_ready_max_score}.
+ * not run. A listing with an ERROR is not ready and its score is capped at {@code not_ready_max_score}. A partial run (ADR-052: the
+ * data never had some fields and a presence rule left them out) has no score either and is not ready.
  */
 public final class ReadinessScorer {
 
@@ -44,6 +45,10 @@ public final class ReadinessScorer {
 
         if (!run.complete()) {
             return new ReadinessScore(config.version(), config.packId(), ReadinessScore.Status.INCOMPLETE, null, false,
+                    errors, warnings, infos, run.failedRuleIds());
+        }
+        if (run.partial()) {
+            return new ReadinessScore(config.version(), config.packId(), ReadinessScore.Status.PARTIAL, null, false,
                     errors, warnings, infos, run.failedRuleIds());
         }
         long taken = 0;

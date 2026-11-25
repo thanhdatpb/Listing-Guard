@@ -9,6 +9,7 @@ import com.thanhdatpb.listingguard.ruleengine.config.RulesetException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +38,7 @@ public final class RuleEngine {
      * verified fixes.
      */
     public List<Finding> run(Listing listing, RulesetConfig config) {
-        return evaluate(listing, config).findings().stream().map(Finding::withoutFix).toList();
+        return evaluate(listing, config, null).findings().stream().map(Finding::withoutFix).toList();
     }
 
     /**
@@ -51,7 +52,17 @@ public final class RuleEngine {
      * per value for a tag, because positions move). INFO findings are not compared.
      */
     public RuleRun runDetailed(Listing listing, RulesetConfig config) {
-        Evaluation base = evaluate(listing, config);
+        return runDetailed(listing, config, null);
+    }
+
+    /**
+     * As {@link #runDetailed(Listing, RulesetConfig)}, for data that holds only some fields (ADR-052). {@code checkedFields} are the
+     * fields the caller supplied; a presence rule ({@link FieldScopedRule}) does not report a field outside the set, and the run
+     * names what was left out ({@link RuleRun#skippedFields()}). A field inside the set, supplied and empty, is reported as always.
+     * {@code null} means every field was supplied: the result is exactly that of {@link #runDetailed(Listing, RulesetConfig)}.
+     */
+    public RuleRun runDetailed(Listing listing, RulesetConfig config, Set<String> checkedFields) {
+        Evaluation base = evaluate(listing, config, checkedFields);
         List<Finding> findings = new ArrayList<>(base.findings().size());
         Map<String, Integer> baseCounts = null;
         for (Finding finding : base.findings()) {
@@ -62,9 +73,27 @@ public final class RuleEngine {
             if (baseCounts == null) {
                 baseCounts = problemCounts(base.findings());
             }
-            findings.add(fixHolds(finding, listing, config, base, baseCounts) ? finding : finding.withoutFix());
+            findings.add(fixHolds(finding, listing, config, checkedFields, base, baseCounts) ? finding : finding.withoutFix());
         }
-        return new RuleRun(config.packId(), findings, base.failedRuleIds());
+        return new RuleRun(config.packId(), findings, base.failedRuleIds(), base.skippedRuleIds(), base.skippedFields());
+    }
+
+    /**
+     * The fields {@link #runDetailed(Listing, RulesetConfig, Set)} would leave out for this listing and {@code checkedFields}, in
+     * ruleset order, without running anything. A caller that has to know them before the run (a cache identity) asks here, so the two
+     * cannot differ. Empty for {@code null}.
+     */
+    public List<String> skippedFields(Listing listing, RulesetConfig config, Set<String> checkedFields) {
+        if (checkedFields == null) {
+            return List.of();
+        }
+        Set<String> skipped = new LinkedHashSet<>();
+        for (Rule rule : registry.rulesFor(config.packId(), config.marketplace())) {
+            if (rule instanceof FieldScopedRule scoped && config.rule(rule.id(), listing.productType()).enabled()) {
+                scoped.scopedFields(listing, config).stream().filter(field -> !checkedFields.contains(field)).forEach(skipped::add);
+            }
+        }
+        return List.copyOf(skipped);
     }
 
     /**
@@ -89,12 +118,24 @@ public final class RuleEngine {
         return List.copyOf(limits);
     }
 
-    private Evaluation evaluate(Listing listing, RulesetConfig config) {
+    private Evaluation evaluate(Listing listing, RulesetConfig config, Set<String> checkedFields) {
         List<Finding> findings = new ArrayList<>();
         List<String> failed = new ArrayList<>();
+        Set<String> skippedRules = new LinkedHashSet<>();
+        Set<String> skippedFields = new LinkedHashSet<>();
         for (Rule rule : registry.rulesFor(config.packId(), config.marketplace())) {
             try {
                 if (!config.rule(rule.id(), listing.productType()).enabled()) {
+                    continue;
+                }
+                if (checkedFields != null && rule instanceof FieldScopedRule scoped) {
+                    Set<String> skipped = new LinkedHashSet<>(scoped.scopedFields(listing, config));
+                    skipped.removeIf(checkedFields::contains);
+                    findings.addAll(scoped.evaluate(listing, config, skipped));
+                    if (!skipped.isEmpty()) {
+                        skippedRules.add(rule.id());
+                        skippedFields.addAll(skipped);
+                    }
                     continue;
                 }
                 findings.addAll(rule.evaluate(listing, config));
@@ -103,16 +144,16 @@ public final class RuleEngine {
                 log.error("Rule '{}' failed on ruleset {}; skipping it", rule.id(), config.version(), e);
             }
         }
-        return new Evaluation(findings, failed);
+        return new Evaluation(findings, failed, List.copyOf(skippedRules), List.copyOf(skippedFields));
     }
 
-    private boolean fixHolds(Finding finding, Listing listing, RulesetConfig config, Evaluation base,
+    private boolean fixHolds(Finding finding, Listing listing, RulesetConfig config, Set<String> checkedFields, Evaluation base,
                              Map<String, Integer> baseCounts) {
         Optional<Listing> changed = FixApplier.apply(listing, finding);
         if (changed.isEmpty()) {
             return false;
         }
-        Evaluation after = evaluate(changed.get(), config);
+        Evaluation after = evaluate(changed.get(), config, checkedFields);
         if (!after.failedRuleIds().equals(base.failedRuleIds())) {
             return false;
         }
@@ -151,7 +192,8 @@ public final class RuleEngine {
         return finding.ruleId() + "|" + field.substring(0, bracket) + "|" + finding.value();
     }
 
-    private record Evaluation(List<Finding> findings, List<String> failedRuleIds) {
+    private record Evaluation(List<Finding> findings, List<String> failedRuleIds, List<String> skippedRuleIds,
+                              List<String> skippedFields) {
     }
 
     /**
