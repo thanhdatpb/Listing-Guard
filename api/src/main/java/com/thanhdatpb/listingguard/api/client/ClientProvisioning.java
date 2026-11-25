@@ -267,6 +267,11 @@ public class ClientProvisioning {
         return clients.findByName(name).orElseThrow(() -> new IllegalArgumentException("No client named '" + name + "'."));
     }
 
+    /** Whether {@code name} is a client name: 1 to 32 characters from a-z 0-9 _ - that start with a letter or digit. */
+    public static boolean isValidName(String name) {
+        return name != null && NAME.matcher(name).matches();
+    }
+
     private static void requireValidName(String name) {
         if (name == null || !NAME.matcher(name).matches()) {
             throw new IllegalArgumentException("A client name is 1 to 32 characters from a-z 0-9 _ - and starts with a letter or digit.");

@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.api.client;
 
 import com.thanhdatpb.listingguard.api.console.ConsoleAccount;
+import com.thanhdatpb.listingguard.api.console.ConsoleAccountImporter;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRoles;
 import com.thanhdatpb.listingguard.api.console.ConsoleRole;
 import com.thanhdatpb.listingguard.api.console.editor.PodProfileAdminCommands;
@@ -22,6 +23,7 @@ import org.springframework.boot.ApplicationArguments;
  * plan set &lt;client&gt; &lt;plan&gt;      (ADR-013: FREE, SELLER or PRO)
  * catalog list     catalog activate &lt;version&gt;     catalog rollback [--to=&lt;version&gt;]   (ADR-009, PR A2d)
  * account list &lt;client&gt;     account role &lt;email&gt; &lt;ADMIN|MEMBER&gt;   (ADR-031)
+ * account import &lt;file.csv&gt; [--dry-run] [--create-clients]   (ADR-053, accounts of a pilot from one file)
  * pod-profile import &lt;file.csv&gt; [--out=&lt;dir&gt;]   (ADR-048, a supplier spec file into new POD profile versions)
  * </pre>
  */
@@ -39,11 +41,13 @@ public final class AdminCommands {
               plan set <client> <plan>   (plan: FREE, SELLER or PRO)
               account list <client>
               account role <email> <role>   (role: ADMIN or MEMBER; an ADMIN edits the client's trademark watchlist in the console)
+              account import <file.csv> [--dry-run] [--create-clients]   (columns email, role, client, display_name; ADR-053)
             """ + CatalogAdminCommands.USAGE + PodProfileAdminCommands.USAGE;
 
     private final ClientProvisioning provisioning;
     private final CatalogAdminCommands catalog;
     private final ConsoleAccountRoles accounts;
+    private final ConsoleAccountImporter importer;
     private final PrintStream out;
 
     /** Without the {@code catalog} commands. */
@@ -59,9 +63,16 @@ public final class AdminCommands {
     /** @param accounts the {@code account} commands (ADR-031); null leaves them out */
     public AdminCommands(ClientProvisioning provisioning, CatalogAdminCommands catalog, ConsoleAccountRoles accounts,
                          PrintStream out) {
+        this(provisioning, catalog, accounts, null, out);
+    }
+
+    /** @param importer {@code account import} (ADR-053); null leaves it out */
+    public AdminCommands(ClientProvisioning provisioning, CatalogAdminCommands catalog, ConsoleAccountRoles accounts,
+                         ConsoleAccountImporter importer, PrintStream out) {
         this.provisioning = provisioning;
         this.catalog = catalog;
         this.accounts = accounts;
+        this.importer = importer;
         this.out = out;
     }
 
@@ -113,6 +124,7 @@ public final class AdminCommands {
             }
             case "account list" -> listAccounts(argument(args, 2, "a client name"));
             case "account role" -> setRole(argument(args, 2, "an email"), argument(args, 3, "a role"));
+            case "account import" -> importAccounts(argument(args, 2, "a file"), arguments);
             default -> throw usage("Unknown command '" + group + " " + command + "'.");
         }
     }
@@ -182,6 +194,62 @@ public final class AdminCommands {
         }
         out.println(previous == role ? "The account is already " + role + "; nothing changed."
                 : "The account is now " + role + " (was " + previous + "). It takes effect on its next console page.");
+    }
+
+    /** The most bytes of an account file; a pilot has a handful of accounts. */
+    private static final long IMPORT_MAX_BYTES = 1_000_000;
+
+    /**
+     * {@code account import <file.csv> [--dry-run] [--create-clients]} (ADR-053). Prints one line for each row, the counts and the
+     * e-mails to paste into {@code LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS}. A file with a problem is listed line by line and
+     * nothing is written. It sends no e-mail.
+     */
+    private void importAccounts(String file, ApplicationArguments arguments) {
+        if (importer == null) {
+            throw usage("The account commands are not available here.");
+        }
+        String text;
+        try {
+            java.nio.file.Path path = java.nio.file.Path.of(file);
+            if (java.nio.file.Files.size(path) > IMPORT_MAX_BYTES) {
+                throw new IllegalArgumentException("The file is larger than " + IMPORT_MAX_BYTES + " bytes.");
+            }
+            text = java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                    .decode(java.nio.ByteBuffer.wrap(java.nio.file.Files.readAllBytes(path))).toString();
+        } catch (java.io.IOException | java.nio.file.InvalidPathException e) {
+            throw new IllegalArgumentException("The file '" + file + "' cannot be read as UTF-8 text.");
+        }
+        ConsoleAccountImporter.Result result = importer.importTable(text, arguments.containsOption("dry-run"),
+                arguments.containsOption("create-clients"));
+        if (!result.ok()) {
+            result.problems().forEach(problem -> out.println("Problem, " + problem));
+            throw new IllegalArgumentException("Nothing was imported: " + result.problems().size()
+                    + " problem(s) in the file. Correct the file and run the command again.");
+        }
+        String dry = result.dryRun() ? "[dry run] " : "";
+        for (ConsoleAccountImporter.Row row : result.rows()) {
+            String what = switch (row.action()) {
+                case CREATED -> result.dryRun() ? "would create" : "created";
+                case ROLE_UPDATED -> result.dryRun() ? "would set the role of" : "role updated for";
+                case UNCHANGED -> "unchanged";
+            };
+            out.println(dry + "Line " + row.line() + ": " + what + " " + row.email() + " (" + row.role() + ", client "
+                    + row.client() + (row.clientCreated() ? ", client " + (result.dryRun() ? "would be created" : "created") : "")
+                    + ")");
+        }
+        out.println(dry + result.rows().size() + " row(s): " + result.count(ConsoleAccountImporter.Action.CREATED) + " created, "
+                + result.count(ConsoleAccountImporter.Action.ROLE_UPDATED) + " role updated, "
+                + result.count(ConsoleAccountImporter.Action.UNCHANGED) + " unchanged. No e-mail was sent.");
+        if (result.displayNamesSeen()) {
+            out.println("display_name was read and not stored: an account has no such field.");
+        }
+        out.println("For LISTING_GUARD_CONSOLE_ACCESS_ALLOWED_EMAILS (add these, then recreate the api service):");
+        out.println(String.join(",", result.emails()));
+        if (!result.notAllowed().isEmpty()) {
+            out.println("Not allowed to sign in with the current settings: " + String.join(", ", result.notAllowed()));
+        }
     }
 
     private void listKeys(String clientName) {
