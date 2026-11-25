@@ -35,10 +35,19 @@ public final class LlmJudgement {
         UNSURE
     }
 
-    /** One verdict. The reason is only used with LIKELY_DESCRIPTIVE. */
-    public record Judged(Verdict verdict, String reason) {
+    /**
+     * One verdict. The reason is only used with LIKELY_DESCRIPTIVE.
+     *
+     * @param basis what the model was given with the sentence (the evidence pack of ADR-051), or null when it got none: then a
+     *              demotion is recorded exactly as before. Only a demotion keeps it; any other verdict changes nothing.
+     */
+    public record Judged(Verdict verdict, String reason, JudgeBasis basis) {
 
         public static final Judged UNSURE = new Judged(Verdict.UNSURE, "");
+
+        public Judged(Verdict verdict, String reason) {
+            this(verdict, reason, null);
+        }
     }
 
     private LlmJudgement() {
@@ -83,7 +92,7 @@ public final class LlmJudgement {
             if (!eligible(result, finding)) {
                 continue;
             }
-            findings.set(index, lowered(finding, judged.reason()));
+            findings.set(index, lowered(finding, judged));
             changed = true;
         }
         if (!changed && !skipped) {
@@ -99,13 +108,18 @@ public final class LlmJudgement {
                 findings, result.failedRuleIds(), result.disclaimer(), List.copyOf(skippedIds));
     }
 
-    private static TrademarkFinding lowered(TrademarkFinding finding, String reason) {
+    private static TrademarkFinding lowered(TrademarkFinding finding, Judged judged) {
         Evidence old = finding.evidence();
+        String reason = judged.reason();
         // every adjustment of a finding states the level the rule assigned, so the new one does too
         RiskLevel from = old.riskAdjustments().isEmpty() ? finding.risk() : old.riskAdjustments().get(0).from();
         String note = reason == null || reason.isBlank() ? LABEL : LABEL + " " + reason.strip();
         List<RiskAdjustment> adjustments = new ArrayList<>(old.riskAdjustments());
-        adjustments.add(new RiskAdjustment(AdjustmentReason.LLM_DESCRIPTIVE, from, RiskLevel.LOW, note));
+        // the evidence the model was given and its checked reason are kept with the demotion; with no evidence pack the adjustment
+        // is exactly the one ADR-036 describes
+        JudgeBasis basis = judged.basis() == null ? null
+                : judged.basis().withReason(reason == null || reason.isBlank() ? null : reason.strip());
+        adjustments.add(new RiskAdjustment(AdjustmentReason.LLM_DESCRIPTIVE, from, RiskLevel.LOW, note, null, basis));
         Evidence evidence = new Evidence(old.field(), old.start(), old.end(), old.snippet(), old.normalizedToken(),
                 old.matchedMark(), old.matchType(), old.score(), old.catalogVersion(), old.ruleId(), old.insideColorPhrase(),
                 old.otherRuleIds(), old.sourceIds(), adjustments, old.sourceLinks(), old.watchlist());

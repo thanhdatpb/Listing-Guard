@@ -54,6 +54,8 @@ services:
       # Free-tier LLM providers and the trademark context judge (ADR-036, docs/llm.md): off by default; the keys are secrets (.env)
       LISTING_GUARD_LLM_ENABLED: ${LISTING_GUARD_LLM_ENABLED:-false}
       LISTING_GUARD_LLM_JUDGE_ENABLED: ${LISTING_GUARD_LLM_JUDGE_ENABLED:-false}
+      # Which judge prompt (ADR-051): trademark-judge-2026-11 (default) or trademark-judge-2026-12 (with an evidence pack).
+      LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION: ${LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION:-trademark-judge-2026-11}
       # The console's "Gợi ý sửa" button (ADR-037): off by default; it also needs LISTING_GUARD_LLM_ENABLED and a provider whose
       # LISTING_TEXT_ALLOWED is true. With it on, the title, tags and findings of a listing go to that provider on each press.
       LISTING_GUARD_LLM_REWRITE_ENABLED: ${LISTING_GUARD_LLM_REWRITE_ENABLED:-false}

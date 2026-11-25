@@ -14,9 +14,14 @@ import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals;
  * @param note   the ruleset's Vietnamese explanation, with the real values filled in
  */
 public record RiskAdjustment(AdjustmentReason reason, RiskLevel from, RiskLevel to, String note,
-                             DistinctivenessSignals distinctiveness) {
+                             DistinctivenessSignals distinctiveness, JudgeBasis judge) {
     public RiskAdjustment(AdjustmentReason reason, RiskLevel from, RiskLevel to, String note) {
-        this(reason, from, to, note, null);
+        this(reason, from, to, note, null, null);
+    }
+
+    public RiskAdjustment(AdjustmentReason reason, RiskLevel from, RiskLevel to, String note,
+                          DistinctivenessSignals distinctiveness) {
+        this(reason, from, to, note, distinctiveness, null);
     }
 
 

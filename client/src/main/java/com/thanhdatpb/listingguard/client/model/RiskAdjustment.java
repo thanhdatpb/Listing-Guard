@@ -8,11 +8,17 @@ package com.thanhdatpb.listingguard.client.model;
  * @param to     the level after it
  * @param note   the reason in words
  * @param distinctiveness unverified catalog signals for a tier-based adjustment, or {@code null}
+ * @param judgeEvidence   what the LLM judge was shown and its reason, only on {@code llm_descriptive} when the operator chose the
+ *                        evidence prompt, or {@code null}
  */
 public record RiskAdjustment(String reason, RiskLevel from, RiskLevel to, String note,
-                             TrademarkCalibrationEvidence distinctiveness) {
+                             TrademarkCalibrationEvidence distinctiveness, TrademarkJudgeEvidence judgeEvidence) {
 
     public RiskAdjustment(String reason, RiskLevel from, RiskLevel to, String note) {
-        this(reason, from, to, note, null);
+        this(reason, from, to, note, null, null);
+    }
+
+    public RiskAdjustment(String reason, RiskLevel from, RiskLevel to, String note, TrademarkCalibrationEvidence distinctiveness) {
+        this(reason, from, to, note, distinctiveness, null);
     }
 }

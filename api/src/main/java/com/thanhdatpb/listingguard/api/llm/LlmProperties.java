@@ -58,12 +58,16 @@ public record LlmProperties(
      * @param snippetChars    characters of the field text kept on each side of the match
      * @param maxOutputTokens tokens the answer may use (a reasoning model spends part of them thinking)
      * @param timeout         per provider
+     * @param promptVersion   which prompt file the judge uses: {@code trademark-judge-2026-11} (the default, the prompt of ADR-036) or
+     *                        {@code trademark-judge-2026-12} (the same question with an evidence pack, ADR-051). An unknown value
+     *                        stops the start; setting the default again is the rollback
      */
     public record Judge(
             @DefaultValue("false") boolean enabled,
             @DefaultValue("8") int maxPerCheck,
             @DefaultValue("160") int snippetChars,
             @DefaultValue("600") int maxOutputTokens,
-            @DefaultValue("20s") Duration timeout) {
+            @DefaultValue("20s") Duration timeout,
+            @DefaultValue("trademark-judge-2026-11") String promptVersion) {
     }
 }
