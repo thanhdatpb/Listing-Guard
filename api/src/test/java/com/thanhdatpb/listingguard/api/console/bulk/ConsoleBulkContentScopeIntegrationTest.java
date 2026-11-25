@@ -257,6 +257,12 @@ class ConsoleBulkContentScopeIntegrationTest {
         assertThat(storedChecks(seller).get(0).get("readiness_status")).as("nothing was left out").isEqualTo("SCORED");
     }
 
+    @Test
+    void theReadinessPageOfThePilotDoesNotExistWithoutThePilotProfile() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/console/readiness")
+                .with(com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.signedIn(user()))).andExpect(status().isNotFound());
+    }
+
     // ---- the full scope is the old behaviour
 
     @Test

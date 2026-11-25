@@ -216,15 +216,12 @@
                 <p class="lg-text-muted lg-small" th:text="${result.trademark.detail}"></p>
                 <p class="lg-small lg-panel__hint" th:if="${result.trademark.hint != null}" th:text="${result.trademark.hint}"></p>
                 <p class="lg-small lg-panel__demo" id="trademark-demo-note" th:if="${demoCatalog}"><span th:replace="~{console/layout :: demoText}"></span></p>
-                <!-- The wording of the ruleset is always printed as it is (it is the legal text). A statement of the page's own language
-                     goes above it when that language has one that differs (ADR-028). -->
-                <th:block th:with="note=${@consoleMessages.disclaimerNote(result.trademark.disclaimer)}">
-                    <p class="lg-text-muted lg-small lg-panel__disclaimer" id="trademark-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
-                    <p class="lg-text-muted lg-small lg-panel__disclaimer" id="trademark-disclaimer">
-                        <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
-                        <span th:text="${result.trademark.disclaimer}"></span>
-                    </p>
-                </th:block>
+                <!-- One short line and a link (ADR-053). The wording of the ruleset is printed as it is on the explanation page (it is the
+                     legal text), with the statement of the page's own language above it when that language has one (ADR-028). -->
+                <p class="lg-text-muted lg-small lg-panel__disclaimer" id="trademark-disclaimer">
+                    <span th:text="#{result.short}"></span>
+                    <a id="explain-link" th:href="@{/console/explain}" target="_blank" rel="noopener" th:text="#{result.explain.link}"></a>
+                </p>
             </section>
 
             <section class="lg-stack" id="rule-findings" th:if="${result.rulesRan}" aria-labelledby="findings-heading">

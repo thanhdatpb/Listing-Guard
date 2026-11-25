@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{readiness.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- The "Sẵn sàng" page (ADR-053): one table for each group of things a pilot needs, each line with its state, what was found and what to
+     do. It reads existing data and writes nothing; every sentence is a message (ADR-028) and every value goes through th:text. -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('readiness')}"></header>
+<main class="lg-page" id="readiness-page">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{readiness.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{readiness.intro}"></p>
+        </div>
+    </div>
+
+    <div class="lg-banner lg-banner--success lg-section" id="readiness-summary" role="status" th:if="${view.ready()}">
+        <p th:text="#{readiness.ready(${#strings.toString(view.ok)}, ${#strings.toString(view.total)})}"></p>
+    </div>
+    <div class="lg-banner lg-banner--warning lg-section" id="readiness-summary" role="status" th:unless="${view.ready()}">
+        <p th:text="#{readiness.notready(${#strings.toString(view.ok)}, ${#strings.toString(view.total)}, ${#strings.toString(view.total - view.ok)})}"></p>
+    </div>
+
+    <section class="lg-card lg-section" th:each="section, state : ${view.sections}" th:attr="id='readiness-section-' + ${state.count}"
+             th:aria-labelledby="'readiness-heading-' + ${state.count}">
+        <div class="lg-card__head">
+            <h2 class="lg-card__title" th:id="'readiness-heading-' + ${state.count}" th:text="${section.title}"></h2>
+        </div>
+        <div class="lg-table-wrap">
+            <table class="lg-table lg-table--scroll">
+                <caption class="lg-sr-only" th:text="${section.title}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{readiness.col.item}"></th>
+                    <th scope="col" th:text="#{readiness.col.status}"></th>
+                    <th scope="col" th:text="#{readiness.col.detail}"></th>
+                    <th scope="col" th:text="#{readiness.col.hint}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${section.items}" th:attr="id='readiness-' + ${#strings.replace(item.key, '.', '-')},data-state=${item.ok} ? 'ok' : 'missing'">
+                    <th scope="row" th:text="${item.title}"></th>
+                    <td>
+                        <span class="lg-pill lg-pill--clean" th:if="${item.ok}">
+                            <svg class="lg-icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg>
+                            <th:block th:text="#{readiness.status.ok}"></th:block>
+                        </span>
+                        <span class="lg-pill lg-pill--error" th:unless="${item.ok}">
+                            <span class="lg-mark" aria-hidden="true"></span>
+                            <th:block th:text="#{readiness.status.missing}"></th:block>
+                        </span>
+                    </td>
+                    <td th:text="${item.detail}"></td>
+                    <td class="lg-text-muted lg-small" th:text="${item.hint}"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+</body>
+</html>

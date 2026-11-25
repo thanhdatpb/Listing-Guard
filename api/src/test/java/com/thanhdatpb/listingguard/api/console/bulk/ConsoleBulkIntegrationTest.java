@@ -272,14 +272,30 @@ class ConsoleBulkIntegrationTest {
     }
 
     @Test
-    void theTrademarkDisclaimerIsOnThePageNextToTheTableAndInEachRowDetail() throws Exception {
+    void theResultPageHasOneShortLineAndALinkAndTheExplanationKeepsTheRulesetsDisclaimerUnchanged() throws Exception {
         ConsoleUser seller = user(PlanCode.SELLER);
         String result = run(seller, prepare(seller, "ETSY", table(goodRow("S-1", "Zorvex ceramic mug " + unique())), null));
 
         String disclaimer = trademarkRulesets.ruleset().disclaimer();
-        assertThat(result).contains(disclaimer).contains("id=\"result-disclaimer\"").contains("không phải lời xác nhận của sàn");
-        assertThat(result.split(Pattern.quote(disclaimer), -1).length - 1).as("the page and the row detail").isGreaterThan(1);
+        assertThat(result).contains("id=\"result-note\"").contains("Kết quả chỉ là cảnh báo tham khảo, không phải xác nhận của sàn")
+                .containsPattern("<a id=\"explain-link\"[^>]*href=\"/console/explain\"[^>]*target=\"_blank\"[^>]*rel=\"noopener\"")
+                .contains("Giải thích kết quả");
+        assertThat(result).as("the paragraphs that were repeated are gone, in the page and in every row").doesNotContain(disclaimer)
+                .doesNotContain("không phải lời xác nhận của sàn").doesNotContain("id=\"result-disclaimer\"");
         assertThat(result).containsPattern("(?i)Nhãn trong danh mục: zorvex");
+
+        String explanation = mvc.perform(get("/console/explain").with(signedIn(seller))).andExpect(status().isOk()).andReturn()
+                .getResponse().getContentAsString();
+        assertThat(explanation).contains("Giải thích kết quả").contains("id=\"disclaimer\"").contains(disclaimer)
+                .contains("không phải lời xác nhận của sàn").contains("Đạt (nội dung)");
+        assertThat(explanation.split(Pattern.quote(disclaimer), -1).length - 1).as("said once").isEqualTo(1);
+    }
+
+    @Test
+    void theExplanationPageNeedsASignInAndIsNeverCached() throws Exception {
+        mvc.perform(get("/console/explain")).andExpect(status().is3xxRedirection());
+        MvcResult page = mvc.perform(get("/console/explain").with(signedIn(user(PlanCode.FREE)))).andExpect(status().isOk()).andReturn();
+        assertThat(page.getResponse().getHeader("Cache-Control")).contains("no-store");
     }
 
     @Test
@@ -525,18 +541,26 @@ class ConsoleBulkIntegrationTest {
                 assertThat(page).as(language).contains("<html lang=\"" + language + "\"").doesNotContain("??")
                         .doesNotContain("#{").doesNotContain("${");
             }
-            assertThat(result).as(language + " keeps the ruleset's own disclaimer").contains(disclaimer);
+            // the page says it in one short line and links to the explanation, where the ruleset's own text is (ADR-053)
+            assertThat(result).as(language + " one short line and a link").contains("id=\"explain-link\"")
+                    .doesNotContain(disclaimer).doesNotContain("id=\"result-disclaimer\"");
+            String explanation = mvc.perform(get("/console/explain").with(signedIn(seller)).cookie(cookie)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(explanation).as(language + " keeps the ruleset's own disclaimer").contains(disclaimer);
             if (language.equals("en")) {
                 assertThat(form).contains("Paste from Sheet").doesNotContain("Dán từ Sheet");
                 assertThat(mapping).contains("What is each column?").contains("data rows and 11 columns.");
-                assertThat(result).contains("Results (Etsy)").contains("id=\"result-disclaimer-note\"")
-                        .contains("Original text of the ruleset:").doesNotContain("Kết quả (");
+                assertThat(result).contains("Results (Etsy)").contains("Results are reference warnings only")
+                        .contains("Explain the results").doesNotContain("Kết quả (");
+                assertThat(explanation).contains("id=\"disclaimer-note\"").contains("Original text of the ruleset:");
                 assertThat(sheetLines(result).get(0)).isEqualTo("Status\tSummary");
                 assertThat(resultRows(result).get(0).status()).isEqualTo("Warning");
             } else {
                 assertThat(form).contains("Dán từ Sheet").doesNotContain("Paste from Sheet");
                 assertThat(mapping).contains("Mỗi cột là gì?");
-                assertThat(result).contains("Kết quả (Etsy)").doesNotContain("id=\"result-disclaimer-note\"");
+                assertThat(result).contains("Kết quả (Etsy)").contains("Kết quả chỉ là cảnh báo tham khảo")
+                        .contains("Giải thích kết quả");
+                assertThat(explanation).doesNotContain("id=\"disclaimer-note\"");
                 assertThat(sheetLines(result).get(0)).isEqualTo("Trạng thái\tTóm tắt");
                 assertThat(resultRows(result).get(0).status()).isEqualTo("Cảnh báo");
             }

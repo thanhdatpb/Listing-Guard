@@ -30,7 +30,8 @@ public class ConsoleAccountAdvice {
     private final ConsoleAccountRoles roles;
     private final ConsolePilot pilot;
 
-    public record Navigation(boolean pilot, boolean manage, boolean policyChanges, boolean pod, boolean review) { }
+    /** {@code readiness} is the "Sẵn sàng" page (ADR-053): the pilot's own, for an ADMIN. */
+    public record Navigation(boolean pilot, boolean manage, boolean policyChanges, boolean pod, boolean review, boolean readiness) { }
 
     @ModelAttribute("consoleNavigation")
     public Navigation navigation() {
@@ -38,7 +39,7 @@ public class ConsoleAccountAdvice {
         boolean pilotEnabled = pilot.enabled();
         boolean manage = !pilotEnabled || authentication != null
                 && authentication.getPrincipal() instanceof ConsoleUser user && roles.isAdmin(user);
-        return new Navigation(pilotEnabled, manage, pilot.policyChanges(), pilot.pod(), pilot.review());
+        return new Navigation(pilotEnabled, manage, pilot.policyChanges(), pilot.pod(), pilot.review(), pilotEnabled && manage);
     }
 
     public ConsoleAccountAdvice(ClientRepository clients, ConsoleAccountRoles roles, ConsolePilot pilot) {

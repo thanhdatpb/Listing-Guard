@@ -237,21 +237,27 @@ class ConsoleLocalizationIntegrationTest {
     }
 
     @Test
-    void theTrademarkDisclaimerIsAlwaysTheRulesetsWordsAndAnEnglishStatementComesFirstOnAnEnglishPage() throws Exception {
+    void theTrademarkDisclaimerIsTheRulesetsWordsOnTheExplanationPageAndAnEnglishStatementComesFirstOnAnEnglishPage() throws Exception {
         String disclaimer = trademarkRulesets.ruleset().disclaimer();
         ConsoleUser user = userOf(client());
         Map<String, String> form = etsyForm("Mug " + unique());
 
-        String english = section(html(in(checkPost(user, form), "en")), "trademark-panel");
-        String vietnamese = section(html(in(checkPost(user, form), "vi")), "trademark-panel");
+        // the editor says it in one short line with a link (ADR-053); the words of the ruleset are on the explanation page
+        String panel = section(html(in(checkPost(user, form), "en")), "trademark-panel");
+        assertThat(panel).contains("id=\"explain-link\"").contains("Results are reference warnings only").doesNotContain(disclaimer);
 
-        assertThat(english).contains("id=\"trademark-disclaimer-note\"")
+        String english = html(in(get("/console/explain").with(signedIn(user)), "en"));
+        String vietnamese = html(in(get("/console/explain").with(signedIn(user)), "vi"));
+
+        assertThat(english).contains("id=\"disclaimer-note\"")
                 .contains("These results are reference warnings only, not a legal conclusion")
                 .contains("Original text of the ruleset:").contains(disclaimer);
         assertThat(english.indexOf("These results are reference warnings only")).isLessThan(english.indexOf(disclaimer));
-        assertThat(vietnamese).contains(disclaimer).doesNotContain("trademark-disclaimer-note").doesNotContain("Nguyên văn")
+        assertThat(vietnamese).contains(disclaimer).doesNotContain("disclaimer-note").doesNotContain("Nguyên văn")
                 .doesNotContain("reference warnings only");
         assertThat(vietnamese.split(Pattern.quote(disclaimer), -1)).as("said once").hasSize(2);
+        assertThat(english).contains("What OK means");
+        assertThat(vietnamese).contains("Giải thích kết quả").contains("“Đạt” nghĩa là gì");
     }
 
     @Test

@@ -210,14 +210,12 @@
                 </a>
             </div>
         </div>
-        <p class="lg-field__hint" id="result-note" th:text="#{bulk.result.note}"></p>
-        <th:block th:with="note=${@consoleMessages.disclaimerNote(result.disclaimer)}">
-            <p class="lg-field__hint" id="result-disclaimer-note" th:if="${note != null}" th:text="${note}"></p>
-            <p class="lg-field__hint" id="result-disclaimer">
-                <span th:if="${note != null}" th:text="#{editor.disclaimer.original}"></span>
-                <span th:text="${result.disclaimer}"></span>
-            </p>
-        </th:block>
+        <!-- One short line instead of the paragraphs this page used to repeat (ADR-053); the full text, with the ruleset's disclaimer
+             unchanged, is on the explanation page. It opens in a new tab so the result in front of the seller is not lost. -->
+        <p class="lg-field__hint" id="result-note">
+            <span th:text="#{result.short}"></span>
+            <a id="explain-link" th:href="@{/console/explain}" target="_blank" rel="noopener" th:text="#{result.explain.link}"></a>
+        </p>
 
         <div class="lg-banner lg-banner--info lg-section" th:each="note : ${result.notes}"><p th:text="${note}"></p></div>
 
@@ -264,7 +262,7 @@
                 </tr>
                 <tr class="lg-detail-row" th:attr="id='bulk-detail-' + ${row.index},data-detail-of=${row.index}" th:if="${row.status.name() != 'EMPTY'}">
                     <td colspan="7">
-                        <div th:replace="~{console/bulk-fragments :: rowDetail(${row}, ${result.disclaimer})}"></div>
+                        <div th:replace="~{console/bulk-fragments :: rowDetail(${row})}"></div>
                         <p class="lg-small"><a th:href="'#row-' + ${row.index}" th:text="#{bulk.row.close}"></a></p>
                     </td>
                 </tr>
