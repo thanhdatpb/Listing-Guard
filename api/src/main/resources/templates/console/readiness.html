@@ -47,14 +47,9 @@
                 <tr th:each="item : ${section.items}" th:attr="id='readiness-' + ${#strings.replace(item.key, '.', '-')},data-state=${item.ok} ? 'ok' : 'missing'">
                     <th scope="row" th:text="${item.title}"></th>
                     <td>
-                        <span class="lg-pill lg-pill--clean" th:if="${item.ok}">
-                            <svg class="lg-icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg>
-                            <th:block th:text="#{readiness.status.ok}"></th:block>
-                        </span>
-                        <span class="lg-pill lg-pill--error" th:unless="${item.ok}">
-                            <span class="lg-mark" aria-hidden="true"></span>
-                            <th:block th:text="#{readiness.status.missing}"></th:block>
-                        </span>
+                        <!-- the shape of each pill (a check, a diamond) comes from its style: the state is a word and a shape, not a color -->
+                        <span class="lg-pill lg-pill--clean" th:if="${item.ok}" th:text="#{readiness.status.ok}"></span>
+                        <span class="lg-pill lg-pill--error" th:unless="${item.ok}" th:text="#{readiness.status.missing}"></span>
                     </td>
                     <td th:text="${item.detail}"></td>
                     <td class="lg-text-muted lg-small" th:text="${item.hint}"></td>

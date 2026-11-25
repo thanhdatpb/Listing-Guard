@@ -214,6 +214,19 @@ class ConsoleAccountImportIntegrationTest {
     }
 
     @Test
+    void theAccountsTemplateOfTheDocsIsAFileTheImportAccepts() throws IOException {
+        String text = Files.readString(Path.of("..", "docs", "samples", "accounts-template.csv"), StandardCharsets.UTF_8);
+
+        Result result = importer.importTable(text, true, true);
+
+        assertThat(result.ok()).isTrue();
+        assertThat(result.rows()).extracting(ConsoleAccountImporter.Row::role)
+                .containsExactly(ConsoleRole.ADMIN, ConsoleRole.MEMBER, ConsoleRole.MEMBER);
+        assertThat(result.rows()).extracting(ConsoleAccountImporter.Row::client).containsOnly("project-global");
+        assertThat(result.emails()).containsExactly("lead@pilot.example.test", "seller1@pilot.example.test", "seller2@pilot.example.test");
+    }
+
+    @Test
     void theDisplayNameIsNotStoredBecauseAnAccountHasNoSuchField() {
         List<String> columns = jdbc.queryForList("SELECT column_name FROM information_schema.columns WHERE table_name = 'account'",
                 String.class);

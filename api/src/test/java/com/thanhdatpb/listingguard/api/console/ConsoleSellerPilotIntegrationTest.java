@@ -50,7 +50,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
         "listing-guard.image.enabled=false",
         "listing-guard.fixes.enabled=true",
         "listing-guard.trademark.ruleset=classpath:rulesets/trademark-risk-2026-12.yaml",
-        "listing-guard.plans.enabled=false"
+        "listing-guard.plans.enabled=false",
+        // the pilot template has no embedding provider (none); the tests would otherwise give every context the fake one (ADR-053)
+        "test.default-embedding-provider=true"
 })
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -62,6 +64,7 @@ class ConsoleSellerPilotIntegrationTest {
     @Autowired Clock clock;
     @Autowired ObjectMapper mapper;
     @LocalServerPort int port;
+    @Autowired com.thanhdatpb.listingguard.api.trademark.watchlist.WatchlistService watchlist;
     @MockitoBean CloudflareAccessJwtVerifier verifier;
 
     private static final String MEMBER = "seller-assertion";
@@ -186,6 +189,16 @@ class ConsoleSellerPilotIntegrationTest {
         String mappingScreenshot = System.getenv("LG_PILOT_SCREENSHOT_MAPPING");
         if (mappingScreenshot != null) {
             browser.environment().put("LG_PILOT_SCREENSHOT_MAPPING", Path.of(mappingScreenshot).toAbsolutePath().toString());
+        }
+        // the lead opens the readiness page after the four invented marks of the watchlist template are in the client's list (ADR-053)
+        String template = java.nio.file.Files.readString(Path.of("..", "docs", "samples", "watchlist-template.csv"),
+                java.nio.charset.StandardCharsets.UTF_8);
+        watchlist.replace(client, com.thanhdatpb.listingguard.api.console.watchlist.WatchlistTable.read(template, ',').stream()
+                .map(com.thanhdatpb.listingguard.api.console.watchlist.WatchlistTable.Row::entry).toList(), "test", null);
+        browser.environment().put("LG_PILOT_ADMIN_ASSERTION", ADMIN);
+        String readinessScreenshot = System.getenv("LG_PILOT_SCREENSHOT_READINESS");
+        if (readinessScreenshot != null) {
+            browser.environment().put("LG_PILOT_SCREENSHOT_READINESS", Path.of(readinessScreenshot).toAbsolutePath().toString());
         }
         Process process = browser.start();
         if (!process.waitFor(90, TimeUnit.SECONDS)) {

@@ -71,5 +71,24 @@ with sync_playwright() as playwright:
         # taller than the flow's window, so the picture shows the eight rows and the finding of each
         page.set_viewport_size({"width": 1240, "height": 1240})
         page.screenshot(path=destination, full_page=False, animations="disabled")
+    # the pilot lead's own page (ADR-053): the readiness of the deployment and the client, in a context of its own so the seller's flow
+    # above keeps its six clicks
+    lead = os.environ.get("LG_PILOT_ADMIN_ASSERTION")
+    if lead:
+        lead_context = browser.new_context(base_url=origin, viewport={"width": 1240, "height": 920},
+                                           extra_http_headers={"Cf-Access-Jwt-Assertion": lead})
+        lead_page = lead_context.new_page()
+        lead_page.goto("/console/readiness")
+        expect(lead_page.locator("#readiness-page")).to_be_visible()
+        expect(lead_page.locator("#readiness-summary")).to_contain_text("mục")
+        expect(lead_page.locator("#readiness-catalog")).to_have_attribute("data-state", "ok")
+        expect(lead_page.locator("#readiness-watchlist")).to_have_attribute("data-state", "ok")
+        readiness_screenshot = os.environ.get("LG_PILOT_SCREENSHOT_READINESS")
+        if readiness_screenshot:
+            destination = Path(readiness_screenshot)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            lead_page.screenshot(path=destination, full_page=True, animations="disabled")
+        # a member of the same client is refused
+        assert page.request.get("/console/readiness").status == 403
     print(f"Seller Pilot Console: {clicks} clicks; 8 synthetic rows; clipboard verified")
     browser.close()

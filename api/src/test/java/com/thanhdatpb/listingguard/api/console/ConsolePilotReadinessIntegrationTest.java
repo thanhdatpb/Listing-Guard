@@ -251,8 +251,7 @@ class ConsolePilotReadinessIntegrationTest {
     void theStateOfEveryLineIsAWordAndNotOnlyAColor() throws Exception {
         String page = page(lead, "vi");
 
-        assertThat(Pattern.compile("lg-pill--clean\">\\s*<svg[^>]*>.*?</svg>\\s*Đạt", Pattern.DOTALL).matcher(page).results().count())
-                .isEqualTo(LINES - 1);
-        assertThat(Pattern.compile("lg-pill--error\">\\s*<span[^>]*></span>\\s*Thiếu").matcher(page).results().count()).isEqualTo(1);
+        assertThat(Pattern.compile("lg-pill--clean\">Đạt</span>").matcher(page).results().count()).isEqualTo(LINES - 1);
+        assertThat(Pattern.compile("lg-pill--error\">Thiếu</span>").matcher(page).results().count()).isEqualTo(1);
     }
 }

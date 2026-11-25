@@ -20,6 +20,7 @@ chức năng đang hoạt động. Tiếng Việt là mặc định. Bạn có t
    trường bắt buộc bảng không có cột **chưa được kiểm**, nên đó chưa phải "sẵn sàng đăng". Ghi chú màu xanh phía trên bảng liệt kê các trường đó.
    Mở chi tiết để xem trường, quy tắc, nhãn hiệu và lý do. Xem xét trước các finding **HIGH**.
    **MEDIUM** cần đọc ngữ cảnh. **LOW** có thể vẫn có finding. **Chưa hoàn tất** nghĩa là còn thiếu dữ liệu hoặc một bước kiểm tra.
+   Dòng chữ nhỏ phía trên bảng nhắc rằng kết quả chỉ là cảnh báo tham khảo; bấm **Giải thích kết quả** (mở ở tab mới) để đọc đầy đủ ý nghĩa của "Đạt" và lời miễn trừ về nhãn hiệu.
 4. Mở **Sửa bảng và kiểm lại**. Sửa ô cần thiết hoặc dán lại bảng đã sửa. Giữ các cột và hàng đúng thứ tự, rồi bấm **Kiểm lại các hàng**.
 5. Bấm **Sao chép cột kết quả**. Dán ba cột trạng thái, tóm tắt và phạm vi vào ba ô trống bên cạnh dữ liệu của bạn trong Sheet.
 
