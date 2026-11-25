@@ -6,6 +6,7 @@ import com.thanhdatpb.listingguard.api.listing.Normalizer;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.trademark.tsdr.TsdrStatusOverlay;
+import com.thanhdatpb.listingguard.api.trademark.judge.JudgeContext;
 import com.thanhdatpb.listingguard.api.trademark.judge.TrademarkContextJudge;
 import com.thanhdatpb.listingguard.api.trademark.watchlist.WatchlistService;
 import com.thanhdatpb.listingguard.core.listing.Listing;
@@ -17,6 +18,7 @@ import com.thanhdatpb.listingguard.trademark.TrademarkScanner;
 import java.util.Map;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,7 +136,7 @@ public class TrademarkCheckService {
         // the watchlist and, when the LLM judge is on (ADR-036), its prompt and models are part of the analysis version; with both
         // absent the map is empty and the fingerprint is the one a check always had
         Map<String, String> components = new java.util.TreeMap<>(watchlist.watchlist().fingerprintComponents());
-        components.putAll(judge.fingerprintComponents());
+        components.putAll(judge.fingerprintComponents(new JudgeContext(clientId, marketplace, null)));
         Prepared prepared = prepare(marketplace, watchlist, components);
         TrademarkScanner scanner = prepared.scanner();
         String fingerprint = prepared.fingerprint();
@@ -153,7 +155,11 @@ public class TrademarkCheckService {
         // a cached answer costs nothing and was returned above; a new result is stored, and a complete one is counted
         // (ADR-013). An INCOMPLETE result is stored for GET and never reused, so the client is not charged for it.
         plans.requireQuota(admission);
-        TrademarkResult result = judge.judge(input, scanner.scan(input, watchlist.watchlist()), scanner.catalog());
+        // the judge may be given an evidence pack (ADR-051): the Nice classes of the declared product type come from the ruleset's own
+        // mapping, and the client's id lets it read this client's verified decisions and no other's
+        Set<Integer> productClasses = productType == null ? null : scanner.ruleset().productClasses().classesOf(productType);
+        TrademarkResult result = judge.judge(input, scanner.scan(input, watchlist.watchlist()), scanner.catalog(),
+                new JudgeContext(clientId, marketplace, productClasses));
         try {
             return transactions.execute(status -> {
                 if (result.completeness() == Completeness.COMPLETE) {

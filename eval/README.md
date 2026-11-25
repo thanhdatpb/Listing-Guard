@@ -124,3 +124,17 @@ Mọi thay đổi bộ mẫu cần được xem xét cùng hash mới và kết 
 Trong nhóm DESCRIPTIVE, 10 ca xuống LOW và 5 ca xuống MEDIUM. Ca FUZZY vẫn MEDIUM và ca LEGACY
 ghi INCOMPLETE khi dùng ruleset mới. Gate so từng finding và bằng chứng với kết quả cũ.
 `ALL_HIGH` lịch sử dùng bộ mẫu cũ riêng và nằm ngoài precision/recall.
+
+### Judge với gói bằng chứng (ADR-051)
+
+`listing/trademark/judge-cases.tsv` có 17 ca tự đặt cho judge LLM: đủ bằng chứng, thiếu một phần, verified case mâu thuẫn với tier,
+catalog không có tier (`jsonl-1`) và các finding judge không bao giờ được thấy (watchlist, trường `brand`, tier STRONG, nhiều từ).
+`TrademarkJudgeEvalGateTest` chạy từng ca hai lần, với prompt cũ và với prompt bằng chứng, bằng model kịch bản trả lời cố định theo cột
+`verdict`. Gate thất bại khi một mức tăng lên, khi finding thuộc nhóm không bao giờ xét bị gửi hoặc bị hạ, khi prompt bằng chứng cho mức khác
+prompt cũ với cùng câu trả lời, hoặc khi một dữ kiện thiếu không được ghi `unknown`. Báo cáo ở `api/target/eval-listing/trademark-judge.md`.
+
+```bash
+./mvnw -B -pl api -am test -Dtest=TrademarkJudgeEvalGateTest -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+Bộ này chỉ chứng minh phần chương trình bao quanh model. Tỉ lệ đồng ý của model thật với nhãn đã gán chưa đo; xem `docs/llm.md`.

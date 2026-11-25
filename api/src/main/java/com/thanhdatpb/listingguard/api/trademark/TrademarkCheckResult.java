@@ -5,12 +5,14 @@ import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.FindingSource;
+import com.thanhdatpb.listingguard.trademark.JudgeBasis;
 import com.thanhdatpb.listingguard.trademark.MatchType;
 import com.thanhdatpb.listingguard.trademark.RiskLevel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -253,9 +255,41 @@ public record TrademarkCheckResult(
             @Schema(description = "Human text, currently Vietnamese.") String note,
             @JsonInclude(JsonInclude.Include.NON_NULL)
             @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED,
-                    description = "Unverified catalog data used for a tier-based adjustment.") CalibrationEvidence distinctiveness) {
+                    description = "Unverified catalog data used for a tier-based adjustment.") CalibrationEvidence distinctiveness,
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+                    description = "Only on `llm_descriptive` when the operator chose the evidence prompt of the LLM judge "
+                            + "(ADR-051): what the model was shown besides the sentence, and its reason.") JudgeEvidenceView judgeEvidence) {
         public RiskAdjustmentView(String reason, RiskLevel from, RiskLevel to, String note) {
-            this(reason, from, to, note, null);
+            this(reason, from, to, note, null, null);
+        }
+
+        public RiskAdjustmentView(String reason, RiskLevel from, RiskLevel to, String note, CalibrationEvidence distinctiveness) {
+            this(reason, from, to, note, distinctiveness, null);
+        }
+    }
+
+    /**
+     * What the LLM judge was given with the sentence when it lowered a finding (ADR-051), and why it did. The evidence is computed
+     * by the program, not by the model, and each field that was not available is {@code unknown}. It holds no prompt, no sentence of
+     * the listing and no mark.
+     */
+    @Schema(name = "TrademarkJudgeEvidence")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record JudgeEvidenceView(
+            @Schema(description = "The `version` of the judge prompt file that was used.", example = "trademark-judge-2026-12")
+            String promptVersion,
+            @Schema(description = "The evidence fields as they were sent, each a string: `distinctiveness_tier`, `same_mark_count`, "
+                    + "`same_mark_class_count`, `mark_kind`, `dictionary_word`, `word_count`, `product_class_overlap`, `tsdr_status` "
+                    + "and `verified_case`. `same_mark_count` counts live USPTO serial records, not owners. A value the program did "
+                    + "not have is `unknown`. These are hints for the model; no rule uses them.")
+            Map<String, String> evidence,
+            @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+                    description = "The model's reason after the schema check (at most 200 characters, Vietnamese); "
+                            + "the same text the note ends with.") String reason) {
+
+        static JudgeEvidenceView of(JudgeBasis basis) {
+            return basis == null ? null : new JudgeEvidenceView(basis.promptVersion(), basis.evidence(), basis.reason());
         }
     }
 

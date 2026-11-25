@@ -52,6 +52,7 @@ LISTING_GUARD_LLM_GROQ_LISTING_TEXT_ALLOWED=true     # only after you have read 
 |---|---|---|
 | `LISTING_GUARD_LLM_ENABLED` | `false` | The shared client. With it on and no provider key the API refuses to start. |
 | `LISTING_GUARD_LLM_JUDGE_ENABLED` | `false` | The trademark context judge. Needs the line above. |
+| `LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION` | `trademark-judge-2026-11` | The judge's prompt file. `trademark-judge-2026-12` adds the [evidence pack](#evidence-pack-for-the-judge-adr-051); the first value is the rollback; any other value stops the start. |
 | `LISTING_GUARD_LLM_<PROVIDER>_KEY` | empty | `GROQ`, `CLOUDFLARE`, `GEMINI`. A provider without a key is skipped. A secret: never in Git, a command line or a log. |
 | `LISTING_GUARD_LLM_<PROVIDER>_LISTING_TEXT_ALLOWED` | `false` | May receive the text of a client's listing. |
 | `LISTING_GUARD_LLM_CLOUDFLARE_ACCOUNT_ID` | none | Part of Cloudflare's URL. |
@@ -81,7 +82,8 @@ the vendor's terms; an agreement with your clients may be needed.
 - **Audit log**: one INFO line per call on logger `com.thanhdatpb.listingguard.audit.llm`: purpose, provider, model, data kinds,
   outcome (`OK`, `CACHE_HIT`, `FAILED:<kind>`, `SKIPPED:<reason>`), tokens. Never the prompt, the answer, a key or a listing.
 - **Database**: table `llm_usage` (V41) holds requests and tokens per day and provider, nothing else.
-- **A finding**: `riskAdjustments` has an entry with reason `llm_descriptive`, `from` = the level the rule assigned, `to` = `LOW`.
+- **A finding**: `riskAdjustments` has an entry with reason `llm_descriptive`, `from` = the level the rule assigned, `to` = `LOW`. With the
+  evidence prompt it also has `judgeEvidence`: the prompt version, the evidence fields as they were sent and the model's reason.
 - **Analysis version**: with the judge on, the fingerprint holds `llm_judge = <prompt version>:<hash>;models=...;max=...;snippet=...`,
   so a new prompt, model, order or setting misses the cache.
 
@@ -98,6 +100,90 @@ docker compose run --rm backtest --input=... --mapping=... --marketplace=ETSY --
 
 If recall of claimed rows falls at all, leave the judge off. `eval-listing --llm-judge` repeats the labelled sample set with the
 judge; that set uses fictional marks, so it checks that the step works, not how often a real colour name is a false alarm.
+
+## Evidence pack for the judge (ADR-051)
+
+The judge above sees the mark, its Nice classes, the field and the sentence. With
+`LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION=trademark-judge-2026-12` it also reads **facts the program already knows**, gathered by plain code
+before the one call: no tool calling, no extra request, no network call during a check, so it works on every free provider. A fact the
+program does not have is shown as `unknown` and never guessed. The default value `trademark-judge-2026-11` is the prompt above, byte for
+byte, and is the way back. [ADR-051](adr/ADR-051-trademark-judge-evidence-pack.md) is the decision record.
+
+| Field | What it says | Where it comes from | `unknown` when |
+|---|---|---|---|
+| `distinctiveness_tier` | `STRONG`, `ORDINARY` or `WEAK`: an unverified estimate | the catalog's signals ([ADR-046](adr/ADR-046-catalog-distinctiveness-signals.md)) | the catalog has no tier (`jsonl-1`) |
+| `same_mark_count` | live USPTO **serial records** with the same text; not owners | the same signals | no signals |
+| `same_mark_class_count` | Nice classes those records cover | the same signals | no signals |
+| `mark_kind` | `STANDARD_CHARACTER`, `WORDS_WITH_DESIGN`, `OTHER` | the same signals | no signals |
+| `dictionary_word` | `true` or `false` | the same signals | no signals, or the converter could not tell |
+| `word_count` | words of the mark | the signals, else the tokens of the catalog mark | the catalog mark cannot be read |
+| `product_class_overlap` | `yes` or `no`: is a Nice class of the mark a class of the declared `product_type` | the ruleset's own `product_classes` | no `product_type`, or the mark has no class |
+| `tsdr_status` | `LIVE`, `DEAD` or `UNKNOWN`, and its age in days | the `tsdr_status` table the `tsdr-status` job fills; the USPTO is not called | `finding-status` is off or nothing is recorded |
+| `verified_case` | this client's latest verified decision for the same rule, field kind and mark: `confirmed` or `false_alarm`, and its age in days; `none` when there is none | verified cases ([ADR-044](adr/ADR-044-review-cases-and-decisions.md)), only for the same client, only if unrevoked and unexpired | verified cases are off |
+
+The pack holds no note, no reason, no reviewer and no mark of the watchlist. A decision is matched by mark through the retained check
+result, which is kept 30 days (a verified case 90), so an older decision reads `none`. The text of the prompt tells the model that the
+pack is a hint and that `unknown` is not a sign for or against a brand.
+
+**An example with synthetic data** (the user message; the fixed instructions that explain each field are in the system message and come
+first):
+
+```text
+Evidence computed by the program ("unknown" = not available):
+- distinctiveness_tier: ORDINARY
+- same_mark_count: 12
+- same_mark_class_count: 1
+- mark_kind: STANDARD_CHARACTER
+- dictionary_word: true
+- word_count: 1
+- product_class_overlap: no
+- tsdr_status: LIVE, checked 12 days ago
+- verified_case: confirmed, 45 days ago
+Matched text (the program put it between [[ and ]] in the sentence): Lunaria
+Nice classes of the matched mark: 25
+Field of the listing: title
+<<<DATA
+Handmade [[Lunaria]] ceramic mug
+DATA>>>
+```
+
+The answer is the same JSON as before, and only `likely_descriptive` changes anything. `judgeEvidence` of a lowered finding then holds
+the nine fields above exactly as sent, the prompt version and the model's reason; it holds no prompt and no sentence of the listing.
+
+**What does not change.** No rule uses the pack. Which finding the judge looks at is as before: a catalog finding at MEDIUM, and with
+ruleset `trademark-risk-2026-12` only the MEDIUM that `catalog_ordinary_exact` gives, so a watchlist match, a several-word match, a
+tier `STRONG` mark and a match in `brand` or `shop_name` (all HIGH there) are never sent. The code can only lower a level. A past
+`confirmed` decision is shown to the model; it does not block a demotion.
+
+**Cost.** A few hundred more input tokens per judged finding. The data of the call is declared `LISTING_TEXT` as before: a provider
+that may not receive listing text receives nothing, and nothing is gathered. With the evidence prompt and verified cases on, a digest of
+the client's active verified trademark cases is part of the analysis version, so a revoked or new decision makes the next check a new
+analysis (it uses a unit of quota where plans are on). The TSDR status is not part of it: it is the status at the time of the check.
+
+**Measured: not yet (chưa đo).** `eval/listing/trademark/judge-cases.tsv` holds 17 invented cases and `TrademarkJudgeEvalGateTest` runs
+them in CI with a scripted model, once with each prompt (report `api/target/eval-listing/trademark-judge.md`). That gate proves the
+program around the model: no level goes up, no watchlist, brand-field, `STRONG` or several-word finding is sent or lowered, the
+evidence prompt ends where the old one ends when the facts are missing, and a missing fact reads `unknown`. It says nothing about how
+often a real model agrees with labels. To measure that, with a Groq key and its listing-text flag set (it needs the settings above),
+run the same labelled sample set and your labelled file once for each prompt and compare the two outputs:
+
+```bash
+# the labelled sample set of eval-listing (fictional marks): the step works and which labelled levels it changes
+LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION=trademark-judge-2026-11 docker compose run --rm eval-listing --llm-judge
+LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION=trademark-judge-2026-12 docker compose run --rm eval-listing --llm-judge
+# your own labelled file (ADR-032): recall of claimed rows, rows lost, unclaimed rows flagged, per prompt
+LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION=trademark-judge-2026-11 docker compose run --rm backtest --input=... --mapping=... --marketplace=ETSY --claimed-column=... --llm-judge
+LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION=trademark-judge-2026-12 docker compose run --rm backtest --input=... --mapping=... --marketplace=ETSY --claimed-column=... --llm-judge
+```
+
+| Measure | Prompt `2026-11` | Prompt `2026-12` |
+|---|---|---|
+| Agreement with the labelled levels of `eval-listing` | chưa đo | chưa đo |
+| Recall of claimed rows after the judge (backtest) | chưa đo | chưa đo |
+| Rows lost, unclaimed rows flagged (backtest) | chưa đo | chưa đo |
+| Agreement with the verdicts of [ADR-034](adr/ADR-034-finding-feedback-and-value-dashboard.md) feedback | chưa đo; no command compares the judge with those verdicts yet (they would have to be exported as labels first) | chưa đo |
+
+Keep the evidence prompt off if recall of claimed rows is lower than with the old prompt.
 
 ## Limits of this feature
 

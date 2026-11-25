@@ -9,11 +9,11 @@ import com.thanhdatpb.listingguard.api.llm.LlmUnavailableException;
 import com.thanhdatpb.listingguard.rag.llm.LlmRequest;
 import com.thanhdatpb.listingguard.trademark.CanonicalInput;
 import com.thanhdatpb.listingguard.trademark.Evidence;
+import com.thanhdatpb.listingguard.trademark.JudgeBasis;
 import com.thanhdatpb.listingguard.trademark.LlmJudgement;
 import com.thanhdatpb.listingguard.trademark.LlmJudgement.Judged;
 import com.thanhdatpb.listingguard.trademark.LlmJudgement.Verdict;
 import com.thanhdatpb.listingguard.trademark.TrademarkCheckInput;
-import com.thanhdatpb.listingguard.trademark.TrademarkFinding;
 import com.thanhdatpb.listingguard.trademark.TrademarkResult;
 import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
 import com.thanhdatpb.listingguard.trademark.catalog.TrademarkCatalog;
@@ -28,12 +28,19 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
  * Asks a language model whether the word a catalog finding matched is a brand or an ordinary word in its sentence (ADR-036 item 8).
  * It sends the mark, its Nice classes, the field and a short span of text around the match, and nothing else of the listing. What
  * the answer may change is decided by {@link LlmJudgement}, which can only lower a MEDIUM catalog finding to LOW.
+ *
+ * <p>With the prompt version {@code trademark-judge-2026-12} (ADR-051) it also sends an evidence pack the program computed in code:
+ * the catalog's distinctiveness signals, whether the mark's Nice class is one of the declared product type, the last TSDR status the
+ * catalog recorded and this client's nearest verified decision, each {@code unknown} when the program does not have it. The pack is
+ * for the model to read; no rule in the program uses it, which findings are looked at does not change, and a demotion still comes only
+ * from {@link LlmJudgement}. With the default prompt version nothing is gathered and the request is the one of ADR-036.
  *
  * <p>Inactive (the default) it returns the result it was given and adds nothing to the analysis version, so a check is exactly what
  * it was before. It is also inactive when no provider may receive listing text: nothing is sent and the result is not marked
@@ -54,23 +61,35 @@ public class TrademarkContextJudge {
     private final LlmProperties.Judge settings;
     private final boolean requested;
     private final JudgePrompt prompt;
+    private final JudgeEvidenceGatherer gatherer;
 
-    public TrademarkContextJudge(LlmClient client, LlmProperties properties) {
+    @Autowired
+    public TrademarkContextJudge(LlmClient client, LlmProperties properties, JudgeEvidenceGatherer gatherer) {
         this.client = client;
         this.settings = properties.judge();
+        // an unknown prompt version stops the start whether or not the judge is on: a typo must not wait for the day it is switched on
+        if (!JudgePrompt.VERSIONS.contains(settings.promptVersion())) {
+            JudgePrompt.forVersion(settings.promptVersion());
+        }
         this.requested = properties.enabled() && settings.enabled();
-        this.prompt = requested ? JudgePrompt.load() : null;
+        this.prompt = requested ? JudgePrompt.forVersion(settings.promptVersion()) : null;
+        this.gatherer = gatherer;
         if (requested && !client.canServe(LISTING_TEXT)) {
             log.warn("listing-guard.llm.judge.enabled is true but no LLM provider may receive listing text "
                     + "(listing-text-allowed is false for all): the judge is inactive and sends nothing");
         }
     }
 
+    /** A judge with no TSDR table and no verified cases to read: the evidence of those two is {@code unknown}. */
+    public TrademarkContextJudge(LlmClient client, LlmProperties properties) {
+        this(client, properties, JudgeEvidenceGatherer.none());
+    }
+
     /** A judge that never does anything. */
     public static TrademarkContextJudge off() {
         return new TrademarkContextJudge(LlmClient.disabled(Clock.systemUTC()),
                 new LlmProperties(false, List.of(), new LlmProperties.Cache(1, Duration.ofHours(1)),
-                        new LlmProperties.Judge(false, 8, 160, 600, Duration.ofSeconds(20))));
+                        new LlmProperties.Judge(false, 8, 160, 600, Duration.ofSeconds(20), JudgePrompt.DEFAULT_VERSION)));
     }
 
     /** True when a check is judged: the judge is on and at least one provider may receive listing text. */
@@ -83,12 +102,29 @@ public class TrademarkContextJudge {
      * tried, and the settings that change what is sent. Empty when the judge is not active, so the fingerprint is the old one.
      */
     public Map<String, String> fingerprintComponents() {
+        return fingerprintComponents(JudgeContext.NONE);
+    }
+
+    /**
+     * The same for the check of one client. With an evidence prompt and verified cases switched on, a digest of the client's active
+     * verified trademark cases is added: a result judged with a decision is not served once the decision is revoked or a new one is
+     * made. The TSDR status is deliberately not in the digest: the {@code tsdr-status} job is global and would invalidate every client's
+     * cached result at each run, and the status is a hint that the answer, like the model's reason, records as of the check.
+     */
+    public Map<String, String> fingerprintComponents(JudgeContext context) {
         if (!active()) {
             return Map.of();
         }
         String models = String.join(",", client.modelIds(LISTING_TEXT));
-        return Map.of(COMPONENT, prompt.identity() + ";models=" + models + ";max=" + settings.maxPerCheck() + ";snippet="
-                + settings.snippetChars());
+        String component = prompt.identity() + ";models=" + models + ";max=" + settings.maxPerCheck() + ";snippet="
+                + settings.snippetChars();
+        if (prompt.evidence()) {
+            String digest = gatherer.digest(context);
+            if (!digest.isEmpty()) {
+                component += ";verified=" + digest;
+            }
+        }
+        return Map.of(COMPONENT, component);
     }
 
     /**
@@ -96,6 +132,13 @@ public class TrademarkContextJudge {
      * @return the result as it was, or with findings lowered and, when the step could not run, INCOMPLETE
      */
     public TrademarkResult judge(TrademarkCheckInput input, TrademarkResult result, TrademarkCatalog catalog) {
+        return judge(input, result, catalog, JudgeContext.NONE);
+    }
+
+    /**
+     * @param context whose check this is, for the evidence pack; {@link JudgeContext#NONE} for a job that has no client
+     */
+    public TrademarkResult judge(TrademarkCheckInput input, TrademarkResult result, TrademarkCatalog catalog, JudgeContext context) {
         if (!active()) {
             return result;
         }
@@ -120,12 +163,20 @@ public class TrademarkContextJudge {
             }
             Set<LlmDataClass> data = EnumSet.of(LlmDataClass.ofField(evidence.field()));
             String mark = clean(evidence.matchedMark() == null ? evidence.snippet() : evidence.matchedMark());
+            CatalogMark catalogMark = catalogMark(evidence, catalog);
+            String sentence = context(fieldText, evidence.start(), evidence.end(), settings.snippetChars());
+            JudgeEvidence pack = prompt.evidence() ? gatherer.gather(context, evidence, catalogMark) : null;
             LlmRequest request = new LlmRequest(prompt.system(),
-                    prompt.render(mark, classes(evidence, catalog), evidence.field(),
-                            context(fieldText, evidence.start(), evidence.end(), settings.snippetChars())),
+                    pack == null ? prompt.render(mark, classes(catalogMark), evidence.field(), sentence)
+                            : prompt.render(mark, classes(catalogMark), evidence.field(), sentence, pack.block()),
                     prompt.schema(), settings.maxOutputTokens(), settings.timeout());
             try {
-                verdicts.put(index, parse(client.complete(new LlmClient.Call(PURPOSE, request, data)).text()));
+                Judged judged = parse(client.complete(new LlmClient.Call(PURPOSE, request, data)).text());
+                if (pack != null) {
+                    // the evidence the model was given goes with the finding it lowers; the reason is added when the verdict is applied
+                    judged = new Judged(judged.verdict(), judged.reason(), new JudgeBasis(prompt.version(), pack.asMap(), null));
+                }
+                verdicts.put(index, judged);
             } catch (LlmUnavailableException e) {
                 skipped = true;
                 if (e.reason() != LlmUnavailableException.Reason.NO_ELIGIBLE_PROVIDER) {
@@ -150,19 +201,23 @@ public class TrademarkContextJudge {
                 + text.substring(end, to) + (to < text.length() ? "..." : "");
     }
 
-    private static String classes(Evidence evidence, TrademarkCatalog catalog) {
+    /** The catalog mark the finding matched, or null when the catalog cannot be asked or does not hold it. */
+    private static CatalogMark catalogMark(Evidence evidence, TrademarkCatalog catalog) {
         if (catalog == null || evidence.normalizedToken() == null) {
-            return "unknown";
+            return null;
         }
         try {
-            CatalogMark mark = catalog.findExact(List.of(evidence.normalizedToken())).get(evidence.normalizedToken());
-            if (mark == null || mark.niceClasses().isEmpty()) {
-                return "unknown";
-            }
-            return mark.niceClasses().stream().map(String::valueOf).collect(Collectors.joining(", "));
+            return catalog.findExact(List.of(evidence.normalizedToken())).get(evidence.normalizedToken());
         } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static String classes(CatalogMark mark) {
+        if (mark == null || mark.niceClasses().isEmpty()) {
             return "unknown";
         }
+        return mark.niceClasses().stream().map(String::valueOf).collect(Collectors.joining(", "));
     }
 
     private static String clean(String text) {

@@ -1826,6 +1826,10 @@
             "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
             "type" : "string"
           },
+          "judgeEvidence" : {
+            "$ref" : "#/components/schemas/TrademarkJudgeEvidence",
+            "description" : "Only on `llm_descriptive` when the operator chose the evidence prompt of the LLM judge (ADR-051): what the model was shown besides the sentence, and its reason."
+          },
           "note" : {
             "description" : "Human text, currently Vietnamese.",
             "type" : "string"
@@ -2396,6 +2400,27 @@
           },
           "suggestion" : {
             "description" : "Human text, currently Vietnamese. Never proposes a replacement value.",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkJudgeEvidence" : {
+        "properties" : {
+          "evidence" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "The evidence fields as they were sent, each a string: `distinctiveness_tier`, `same_mark_count`, `same_mark_class_count`, `mark_kind`, `dictionary_word`, `word_count`, `product_class_overlap`, `tsdr_status` and `verified_case`. `same_mark_count` counts live USPTO serial records, not owners. A value the program did not have is `unknown`. These are hints for the model; no rule uses them.",
+            "type" : "object"
+          },
+          "promptVersion" : {
+            "description" : "The `version` of the judge prompt file that was used.",
+            "example" : "trademark-judge-2026-12",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "The model's reason after the schema check (at most 200 characters, Vietnamese); the same text the note ends with.",
             "type" : "string"
           }
         },

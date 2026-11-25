@@ -255,6 +255,10 @@ listing-guard:
       snippet-chars: 160
       max-output-tokens: 600
       timeout: 20s
+      # The prompt file of the judge (ADR-051): trademark-judge-2026-11 asks the question of ADR-036 alone; trademark-judge-2026-12 adds an
+      # evidence pack computed in code (catalog signals, product class, TSDR status, this client's verified decision). Setting the first
+      # again is the rollback; any other value stops the start.
+      prompt-version: ${LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION:trademark-judge-2026-11}
     # LLM rewrite suggestions (ADR-037, docs/llm.md): the console's "Gợi ý sửa" button. Off by default, and it also needs enabled=true above
     # and a provider with listing-text-allowed. When on, the title, tags and findings of a listing are sent to that provider each time a
     # seller presses the button.

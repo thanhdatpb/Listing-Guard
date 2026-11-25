@@ -191,7 +191,8 @@ public class TrademarkCheckStore {
                     ps.setString(16, json(evidence.riskAdjustments().stream().map(adjustment ->
                             new TrademarkCheckResult.RiskAdjustmentView(adjustment.reason().code(), adjustment.from(),
                                     adjustment.to(), adjustment.note(),
-                                    TrademarkCheckResult.CalibrationEvidence.of(adjustment.distinctiveness()))).toList()));
+                                    TrademarkCheckResult.CalibrationEvidence.of(adjustment.distinctiveness()),
+                                    TrademarkCheckResult.JudgeEvidenceView.of(adjustment.judge()))).toList()));
                     ps.setString(17, finding.message());
                     ps.setString(18, finding.suggestion());
                     ps.setString(19, evidence.watchlist() == null ? null : json(watchlistView(evidence.watchlist())));
