@@ -232,7 +232,7 @@ class ConsoleReauditIntegrationTest {
                 .doesNotContain("A synthetic mug").doesNotContain("ceramic");
 
         String csv = csv(html);
-        assertThat(csv).startsWith("﻿").contains("SKU,Account,Luật,Nhãn,Mức rủi ro,Nhóm,Dòng,Trường");
+        assertThat(csv).startsWith("﻿").contains("SKU,Tài khoản,Luật,Nhãn,Mức rủi ro,Nhóm,Dòng,Trường");
         assertThat(csv.lines()).anyMatch(line -> line.startsWith("E-1,,") && line.toLowerCase().contains("zorvex"))
                 .anyMatch(line -> line.startsWith("'=E-3,,") && line.toLowerCase().contains("zorvex"))
                 .noneMatch(line -> line.startsWith("E-2,") && line.toLowerCase().contains("zorvex"));
