@@ -59,7 +59,17 @@ public final class PersonalizationScreener {
      * @param trademarkFingerprint the value of the trademark scanner's fingerprint, or null when no catalog is served
      */
     public AnalysisFingerprint fingerprint(String marketplace, String trademarkFingerprint) {
-        return AnalysisFingerprint.of(ruleset, AlgorithmVersions.CURRENT, marketplace, trademarkFingerprint);
+        return fingerprint(marketplace, trademarkFingerprint, null);
+    }
+
+    /**
+     * The fingerprint of a screening that reads an imported POD profile (ADR-048): the id and version of the profile, its
+     * resource hash and its limit are part of it.
+     *
+     * @param supplier the profile {@link #screen(PersonalizationInput, TrademarkScanner, SupplierProfile)} is given, or null
+     */
+    public AnalysisFingerprint fingerprint(String marketplace, String trademarkFingerprint, SupplierProfile supplier) {
+        return AnalysisFingerprint.of(ruleset, AlgorithmVersions.CURRENT, marketplace, trademarkFingerprint, supplier);
     }
 
     /**
@@ -67,7 +77,23 @@ public final class PersonalizationScreener {
      * @throws UnknownPrintProfileException if the input names a print profile the ruleset does not declare
      */
     public ScreeningResult screen(PersonalizationInput input, TrademarkScanner scanner) {
+        return screen(input, scanner, null);
+    }
+
+    /**
+     * Screens against the ruleset's print profile with the length limit of an imported POD profile (ADR-048). The characters
+     * the workshop can print are still the ruleset's. {@code printProfile} of the result names both the ruleset profile and
+     * the imported one.
+     *
+     * @param scanner the trademark scanner on the catalog the application serves, or null when none is served
+     * @param supplier the imported profile whose limit applies, or null to use the ruleset's own limits
+     * @throws UnknownPrintProfileException if the input names a print profile the ruleset does not declare
+     */
+    public ScreeningResult screen(PersonalizationInput input, TrademarkScanner scanner, SupplierProfile supplier) {
         PersonalizationRuleset.PrintProfile profile = ruleset.profile(input.printProfile());
+        if (supplier != null) {
+            profile = profile.withSupplierLimit(supplier.key(), supplier.maxChars());
+        }
         String hash = CanonicalInput.of(input).hash();
         RuleContext context = new RuleContext(ruleset, profile, input.values());
 
