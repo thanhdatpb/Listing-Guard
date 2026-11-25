@@ -18,11 +18,16 @@ import java.util.List;
  * @param sourceIds   the ids of every source record merged into this mark, ascending, without duplicates
  */
 public record CatalogMark(String normalized, String display, List<Integer> niceClasses, MarkStatus status,
-                          boolean commonWord, List<String> sourceIds) {
+                          boolean commonWord, List<String> sourceIds, DistinctivenessSignals distinctiveness) {
 
     public CatalogMark {
         niceClasses = niceClasses == null ? List.of() : List.copyOf(niceClasses);
         sourceIds = sourceIds == null ? List.of() : List.copyOf(sourceIds);
+    }
+
+    public CatalogMark(String normalized, String display, List<Integer> niceClasses, MarkStatus status,
+                       boolean commonWord, List<String> sourceIds) {
+        this(normalized, display, niceClasses, status, commonWord, sourceIds, null);
     }
 
     public CatalogMark(String normalized, String display, List<Integer> niceClasses, MarkStatus status,

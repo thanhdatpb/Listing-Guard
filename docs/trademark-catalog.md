@@ -67,7 +67,7 @@ results. Without a catalog the endpoint answers `503` (`trademark-not-configured
 
 [`illeatmyhat/uspto-trademarks`](https://huggingface.co/datasets/illeatmyhat/uspto-trademarks) is a third party's rebuild of the
 USPTO bulk XML: the annual backfile plus the dailies, as Parquet tables joined by `serial_no`, with the latest state of each case
-file. Its card says the data is a US government work (public domain). The `hf-convert` job turns it into one `jsonl-1` file that
+file. Its card says the data is a US government work (public domain). The `hf-convert` job turns it into one `jsonl-2` file that
 `trademark-import` loads like any other ([ADR-030](adr/ADR-030-hugging-face-uspto-parquet-source.md), which also holds the column
 names, the measurements and the open questions). The job needs no USPTO key, no database and no network.
 
@@ -124,6 +124,39 @@ names, the measurements and the open questions). The job needs no USPTO key, no 
 6. **Next build.** The dataset is rebuilt monthly. Download the new build into a fresh folder (for example `catalogs/raw/hf-2026-11/`),
    convert it with `--input=hf-2026-11` to a new file name, add a new manifest entry and import it as a new version. Never edit an
    imported file.
+
+
+## Tín hiệu distinctiveness (jsonl-2)
+
+`hf-convert` tạo `jsonl-2`. Mỗi dòng thêm `word_count`, `same_mark_count`, `same_mark_class_count`,
+`mark_kind`, `dictionary_word`, `distinctiveness_tier` và `distinctiveness_reason` theo
+[ADR-046](adr/ADR-046-catalog-distinctiveness-signals.md). Các trường này tùy chọn khi import.
+Import dùng `format_version: jsonl-2` trong manifest. File và manifest `jsonl-1` cũ tiếp tục dùng được.
+Khi các dòng trùng nhãn có bộ tín hiệu xung đột, entry để trống tín hiệu.
+
+Trên máy đã có Parquet, dùng lệnh sau. Chỉ thêm `--wordlist=english.txt` nếu đã chọn danh sách và lưu nó
+dưới `catalogs/raw/`. Mỗi dòng chứa một từ UTF-8, dòng bắt đầu bằng `#` là chú thích. Thiếu wordlist,
+`dictionary_word` là null và tier là `ORDINARY`.
+
+```bash
+docker compose --profile tools run --rm --build hf-convert \
+  --input=hf --output=hf-uspto-distinctiveness-v1.jsonl
+```
+
+Đọc report, xác minh `COMPLETE` và sao chép file vào thư mục `catalogs/raw/` của máy import. Thêm mục
+manifest từ đầu ra với label mới `hf-uspto-distinctiveness-v1` và đúng checksum. Khi dùng từ điển,
+ghi tên, URL, revision, giấy phép và SHA-256 tại nguồn dữ liệu nội bộ hoặc chú thích manifest.
+Chạy import sau khi API đã áp dụng V48, rồi activate phiên bản đầy đủ do import in ra.
+
+```bash
+docker compose --profile prod --profile tools run --rm trademark-import \
+  --catalog=hf-uspto-distinctiveness-v1
+docker compose --profile prod --profile admin run --rm admin catalog activate <version>
+```
+
+Report có phân bố theo nhãn chuẩn hóa duy nhất, tối đa 50 nhãn WEAK và 50 nhãn STRONG, số serial, dung lượng,
+thời gian và checksum. Giữ báo cáo thật ngoài Git. Scanner chỉ mang metadata và tiếp tục chấm theo quy tắc hiện hành.
+
 
 ## Keeping the status of marks current: `tsdr-status`
 

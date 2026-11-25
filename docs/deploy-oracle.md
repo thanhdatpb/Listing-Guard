@@ -666,7 +666,7 @@ of the API; turn it on only after real statuses are stored. The api container mu
 ## 8b. A trademark catalog from the Hugging Face rebuild: convert elsewhere, copy, import, activate
 
 Without a USPTO key, the catalog of this deployment comes from `hf-convert` ([ADR-030](adr/ADR-030-hugging-face-uspto-parquet-source.md)),
-which turns the public Parquet rebuild of the USPTO data into one `jsonl-1` file. **Convert on another machine and copy only the
+which turns the public Parquet rebuild of the USPTO data into one `jsonl-2` file. **Convert on another machine and copy only the
 `.jsonl` file to the VM**: the conversion needs 2 GB of DuckDB memory plus 0.5 GB of heap (a 3 GB container), 775 MB of download
 and no database, and on the 12 GB host it would sit next to the API and PostgreSQL. The VM then only runs `trademark-import`
 (about 0.5 GB). **Read the status first:** the data is a third party's rebuild whose terms nobody has checked for you (its card
@@ -688,7 +688,12 @@ for f in profile/build_lineage.json lookups/status_codes.csv lookups/_sources.js
   mkdir -p "catalogs/raw/hf/$(dirname $f)" && curl -fL --retry 3 "$B/$f" -o "catalogs/raw/hf/$f"
 done
 docker compose --profile tools run --rm --build hf-convert --input=hf --output=hf-uspto-2026-10.jsonl
+# Optional after choosing a local wordlist: add --wordlist=english.txt (under catalogs/raw/)
 ```
+
+Với bản chạy V48, xem [quy trình chuyển đổi `jsonl-2` và kích hoạt label mới](trademark-catalog.md#tín-hiệu-distinctiveness-jsonl-2).
+Báo cáo tier giữ riêng trên máy có dữ liệu.
+
 
 Read `catalogs/raw/hf-uspto-2026-10.jsonl.report.json`: `completeness` must be `COMPLETE` (an `INCOMPLETE` run still writes the
 file but says why: do not deploy it before you read the problems). The job prints the `sha256` and a manifest entry; keep both.

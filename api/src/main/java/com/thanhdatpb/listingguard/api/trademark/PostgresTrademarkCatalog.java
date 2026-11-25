@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.api.trademark;
 
 import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals;
 import com.thanhdatpb.listingguard.trademark.catalog.MarkStatus;
 import com.thanhdatpb.listingguard.trademark.catalog.TrademarkCatalog;
 import java.math.BigDecimal;
@@ -27,7 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 public final class PostgresTrademarkCatalog implements TrademarkCatalog {
 
-    private static final String COLUMNS = "e.normalized, e.display, e.nice_classes, e.status, e.common_word, e.source_ids";
+    private static final String COLUMNS = "e.normalized, e.display, e.nice_classes, e.status, e.common_word, e.source_ids, e.distinctiveness";
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
@@ -101,6 +102,7 @@ public final class PostgresTrademarkCatalog implements TrademarkCatalog {
             sourceIds.add((String) value);
         }
         return new CatalogMark(rs.getString("normalized"), rs.getString("display"), niceClasses,
-                MarkStatus.valueOf(rs.getString("status")), rs.getBoolean("common_word"), sourceIds);
+                MarkStatus.valueOf(rs.getString("status")), rs.getBoolean("common_word"), sourceIds,
+                DistinctivenessSignals.fromJson(rs.getString("distinctiveness")));
     }
 }

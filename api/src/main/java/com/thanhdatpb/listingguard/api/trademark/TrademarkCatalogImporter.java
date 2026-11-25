@@ -61,12 +61,13 @@ public class TrademarkCatalogImporter {
                 nice_classes SMALLINT[] NOT NULL,
                 status_rank  SMALLINT   NOT NULL,
                 common_word  BOOLEAN    NOT NULL,
-                source_id    TEXT       NOT NULL
+                source_id    TEXT       NOT NULL,
+                distinctiveness JSONB
             ) ON COMMIT DROP""";
 
     private static final String INSERT_STAGING = """
-            INSERT INTO trademark_import_staging (normalized, display, nice_classes, status_rank, common_word, source_id)
-            VALUES (?, ?, ?, ?, ?, ?)""";
+            INSERT INTO trademark_import_staging (normalized, display, nice_classes, status_rank, common_word, source_id, distinctiveness)
+            VALUES (?, ?, ?, ?, ?, ?, ?::jsonb)""";
 
     /**
      * The merge rule of {@link CatalogImport} in SQL: the smallest display form (ties to the smaller source id), the
@@ -76,12 +77,14 @@ public class TrademarkCatalogImporter {
      */
     private static final String INSERT_ENTRIES = """
             INSERT INTO trademark_entry (catalog_version_id, normalized, display, nice_classes, status, common_word,
-                source_ids)
-            SELECT ?, g.normalized, g.display, c.classes, %s, g.common_word, s.source_ids
+                source_ids, distinctiveness)
+            SELECT ?, g.normalized, g.display, c.classes, %s, g.common_word, s.source_ids, g.distinctiveness
             FROM (SELECT normalized,
                          (array_agg(display ORDER BY display COLLATE "C", source_id COLLATE "C"))[1] AS display,
                          min(status_rank) AS status_rank,
-                         bool_or(common_word) AS common_word
+                         bool_or(common_word) AS common_word,
+                         CASE WHEN count(DISTINCT distinctiveness) = 1
+                              THEN min(distinctiveness::text)::jsonb END AS distinctiveness
                   FROM trademark_import_staging GROUP BY normalized) g
             JOIN (SELECT normalized, array_agg(DISTINCT class ORDER BY class) AS classes
                   FROM trademark_import_staging, unnest(nice_classes) AS class GROUP BY normalized) c
@@ -213,6 +216,7 @@ public class TrademarkCatalogImporter {
                 ps.setInt(4, record.status().ordinal());
                 ps.setBoolean(5, record.commonWord());
                 ps.setString(6, record.sourceId());
+                ps.setString(7, record.distinctiveness() == null ? null : record.distinctiveness().toJson());
             });
             batch.clear();
         }

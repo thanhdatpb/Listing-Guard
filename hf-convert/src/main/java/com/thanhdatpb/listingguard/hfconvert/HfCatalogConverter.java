@@ -6,9 +6,15 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.catalog.MarkStatus;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals.MarkKind;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals.Reason;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals.Tier;
 import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogImport;
 import com.thanhdatpb.listingguard.trademark.normalize.TextNormalizer;
 import java.io.BufferedWriter;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -18,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.DigestOutputStream;
+import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
@@ -36,9 +43,10 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.duckdb.DuckDBConnection;
 
 /**
- * Converts the Hugging Face dataset {@code illeatmyhat/uspto-trademarks} (ADR-030) to one {@code jsonl-1} file with
+ * Converts the Hugging Face dataset {@code illeatmyhat/uspto-trademarks} (ADR-030) to one {@code jsonl-2} file with
  * DuckDB: for each serial number its latest {@code case_file} row, its Nice classes from {@code intl_class}, filtered by
  * {@link HfConvertFilters}. Nothing here touches a database of Listing Guard.
  *
@@ -136,13 +144,17 @@ public final class HfCatalogConverter {
     }
 
     /**
-     * Reads the dataset and writes {@code jsonl-1} (UTF-8, LF) to {@code jsonl}. The stream is not closed; the output is
+     * Reads the dataset and writes {@code jsonl-2} (UTF-8, LF) to {@code jsonl}. The stream is not closed; the output is
      * flushed. On an exception the output holds a partial result and must be discarded.
      *
      * @throws HfConvertException a remote input without the network allowed, a dataset the filters were not written
      *                            for, a missing table, a DuckDB error, or (strict) the first problem
      */
     public HfConversionReport convert(HfDataset dataset, OutputStream jsonl) throws IOException {
+        return convert(dataset, jsonl, null);
+    }
+
+    HfConversionReport convert(HfDataset dataset, OutputStream jsonl, Path wordlist) throws IOException {
         long started = System.nanoTime();
         if (dataset.remote() && !settings.allowNetwork()) {
             throw new HfConvertException("The input " + dataset.label() + " needs the network, which is off; download "
@@ -163,7 +175,7 @@ public final class HfCatalogConverter {
             Run run = new Run(connection, dataset);
             run.caseFiles = dataset.remote() ? run.remoteFiles(HfDataset.CASE_FILE) : localCaseFiles;
             run.intlFiles = dataset.remote() ? run.remoteFiles(HfDataset.INTL_CLASS) : localIntlFiles;
-            return run.execute(jsonl, started);
+            return run.execute(jsonl, started, wordlist);
         } catch (SQLException e) {
             throw new HfConvertException("DuckDB failed: " + e.getMessage(), e);
         }
@@ -236,7 +248,7 @@ public final class HfCatalogConverter {
             this.dataset = dataset;
         }
 
-        HfConversionReport execute(OutputStream jsonl, long started) throws SQLException, IOException {
+        HfConversionReport execute(OutputStream jsonl, long started, Path wordlist) throws SQLException, IOException {
             List<HfConversionReport.FileReport> files = new ArrayList<>();
             long caseRows = rows(caseFiles, files);
             long intlRows = rows(intlFiles, files);
@@ -261,6 +273,12 @@ public final class HfCatalogConverter {
                 problem(recordErrors + " serial numbers have a record error " + errors + ".");
             }
 
+            stageCandidates();
+            String wordlistSha256 = stageWords(wordlist);
+            DistinctivenessThresholds thresholds = DistinctivenessThresholds.load();
+            buildSignals(thresholds, wordlist != null);
+            HfConversionReport.Distinctiveness signals = summarizeSignals(thresholds, wordlistSha256);
+
             MessageDigest digest = newDigest();
             CountingOutput out = new CountingOutput(new DigestOutputStream(jsonl, digest));
             Writer writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8), BUFFER_CHARS);
@@ -276,7 +294,7 @@ public final class HfCatalogConverter {
                     rulesetVersion, filters.minYear(), dataset.label(), dataset.remote(), source, lineage, files,
                     caseRows, intlRows, caseRows - distinct, distinct, written, recordErrors, deadRemoved,
                     ignoredClassCodes, filtered, errors, deadByStatus, lookup, problems, duckdbVersion(),
-                    (System.nanoTime() - started) / 1_000_000, out.count, HexFormat.of().formatHex(digest.digest()));
+                    (System.nanoTime() - started) / 1_000_000, out.count, HexFormat.of().formatHex(digest.digest()), signals);
         }
 
         private void problem(String message) {
@@ -509,16 +527,24 @@ public final class HfCatalogConverter {
 
         // --- the marks, in Java: the import's own normalization ---
 
-        private void writeCandidates(Writer writer) throws SQLException, IOException {
-            try (Statement statement = connection.createStatement();
+        private void stageCandidates() throws SQLException {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("""
+                        CREATE TEMP TABLE candidates (serial VARCHAR, status VARCHAR, display VARCHAR,
+                            normalized VARCHAR, classes VARCHAR, kind VARCHAR)
+                        """);
+            }
+            DuckDBConnection duck = connection.unwrap(DuckDBConnection.class);
+            try (var rows = duck.createAppender("temp", "main", "candidates");
+                 Statement statement = connection.createStatement();
                  ResultSet rs = statement.executeQuery("WITH c AS (SELECT serial_no, status_cd, dt, fn, classes, "
                          + "ignored FROM classified WHERE reason IS NULL), "
                          + "f AS (SELECT DISTINCT r.serial_no, r.file_dt_source AS dt, r.file_name_source AS fn, "
-                         + "r.mark_id_char AS mark FROM read_parquet(" + list(caseFiles) + ") r "
+                         + "r.mark_id_char AS mark, r.mark_draw_cd AS draw FROM read_parquet(" + list(caseFiles) + ") r "
                          + "SEMI JOIN c ON r.serial_no = c.serial_no) "
-                         + "SELECT c.serial_no, c.status_cd, f.mark, c.classes, c.ignored FROM c JOIN f "
+                         + "SELECT c.serial_no, c.status_cd, f.mark, c.classes, c.ignored, f.draw FROM c JOIN f "
                          + "ON f.serial_no = c.serial_no AND f.dt IS NOT DISTINCT FROM c.dt "
-                         + "AND f.fn IS NOT DISTINCT FROM c.fn ORDER BY c.serial_no")) {
+                         + "AND f.fn IS NOT DISTINCT FROM c.fn")) {
                 while (rs.next()) {
                     String serial = rs.getString(1);
                     MarkStatus status = filters.statusOf(rs.getString(2));
@@ -546,18 +572,136 @@ public final class HfCatalogConverter {
                         drop(MARK_TOO_SHORT);
                         continue;
                     }
-                    ObjectNode json = JSON.createObjectNode();
-                    json.put("mark", display);
-                    json.put("status", status.name());
-                    ArrayNode niceClasses = json.putArray("nice_classes");
-                    for (String niceClass : rs.getString(4).split(",")) {
-                        niceClasses.add(Integer.parseInt(niceClass));
+                    rows.beginRow().append(serial).append(status.name()).append(display).append(normalized)
+                            .append(rs.getString(4)).append(markKind(rs.getString(6)).name()).endRow();
+                    ignoredClassCodes += rs.getLong(5);
+                }
+            }
+        }
+
+        private String stageWords(Path wordlist) throws SQLException, IOException {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("CREATE TEMP TABLE dictionary (word VARCHAR)");
+            }
+            if (wordlist == null) {
+                return null;
+            }
+            MessageDigest digest = newDigest();
+            DuckDBConnection duck = connection.unwrap(DuckDBConnection.class);
+            try (var words = duck.createAppender("temp", "main", "dictionary");
+                 var input = new DigestInputStream(Files.newInputStream(wordlist), digest);
+                 var reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8.newDecoder()))) {
+                for (String line; (line = reader.readLine()) != null; ) {
+                    if (line.startsWith("#") || line.isBlank()) {
+                        continue;
                     }
-                    json.put("source_id", serial);
+                    String word = normalizer.normalizeMark(line.strip());
+                    if (word.isEmpty() || word.contains(" ") || word.length() > CatalogImport.MAX_MARK_CHARS) {
+                        throw new HfConvertException("Wordlist entries must normalize to one token (one word per line).");
+                    }
+                    words.beginRow().append(word).endRow();
+                }
+            }
+            if (scalar("SELECT count(*) FROM dictionary") == 0) {
+                throw new HfConvertException("The supplied wordlist contains no words.");
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        }
+
+        private void buildSignals(DistinctivenessThresholds thresholds, boolean dictionaryAvailable) throws SQLException {
+            String allowedClasses = filters.niceClasses().stream().map(String::valueOf).collect(Collectors.joining(", "));
+            String dictionaryMatch = dictionaryAvailable ? "d.word IS NOT NULL" : "NULL::BOOLEAN";
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("""
+                        CREATE TEMP TABLE signals AS
+                        WITH stats AS (
+                            SELECT normalized, count(DISTINCT serial) AS serial_count,
+                                   CASE WHEN min(kind) = max(kind) THEN min(kind) ELSE 'OTHER' END AS mark_kind
+                            FROM candidates GROUP BY normalized
+                        ), classes AS (
+                            SELECT normalized, count(DISTINCT nice) AS class_count
+                            FROM candidates, unnest(string_split(classes, ',')) AS split(nice)
+                            WHERE CAST(nice AS INTEGER) IN (%s)
+                            GROUP BY normalized
+                        ), evidence AS (
+                            SELECT stats.*, classes.class_count, len(string_split(normalized, ' ')) AS word_count,
+                                   %s AS dictionary_word
+                            FROM stats JOIN classes USING (normalized)
+                            LEFT JOIN (SELECT DISTINCT word FROM dictionary) d ON d.word = normalized
+                        ), reasons AS (
+                            SELECT *, CASE
+                                WHEN dictionary_word IS NULL THEN 'DICTIONARY_UNAVAILABLE'
+                                WHEN mark_kind = 'OTHER' THEN 'DRAWING_UNKNOWN'
+                                WHEN word_count = 1 AND (dictionary_word OR serial_count >= %d OR class_count >= %d)
+                                    THEN 'COMMON_OR_REPEATED'
+                                WHEN mark_kind = 'STANDARD_CHARACTER' AND word_count >= %d AND serial_count <= %d
+                                    AND class_count <= %d THEN 'UNIQUE_MULTIWORD'
+                                ELSE 'DEFAULT' END AS reason
+                            FROM evidence
+                        )
+                        SELECT *, CASE reason
+                            WHEN 'COMMON_OR_REPEATED' THEN 'WEAK'
+                            WHEN 'UNIQUE_MULTIWORD' THEN 'STRONG'
+                            ELSE 'ORDINARY' END AS tier
+                        FROM reasons
+                        """.formatted(allowedClasses, dictionaryMatch, thresholds.weakSerialMinimum(),
+                        thresholds.weakClassMinimum(), thresholds.strongWordMinimum(), thresholds.strongSerialMaximum(),
+                        thresholds.strongClassMaximum()));
+            }
+        }
+
+        private HfConversionReport.Distinctiveness summarizeSignals(DistinctivenessThresholds thresholds, String dictionarySha)
+                throws SQLException {
+            Map<String, Long> distribution = new TreeMap<>();
+            for (Tier tier : Tier.values()) {
+                distribution.put(tier.name(), 0L);
+            }
+            try (Statement statement = connection.createStatement();
+                 ResultSet rs = statement.executeQuery("SELECT tier, count(*) FROM signals GROUP BY tier")) {
+                while (rs.next()) {
+                    distribution.put(rs.getString(1), rs.getLong(2));
+                }
+            }
+            return new HfConversionReport.Distinctiveness(thresholds.version(), dictionarySha, distribution,
+                    top(Tier.WEAK, "DESC"), top(Tier.STRONG, "ASC"));
+        }
+
+        private List<HfConversionReport.MarkCount> top(Tier tier, String order) throws SQLException {
+            try (Statement statement = connection.createStatement();
+                 ResultSet rs = statement.executeQuery("SELECT normalized, serial_count FROM signals WHERE tier = "
+                         + literal(tier.name()) + " ORDER BY serial_count " + order + ", normalized LIMIT 50")) {
+                List<HfConversionReport.MarkCount> marks = new ArrayList<>();
+                while (rs.next()) {
+                    marks.add(new HfConversionReport.MarkCount(rs.getString(1), rs.getLong(2)));
+                }
+                return List.copyOf(marks);
+            }
+        }
+
+        private void writeCandidates(Writer writer) throws SQLException, IOException {
+            try (Statement statement = connection.createStatement();
+                 ResultSet rs = statement.executeQuery("""
+                         SELECT c.serial, c.status, c.display, c.classes, s.word_count, s.serial_count, s.class_count,
+                                s.mark_kind, s.dictionary_word, s.tier, s.reason
+                         FROM candidates c JOIN signals s USING (normalized) ORDER BY c.serial
+                         """)) {
+                while (rs.next()) {
+                    ObjectNode json = JSON.createObjectNode();
+                    json.put("mark", rs.getString("display"));
+                    json.put("status", rs.getString("status"));
+                    ArrayNode classes = json.putArray("nice_classes");
+                    for (String niceClass : rs.getString("classes").split(",")) {
+                        classes.add(Integer.parseInt(niceClass));
+                    }
+                    json.put("source_id", rs.getString("serial"));
+                    DistinctivenessSignals signals = new DistinctivenessSignals(rs.getInt("word_count"),
+                            rs.getLong("serial_count"), rs.getInt("class_count"), MarkKind.valueOf(rs.getString("mark_kind")),
+                            rs.getObject("dictionary_word", Boolean.class), Tier.valueOf(rs.getString("tier")),
+                            Reason.valueOf(rs.getString("reason")));
+                    json.setAll((ObjectNode) JSON.valueToTree(signals));
                     writer.write(JSON.writeValueAsString(json));
                     writer.write('\n');
                     written++;
-                    ignoredClassCodes += rs.getLong(5);
                 }
             }
         }
@@ -581,6 +725,14 @@ public final class HfCatalogConverter {
                 return rs.next() ? rs.getString(1) : null;
             }
         }
+    }
+
+    private static MarkKind markKind(String drawing) {
+        return switch (drawing == null ? "" : drawing.trim()) {
+            case "4" -> MarkKind.STANDARD_CHARACTER;
+            case "3" -> MarkKind.WORDS_WITH_DESIGN;
+            default -> MarkKind.OTHER;
+        };
     }
 
     private static String sourceName(String datasetId, HfConversionReport.Lineage lineage) {
