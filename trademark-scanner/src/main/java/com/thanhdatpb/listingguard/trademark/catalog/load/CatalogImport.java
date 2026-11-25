@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals;
 import com.thanhdatpb.listingguard.trademark.catalog.MarkStatus;
 import com.thanhdatpb.listingguard.trademark.normalize.TextNormalizer;
 import java.io.BufferedReader;
@@ -64,6 +65,7 @@ import java.util.stream.Collectors;
 public final class CatalogImport {
 
     public static final String FORMAT_VERSION = "jsonl-1";
+    public static final String SIGNALS_FORMAT_VERSION = "jsonl-2";
     /** The digest of a one-file entry. Do not change it: the versions already imported would stop being found. */
     public static final String IDENTITY_FORMAT = "listing-guard/trademark-catalog-identity/v1";
     /** The digest of an entry with {@code sources:}: it lists every source, ordered by key. */
@@ -94,7 +96,7 @@ public final class CatalogImport {
      * @param sourceId the id as stored: prefixed with {@code <source_key>:} in the {@code sources:} form
      */
     public record CatalogRecord(String display, String normalized, MarkStatus status, Set<Integer> classes,
-                                String sourceId, boolean commonWord) {
+                                String sourceId, boolean commonWord, DistinctivenessSignals distinctiveness) {
         public CatalogRecord {
             classes = Set.copyOf(classes);
         }
@@ -140,9 +142,9 @@ public final class CatalogImport {
      */
     public static CatalogHeader header(CatalogManifest.Entry entry, NormalizationIdentity identity) {
         String where = "Catalog '" + entry.version() + "'";
-        if (!FORMAT_VERSION.equals(entry.formatVersion())) {
+        if (!FORMAT_VERSION.equals(entry.formatVersion()) && !SIGNALS_FORMAT_VERSION.equals(entry.formatVersion())) {
             throw new CatalogFormatException(where + ": format_version '" + entry.formatVersion()
-                    + "' is not supported (use " + FORMAT_VERSION + ")");
+                    + "' is not supported (use " + FORMAT_VERSION + " or " + SIGNALS_FORMAT_VERSION + ")");
         }
         String filtersJson = entry.filtersJson();
         String version = entry.version() + "-" + digest(entry, filtersJson, identity).substring(0, 12);
@@ -165,9 +167,9 @@ public final class CatalogImport {
      */
     public static ScanResult scan(CatalogManifest.Entry entry, Path rawDir, TextNormalizer normalizer,
                                   RecordSink sink) {
-        if (!FORMAT_VERSION.equals(entry.formatVersion())) {
+        if (!FORMAT_VERSION.equals(entry.formatVersion()) && !SIGNALS_FORMAT_VERSION.equals(entry.formatVersion())) {
             throw new CatalogFormatException("Catalog '" + entry.version() + "': format_version '"
-                    + entry.formatVersion() + "' is not supported (use " + FORMAT_VERSION + ")");
+                    + entry.formatVersion() + "' is not supported (use " + FORMAT_VERSION + " or " + SIGNALS_FORMAT_VERSION + ")");
         }
         int read = 0;
         int kept = 0;
@@ -188,7 +190,8 @@ public final class CatalogImport {
                     if (line.isBlank()) {
                         continue;
                     }
-                    CatalogRecord record = record(where + ", line " + lineNumber, line, normalizer, source.key());
+                    CatalogRecord record = record(where + ", line " + lineNumber, line, normalizer, source.key(),
+                            SIGNALS_FORMAT_VERSION.equals(entry.formatVersion()));
                     read++;
                     if (entry.includeStatus().contains(record.status())
                             && record.classes().stream().anyMatch(entry.includeClasses()::contains)) {
@@ -319,7 +322,8 @@ public final class CatalogImport {
         return buffer.toString();
     }
 
-    private static CatalogRecord record(String where, String line, TextNormalizer normalizer, String sourceKey) {
+    private static CatalogRecord record(String where, String line, TextNormalizer normalizer, String sourceKey,
+                                        boolean signalsAllowed) {
         JsonNode node;
         try {
             node = JSON.readTree(line);
@@ -331,7 +335,7 @@ public final class CatalogImport {
         }
         for (Iterator<String> names = node.fieldNames(); names.hasNext(); ) {
             String name = names.next();
-            if (!RECORD_KEYS.contains(name)) {
+            if (!RECORD_KEYS.contains(name) && !(signalsAllowed && DistinctivenessSignals.KEYS.contains(name))) {
                 throw new CatalogFormatException(where + ": unknown key '" + name + "'");
             }
         }
@@ -373,7 +377,12 @@ public final class CatalogImport {
             throw new CatalogFormatException(where + ": the normalized mark is too long");
         }
         String storedId = sourceKey == null ? sourceId : sourceKey + ":" + sourceId;
-        return new CatalogRecord(display, normalized, status, niceClasses, storedId, commonWord);
+        try {
+            return new CatalogRecord(display, normalized, status, niceClasses, storedId, commonWord,
+                    signalsAllowed ? DistinctivenessSignals.parse(node) : null);
+        } catch (IllegalArgumentException e) {
+            throw new CatalogFormatException(where + ": " + e.getMessage());
+        }
     }
 
     private static String requiredText(String where, JsonNode node, String key) {
@@ -423,8 +432,10 @@ public final class CatalogImport {
                     status = record.status();
                 }
             }
+            List<DistinctivenessSignals> signals = group.getValue().stream().map(CatalogRecord::distinctiveness)
+                    .filter(java.util.Objects::nonNull).distinct().limit(2).toList();
             entries.add(new PreparedCatalog.Entry(new CatalogMark(group.getKey(), display.display(),
-                    List.copyOf(classes), status, common, List.copyOf(sourceIds))));
+                    List.copyOf(classes), status, common, List.copyOf(sourceIds), signals.size() == 1 ? signals.getFirst() : null)));
         }
         return entries;
     }

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals.Tier;
 import com.thanhdatpb.listingguard.trademark.catalog.MarkStatus;
 import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogFormatException;
 import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogHeader;
@@ -137,6 +139,37 @@ class TrademarkCatalogImporterIntegrationTest {
                       include_status: %s
                 """.formatted(label, CatalogImport.sha256(firstData.getBytes(StandardCharsets.UTF_8)),
                 CatalogImport.sha256(secondData.getBytes(StandardCharsets.UTF_8)), classes, statuses));
+    }
+
+    @Test
+    void storesJsonl2SignalsOnceForMergedMarksAndLeavesJsonl1Null() throws Exception {
+        String label = uniqueLabel();
+        String row = """
+                {"mark":"MUG","status":"REGISTERED","nice_classes":[25],"source_id":"%s","word_count":1,"same_mark_count":2,"same_mark_class_count":1,"mark_kind":"STANDARD_CHARACTER","dictionary_word":true,"distinctiveness_tier":"WEAK","distinctiveness_reason":"COMMON_OR_REPEATED"}
+                """;
+        writeTwoSources(label, row.formatted("a"), row.formatted("b"), "[25]", "[REGISTERED]");
+        Path manifest = dir.resolve("manifest.yaml");
+        Files.writeString(manifest, Files.readString(manifest).replace("jsonl-1", "jsonl-2"));
+        var imported = importSynthetic(label);
+        String version = imported.catalog().version();
+        String json = jdbc.queryForObject("""
+                SELECT e.distinctiveness::text FROM trademark_entry e JOIN trademark_catalog_version v
+                  ON v.id = e.catalog_version_id WHERE v.version = ?
+                """, String.class, version);
+        assertThat(DistinctivenessSignals.fromJson(json).sameMarkCount()).isEqualTo(2L);
+        DistinctivenessSignals signals = DistinctivenessSignals.fromJson(json);
+        assertThat(signals.tier()).isEqualTo(Tier.WEAK);
+        long id = jdbc.queryForObject("SELECT id FROM trademark_catalog_version WHERE version = ?", Long.class, version);
+        var catalog = new PostgresTrademarkCatalog(jdbc, transactions, id, version);
+        assertThat(catalog.findExact(List.of("mug")).get("mug").distinctiveness()).isEqualTo(signals);
+
+        String legacyLabel = uniqueLabel();
+        TrademarkFixtures.syntheticDir(dir, legacyLabel);
+        var legacy = importSynthetic(legacyLabel);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM trademark_entry e JOIN trademark_catalog_version v ON v.id = e.catalog_version_id
+                WHERE v.version = ? AND e.distinctiveness IS NOT NULL
+                """, Long.class, legacy.catalog().version())).isZero();
     }
 
     @Test

@@ -16,6 +16,9 @@
 #
 #   one file       the keys file, source_name, url, license, source_date and sha256 sit in the entry; the source ids
 #                  are stored as the file gives them
+#   format_version jsonl-2: same as jsonl-1, with optional distinctiveness metadata (ADR-046).
+#   Use the converter's output SHA-256. Record wordlist provenance in comments when one was supplied.
+#
 #   several files  a `sources:` list, each element with the keys below; every source id is stored as
 #                  <source_key>:<source_id>, and a mark that several files share becomes one entry (classes united,
 #                  source ids gathered, common_word true if any file says so)

@@ -261,10 +261,24 @@ class CatalogImportTest {
     @Test
     void rejectsAFormatVersionTheCodeDoesNotRead() throws IOException {
         CatalogManifest.Entry good = entry(line("Zorvex", "REGISTERED", "[25]", "a") + "\n");
-        CatalogManifest.Entry other = new CatalogManifest.Entry(good.version(), "jsonl-2", good.sources(),
+        CatalogManifest.Entry other = new CatalogManifest.Entry(good.version(), "jsonl-3", good.sources(),
                 good.includeClasses(), good.includeStatus());
 
         assertThatThrownBy(() -> prepare(other)).hasMessageContaining("format_version");
+    }
+
+    @Test
+    void jsonl2AllowsAbsentSignalsAndRejectsMalformedSuppliedCounts() throws IOException {
+        String base = line("Zorvex", "REGISTERED", "[25]", "a");
+        CatalogManifest.Entry old = entry(base + "\n");
+        CatalogManifest.Entry version2 = new CatalogManifest.Entry(old.version(), "jsonl-2", old.sources(),
+                old.includeClasses(), old.includeStatus());
+        assertThat(prepare(version2).entries().getFirst().mark().distinctiveness()).isNull();
+
+        CatalogManifest.Entry malformed = entry(base.substring(0, base.length() - 1) + ",\"same_mark_count\":0}\n");
+        CatalogManifest.Entry malformedVersion2 = new CatalogManifest.Entry(malformed.version(), "jsonl-2",
+                malformed.sources(), malformed.includeClasses(), malformed.includeStatus());
+        assertThatThrownBy(() -> prepare(malformedVersion2)).hasMessageContaining("same_mark_count");
     }
 
     @Test

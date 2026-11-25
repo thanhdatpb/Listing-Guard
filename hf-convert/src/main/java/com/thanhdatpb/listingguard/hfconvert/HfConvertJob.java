@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * Converts the dataset to one {@code jsonl-1} file inside {@code catalogs/raw/} (ADR-030), like {@code uspto-convert}:
+ * Converts the dataset to one {@code jsonl-2} file inside {@code catalogs/raw/} (ADR-030), like {@code uspto-convert}:
  * the input is a folder inside the raw directory (or a {@code hf://} URL when the network is allowed), the output a plain
  * file name inside it, written to a {@code .part} file and renamed when the conversion succeeded, with
  * {@code <output>.report.json} next to it. An existing output is refused unless {@code overwrite} is true. DuckDB spills
@@ -57,6 +57,10 @@ public final class HfConvertJob {
      * @throws HfConvertException       if the conversion fails
      */
     public Result run(Path rawDir, String input, String output, boolean overwrite) throws IOException {
+        return run(rawDir, input, output, overwrite, null);
+    }
+
+    Result run(Path rawDir, String input, String output, boolean overwrite, String wordlist) throws IOException {
         Path root = rawDir.toAbsolutePath().normalize();
         if (!Files.isDirectory(root)) {
             throw new IllegalArgumentException("The raw directory " + root + " does not exist.");
@@ -78,6 +82,20 @@ public final class HfConvertJob {
                     + "(a catalog that names it in the manifest then needs the new sha256).");
         }
 
+        Path dictionary = null;
+        if (wordlist != null) {
+            Path path = root.resolve(wordlist).normalize();
+            if (!path.startsWith(root) || !Files.isRegularFile(path)
+                    || !path.toRealPath().startsWith(root.toRealPath()) || Files.size(path) > 16 * 1024 * 1024) {
+                throw new IllegalArgumentException("--wordlist must be a regular file of at most 16 MiB inside catalogs/raw.");
+            }
+            if (path.equals(target) || path.equals(root.resolve(output + REPORT_SUFFIX))
+                    || path.startsWith(root.resolve(TEMP_DIR))) {
+                throw new IllegalArgumentException("--wordlist must be separate from output and temporary files.");
+            }
+            dictionary = path;
+        }
+
         Path temp = root.resolve(TEMP_DIR);
         deleteTree(temp);
         Files.createDirectories(temp);
@@ -88,7 +106,7 @@ public final class HfConvertJob {
                     new HfCatalogConverter.Settings(options.allowNetwork(), options.strict(), options.memoryLimit(),
                             options.threads(), temp));
             try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(part), BUFFER_BYTES)) {
-                report = converter.convert(dataset, out);
+                report = converter.convert(dataset, out, dictionary);
             } catch (IOException | RuntimeException e) {
                 Files.deleteIfExists(part);
                 throw e;

@@ -37,7 +37,7 @@ public final class HfConvertMain {
     static final String DEFAULT_RULESET = "classpath:rulesets/trademark-risk-2026-11b.yaml";
     private static final Set<String> FLAGS = Set.of("overwrite", "strict", "allow-network", "help");
     private static final Set<String> KEYS = Set.of("input", "output", "filters", "min-year", "memory-limit", "threads",
-            "ruleset");
+            "ruleset", "wordlist");
 
     private HfConvertMain() {
     }
@@ -77,7 +77,7 @@ public final class HfConvertMain {
                     + threads + ".");
             HfConvertJob job = new HfConvertJob(filters, new TextNormalizer(ruleset.normalization()), ruleset.version(),
                     new HfConvertJob.Options(network, strict, memory, threads));
-            HfConvertJob.Result result = job.run(rawDir, input, output, overwrite);
+            HfConvertJob.Result result = job.run(rawDir, input, output, overwrite, options.get("wordlist"));
             summary(result, filters, out, err);
             return 0;
         } catch (IllegalArgumentException | HfConvertException e) {
@@ -118,7 +118,7 @@ public final class HfConvertMain {
         String label = "hf-uspto-" + (source.sourceDate() == null ? "yyyy-mm" : source.sourceDate().substring(0, 7));
         List<String> lines = new ArrayList<>();
         lines.add("  - version: " + label);
-        lines.add("    format_version: jsonl-1");
+        lines.add("    format_version: jsonl-2");
         lines.add("    sources:");
         lines.add("      - source_key: uspto");
         lines.add("        file: " + result.output().getFileName());
@@ -212,7 +212,7 @@ public final class HfConvertMain {
 
     static String usage() {
         return """
-                Usage: hf-convert --output=<name>.jsonl [--input=hf | --input=hf://datasets/<owner>/<name>[@<rev>]]
+                Usage: hf-convert --output=<name>.jsonl [--wordlist=<file inside catalogs/raw>] [--input=hf | --input=hf://datasets/<owner>/<name>[@<rev>]]
                                   [--overwrite] [--strict] [--allow-network] [--min-year=<yyyy>]
                                   [--filters=classpath:<path>|file:<path>] [--memory-limit=2GB] [--threads=2]
                                   [--ruleset=classpath:<path>|file:<path>]

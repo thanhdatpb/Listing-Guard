@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals.MarkKind;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals.Reason;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals.Tier;
 import com.thanhdatpb.listingguard.trademark.catalog.MarkStatus;
 import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogImport;
 import com.thanhdatpb.listingguard.trademark.catalog.load.CatalogManifest;
@@ -73,6 +76,82 @@ class HfConvertJobTest {
     }
 
     @Test
+    void countsOnlyLiveSerialsAndSelectedClassesBeforeMergingNormalizedMarks() throws Exception {
+        String live = code(MarkStatus.REGISTERED);
+        String first = "%03d".formatted(FILTERS.niceClasses().first());
+        String last = "%03d".formatted(FILTERS.niceClasses().last());
+        HfFixture.caseFile(dataset, "data_0", List.of(
+                CaseRow.live("90000301", "MUG", live),
+                CaseRow.live("90000302", "mug", live),
+                CaseRow.live("90000303", "Mug", "602"),
+                CaseRow.live("90000304", "Quillmont Tees", live),
+                CaseRow.live("90000305", "Zorvexa", live).withDraw("3"),
+                CaseRow.live("90000306", "Mug", live)));
+        HfFixture.intlClass(dataset, "data_0", List.of(
+                ClassRow.of("90000301", 1, first), ClassRow.of("90000301", 2, "001"),
+                ClassRow.of("90000302", 1, last), ClassRow.of("90000303", 1, first),
+                ClassRow.of("90000304", 1, first), ClassRow.of("90000305", 1, first),
+                ClassRow.of("90000306", 1, "001")));
+        HfFixture.lineage(dataset, 6, 7);
+        HfFixture.lookup(dataset, FILTERS, Map.of());
+        Files.writeString(raw.resolve("words.txt"), "Mug\nmug\n");
+
+        var result = job(false).run(raw, "hf", "with-signals.jsonl", false, "words.txt");
+        var report = result.report();
+        assertThat(report.deadRemoved()).isEqualTo(1);
+        assertThat(report.recordsWritten()).isEqualTo(4);
+        assertThat(report.distinctiveness().tierDistribution()).isEqualTo(Map.of("WEAK", 1L, "STRONG", 1L, "ORDINARY", 1L));
+        assertThat(report.distinctiveness().topWeak()).containsExactly(new HfConversionReport.MarkCount("mug", 2));
+        assertThat(report.distinctiveness().topStrong()).containsExactly(new HfConversionReport.MarkCount("quillmont tees", 1));
+        var document = CatalogManifest.parse("catalogs:\n" + HfConvertMain.manifestEntry(result, FILTERS) + "\n");
+        var entries = CatalogImport.prepare(document.catalogs().getFirst(), raw, NORMALIZER,
+                NormalizationIdentity.of(RULESET)).entries();
+        assertThat(entries).extracting(e -> e.mark().distinctiveness().tier()).containsExactly(Tier.WEAK, Tier.STRONG, Tier.ORDINARY);
+        var mug = entries.getFirst().mark().distinctiveness();
+        assertThat(mug.dictionaryWord()).isTrue();
+        assertThat(mug.wordCount()).isEqualTo(1);
+        assertThat(mug.sameMarkCount()).isEqualTo(2L);
+        assertThat(mug.sameMarkClassCount()).isEqualTo(2);
+        assertThat(entries.get(1).mark().distinctiveness().wordCount()).isEqualTo(2);
+        assertThat(entries.get(2).mark().distinctiveness().markKind()).isEqualTo(MarkKind.WORDS_WITH_DESIGN);
+    }
+
+    @Test
+    void weakThresholdsWorkForRepeatedSerialsAndClassesWithoutADictionaryMatch() throws Exception {
+        String live = code(MarkStatus.REGISTERED);
+        List<Integer> classes = List.copyOf(FILTERS.niceClasses());
+        String first = "%03d".formatted(classes.get(0));
+        String second = "%03d".formatted(classes.get(1));
+        String third = "%03d".formatted(classes.get(2));
+        HfFixture.caseFile(dataset, "data_0", List.of(
+                CaseRow.live("90000401", "Zorvexa", live),
+                CaseRow.live("90000402", "Zorvexa", live),
+                CaseRow.live("90000403", "Zorvexa", live),
+                CaseRow.live("90000404", "Vexalon", live),
+                CaseRow.live("90000405", "Zorvex Mug", live).withDraw("5")));
+        HfFixture.intlClass(dataset, "data_0", List.of(
+                ClassRow.of("90000401", 1, first), ClassRow.of("90000402", 1, first),
+                ClassRow.of("90000403", 1, first), ClassRow.of("90000404", 1, first),
+                ClassRow.of("90000404", 2, second), ClassRow.of("90000404", 3, third),
+                ClassRow.of("90000405", 1, first)));
+        HfFixture.lineage(dataset, 5, 7);
+        HfFixture.lookup(dataset, FILTERS, Map.of());
+        Files.writeString(raw.resolve("words.txt"), "cup\n");
+
+        var result = job(false).run(raw, "hf", "thresholds.jsonl", false, "words.txt");
+        assertThat(result.report().distinctiveness().topWeak()).containsExactly(
+                new HfConversionReport.MarkCount("zorvexa", 3), new HfConversionReport.MarkCount("vexalon", 1));
+        assertThat(result.report().distinctiveness().topStrong()).isEmpty();
+        var manifest = CatalogManifest.parse("catalogs:\n" + HfConvertMain.manifestEntry(result, FILTERS));
+        var entries = CatalogImport.prepare(manifest.catalogs().getFirst(), raw, NORMALIZER,
+                NormalizationIdentity.of(RULESET)).entries();
+        assertThat(entries).extracting(e -> e.mark().distinctiveness().dictionaryWord()).containsOnly(false);
+        assertThat(entries).extracting(e -> e.mark().distinctiveness().reason())
+                .containsExactly(Reason.COMMON_OR_REPEATED, Reason.DRAWING_UNKNOWN, Reason.COMMON_OR_REPEATED);
+        assertThat(entries.get(1).mark().distinctiveness().markKind()).isEqualTo(MarkKind.OTHER);
+    }
+
+    @Test
     void writesTheCatalogFileAndItsReportThatTrademarkImportReads() throws Exception {
         HfConvertJob.Result result = job(false).run(raw, "hf", "hf-test.jsonl", false);
 
@@ -96,6 +175,9 @@ class HfConvertJobTest {
                 .filter(m -> m.display().equals("Zorvexa")).findFirst().orElseThrow();
         assertThat(zorvexa.sourceIds()).containsExactly("uspto:90000201");
         assertThat(zorvexa.status()).isEqualTo(MarkStatus.REGISTERED);
+        assertThat(zorvexa.distinctiveness().dictionaryWord()).isNull();
+        assertThat(zorvexa.distinctiveness().tier()).isEqualTo(Tier.ORDINARY);
+        assertThat(zorvexa.distinctiveness().reason()).isEqualTo(Reason.DICTIONARY_UNAVAILABLE);
         assertThat(zorvexa.niceClasses()).containsExactly(FILTERS.niceClasses().first(), FILTERS.niceClasses().last());
         assertThat(catalog.sourceDate()).isEqualTo(HfFixture.BUILD);
         // the sources form prefixes each joined value with its source key

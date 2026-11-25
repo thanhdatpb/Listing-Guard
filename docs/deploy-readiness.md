@@ -548,3 +548,11 @@ the real USPTO download and TSDR.
 Java language server of VS Code had written its own compiled classes (with `Unresolved compilation problems`) into
 `api/target/classes` while branches were being switched, and Maven kept them. Deleting the module `target/` folders and building
 again fixed it. Close the editor's Java server, or delete `target/`, before the verify that gates a tag.
+
+
+## Catalog distinctiveness sau V48
+
+Chưa đo, maintainer đo trên máy có dữ liệu. Thực hiện [convert, import và activate](trademark-catalog.md#tín-hiệu-distinctiveness-jsonl-2)
+với một label mới. Ghi thời gian convert/import, kích thước file, số serial sống sau lọc, số entry sau gộp, phân bố
+STRONG/ORDINARY/WEAK và SHA-256 của từ điển nếu dùng. Rà ít nhất 20 ví dụ mỗi tier nếu đủ mẫu. Giữ danh sách nhãn và report thật ngoài Git.
+So sánh severity trước và sau trên cùng listing mẫu, cùng ruleset sau khi kích hoạt catalog mới.

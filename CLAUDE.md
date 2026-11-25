@@ -49,6 +49,8 @@ Do not use `-DforkCount=0` in this repository: it can change the test working-di
 
 - Keep tenant scope in queries, authorization, cache identity, quotas and audit. Keep listing and buyer data out of logs.
 - Use immutable published rulesets and preserve independent pack versions and analysis fingerprints. Use additive Flyway migrations.
+- Treat [catalog distinctiveness signals](docs/adr/ADR-046-catalog-distinctiveness-signals.md) as unverified metadata.
+  Keep scanner severity unchanged when enriching catalogs.
 - Maintain additive `/api/v1` contracts and RFC 7807 errors. Follow the OpenAPI refresh, compatibility report and release-baseline
   sequence in [ADR-022](docs/adr/ADR-022-api-contract-and-compatibility.md) and the detailed conventions.
 - Keep the Console in Spring MVC with Thymeleaf, htmx, shared design tokens and VI/EN messages.

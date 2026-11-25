@@ -17,8 +17,7 @@ import java.util.TreeMap;
  * <p>Every serial number of the case files is counted exactly once, so
  * {@code distinctSerials == recordsWritten + recordErrors + deadRemoved + filteredTotal()}: a record error (see
  * {@code errors}), not live in its latest row ({@code deadRemoved}, by status code in {@code deadByStatus}), then the
- * first filter that drops it ({@code filtered}). A report holds counts, file names and versions, never a mark or a serial
- * number.
+ * first filter that drops it ({@code filtered}). A report holds counts, file names, versions and bounded samples of normalized marks, without serial numbers.
  *
  * @param completeness  {@code INCOMPLETE} when {@code problems} or {@code recordErrors} is not empty: the output cannot be
  *                      trusted for a deployment
@@ -57,11 +56,17 @@ public record HfConversionReport(
         String duckdbVersion,
         long elapsedMillis,
         long outputBytes,
-        String outputSha256) {
+        String outputSha256,
+        Distinctiveness distinctiveness) {
 
     public static final String FORMAT = "listing-guard/hf-convert-report/v1";
 
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+
+    public record MarkCount(String mark, long count) { }
+
+    public record Distinctiveness(String thresholdsVersion, String dictionarySha256, Map<String, Long> tierDistribution,
+                                  List<MarkCount> topWeak, List<MarkCount> topStrong) { }
 
     /** The data-file keys of a manifest entry. */
     public record Source(String sourceName, String url, String license, String sourceDate) {
@@ -164,6 +169,7 @@ public record HfConversionReport(
         json.put("elapsedMillis", elapsedMillis);
         json.put("outputBytes", outputBytes);
         json.put("outputSha256", outputSha256);
+        json.put("distinctiveness", distinctiveness);
         try {
             return JSON.writeValueAsString(json) + "\n";
         } catch (JsonProcessingException e) {

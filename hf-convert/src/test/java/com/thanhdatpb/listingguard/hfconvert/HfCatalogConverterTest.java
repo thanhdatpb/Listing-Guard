@@ -318,7 +318,9 @@ class HfCatalogConverterTest {
         for (JsonNode line : first.lines()) {
             List<String> keys = new ArrayList<>();
             line.fieldNames().forEachRemaining(keys::add);
-            assertThat(keys).containsExactly("mark", "status", "nice_classes", "source_id");
+            assertThat(keys).containsExactly("mark", "status", "nice_classes", "source_id", "word_count",
+                "same_mark_count", "same_mark_class_count", "mark_kind", "dictionary_word",
+                "distinctiveness_tier", "distinctiveness_reason");
         }
         assertThat(first.report().outputBytes()).isEqualTo(first.text().getBytes(StandardCharsets.UTF_8).length);
     }

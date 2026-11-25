@@ -1,0 +1,9 @@
+{
+  "version": "distinctiveness-2026-11",
+  "sourceStatus": "unverified",
+  "weakSerialMinimum": 3,
+  "weakClassMinimum": 3,
+  "strongWordMinimum": 2,
+  "strongSerialMaximum": 1,
+  "strongClassMaximum": 1
+}

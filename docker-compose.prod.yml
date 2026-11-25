@@ -202,11 +202,11 @@ services:
       # only raw/ is mounted, and writable: the job reads the XML there and writes the jsonl-1 file and its report there
       - ./catalogs/raw:/catalogs/raw
 
-  # Converts the Hugging Face dataset illeatmyhat/uspto-trademarks (Parquet) in catalogs/raw/hf/ to one jsonl-1 file
+  # Converts the Hugging Face dataset illeatmyhat/uspto-trademarks (Parquet) in catalogs/raw/hf/ to one jsonl-2 file
   # (ADR-030); trademark-import loads it. No release image carries it (DuckDB stays out of the api image): it is built here
   # from the checkout, Dockerfile target hf-convert. No database; no network unless HF_CONVERT_ALLOW_NETWORK=true.
-  # Measured on a dev machine (ADR-030): about 1 minute and 2.1 GB of memory with DuckDB at 2GB; it fits the A1 next to a
-  # running stack. You may instead convert on another machine and copy only the .jsonl file and its manifest entry.
+  # ADR-030 measured the earlier jsonl-1 converter. The jsonl-2 conversion has not been measured with real data.
+  # Convert elsewhere if needed and copy the .jsonl file and its manifest entry.
   #   docker compose -f docker-compose.prod.yml --profile tools run --rm --build hf-convert --input=hf --output=hf-uspto-2026-10.jsonl [--min-year=2015]
   hf-convert:
     image: listing-guard-hf-convert:local
