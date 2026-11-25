@@ -133,6 +133,7 @@ The nine tools are `check_listing`, `check_trademark`, `check_variations`, `chec
 - [Java client SDK](client/README.md) for Java backends.
 - [`batch-check`](docs/batch-check.md) for CSV or Amazon flat-file reports.
 - [Console bulk check](docs/bulk-check.md) to paste rows from a Google Sheet (or upload a CSV) and copy the results back.
+- [Seller pilot guide](docs/pilot-seller-guide.md) for the Vietnamese Sheet-to-recheck workflow and pilot reports.
 - [Periodic re-audit](docs/reaudit.md): upload the listings you have on sale and see which trademark risks are new since your last audit, which listings changed, and a CSV of what to fix ([ADR-035](docs/adr/ADR-035-periodic-reaudit.md)).
 - [Free-tier LLM providers and a trademark context judge](docs/llm.md) (off by default): Groq, Cloudflare Workers AI and Gemini, so a colour name such as "Dodger blue" is shown as a likely descriptive word instead of a brand; the rules stay in charge ([ADR-036](docs/adr/ADR-036-free-tier-llm-providers-and-trademark-context-judge.md)).
 - [Finding feedback and the weekly home page](docs/feedback.md): mark each finding Correct, False positive or Not useful, and show the week's value and false-positive rates ([ADR-034](docs/adr/ADR-034-finding-feedback-and-value-dashboard.md)).

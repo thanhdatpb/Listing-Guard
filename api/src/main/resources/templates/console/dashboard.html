@@ -12,22 +12,36 @@
      rules that found the most. Every value goes through th:text and every sentence is a message (ADR-028). -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('dashboard')}"></header>
-<main class="lg-page" id="home">
+<main class="lg-page" id="home"
+      th:with="pilotHome=${pilotCapabilities != null},overview=${pilotCapabilities == null or consoleNavigation.manage}">
     <span id="main" tabindex="-1"></span>
     <div class="lg-page__head">
         <div>
-            <p class="lg-page__crumb" th:with="pattern=#{format.date}" th:text="#{home.week(${#temporals.format(home.weekFrom, pattern)}, ${#temporals.format(home.today, pattern)})}"></p>
+            <p class="lg-page__crumb" th:if="${overview}" th:with="pattern=#{format.date}" th:text="#{home.week(${#temporals.format(home.weekFrom, pattern)}, ${#temporals.format(home.today, pattern)})}"></p>
             <h1 th:text="#{dashboard.heading}"></h1>
-            <p class="lg-page__sub" th:text="#{home.sub}"></p>
+            <p class="lg-page__sub" th:if="${overview}" th:text="#{home.sub}"></p>
         </div>
         <div class="lg-actions">
             <!-- One brand button on a screen: with no data yet it is the empty state's button, so this one is plain. -->
-            <a class="lg-btn" th:classappend="${!home.empty} ? 'lg-btn--primary'" th:href="@{/console/check}">
+            <a class="lg-btn" th:classappend="${!pilotHome and !home.empty} ? 'lg-btn--primary'" th:href="@{/console/check}">
                 <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg>
                 <th:block th:text="#{nav.check}"></th:block>
             </a>
         </div>
     </div>
+
+    <section th:if="${pilotCapabilities != null}" id="pilot-capabilities" class="lg-card lg-section" aria-labelledby="pilot-heading">
+        <h2 class="lg-section-title" id="pilot-heading" th:text="#{pilot.badge}"></h2>
+        <p th:text="#{pilot.available}"></p>
+        <ul>
+            <li th:each="pack : ${pilotCapabilities.packs}" th:if="${pack.available}" th:attr="data-pack=${pack.id}"
+                th:text="${@consoleMessages.pilotPack(pack.id)}"></li>
+            <li th:if="${pilotCapabilities.fixes.enabled}" th:text="#{pilot.fixes}"></li>
+            <li th:text="#{pilot.flow}"></li>
+            <li th:if="${consoleNavigation.manage}" th:text="#{pilot.manage}"></li>
+        </ul>
+        <a id="pilot-start" class="lg-btn lg-btn--primary" th:href="@{/console/bulk}" th:text="#{pilot.start}"></a>
+    </section>
 
     <!-- The catalog changed since a scope was last re-audited (ADR-035): said as a warning, with the way to the page. -->
     <th:block th:if="${reauditNotice != null}">
@@ -35,7 +49,7 @@
     </th:block>
 
     <!-- No result and no verdict in eight weeks: how to start, not a page of zeros. -->
-    <section class="lg-empty lg-section" id="home-empty" th:if="${home.empty}" aria-labelledby="empty-heading">
+    <section class="lg-empty lg-section" id="home-empty" th:if="${!pilotHome and home.empty}" aria-labelledby="empty-heading">
         <h2 id="empty-heading" class="lg-empty__title" th:text="#{home.empty.heading}"></h2>
         <p class="lg-empty__text" th:text="#{home.empty.intro}"></p>
         <ol class="lg-empty__steps">
@@ -47,7 +61,7 @@
         <a class="lg-btn lg-btn--primary" th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a>
     </section>
 
-    <th:block th:unless="${home.empty}">
+    <th:block th:if="${overview and !home.empty}">
         <section class="lg-section" id="home-cards" aria-labelledby="cards-heading">
             <h2 id="cards-heading" class="lg-sr-only" th:text="#{home.cards.heading}"></h2>
             <div class="lg-grid lg-grid--stats">
@@ -127,7 +141,7 @@
                             <div class="lg-kv__label" th:text="#{home.data.watchlist}"></div>
                             <div class="lg-kv__value" th:text="#{home.data.watchlist.value(${#strings.toString(home.data.watchlistEntries)})}"></div>
                         </div>
-                        <a class="lg-small" th:href="@{/console/watchlist}" th:text="#{home.data.manage}"></a>
+                        <a class="lg-small" th:if="${consoleNavigation == null or consoleNavigation.manage}" th:href="@{/console/watchlist}" th:text="#{home.data.manage}"></a>
                     </li>
                     <li class="lg-kv__item" id="data-reaudit">
                         <div class="lg-kv__main">
@@ -230,7 +244,7 @@
                         </tbody>
                     </table>
                 </div>
-                <p class="lg-small lg-card__foot"><a th:href="@{/console/stats}" th:text="#{home.top.more}"></a></p>
+                <p class="lg-small lg-card__foot"><a th:if="${consoleNavigation == null or consoleNavigation.manage}" th:href="@{/console/stats}" th:text="#{home.top.more}"></a></p>
             </section>
         </div>
     </th:block>

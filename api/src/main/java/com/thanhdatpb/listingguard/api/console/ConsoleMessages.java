@@ -39,6 +39,10 @@ public class ConsoleMessages {
         return source.getMessage(code, text.length == 0 ? null : text, locale);
     }
 
+    public String pilotPack(String id) {
+        return get("pilot.pack." + id);
+    }
+
     /** What the rule checks, in the language of the page; {@code null} when no language has a sentence for it. */
     public String ruleExplanation(String ruleId) {
         return ruleExplanation(LocaleContextHolder.getLocale(), ruleId);

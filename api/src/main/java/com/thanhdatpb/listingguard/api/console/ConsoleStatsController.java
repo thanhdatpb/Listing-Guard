@@ -106,13 +106,13 @@ public class ConsoleStatsController {
         }
     }
 
-    private ReportQuery query(String from, String to, String marketplace) {
+    ReportQuery query(String from, String to, String marketplace) {
         boolean named = !blank(from) || !blank(to);
         return named ? stats.query(from, to, marketplace) : stats.defaultQuery(marketplace);
     }
 
     /** What a refusal says, in the language of the page, with the report's messages (the same rules refuse the same periods). */
-    private String problem(RuntimeException e) {
+    String problem(RuntimeException e) {
         if (e instanceof InvalidReportPeriodException period) {
             return switch (period.reason()) {
                 case FROM_AFTER_TO -> messages.get("report.error.fromafterto");

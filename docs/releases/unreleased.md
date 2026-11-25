@@ -22,3 +22,10 @@ ghi `catalog_distinctiveness` trong `skippedRuleIds`. Xem [ADR-043](../adr/ADR-0
 ADR-022, additive against v0.10.0
 
 - `response-property-added` at `schema RiskAdjustmentView.distinctiveness`
+
+## Seller pilot
+
+Mẫu `deploy/env.pilot.example` bật luồng seller qua Cloudflare Access, tiếng Việt mặc định, kiểm tra trademark với
+catalog đã phân tầng, sửa và kiểm lại bảng dán từ Sheet. Console có menu theo vai trò và xuất báo cáo pilot CSV/HTML.
+Migration V49 chỉ ghi số đếm theo client, ngày UTC và marketplace. Xem [ADR-047](../adr/ADR-047-seller-pilot-profile-and-console-navigation.md)
+và [hướng dẫn seller](../pilot-seller-guide.md).

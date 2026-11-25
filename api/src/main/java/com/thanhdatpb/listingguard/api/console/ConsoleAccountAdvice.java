@@ -27,9 +27,24 @@ public class ConsoleAccountAdvice {
     private static final java.util.regex.Pattern GENERATED_NAME = java.util.regex.Pattern.compile("web-[0-9a-f]{24}");
 
     private final ClientRepository clients;
+    private final ConsoleAccountRoles roles;
+    private final ConsolePilot pilot;
 
-    public ConsoleAccountAdvice(ClientRepository clients) {
+    public record Navigation(boolean pilot, boolean manage, boolean policyChanges, boolean pod, boolean review) { }
+
+    @ModelAttribute("consoleNavigation")
+    public Navigation navigation() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean pilotEnabled = pilot.enabled();
+        boolean manage = !pilotEnabled || authentication != null
+                && authentication.getPrincipal() instanceof ConsoleUser user && roles.isAdmin(user);
+        return new Navigation(pilotEnabled, manage, pilot.policyChanges(), pilot.pod(), pilot.review());
+    }
+
+    public ConsoleAccountAdvice(ClientRepository clients, ConsoleAccountRoles roles, ConsolePilot pilot) {
         this.clients = clients;
+        this.roles = roles;
+        this.pilot = pilot;
     }
 
     @ModelAttribute("consoleAccount")

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{pilot.report}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<main class="lg-page" id="pilot-print">
+    <a class="lg-btn pilot-screen" th:href="@{/console/stats(from=${pilotQuery.from},to=${pilotQuery.to},marketplace=${pilotQuery.marketplace})}"
+       th:text="#{stats.title}"></a>
+    <a class="lg-btn pilot-screen" th:href="@{/console/stats/pilot.csv(from=${pilotQuery.from},to=${pilotQuery.to},marketplace=${pilotQuery.marketplace})}"
+       th:text="#{pilot.export}"></a>
+    <h1 th:text="#{pilot.report}"></h1>
+    <p><time th:text="${pilotQuery.from}"></time> – <time th:text="${pilotQuery.to}"></time>
+        <span th:text="#{pilot.timezone}"></span> · <span th:text="${pilotQuery.marketplace == null} ? #{report.form.all} : ${pilotQuery.marketplace}"></span></p>
+    <p class="pilot-screen lg-small" th:text="#{pilot.print.hint}"></p>
+    <div class="lg-table-wrap"><table class="lg-table" id="pilot-daily">
+        <caption th:text="#{pilot.daily}"></caption>
+        <thead><tr>
+            <th scope="col" th:text="#{pilot.day}"></th><th scope="col" th:text="#{pilot.checked}"></th>
+            <th scope="col">HIGH</th><th scope="col">MEDIUM</th><th scope="col">LOW</th>
+            <th scope="col" th:text="#{pilot.unranked}"></th><th scope="col" th:text="#{pilot.rechecked}"></th>
+        </tr></thead>
+        <tbody><tr th:each="day : ${pilotDays}">
+            <th scope="row" th:text="${day.date}"></th><td th:text="${day.checked}"></td>
+            <td th:text="${day.rate(day.high) == null ? '—' : day.high + ' (' + #numbers.formatPercent(day.rate(day.high), 1, 1) + ')'}"></td>
+            <td th:text="${day.rate(day.medium) == null ? '—' : day.medium + ' (' + #numbers.formatPercent(day.rate(day.medium), 1, 1) + ')'}"></td>
+            <td th:text="${day.rate(day.low) == null ? '—' : day.low + ' (' + #numbers.formatPercent(day.rate(day.low), 1, 1) + ')'}"></td>
+            <td th:text="${day.unranked()}"></td><td th:text="${day.rechecked}"></td>
+        </tr></tbody>
+    </table></div>
+    <p class="lg-small" th:text="#{pilot.daily.note}"></p>
+    <div class="lg-table-wrap"><table class="lg-table" id="pilot-feedback">
+        <caption th:text="#{stats.byrule.heading}"></caption>
+        <thead><tr>
+            <th scope="col" th:text="#{report.col.pack}"></th><th scope="col" th:text="#{report.col.rule}"></th>
+            <th scope="col" th:text="#{stats.col.source}"></th><th scope="col" th:text="#{stats.col.verdicts}"></th>
+            <th scope="col" th:text="#{feedback.verdict.false-positive}"></th><th scope="col" th:text="#{stats.col.rate}"></th>
+        </tr></thead>
+        <tbody>
+        <tr th:if="${pilotRules.isEmpty()}"><td colspan="6" th:text="#{stats.byrule.none}"></td></tr>
+        <tr th:each="rule : ${pilotRules}">
+            <td th:text="${rule.pack}"></td><th scope="row" th:text="${rule.ruleId}"></th><td th:text="${rule.source}"></td>
+            <td th:text="${rule.verdicts}"></td><td th:text="${rule.falsePositive}"></td>
+            <td th:text="${#numbers.formatPercent(rule.falsePositiveRate, 1, 1)}"></td>
+        </tr></tbody>
+    </table></div>
+    <p class="lg-small" th:text="#{pilot.feedback.note}"></p>
+</main>
+</body>
+</html>

@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 /** Session-authenticated entry point for the same policy checks used by the API-key controller. */
 @Hidden
 @RestController
-@ConditionalOnProperty(prefix = "listing-guard.console", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = {"listing-guard.console.enabled", "listing-guard.analyzer.enabled"}, havingValue = "true")
 class ConsolePolicyCheckController {
     private final PolicyChecks checks;
     private final ConsoleAccountRoles accounts;

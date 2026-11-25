@@ -63,6 +63,23 @@
     source.select();
   }
 
+  var draft = document.getElementById('pilot-data');
+  if (draft) {
+    var unchecked = document.getElementById('pilot-unchecked');
+    var csv = document.getElementById('download-csv');
+    var sheet = document.getElementById('sheet-help');
+    var syncDraft = function () {
+      var dirty = draft.value !== draft.defaultValue;
+      copy.disabled = dirty;
+      if (csv) csv.hidden = dirty;
+      if (sheet) sheet.hidden = dirty;
+      if (unchecked) unchecked.hidden = !dirty;
+      if (dirty) say('');
+    };
+    draft.addEventListener('input', syncDraft);
+    syncDraft();
+  }
+
   copy.hidden = false;
   copy.addEventListener('click', function () {
     if (navigator.clipboard && window.isSecureContext) {

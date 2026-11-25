@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console;
 
+import com.thanhdatpb.listingguard.api.capabilities.CapabilitiesService;
 import com.thanhdatpb.listingguard.api.console.reaudit.ReauditService;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,11 +23,16 @@ public class ConsoleDashboardController {
     private final PlanService plans;
     private final ConsoleHomeService home;
     private final ReauditService reaudit;
+    private final CapabilitiesService capabilities;
+    private final ConsolePilot pilot;
 
-    public ConsoleDashboardController(PlanService plans, ConsoleHomeService home, ReauditService reaudit) {
+    public ConsoleDashboardController(PlanService plans, ConsoleHomeService home, ReauditService reaudit,
+                                      CapabilitiesService capabilities, ConsolePilot pilot) {
         this.plans = plans;
         this.home = home;
         this.reaudit = reaudit;
+        this.capabilities = capabilities;
+        this.pilot = pilot;
     }
 
     @GetMapping({"/console", "/console/"})
@@ -35,6 +41,9 @@ public class ConsoleDashboardController {
         model.addAttribute("email", user.email());
         model.addAttribute("usage", plans.usage(user.clientId()));
         model.addAttribute("home", home.home(user.clientId()));
+        if (pilot.enabled()) {
+            model.addAttribute("pilotCapabilities", capabilities.capabilities());
+        }
         // the catalog changed since a scope was last re-audited (ADR-035)
         model.addAttribute("reauditNotice", reaudit.notice(user.clientId()).orElse(null));
         return "console/dashboard";

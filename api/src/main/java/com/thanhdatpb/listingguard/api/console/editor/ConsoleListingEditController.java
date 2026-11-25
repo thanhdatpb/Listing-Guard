@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.thanhdatpb.listingguard.api.console.ConsoleFeedbackSupport;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
+import com.thanhdatpb.listingguard.api.console.PilotMetrics;
+import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.api.edit.ListingEditRequest;
 import com.thanhdatpb.listingguard.api.edit.ListingEditResult;
 import com.thanhdatpb.listingguard.api.edit.ListingEditService;
@@ -31,15 +33,17 @@ public class ConsoleListingEditController {
     private final com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history;
     private final ObjectMapper mapper;
     private final PolicyChecks policyChecks;
+    private final PilotMetrics pilotMetrics;
 
     public ConsoleListingEditController(ListingEditService edits, ConsoleFeedbackSupport feedback,
                                         com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history,
-                                        ObjectMapper mapper, PolicyChecks policyChecks) {
+                                        ObjectMapper mapper, PolicyChecks policyChecks, PilotMetrics pilotMetrics) {
         this.edits = edits;
         this.feedback = feedback;
         this.history = history;
         this.mapper = mapper;
         this.policyChecks = policyChecks;
+        this.pilotMetrics = pilotMetrics;
     }
 
     @GetMapping("/console/check/edit")
@@ -66,6 +70,14 @@ public class ConsoleListingEditController {
                     null, null));
             ListingEditResult result = comparison.result();
             model.addAttribute("comparison", comparison);
+            var trademark = result.after().trademarkRisk();
+            var rules = result.after().listingRules();
+            if (rules != null || trademark != null) {
+                String risk = trademark != null && trademark.completeness() == Completeness.COMPLETE && trademark.riskLevel() != null
+                        ? trademark.riskLevel().name() : null;
+                pilotMetrics.record(user.clientId(), rules != null ? rules.marketplace() : trademark.marketplace(),
+                        List.of(new PilotMetrics.Observation(risk, !result.changedFields().isEmpty())));
+            }
             feedback.accountId(user).ifPresent(account -> {
                 record(user.clientId(), account, result.before());
                 record(user.clientId(), account, result.after());

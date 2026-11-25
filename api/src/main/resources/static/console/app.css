@@ -214,6 +214,21 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 @media print {
   .app-side, .app-skip { display: none; }
   body:has(> .app-side) { padding-left: 0; }
+  @page pilot { size: A4 portrait; margin: 12mm; }
+  #pilot-print {
+    page: pilot;
+    padding: 0;
+    max-width: none;
+    color-scheme: light;
+    color: CanvasText;
+    background: Canvas;
+    font-size: 10pt;
+  }
+  #pilot-print .pilot-screen { display: none; }
+  #pilot-print .lg-table-wrap { overflow: visible; }
+  #pilot-print table { width: 100%; font-size: 9pt; }
+  #pilot-print th, #pilot-print td { padding: 3pt; }
+  #pilot-print tr { break-inside: avoid; }
 }
 
 /* ---------- button ---------- */

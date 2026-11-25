@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -32,7 +32,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Hidden
 @Controller
 @RequestMapping("/console/pod-readiness")
-@ConditionalOnProperty(prefix = "listing-guard.console", name = "enabled", havingValue = "true")
+@ConditionalOnExpression("${listing-guard.console.enabled:false} && ${listing-guard.console.pod-enabled:true}")
 class ConsolePodController {
     private static final String VIEW = "console/pod-readiness";
     private final PodProfiles profiles;
