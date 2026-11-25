@@ -84,16 +84,31 @@ public final class RuleEngine {
      * cannot differ. Empty for {@code null}.
      */
     public List<String> skippedFields(Listing listing, RulesetConfig config, Set<String> checkedFields) {
+        Set<String> fields = new LinkedHashSet<>();
+        skips(listing, config, checkedFields).values().forEach(fields::addAll);
+        return List.copyOf(fields);
+    }
+
+    /** The ids of the rules that {@link #runDetailed(Listing, RulesetConfig, Set)} would leave something out of, like {@link #skippedFields}. */
+    public List<String> skippedRuleIds(Listing listing, RulesetConfig config, Set<String> checkedFields) {
+        return List.copyOf(skips(listing, config, checkedFields).keySet());
+    }
+
+    private Map<String, Set<String>> skips(Listing listing, RulesetConfig config, Set<String> checkedFields) {
+        Map<String, Set<String>> skips = new java.util.LinkedHashMap<>();
         if (checkedFields == null) {
-            return List.of();
+            return skips;
         }
-        Set<String> skipped = new LinkedHashSet<>();
         for (Rule rule : registry.rulesFor(config.packId(), config.marketplace())) {
             if (rule instanceof FieldScopedRule scoped && config.rule(rule.id(), listing.productType()).enabled()) {
-                scoped.scopedFields(listing, config).stream().filter(field -> !checkedFields.contains(field)).forEach(skipped::add);
+                Set<String> skipped = new LinkedHashSet<>(scoped.scopedFields(listing, config));
+                skipped.removeIf(checkedFields::contains);
+                if (!skipped.isEmpty()) {
+                    skips.put(rule.id(), skipped);
+                }
             }
         }
-        return List.copyOf(skipped);
+        return skips;
     }
 
     /**
