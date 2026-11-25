@@ -73,3 +73,25 @@ vẫn là cổng duy nhất và model không bao giờ tự quyết định bả
 `/console/stats` thêm tỉ lệ có gợi ý an toàn ở vòng 1 so với vòng 2 trở đi, và panel ghi "Đã thử N vòng" cùng lý do dừng bằng tiếng
 Việt và tiếng Anh. Không có thay đổi hợp đồng REST. Xem [ADR-050](../adr/ADR-050-rewrite-repair-rounds.md) (bổ sung
 [ADR-037](../adr/ADR-037-llm-rewrite-suggestions-verified-by-rules.md)) và [vòng sửa lại](../llm.md#repair-rounds-adr-050).
+
+
+## Gói bằng chứng cho judge trademark
+
+Cấu hình mới `listing-guard.llm.judge.prompt-version` (`LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION`). Mặc định
+`trademark-judge-2026-11` là prompt cũ, giữ nguyên từng byte và cũng là cách khôi phục; giá trị `trademark-judge-2026-12` thêm một gói
+bằng chứng do code tất định gom trước khi gọi model đúng một lần, không gọi tool, không gọi mạng lúc kiểm: tier, số hồ sơ cùng chuỗi,
+số nhóm Nice, loại nhãn, từ điển, số từ, nhóm Nice của nhãn có nằm trong nhóm của `product_type` đã khai không (dùng ánh xạ của
+ruleset), trạng thái TSDR đã lưu (chỉ khi bật `finding-status`) và quyết định verified case gần nhất của chính client (chỉ khi bật verified
+cases, còn hạn, chưa thu hồi; chỉ kết quả và số ngày, không ghi chú). Thiếu thì ghi `unknown`, không đoán. Không có luật tất định mới:
+finding nào được xét và việc chỉ được hạ mức giữ như ADR-036 và ADR-043; watchlist, nhiều từ, tier STRONG, khớp trong brand/shop_name
+không bao giờ được gửi với ruleset `2026-12`. Khi hạ mức, adjustment `llm_descriptive` ghi thêm `judgeEvidence` (phiên bản prompt, các
+trường bằng chứng đã gửi, lý do của model); không lưu prompt, không có migration (nằm trong JSONB `risk_adjustments`). Với prompt bằng chứng
+và verified cases bật, digest các verified case của client nằm trong `analysisVersion`. Bộ 17 ca tổng hợp
+`eval/listing/trademark/judge-cases.tsv` chạy trong CI với model kịch bản (`TrademarkJudgeEvalGateTest`); tỉ lệ đồng ý của model thật với
+nhãn đã gán **chưa đo**, lệnh để đo nằm trong `docs/llm.md`. Xem [ADR-051](../adr/ADR-051-trademark-judge-evidence-pack.md) (bổ sung
+[ADR-036](../adr/ADR-036-free-tier-llm-providers-and-trademark-context-judge.md)) và
+[gói bằng chứng](../llm.md#evidence-pack-for-the-judge-adr-051).
+
+ADR-022, additive against v0.10.0
+
+- `response-property-added` at `schema RiskAdjustmentView.judgeEvidence`
