@@ -61,6 +61,28 @@ networks only; it has no authentication and must never be exposed to the interne
 If the seller asks for a revision, the agent may suggest text for the seller to review, then must call the relevant checks again
 on the exact proposed content and report remaining findings. It never writes to Etsy or Amazon.
 
+## Repair with an agent
+
+When the seller asks the agent to fix a listing whose first checks found an `ERROR` or a trademark finding in the title or tags, the
+skill runs a **bounded repair loop** ([ADR-049](adr/ADR-049-agent-repair-loop.md)). The agent drafts one revision with its own model,
+checks that exact text with the same tools, and compares the findings with the original. It stops when the targeted findings are
+gone, after three rounds, after two rounds without progress, or at once on `quota-exceeded`, `rate-limited`, `plan-not-allowed`, a
+`*-not-configured` error or an `INCOMPLETE` result, and reports the limit instead of calling the draft clean. No Listing Guard key
+for a model is involved. Each round can use new quota, so the agent reads `get_usage` first and, for several listings, tells the
+seller the expected number of results and waits.
+
+> **Seller:** Fix whatever this listing flags, and change only what it flags.
+>
+> **Agent tool calls:** `get_capabilities` → `check_listing` → `check_trademark` → `get_limits` → `get_usage`, then per round
+> `check_listing` → `check_trademark` on the draft.
+>
+> **Agent:** Done after 2 of 3 rounds. [Per field: original, proposal, what it resolves.] [Findings that remain.] [Versions,
+> completeness, catalog state and disclaimer.] This is a draft for you to review; I changed nothing on the marketplace.
+
+The procedure is in [`references/repair-loop.md`](../skills/listing-guard/references/repair-loop.md) and a full example is
+[`examples/repair-loop-etsy.md`](../skills/listing-guard/examples/repair-loop-etsy.md). The console's **Gợi ý sửa** button is the
+other way to get an AI fix; [the LLM guide](llm.md#two-ways-to-get-an-ai-fix) compares them.
+
 ## Limits and disclaimers
 
 - Listing Guard checks rules and reference data; it does not guarantee marketplace acceptance or establish that a listing is
