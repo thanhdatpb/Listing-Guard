@@ -22,7 +22,7 @@ Self-hosted pre-publish compliance API for Etsy and Amazon listings: determinist
 
 The API checks listings and returns findings with their source, field and evidence. Separate endpoints screen variation families, buyer personalization text and listing images.
 Sellers can compare edits and reopen saved check results in the [console history](docs/edit-mode.md).
-An optional, off-by-default console button proposes rewrites that only appear after the rules and the trademark check accept them ([LLM suggestions](docs/llm.md)).
+An optional, off-by-default console button proposes rewrites that only appear after the rules and the trademark check accept them ([LLM suggestions](docs/llm.md)); with `max-rounds` above 1 it asks the model again, with the reasons the checks gave ([ADR-050](docs/adr/ADR-050-rewrite-repair-rounds.md)).
 The API stores results in each client's scope; optional plans, quota and fix/readiness output are disabled by default.
 Trademark checks require an operator loaded catalog, and image checks are disabled by default with thresholds still unverified.
 The optional console keeps magic-link sign-in by default and can use verified Cloudflare Access identities without SMTP (ADR-027).

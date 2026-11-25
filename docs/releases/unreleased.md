@@ -57,3 +57,19 @@ cuối gồm bảng cũ và mới theo từng trường, finding còn lại, `an
 Listing Guard. Ví dụ tự đặt nằm ở `skills/listing-guard/examples/repair-loop-etsy.md`. `docs/llm.md` so sánh hai cách sửa bằng AI:
 agent ngoài qua MCP (không cần khoá) và nút "Gợi ý sửa" của ADR-037 (cần khoá). `AgentSkillContractTest` mở rộng sang mọi file
 của skill. Xem [ADR-049](../adr/ADR-049-agent-repair-loop.md) và [hai cách sửa bằng AI](../llm.md#two-ways-to-get-an-ai-fix).
+
+
+## Vòng sửa lại cho nút "Gợi ý sửa"
+
+Cấu hình mới `listing-guard.llm.rewrite.max-rounds` (`LISTING_GUARD_LLM_REWRITE_MAX_ROUNDS`, mặc định 1, từ 1 đến 3; giá trị khác thì
+API không khởi động). Với 1, prompt, số lần gọi model, kết quả và dòng `rewrite_suggestion_run` giống hệt trước, có test ghim. Với 2
+hoặc 3, khi vòng trước có câu trả lời đọc được nhưng không bản nào qua kiểm tra, hệ thống hỏi lại model kèm lý do từng bản bị loại
+(bước shape, listing_rule, trademark hoặc progress, rule id, trường, giới hạn bị vi phạm). Với trademark mới chỉ gửi rule id, trường
+và "added a registered mark", không gửi tên nhãn của catalog hay watchlist, không gửi đoạn khớp hay chính bản đề xuất đó. Bước kiểm
+vẫn là cổng duy nhất và model không bao giờ tự quyết định bản nào đạt. Model lỗi, provider không phục vụ được hoặc check không chạy
+được thì dừng như trước, không thử vòng sau. Một lần bấm vẫn tính một lượt cho `max-per-hour` nhưng gửi tới nhà cung cấp tối đa
+`max-rounds` yêu cầu (ghi rõ trong `docs/llm.md`); dòng audit của vòng 2 trở đi có purpose `rewrite_repair`. Migration V50 thêm vào
+`rewrite_suggestion_run` hai cột `rounds_used` và `safe_round` (vòng có bản đạt đầu tiên), chỉ là số đếm, không lưu text. Trang
+`/console/stats` thêm tỉ lệ có gợi ý an toàn ở vòng 1 so với vòng 2 trở đi, và panel ghi "Đã thử N vòng" cùng lý do dừng bằng tiếng
+Việt và tiếng Anh. Không có thay đổi hợp đồng REST. Xem [ADR-050](../adr/ADR-050-rewrite-repair-rounds.md) (bổ sung
+[ADR-037](../adr/ADR-037-llm-rewrite-suggestions-verified-by-rules.md)) và [vòng sửa lại](../llm.md#repair-rounds-adr-050).
