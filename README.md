@@ -60,6 +60,8 @@ State of v0.10.0. "Ready" means it works and its tests pass, within the evidence
 
 Rule sources stay labeled as they are in the rulesets; no unverified limit is presented as official. The trademark result includes its disclaimer and is not legal advice. The image checker does not identify logos, text or marks. A missing finding is not marketplace approval.
 
+Optional trademark calibration groups lowered common-word matches and preserves their evidence. [Setup and rollback](docs/trademark-catalog.md#bật-hiệu-chỉnh-trademark-theo-tier)
+
 ## How a check flows
 
 ![Seven numbered steps show a listing request moving from a client through the Cloudflare edge and Tunnel to the API, cache, pack and PostgreSQL, then returning findings and evidence; the diagram also shows pre-publish and pre-production patterns and the trademark catalog pipeline.](docs/images/request-flow-and-data.svg)

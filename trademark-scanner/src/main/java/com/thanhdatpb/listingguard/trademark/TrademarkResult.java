@@ -18,12 +18,20 @@ import java.util.List;
  */
 public record TrademarkResult(String inputHash, String rulesetVersion, String catalogVersion, RiskLevel riskLevel,
                               Completeness completeness, List<TrademarkFinding> findings,
-                              List<String> failedRuleIds, String disclaimer, List<String> skippedRuleIds) {
+                              List<String> failedRuleIds, String disclaimer, List<String> skippedRuleIds,
+                              boolean restrictLlmToOrdinary) {
 
     public TrademarkResult {
         findings = List.copyOf(findings);
         failedRuleIds = List.copyOf(failedRuleIds);
         skippedRuleIds = List.copyOf(skippedRuleIds);
+    }
+
+    public TrademarkResult(String inputHash, String rulesetVersion, String catalogVersion, RiskLevel riskLevel,
+                           Completeness completeness, List<TrademarkFinding> findings, List<String> failedRuleIds,
+                           String disclaimer, List<String> skippedRuleIds) {
+        this(inputHash, rulesetVersion, catalogVersion, riskLevel, completeness, findings, failedRuleIds,
+                disclaimer, skippedRuleIds, false);
     }
 
     /** A result of a scan with a catalog: no rule was skipped. */

@@ -15,6 +15,11 @@ public interface TrademarkCatalog {
     /** Identifies this catalog version; recorded in evidence and in the analysis fingerprint by the caller. */
     String version();
 
+    /** False for a catalog version known to predate distinctiveness metadata. */
+    default boolean mayHaveDistinctiveness() {
+        return true;
+    }
+
     /**
      * The marks whose normalized form equals one of {@code normalizedForms} (a token or n-gram of tokens joined by
      * one space). The result is keyed by the form that matched, in binary order of the form; forms without a mark

@@ -163,13 +163,18 @@
                 </div>
             </div>
 
+            <th:block th:with="spotlight=${result.highlights()}">
             <!-- New risks first: what the catalog or the watchlist gained since the previous run -->
             <section class="lg-card lg-section" id="new-risks" aria-labelledby="new-heading">
                 <h3 id="new-heading" class="lg-card__title" th:text="#{reaudit.new.heading}"></h3>
                 <p class="lg-text-muted lg-small" th:text="#{reaudit.new.note}"></p>
                 <p class="lg-text-muted" th:if="${result.newRisks.isEmpty()}" th:text="#{reaudit.new.none}"></p>
                 <th:block th:unless="${result.newRisks.isEmpty()}">
-                    <div th:replace="~{console/reaudit-fragments :: risks(${result.newRisks}, 'new-table', true)}"></div>
+                    <div th:replace="~{console/reaudit-fragments :: risks(${spotlight.newPrimary}, 'new-table', true)}"></div>
+                    <details th:if="${!spotlight.newMore.isEmpty()}">
+                        <summary th:text="#{trademark.more.findings(${spotlight.newMore.size()})}"></summary>
+                        <div th:replace="~{console/reaudit-fragments :: risks(${spotlight.newMore}, 'new-more-table', false)}"></div>
+                    </details>
                 </th:block>
             </section>
 
@@ -180,10 +185,19 @@
                     <p class="lg-text-muted lg-small" th:text="#{reaudit.known.note}"></p>
                     <p class="lg-text-muted" th:if="${result.knownRisks.isEmpty()}" th:text="#{reaudit.known.none}"></p>
                     <th:block th:unless="${result.knownRisks.isEmpty()}">
-                        <div th:replace="~{console/reaudit-fragments :: risks(${result.knownRisks}, 'known-table', false)}"></div>
+                        <div th:replace="~{console/reaudit-fragments :: risks(${spotlight.knownPrimary}, 'known-table', false)}"></div>
+                        <details th:if="${!spotlight.knownMore.isEmpty()}">
+                            <summary th:text="#{trademark.more.findings(${spotlight.knownMore.size()})}"></summary>
+                            <div th:replace="~{console/reaudit-fragments :: risks(${spotlight.knownMore}, 'known-more-table', false)}"></div>
+                        </details>
                     </th:block>
                 </details>
             </section>
+                <details th:each="weak : ${spotlight.weakByLine}" th:with="tableId=${'weak-table-' + weak.key}">
+                    <summary th:text="#{reaudit.weak.line(${weak.key}, ${weak.value.size()})}"></summary>
+                    <div th:replace="~{console/reaudit-fragments :: risks(${weak.value}, ${tableId}, false)}"></div>
+                </details>
+            </th:block>
 
             <!-- What changed in the listings since the previous run -->
             <section class="lg-card lg-section" id="changes" aria-labelledby="changes-heading" th:if="${result.changes != null}">

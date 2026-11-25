@@ -163,7 +163,7 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 |---|---|
 | Resources | `API_MEM_LIMIT` 2g, `JAVA_TOOL_OPTIONS` `-XX:MaxRAMPercentage=75.0`, `POSTGRES_MEM_LIMIT` 4g, `POSTGRES_SHARED_BUFFERS` 2GB, `POSTGRES_WORK_MEM` 16MB, `POSTGRES_MAX_CONNECTIONS` 50; jobs: `JOB_MEM_LIMIT` 1g, `JOB_JAVA_TOOL_OPTIONS` 70 %, `USPTO_CONVERT_MEM_LIMIT` 3g, `USPTO_SYNC_MEM_LIMIT` 3g, `TSDR_STATUS_MEM_LIMIT` 1g, and a `*_JAVA_TOOL_OPTIONS` for convert, sync and tsdr; `hf-convert`: `HF_CONVERT_MEM_LIMIT` 3g, `HF_CONVERT_MEMORY_LIMIT` 2GB (DuckDB), `HF_CONVERT_THREADS` 2, `HF_CONVERT_JAVA_TOOL_OPTIONS` `-Xmx512m` |
 | Backups (read by the scripts from `.env`, not by Compose) | `BACKUP_RETENTION_COUNT` 14; with R2: `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`, `BACKUP_S3_REGION`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` (secrets), `BACKUP_S3_PREFIX`, `BACKUP_S3_SESSION_TOKEN`; the Sunday cron line sets `BACKUP_S3_TIER=weekly` itself |
-| Trademark | `TRADEMARK_CATALOG_VERSION` (empty), `TRADEMARK_FOLLOW_ACTIVATION` false (the two exclude each other), `USPTO_SYNC_LICENSE` (required before `uspto-sync` runs), `USPTO_SYNC_KEEP_VERSIONS` 3, `USPTO_SYNC_DOWNLOAD_ENABLED` false, `LISTING_GUARD_USPTO_ODP_API_KEY` (secret), `USPTO_MAX_DISTINCT_SERIALS`, `USPTO_FILTERS`, `USPTO_STRICT`, `USPTO_ALLOW_OTHER_VERSION`, `USPTO_SYNC_WARN_FREE_GB` 30, `USPTO_SYNC_MIN_FREE_GB` 15, `USPTO_SYNC_LOG_RETENTION` 30 |
+| Trademark | `LISTING_GUARD_TRADEMARK_RULESET` (`classpath:rulesets/trademark-risk-2026-11b.yaml`), `TRADEMARK_CATALOG_VERSION` (empty), `TRADEMARK_FOLLOW_ACTIVATION` false (the two exclude each other), `USPTO_SYNC_LICENSE` (required before `uspto-sync` runs), `USPTO_SYNC_KEEP_VERSIONS` 3, `USPTO_SYNC_DOWNLOAD_ENABLED` false, `LISTING_GUARD_USPTO_ODP_API_KEY` (secret), `USPTO_MAX_DISTINCT_SERIALS`, `USPTO_FILTERS`, `USPTO_STRICT`, `USPTO_ALLOW_OTHER_VERSION`, `USPTO_SYNC_WARN_FREE_GB` 30, `USPTO_SYNC_MIN_FREE_GB` 15, `USPTO_SYNC_LOG_RETENTION` 30 |
 | TSDR | `TSDR_DOWNLOAD_ENABLED` false, `LISTING_GUARD_TSDR_API_KEY` (secret), `TSDR_MAX_MARKS` 100, `TSDR_UNMATCHED_PER_RUN` 0, `TSDR_RECHECK_INTERVAL` 30d, `TSDR_FINDING_STATUS_ENABLED` false, `TSDR_STATUS_LOG_RETENTION` 30 |
 | Console | `LISTING_GUARD_CONSOLE_ENABLED` false, `LISTING_GUARD_CONSOLE_BASE_URL`, `LISTING_GUARD_CONSOLE_AUTH_MODE` MAGIC_LINK (or CLOUDFLARE_ACCESS, BOTH), `LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN`, `..._ACCESS_AUD`, `..._ACCESS_CERTS_URL`, `..._ACCESS_CERT_CACHE_TTL` 1h, `..._ACCESS_ALLOWED_DOMAINS`, `..._ACCESS_ALLOWED_EMAILS`, `..._ACCESS_AUTO_CREATE` false, `..._ACCESS_DEFAULT_CLIENT_NAME` (the Access settings only for CLOUDFLARE_ACCESS or BOTH), `LISTING_GUARD_CONSOLE_MAIL_FROM`, `LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS` 5, `SPRING_MAIL_HOST` (the mail settings only for MAGIC_LINK or BOTH), `SPRING_MAIL_PORT` 587, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (secret), `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` true, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` true. The cookie is always Secure (`LISTING_GUARD_CONSOLE_COOKIE_SECURE` is fixed to `"true"`) |
 | Features | `LISTING_GUARD_PLANS_ENABLED` false, `LISTING_GUARD_FIXES_ENABLED` false |
@@ -556,3 +556,11 @@ Chưa đo, maintainer đo trên máy có dữ liệu. Thực hiện [convert, im
 với một label mới. Ghi thời gian convert/import, kích thước file, số serial sống sau lọc, số entry sau gộp, phân bố
 STRONG/ORDINARY/WEAK và SHA-256 của từ điển nếu dùng. Rà ít nhất 20 ví dụ mỗi tier nếu đủ mẫu. Giữ danh sách nhãn và report thật ngoài Git.
 So sánh severity trước và sau trên cùng listing mẫu, cùng ruleset sau khi kích hoạt catalog mới.
+
+
+### Hiệu chỉnh trademark 2026-12
+
+**Catalog thật chưa đo.** Không có lần chạy lại 20 listing lịch sử trong môi trường tổng hợp. Trên máy có dữ liệu,
+giữ cùng catalog `jsonl-2`, cùng mẫu và cùng cấu hình LLM tắt. Chạy từng listing với `2026-11b` và `2026-12`,
+ghi HIGH/MEDIUM/LOW theo listing và p50/p95 của các lượt chưa cache cho mỗi ruleset. Ghi phiên bản catalog và
+từ điển. Các số liệu cũ ở mục đo Hugging Face tiếp tục là mốc lịch sử.

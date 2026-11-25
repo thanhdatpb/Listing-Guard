@@ -74,9 +74,9 @@
                 </th:block>
             </th:block>
 
-            <th:block th:if="${!row.detail.trademark.items.isEmpty()}" th:with="cards=${@findingCards.bulk(row.detail.trademark.items, 'trademark', result.marketplace)}">
+            <th:block th:if="${!row.detail.trademark.items.isEmpty()}" th:with="cards=${@findingCards.bulkTrademark(row.detail.trademark.items, result.marketplace)}">
                 <h4 class="lg-group__title" th:text="#{bulk.detail.trademark.findings(${'' + row.detail.trademark.items.size()})}"></h4>
-                <div th:replace="~{console/findings :: cards(${cards})}"></div>
+                <div th:replace="~{console/findings :: trademarkHighlights(${cards})}"></div>
             </th:block>
 
             <th:block th:if="${row.detail.variation.kind.name() != 'NONE'}">

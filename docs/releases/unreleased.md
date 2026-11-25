@@ -11,3 +11,14 @@ For each API change, run `./mvnw -B -pl contract-tools verify` and record additi
 Hugging Face conversion emits `jsonl-2` with optional distinctiveness signals. The report adds tier counts and
 bounded samples. V48 stores nullable metadata and preserves `jsonl-1` import. Scanner scoring is unchanged.
 See [ADR-046](../adr/ADR-046-catalog-distinctiveness-signals.md).
+
+
+## Trademark catalog calibration
+
+Ruleset `trademark-risk-2026-12` là opt-in, giữ evidence của các match và ghi dữ liệu tier trong adjustment
+khi hạ mức. Console giới thiệu ba cảnh báo trademark nặng nhất và cho mở nhóm WEAK đã hạ. Catalog thiếu tier
+ghi `catalog_distinctiveness` trong `skippedRuleIds`. Xem [ADR-043](../adr/ADR-043-trademark-context-calibration.md).
+
+ADR-022, additive against v0.10.0
+
+- `response-property-added` at `schema RiskAdjustmentView.distinctiveness`

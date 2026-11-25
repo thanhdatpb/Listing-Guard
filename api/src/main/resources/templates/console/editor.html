@@ -238,10 +238,9 @@
             <section class="lg-stack" id="trademark-findings" th:if="${!result.trademark.groups.isEmpty()}"
                      aria-labelledby="trademark-findings-heading">
                 <h2 id="trademark-findings-heading" class="lg-section-title" th:text="#{editor.trademark.findings.heading}"></h2>
-                <div class="lg-group" th:each="group : ${@findingCards.editorTrademark(result)}">
-                    <h3 class="lg-group__title"><span th:text="${group.label}"></span> <span class="lg-pill" th:text="${group.cards.size()}"></span></h3>
-                    <div th:replace="~{console/findings :: cards(${group.cards})}"></div>
-                </div>
+                <th:block th:with="cards=${@findingCards.editorTrademark(result)}">
+                    <div th:replace="~{console/findings :: trademarkHighlights(${cards})}"></div>
+                </th:block>
             </section>
             <th:block th:if="${rewriteAvailable and result.needsRewrite()}">
                 <th:block th:replace="~{console/rewrite :: editorButton(${form}, ${result.rewriteAnchor()})}"></th:block>

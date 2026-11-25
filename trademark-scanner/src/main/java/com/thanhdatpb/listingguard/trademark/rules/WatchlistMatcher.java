@@ -65,7 +65,7 @@ public final class WatchlistMatcher {
                             "note", entry.note() == null ? "" : entry.note());
                     candidates.add(new Candidate(RuleIds.WATCHLIST_MATCH, minimum, field.name(), from, to, start, end, gram,
                             entry.mark(), length == 1 ? MatchType.EXACT : MatchType.PHRASE, 1.0, placeholders, false,
-                            List.of(), entry.sourceIds(), List.of(), WatchlistMatch.of(entry, form.alias())));
+                            List.of(), entry.sourceIds(), List.of(), WatchlistMatch.of(entry, form.alias()), null));
                 }
             }
         }

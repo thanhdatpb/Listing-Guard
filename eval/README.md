@@ -102,3 +102,25 @@ dương và năm đối chứng âm đúng, và không có FP/FN trên tập c�
 hiện tại, cần được xem xét cùng thay đổi nếu hành vi đó được sửa có chủ đích. Bộ 31 mẫu không phải bộ held-out
 200 mẫu của A4 trong [ADR-009](../docs/adr/ADR-009-trademark-risk-scanner.md) và không ước lượng hiệu quả ngoài thực tế.
 Mọi thay đổi bộ mẫu cần được xem xét cùng hash mới và kết quả chạy thực tế.
+
+### So sánh hiệu chỉnh trademark theo tier
+
+`TrademarkEvalGateTest` chạy cùng input và catalog tổng hợp với `trademark-risk-2026-11b` và
+`trademark-risk-2026-12`. Xem báo cáo từng ca tại `api/target/eval-listing/trademark-calibration.md`.
+
+```bash
+./mvnw -B -pl api -am test -Dtest=TrademarkEvalGateTest -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+| Nhóm tổng hợp | Số ca | HIGH trước | HIGH sau |
+| --- | ---: | ---: | ---: |
+| DESCRIPTIVE | 15 | 15 | 0 |
+| BRAND_USE | 11 | 11 | 11 |
+| WATCHLIST | 5 | 5 | 5 |
+| PHRASE | 1 | 1 | 1 |
+| FUZZY | 1 | 0 | 0 |
+| LEGACY | 1 | 1 | 1 |
+
+Trong nhóm DESCRIPTIVE, 10 ca xuống LOW và 5 ca xuống MEDIUM. Ca FUZZY vẫn MEDIUM và ca LEGACY
+ghi INCOMPLETE khi dùng ruleset mới. Gate so từng finding và bằng chứng với kết quả cũ.
+`ALL_HIGH` lịch sử dùng bộ mẫu cũ riêng và nằm ngoài precision/recall.

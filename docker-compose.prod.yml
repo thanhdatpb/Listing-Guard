@@ -66,6 +66,7 @@ services:
       LISTING_GUARD_LLM_GEMINI_KEY: ${LISTING_GUARD_LLM_GEMINI_KEY:-}
       LISTING_GUARD_LLM_GEMINI_LISTING_TEXT_ALLOWED: ${LISTING_GUARD_LLM_GEMINI_LISTING_TEXT_ALLOWED:-false}
       # Trademark catalog version to serve (ADR-009), as the trademark-import job printed it. Empty: trademark checks off.
+      LISTING_GUARD_TRADEMARK_RULESET: ${LISTING_GUARD_TRADEMARK_RULESET:-classpath:rulesets/trademark-risk-2026-11b.yaml}
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
       # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
       LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
@@ -288,6 +289,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       JAVA_TOOL_OPTIONS: ${TSDR_STATUS_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75.0}
       CATALOGS_DIR: /catalogs
+      LISTING_GUARD_TRADEMARK_RULESET: ${LISTING_GUARD_TRADEMARK_RULESET:-classpath:rulesets/trademark-risk-2026-11b.yaml}
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
       LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
       LISTING_GUARD_TSDR_DOWNLOAD_ENABLED: ${TSDR_DOWNLOAD_ENABLED:-false}
@@ -321,6 +323,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      LISTING_GUARD_TRADEMARK_RULESET: ${LISTING_GUARD_TRADEMARK_RULESET:-classpath:rulesets/trademark-risk-2026-11b.yaml}
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
       # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
       LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
@@ -351,6 +354,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      LISTING_GUARD_TRADEMARK_RULESET: ${LISTING_GUARD_TRADEMARK_RULESET:-classpath:rulesets/trademark-risk-2026-11b.yaml}
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
       # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
       LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}
@@ -379,6 +383,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      LISTING_GUARD_TRADEMARK_RULESET: ${LISTING_GUARD_TRADEMARK_RULESET:-classpath:rulesets/trademark-risk-2026-11b.yaml}
       LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}
       # true serves the latest activation of the catalog log instead (uspto-sync, ADR-009 PR A2d); then leave TRADEMARK_CATALOG_VERSION empty
       LISTING_GUARD_TRADEMARK_ACTIVATION_FOLLOW: ${TRADEMARK_FOLLOW_ACTIVATION:-false}

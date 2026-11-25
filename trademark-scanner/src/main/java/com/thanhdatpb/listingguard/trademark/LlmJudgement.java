@@ -49,11 +49,16 @@ public final class LlmJudgement {
         return finding.source() == FindingSource.CATALOG && finding.risk() == RiskLevel.MEDIUM;
     }
 
+    private static boolean eligible(TrademarkResult result, TrademarkFinding finding) {
+        return eligible(finding) && (!result.restrictLlmToOrdinary() || finding.evidence().riskAdjustments().stream()
+                .anyMatch(adjustment -> adjustment.reason() == AdjustmentReason.CATALOG_ORDINARY_EXACT));
+    }
+
     /** The positions of the eligible findings, in the order of the result. */
     public static List<Integer> eligibleIndexes(TrademarkResult result) {
         List<Integer> indexes = new ArrayList<>();
         for (int i = 0; i < result.findings().size(); i++) {
-            if (eligible(result.findings().get(i))) {
+            if (eligible(result, result.findings().get(i))) {
                 indexes.add(i);
             }
         }
@@ -75,7 +80,7 @@ public final class LlmJudgement {
                 continue;
             }
             TrademarkFinding finding = findings.get(index);
-            if (!eligible(finding)) {
+            if (!eligible(result, finding)) {
                 continue;
             }
             findings.set(index, lowered(finding, judged.reason()));

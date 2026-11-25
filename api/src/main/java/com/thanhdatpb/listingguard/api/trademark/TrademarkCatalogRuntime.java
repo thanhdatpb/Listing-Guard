@@ -163,7 +163,7 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
         }
         String version = properties.catalogVersion();
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT id, version, file_sha256, pack_id, normalization_version, normalization_hash
+                SELECT id, version, file_sha256, pack_id, normalization_version, normalization_hash, format_version
                 FROM trademark_catalog_version WHERE version = ?""", version);
         if (rows.isEmpty()) {
             return new Snapshot(new Status(State.REFUSED, "catalog version '" + version + "' does not exist; "
@@ -193,7 +193,7 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
                     + "catalog, which is served only through listing-guard.trademark.catalog-version"), null, activationId);
         }
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT id, version, file_sha256, pack_id, normalization_version, normalization_hash
+                SELECT id, version, file_sha256, pack_id, normalization_version, normalization_hash, format_version
                 FROM trademark_catalog_version WHERE id = ?""", ((Number) versionId).longValue());
         if (rows.isEmpty()) {
             return new Snapshot(new Status(State.REFUSED, "the activated catalog version '" + version + "' does not "
@@ -214,7 +214,8 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
                     + String.join("; ", differences) + ". " + remedy), null, activationId);
         }
         long id = ((Number) row.get("id")).longValue();
-        PostgresTrademarkCatalog catalog = new PostgresTrademarkCatalog(jdbc, transactions, id, version);
+        PostgresTrademarkCatalog catalog = new PostgresTrademarkCatalog(jdbc, transactions, id, version,
+                "jsonl-2".equals(row.get("format_version")));
         Ready ready = new Ready(new TrademarkScanner(rulesets.ruleset(), catalog), id, version,
                 ((String) row.get("file_sha256")).trim(), postgresMajor(), trigramVersion());
         return new Snapshot(new Status(State.READY, version), ready, activationId);

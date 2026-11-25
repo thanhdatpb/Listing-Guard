@@ -34,13 +34,25 @@ public final class PostgresTrademarkCatalog implements TrademarkCatalog {
     private final TransactionTemplate transactions;
     private final long catalogVersionId;
     private final String version;
+    private final boolean distinctiveness;
 
     public PostgresTrademarkCatalog(JdbcTemplate jdbc, TransactionTemplate transactions, long catalogVersionId,
                                     String version) {
+        this(jdbc, transactions, catalogVersionId, version, true);
+    }
+
+    PostgresTrademarkCatalog(JdbcTemplate jdbc, TransactionTemplate transactions, long catalogVersionId,
+                             String version, boolean distinctiveness) {
+        this.distinctiveness = distinctiveness;
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.catalogVersionId = catalogVersionId;
         this.version = version;
+    }
+
+    @Override
+    public boolean mayHaveDistinctiveness() {
+        return distinctiveness;
     }
 
     @Override

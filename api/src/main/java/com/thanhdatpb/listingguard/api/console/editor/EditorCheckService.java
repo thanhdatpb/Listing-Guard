@@ -236,7 +236,7 @@ public class EditorCheckService {
         return new EditorResult.TrademarkItem(finding.ruleId(), finding.risk().name(), finding.field(),
                 finding.matchType().name(), finding.mark(), finding.message(), finding.suggestion(),
                 EditorEvidence.ofSpan(text, finding.start(), finding.end(), finding.snippet()), target,
-                ConsoleLlmLabel.reason(finding.riskAdjustments()), finding.source().name(), finding.sourceIds());
+                ConsoleLlmLabel.reason(finding.riskAdjustments()), finding.source().name(), finding.sourceIds(), finding.weakCalibrated());
     }
 
     private static EditorResult.Trademark panel(EditorResult.TrademarkKind kind, String big, String headline, String detail,

@@ -95,5 +95,17 @@
     <progress class="lg-progress" th:if="${score != null}" th:value="${score}" th:max="${max}" th:aria-label="#{listing.readiness}"></progress>
     <p class="lg-meter__note"><strong th:text="${headline}"></strong> <span th:text="${note}"></span></p>
 </div>
+<div th:fragment="trademarkHighlights(groups)" class="lg-stack">
+    <div th:replace="~{console/findings :: cards(${groups.primary})}"></div>
+    <details th:if="${!groups.more.isEmpty()}">
+        <summary th:text="#{trademark.more.findings(${groups.more.size()})}"></summary>
+        <div th:replace="~{console/findings :: cards(${groups.more})}"></div>
+    </details>
+    <details th:if="${!groups.weak.isEmpty()}">
+        <summary th:text="#{trademark.weak.findings(${groups.weak.size()})}"></summary>
+        <div th:replace="~{console/findings :: cards(${groups.weak})}"></div>
+    </details>
+</div>
+
 </body>
 </html>

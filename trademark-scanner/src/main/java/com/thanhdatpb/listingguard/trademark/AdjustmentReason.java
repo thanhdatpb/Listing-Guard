@@ -14,6 +14,9 @@ public enum AdjustmentReason {
     /** The mark is a word in the ruleset's {@code generic_words} and the match has no brand context. */
     COMMON_WORD("common_word"),
 
+    CATALOG_WEAK_EXACT("catalog_weak_exact"),
+    CATALOG_ORDINARY_EXACT("catalog_ordinary_exact"),
+
     /**
      * A language model read the sentence around the match and said the word probably describes the product instead of naming a
      * brand (ADR-036). Only ever added by {@link LlmJudgement}, which can lower a MEDIUM catalog finding to LOW and does nothing else.

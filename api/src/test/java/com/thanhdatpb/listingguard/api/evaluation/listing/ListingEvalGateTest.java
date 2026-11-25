@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.env.MutablePropertySources;
+import org.springframework.core.env.PropertySourcesPropertyResolver;
 
 /**
  * The CI gate of ADR-032: the labelled sample set of {@code eval/listing/cases/} scored with the rulesets the application
@@ -79,8 +81,9 @@ public class ListingEvalGateTest {
 
     /** The trademark ruleset {@code listing-guard.trademark.ruleset} names. */
     public static TrademarkRuleset trademarkRuleset() throws IOException {
-        return TrademarkRulesetLoader.loadClasspath(classpath(application().path("listing-guard").path("trademark")
-                .path("ruleset").asText()));
+        String location = application().path("listing-guard").path("trademark").path("ruleset").asText();
+        var defaults = new PropertySourcesPropertyResolver(new MutablePropertySources());
+        return TrademarkRulesetLoader.loadClasspath(classpath(defaults.resolveRequiredPlaceholders(location)));
     }
 
     private static JsonNode application() throws IOException {

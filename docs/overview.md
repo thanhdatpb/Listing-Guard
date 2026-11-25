@@ -121,6 +121,9 @@ What is not built yet is listed in the [Roadmap](#roadmap). Changes between vers
 - [Policy Checks and AI Workbench](implementation/policy-ai-workbench.md) are off by default. Etsy is supported with a matching corpus, approved retention and configured providers. Real-provider evaluation is pending.
 - [Policy Changes](policy-monitor.md) and [POD Readiness](implementation/pod-readiness.md) are available when the Console is enabled. The shipped POD profiles have unverified print limits.
 
+Ruleset opt-in `trademark-risk-2026-12` sử dụng tier catalog để giải thích việc hạ mức một số match exact một từ.
+Console giữ ba cảnh báo trademark nổi bật và cho mở các nhóm còn lại. [Cấu hình và rollback](trademark-catalog.md#bật-hiệu-chỉnh-trademark-theo-tier).
+
 ## Architecture
 
 ```text

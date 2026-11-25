@@ -18,6 +18,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.env.MutablePropertySources;
+import org.springframework.core.env.PropertySourcesPropertyResolver;
 import org.springframework.core.io.ClassPathResource;
 
 /**
@@ -58,8 +60,10 @@ class RuleExplanationsTest {
         JsonNode guard = yaml("application.yml").path("listing-guard");
         List<String> locations = new ArrayList<>();
         guard.path("rulesets").path("locations").forEach(location -> locations.add(location.asText()));
+        // Check checked-in defaults regardless of the environment that runs Maven.
+        var defaults = new PropertySourcesPropertyResolver(new MutablePropertySources());
         for (String pack : new String[] {"trademark", "variation", "personalization"}) {
-            locations.add(guard.path(pack).path("ruleset").asText());
+            locations.add(defaults.resolveRequiredPlaceholders(guard.path(pack).path("ruleset").asText()));
         }
         return locations;
     }

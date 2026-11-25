@@ -194,3 +194,16 @@ docker compose --profile tsdr-status run --rm tsdr-status --max-marks=5
   it was checked to each trademark finding (`tsdrStatuses`, see the [integration guide](integration-guide.md#tsdrstatuses-the-last-uspto-status-of-the-source-records-optional-off-by-default)).
   Off, the answer is the same as before. On, it is read when the answer is built, never stored, and changes no level, cache
   identity or `analysisVersion`.
+
+
+## Bật hiệu chỉnh trademark theo tier
+
+Sau khi nhập catalog `jsonl-2` đã kiểm tra theo ADR-046, có thể bật ruleset mới cho máy chủ hoặc job bằng
+`LISTING_GUARD_TRADEMARK_RULESET=classpath:rulesets/trademark-risk-2026-12.yaml`. Mặc định giữ `2026-11b`.
+Để rollback, đặt biến về `classpath:rulesets/trademark-risk-2026-11b.yaml` và khởi động lại cùng catalog.
+Ruleset đổi fingerprint, vì vậy cache không tái sử dụng kết quả giữa hai phiên bản.
+
+Caps chỉ áp cho exact một token ở title, tags và description khi không có tín hiệu thương hiệu đã khai
+báo. Xem bằng chứng trong `riskAdjustments`, gồm `from`, `to`, `note` và `distinctiveness` nếu có.
+Catalog cũ hoặc match thiếu tier trả kết quả `INCOMPLETE` theo ADR-043. Một match được hạ vẫn xuất hiện
+trong kết quả và có thể xem trong phần thu gọn của Console.

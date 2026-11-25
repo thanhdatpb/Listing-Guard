@@ -102,6 +102,14 @@ public final class TrademarkRulesetLoader {
                 parseGenericWords(root.optionalSection("generic_words"), normalizer);
         TrademarkRuleset.SourceLinks sourceLinks = parseSourceLinks(root.optionalSection("source_links"));
 
+        Section calibration = root.optionalSection("catalog_calibration");
+        TrademarkRuleset.CatalogCalibration caps = null;
+        if (calibration != null) {
+            caps = new TrademarkRuleset.CatalogCalibration(
+                    parseCap(calibration.section("catalog_weak_exact"), RiskLevel.LOW),
+                    parseCap(calibration.section("catalog_ordinary_exact"), RiskLevel.MEDIUM));
+            calibration.finish();
+        }
         Section rules = root.section("rules");
         List<String> order = ruleOrder(rules);
         TrademarkRuleset.CatalogRule exact = parseCatalogRule(rules.section(RuleIds.CATALOG_EXACT), CATALOG_PLACEHOLDERS);
@@ -116,7 +124,18 @@ public final class TrademarkRulesetLoader {
 
         return new TrademarkRuleset(packId, version, checkedAt, sha256(text), disclaimer, normalization, matching,
                 lexicon, order, exact, phrase, fuzzy, geo, colorContains, pureColor, productClasses, genericWords,
-                sourceLinks);
+                sourceLinks, caps);
+    }
+
+    private static TrademarkRuleset.CatalogCalibration.Cap parseCap(Section section, RiskLevel expected) {
+        parseSource(section.section("source"));
+        RiskLevel risk = parseRisk(section, "cap");
+        if (risk != expected) {
+            throw new TrademarkRulesetException(section.path() + ".cap must be " + expected);
+        }
+        String note = template(section, "note", Set.of("mark", "signals", "from", "to"));
+        section.finish();
+        return new TrademarkRuleset.CatalogCalibration.Cap(risk, note);
     }
 
     /** LF line endings, no BOM. This is the text that gets hashed. */

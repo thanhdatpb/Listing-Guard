@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.api.trademark;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.FindingSource;
@@ -55,7 +56,7 @@ public record TrademarkCheckResult(
         RiskLevel riskLevel,
         @Schema(description = "Rules that failed; empty for a COMPLETE result.", example = "[]")
         List<String> failedRuleIds,
-        @Schema(description = "Rules that did not run because no catalog is served (`catalogStatus` NOT_CONFIGURED); empty otherwise.",
+        @Schema(description = "Rules that did not run; `catalog_distinctiveness` means tier data was unavailable to the calibrated ruleset.",
                 example = "[]")
         List<String> skippedRuleIds,
         @Schema(description = "Statement that the result is a reference warning and not a legal conclusion. Show it with the result.")
@@ -179,6 +180,16 @@ public record TrademarkCheckResult(
                             + "newer status later. Read `checkedAt`: the status can be old.")
             List<TsdrStatusView> tsdrStatuses) {
 
+        public boolean weakCalibrated() {
+            return risk == RiskLevel.LOW && riskAdjustments.stream()
+                    .anyMatch(adjustment -> adjustment.reason().equals("catalog_weak_exact"));
+        }
+
+        public boolean catalogCalibrated() {
+            return riskAdjustments.stream().anyMatch(adjustment -> adjustment.reason().equals("catalog_weak_exact")
+                    || adjustment.reason().equals("catalog_ordinary_exact"));
+        }
+
         /** A finding with no source link, no adjustment and no TSDR status member. */
         public FindingView(String ruleId, RiskLevel risk, String field, int start, int end, String snippet, String mark,
                            MatchType matchType, Double score, boolean insideColorPhrase, List<String> otherRuleIds,
@@ -233,12 +244,31 @@ public record TrademarkCheckResult(
     public record RiskAdjustmentView(
             @Schema(description = "`outside_product_classes`: the request named a product type and none of the mark's Nice classes is "
                     + "one of the product type's. `common_word`: the mark is an ordinary word of the ruleset's list and the match is "
-                    + "not an exact or phrase match in a brand field. `llm_descriptive`: a language model read the sentence around "
+                    + "not an exact or phrase match in a brand field. `catalog_weak_exact` and `catalog_ordinary_exact`: "
+                    + "unverified catalog tier caps for an eligible single-token exact match. `llm_descriptive`: a language model read the sentence around "
                     + "the match and thinks the word describes the product (only when the operator turned the LLM judge on, "
                     + "ADR-036); the finding is kept and its note starts with the label.", example = "outside_product_classes") String reason,
             @Schema(description = "The level the rule assigned before any adjustment.") RiskLevel from,
             @Schema(description = "The level this reason alone gives; lower than `from`.") RiskLevel to,
-            @Schema(description = "Human text, currently Vietnamese.") String note) {
+            @Schema(description = "Human text, currently Vietnamese.") String note,
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+                    description = "Unverified catalog data used for a tier-based adjustment.") CalibrationEvidence distinctiveness) {
+        public RiskAdjustmentView(String reason, RiskLevel from, RiskLevel to, String note) {
+            this(reason, from, to, note, null);
+        }
+    }
+
+    @Schema(name = "TrademarkCalibrationEvidence")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record CalibrationEvidence(DistinctivenessSignals.Tier tier, Integer wordCount, Long sameMarkCount,
+                                      Integer sameMarkClassCount, DistinctivenessSignals.MarkKind markKind,
+                                      Boolean dictionaryWord, DistinctivenessSignals.Reason reason) {
+        static CalibrationEvidence of(DistinctivenessSignals signals) {
+            return signals == null ? null : new CalibrationEvidence(signals.tier(), signals.wordCount(),
+                    signals.sameMarkCount(), signals.sameMarkClassCount(), signals.markKind(),
+                    signals.dictionaryWord(), signals.reason());
+        }
     }
 
     /** A public look-up page for the source record of a catalog mark. */

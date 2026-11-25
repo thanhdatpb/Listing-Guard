@@ -7,6 +7,12 @@ package com.thanhdatpb.listingguard.client.model;
  * @param from   the level before the adjustment
  * @param to     the level after it
  * @param note   the reason in words
+ * @param distinctiveness unverified catalog signals for a tier-based adjustment, or {@code null}
  */
-public record RiskAdjustment(String reason, RiskLevel from, RiskLevel to, String note) {
+public record RiskAdjustment(String reason, RiskLevel from, RiskLevel to, String note,
+                             TrademarkCalibrationEvidence distinctiveness) {
+
+    public RiskAdjustment(String reason, RiskLevel from, RiskLevel to, String note) {
+        this(reason, from, to, note, null);
+    }
 }
