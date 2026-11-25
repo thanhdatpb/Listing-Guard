@@ -17,7 +17,7 @@
         <span th:text="#{pilot.timezone}"></span> · <span th:text="${pilotQuery.marketplace == null} ? #{report.form.all} : ${pilotQuery.marketplace}"></span></p>
     <p class="pilot-screen lg-small" th:text="#{pilot.print.hint}"></p>
     <div class="lg-table-wrap"><table class="lg-table" id="pilot-daily">
-        <caption th:text="#{pilot.daily}"></caption>
+        <caption th:text="${pilotContentDays != null} ? #{pilot.daily.full} : #{pilot.daily}"></caption>
         <thead><tr>
             <th scope="col" th:text="#{pilot.day}"></th><th scope="col" th:text="#{pilot.checked}"></th>
             <th scope="col">HIGH</th><th scope="col">MEDIUM</th><th scope="col">LOW</th>
@@ -32,6 +32,23 @@
         </tr></tbody>
     </table></div>
     <p class="lg-small" th:text="#{pilot.daily.note}"></p>
+    <!-- Checks made in content scope (ADR-052) are counted apart, and the table appears only when the period has some. -->
+    <div class="lg-table-wrap" th:if="${pilotContentDays != null}"><table class="lg-table" id="pilot-daily-content">
+        <caption th:text="#{pilot.daily.content}"></caption>
+        <thead><tr>
+            <th scope="col" th:text="#{pilot.day}"></th><th scope="col" th:text="#{pilot.checked}"></th>
+            <th scope="col">HIGH</th><th scope="col">MEDIUM</th><th scope="col">LOW</th>
+            <th scope="col" th:text="#{pilot.unranked}"></th><th scope="col" th:text="#{pilot.rechecked}"></th>
+        </tr></thead>
+        <tbody><tr th:each="day : ${pilotContentDays}">
+            <th scope="row" th:text="${day.date}"></th><td th:text="${day.checked}"></td>
+            <td th:text="${day.rate(day.high) == null ? '—' : day.high + ' (' + #numbers.formatPercent(day.rate(day.high), 1, 1) + ')'}"></td>
+            <td th:text="${day.rate(day.medium) == null ? '—' : day.medium + ' (' + #numbers.formatPercent(day.rate(day.medium), 1, 1) + ')'}"></td>
+            <td th:text="${day.rate(day.low) == null ? '—' : day.low + ' (' + #numbers.formatPercent(day.rate(day.low), 1, 1) + ')'}"></td>
+            <td th:text="${day.unranked()}"></td><td th:text="${day.rechecked}"></td>
+        </tr></tbody>
+    </table></div>
+    <p class="lg-small" th:if="${pilotContentDays != null}" th:text="#{pilot.daily.content.note}"></p>
     <div class="lg-table-wrap"><table class="lg-table" id="pilot-feedback">
         <caption th:text="#{stats.byrule.heading}"></caption>
         <thead><tr>

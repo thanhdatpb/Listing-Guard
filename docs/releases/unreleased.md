@@ -95,3 +95,25 @@ nhãn đã gán **chưa đo**, lệnh để đo nằm trong `docs/llm.md`. Xem [
 ADR-022, additive against v0.10.0
 
 - `response-property-added` at `schema RiskAdjustmentView.judgeEvidence`
+
+
+## Phạm vi kiểm tra cho bảng Sheet
+
+Bước chọn cột của kiểm hàng loạt có thêm **Kiểm nội dung (chỉ các cột có trong bảng)** và **Kiểm đầy đủ để đăng**. Sheet viết title, tag,
+mô tả không có cột `category`, `who_made`, `when_made`, `price`, `quantity` nên trước đây mọi dòng Etsy báo ERROR "Thiếu trường bắt
+buộc" và che mất lỗi thật. Ở kiểm nội dung, trường bắt buộc mà bảng không có cột không bị báo; cột có mà ô trống vẫn là lỗi; mọi quy tắc
+khác không đổi. Bảng nhận một ghi chú ("Bảng không có cột: … — chưa kiểm các trường này"), dòng sạch ghi **Đạt (nội dung)**, kết quả lưu
+có độ sẵn sàng `PARTIAL` (không điểm, không sẵn sàng) và ghi `required_fields` vào `skippedRuleIds`; khối dán vào Sheet và CSV có thêm cột
+*Phạm vi*. Phạm vi là một phần của danh tính kết quả (`analysisVersion` có hậu tố `+content:<trường bị bỏ>`), nên kết quả kiểm nội dung
+không bao giờ được dùng lại cho kiểm đầy đủ và ngược lại; báo cáo pilot đếm hai phạm vi riêng.
+
+Mặc định: kiểm nội dung khi `listing-guard.console.pilot=true`, kiểm đầy đủ ở mọi trường hợp khác (giữ nguyên hành vi cũ từng byte; có
+test). Cấu hình mới `listing-guard.console.bulk.default-scope` (`LISTING_GUARD_CONSOLE_BULK_DEFAULT_SCOPE`, `content` hoặc `full`, trống là
+theo pilot). Lựa chọn của seller được nhớ cùng ánh xạ cột (`console_bulk_mapping`, thêm khóa `scope`, không có nội dung ô). Migration V51
+thêm `listing_check.scope`, cho phép trạng thái `PARTIAL` và thêm `scope` vào khóa của `seller_pilot_daily`. Trang Check listing, rà
+định kỳ, `batch-check`, MCP và `/api/v1` không đổi và luôn kiểm đầy đủ. Trên bảng mẫu tổng hợp
+[`docs/samples/sheet-content-sample.tsv`](../samples/sheet-content-sample.tsv) (tám listing, cột SKU, Title, Description, Tags): kiểm đầy đủ
+**8/8 dòng ERROR**, kiểm nội dung **3 dòng ERROR** (title 159 ký tự, tag 26 ký tự, mô tả trống), 2 Cảnh báo và 3 Đạt (nội dung). Ảnh hướng
+dẫn pilot được chụp lại. Xem [ADR-052](../adr/ADR-052-content-scope-for-sheet-checks.md) và [kiểm tra hàng loạt](../bulk-check.md).
+
+ADR-022: không đổi OpenAPI hay input schema; `./mvnw -B -pl contract-tools verify` không báo khác biệt.

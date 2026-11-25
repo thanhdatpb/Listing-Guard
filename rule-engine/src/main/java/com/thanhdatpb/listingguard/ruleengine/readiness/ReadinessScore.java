@@ -25,7 +25,12 @@ public record ReadinessScore(
         /** Every rule ran; {@code score} is set. */
         SCORED,
         /** A rule failed, so no number is given and the listing is not ready. */
-        INCOMPLETE
+        INCOMPLETE,
+        /**
+         * Every rule ran, but the data never had some fields and the presence rules left them out (ADR-052): no number is given and
+         * the listing is not ready, because nothing was said about those fields.
+         */
+        PARTIAL
     }
 
     public ReadinessScore {

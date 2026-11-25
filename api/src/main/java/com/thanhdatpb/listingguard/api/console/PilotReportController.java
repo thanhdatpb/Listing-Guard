@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console;
 
+import com.thanhdatpb.listingguard.api.check.CheckScope;
 import com.thanhdatpb.listingguard.api.check.MarketplaceNotYetSupportedException;
 import com.thanhdatpb.listingguard.api.check.UnknownMarketplaceException;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackStatsService;
@@ -43,10 +44,15 @@ public class PilotReportController {
         try {
             var query = statistics.query(from, to, marketplace);
             var days = metrics.days(user.clientId(), query);
+            // checks made in content scope (ADR-052) are counted apart and shown only when the period has some: with none, the report
+            // is exactly what it was
+            var contentDays = metrics.days(user.clientId(), query, CheckScope.Kind.CONTENT);
+            boolean hasContent = contentDays.stream().anyMatch(day -> day.checked() > 0);
             var rules = feedback.stats(user.clientId(), query).byRule().stream().filter(rule -> rule.verdicts() > 0).toList();
             response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
             if (!request.getServletPath().endsWith(".csv") && !request.getRequestURI().endsWith(".csv")) {
                 model.addAttribute("pilotDays", days);
+                model.addAttribute("pilotContentDays", hasContent ? contentDays : null);
                 model.addAttribute("pilotRules", rules);
                 model.addAttribute("pilotQuery", query);
                 return "console/pilot-report";
@@ -58,11 +64,13 @@ public class PilotReportController {
                     "HIGH", messages.get("pilot.share"), "MEDIUM", messages.get("pilot.share"), "LOW", messages.get("pilot.share"),
                     messages.get("pilot.unranked"), messages.get("pilot.rechecked"));
             for (var day : days) {
-                StatsCsv.line(csv, day.date().toString(), Long.toString(day.checked()),
-                        Long.toString(day.high()), StatsCsv.rate(day.rate(day.high())),
-                        Long.toString(day.medium()), StatsCsv.rate(day.rate(day.medium())),
-                        Long.toString(day.low()), StatsCsv.rate(day.rate(day.low())),
-                        Long.toString(day.unranked()), Long.toString(day.rechecked()));
+                csvDay(csv, day);
+            }
+            if (hasContent) {
+                StatsCsv.line(csv, messages.get("pilot.daily.content"));
+                for (var day : contentDays) {
+                    csvDay(csv, day);
+                }
             }
             StatsCsv.line(csv, messages.get("report.col.pack"), messages.get("report.col.rule"), messages.get("stats.col.source"),
                     messages.get("stats.col.verdicts"), messages.get("feedback.verdict.false-positive"), messages.get("stats.col.rate"));
@@ -80,5 +88,13 @@ public class PilotReportController {
                  | MarketplaceNotYetSupportedException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, statistics.problem(e), e);
         }
+    }
+
+    private static void csvDay(StringBuilder csv, PilotMetrics.Day day) {
+        StatsCsv.line(csv, day.date().toString(), Long.toString(day.checked()),
+                Long.toString(day.high()), StatsCsv.rate(day.rate(day.high())),
+                Long.toString(day.medium()), StatsCsv.rate(day.rate(day.medium())),
+                Long.toString(day.low()), StatsCsv.rate(day.rate(day.low())),
+                Long.toString(day.unranked()), Long.toString(day.rechecked()));
     }
 }

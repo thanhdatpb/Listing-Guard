@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.CheckResult;
+import com.thanhdatpb.listingguard.api.check.CheckScope;
+import com.thanhdatpb.listingguard.api.check.ScopedCheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.check.NormalizerRegistry;
 import com.thanhdatpb.listingguard.api.console.ConsoleLlmLabel;
@@ -164,6 +166,15 @@ public class BulkCheckService {
      * @throws QuotaExceededException  if no unit of the month's quota is left (only where plans are on); nothing was checked
      */
     public BulkResult run(UUID clientId, EditorMarketplace marketplace, List<Input> inputs, boolean header) {
+        return run(clientId, marketplace, inputs, header, CheckScope.FULL);
+    }
+
+    /**
+     * As above, under a scope (ADR-052). With {@link CheckScope#FULL} the run is exactly the one above. With a content scope the
+     * required fields the table has no column for are not reported as missing; every row says what it was not checked for, the result
+     * carries one note for the table, and a clean row is "OK (content)". The trademark and variation checks do not depend on the scope.
+     */
+    public BulkResult run(UUID clientId, EditorMarketplace marketplace, List<Input> inputs, boolean header, CheckScope scope) {
         PlanService.Admission admission = plans.requirePack(clientId, Pack.LISTING_RULES);
         plans.requireQuota(admission);
         String trademarkNote = trademarkNote(clientId);
@@ -180,7 +191,7 @@ public class BulkCheckService {
             if (acc.input.preset() != null) {
                 continue;
             }
-            acc.rules = rules(clientId, marketplace, acc.input, state);
+            acc.rules = rules(clientId, marketplace, acc.input, state, scope);
             acc.trademark = trademarkNote != null ? BulkResult.Trademark.notRun(trademarkNote)
                     : trademark(clientId, marketplace, acc.input, state);
         }
@@ -193,6 +204,19 @@ public class BulkCheckService {
             rows.add(row(i + 1, accs.get(i), marketplace));
         }
         List<String> notes = new ArrayList<>();
+        // what no row of a content-scope table could be checked for: one note for the table, not one finding for each row (ADR-052)
+        Set<String> skipped = new LinkedHashSet<>();
+        boolean anyJudged = false;
+        for (Acc acc : accs) {
+            if (acc.rules != null && acc.rules.ran()) {
+                anyJudged = true;
+                skipped.addAll(acc.rules.skippedFields());
+            }
+        }
+        if (scope.content() && anyJudged) {
+            notes.add(skipped.isEmpty() ? messages.get("bulk.note.scope.complete")
+                    : messages.get("bulk.note.scope.content", String.join(", ", skipped)));
+        }
         if (trademarkNote != null) {
             notes.add(messages.get("bulk.note.trademark.all", trademarkNote));
         }
@@ -202,7 +226,8 @@ public class BulkCheckService {
         if (state.quotaNote != null) {
             notes.add(messages.get("bulk.note.quota", state.quotaNote));
         }
-        return BulkResult.of(messages, marketplace.code(), header, rows, notes, trademarkRulesets.ruleset().disclaimer());
+        return BulkResult.of(messages, marketplace.code(), header, rows, notes, trademarkRulesets.ruleset().disclaimer(),
+                scope.kind(), List.copyOf(skipped));
     }
 
     private Row row(int index, Acc acc, EditorMarketplace marketplace) {
@@ -263,9 +288,13 @@ public class BulkCheckService {
 
     // ---- the listing rules
 
-    private BulkResult.Rules rules(UUID clientId, EditorMarketplace marketplace, Input input, RunState state) {
+    private BulkResult.Rules rules(UUID clientId, EditorMarketplace marketplace, Input input, RunState state, CheckScope scope) {
         try {
-            CheckResult result = checks.checkDetailed(clientId, new CheckRequest(marketplace.code(), input.listing()));
+            CheckRequest request = new CheckRequest(marketplace.code(), input.listing());
+            // the full check calls the method it always called: nothing about it depends on the scope
+            ScopedCheckResult scoped = scope.content() ? checks.checkDetailed(clientId, request, scope)
+                    : ScopedCheckResult.full(checks.checkDetailed(clientId, request));
+            CheckResult result = scoped.result();
             List<Item> items = new ArrayList<>();
             for (int index = 0; index < result.findings().size(); index++) {
                 CheckResult.FindingView finding = result.findings().get(index);
@@ -278,7 +307,7 @@ public class BulkCheckService {
             }
             String readiness = readiness(result.readiness());
             return new BulkResult.Rules(true, null, readiness, readinessLabel(readiness), score(result.readiness()),
-                    List.copyOf(items));
+                    List.copyOf(items), scoped.scope(), scoped.skippedFields());
         } catch (QuotaExceededException e) {
             state.quotaNote = state.quotaNote == null ? BulkText.quota(messages, e) : state.quotaNote;
             return BulkResult.Rules.notRun(BulkText.quota(messages, e));
@@ -292,6 +321,9 @@ public class BulkCheckService {
     }
 
     private static String readiness(CheckResult.ReadinessView view) {
+        if (view != null && "PARTIAL".equals(view.status())) {
+            return "PARTIAL";
+        }
         if (view == null || "INCOMPLETE".equals(view.status()) || view.score() == null) {
             return "INCOMPLETE";
         }
@@ -302,6 +334,7 @@ public class BulkCheckService {
         return switch (readiness) {
             case "READY" -> messages.get("bulk.readiness.ready");
             case "NOT_READY" -> messages.get("bulk.readiness.notready");
+            case "PARTIAL" -> messages.get("bulk.readiness.partial");
             default -> messages.get("bulk.readiness.incomplete");
         };
     }

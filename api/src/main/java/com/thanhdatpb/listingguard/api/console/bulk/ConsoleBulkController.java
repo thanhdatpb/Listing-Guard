@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.console.bulk;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.thanhdatpb.listingguard.api.check.CheckScope;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccount;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRepository;
 import com.thanhdatpb.listingguard.api.console.ConsoleFeedbackSupport;
@@ -221,10 +222,11 @@ public class ConsoleBulkController {
             BulkTable.Prepared table = BulkTable.prepare(messages, data, delimiter, mode, marketplace, Set.of(), limits.maxRows());
             ColumnMapping mapping = ColumnMapping.fromParams(messages, marketplace, table.columns(), params);
             boolean remember = params.containsKey("remember");
+            CheckScope.Kind scope = scopeOf(params.get("scope"));
             List<String> problems = mapping.problems(messages, marketplace, table.labels());
             if (!problems.isEmpty()) {
                 response.setStatus(HttpStatus.BAD_REQUEST.value());
-                return mappingStep(user, marketplace, table, data, new Remembered(mapping, problems, remember), model);
+                return mappingStep(user, marketplace, table, data, new Remembered(mapping, problems, remember, scope), model);
             }
             List<BulkCheckService.Input> inputs = new ArrayList<>();
             for (DelimitedText.Row row : table.rows()) {
@@ -238,9 +240,12 @@ public class ConsoleBulkController {
                             mapped.attributes(), mapped.listing()));
                 }
             }
-            BulkResult result = service.run(user.clientId(), marketplace, inputs, table.header());
+            // a content scope treats exactly the listing fields the seller gave a column as supplied (ADR-052)
+            CheckScope checkScope = scope == CheckScope.Kind.CONTENT ? CheckScope.content(mapping.mappedFields(marketplace))
+                    : CheckScope.FULL;
+            BulkResult result = service.run(user.clientId(), marketplace, inputs, table.header(), checkScope);
             if (remember) {
-                remember(user, marketplace, mapping.toStored(marketplace, table.labels()));
+                remember(user, marketplace, mapping.toStored(marketplace, table.labels(), scopeName(scope)));
             }
             Set<Integer> changed = Set.of();
             if (pilot.enabled()) {
@@ -259,6 +264,7 @@ public class ConsoleBulkController {
                 fields.put("marketplace", marketplace.code());
                 fields.put("delimiter", delimiterName(delimiter));
                 fields.put("header", table.header() ? "yes" : "no");
+                fields.put("scope", scopeName(scope));
                 for (int i = 0; i < mapping.targets().size(); i++) {
                     fields.put("col." + i, mapping.targetOf(i));
                 }
@@ -426,7 +432,31 @@ public class ConsoleBulkController {
     // ---- the pages
 
     /** The mapping a refused run comes back with: the seller's choices, the reasons and the "remember" box. */
-    private record Remembered(ColumnMapping mapping, List<String> problems, boolean remember) {
+    private record Remembered(ColumnMapping mapping, List<String> problems, boolean remember, CheckScope.Kind scope) {
+    }
+
+    /**
+     * The scope of a submitted form (ADR-052): {@code content} or {@code full}. A form that names none (an older page, a request built by
+     * hand) gets the configured default, and a value that is neither is refused, never read as the other.
+     */
+    private CheckScope.Kind scopeOf(String value) {
+        if (value == null || value.isBlank()) {
+            return defaultScope();
+        }
+        return switch (value.trim()) {
+            case "content" -> CheckScope.Kind.CONTENT;
+            case "full" -> CheckScope.Kind.FULL;
+            default -> throw new BulkTable.Refused(400, messages.get("bulk.error.badscope"));
+        };
+    }
+
+    /** What the mapping step offers first: the setting, else content under the pilot profile, else full. */
+    private CheckScope.Kind defaultScope() {
+        return limits.scopeFor(pilot.enabled());
+    }
+
+    private static String scopeName(CheckScope.Kind scope) {
+        return scope == CheckScope.Kind.CONTENT ? "content" : "full";
     }
 
     private String mappingStep(ConsoleUser user, EditorMarketplace marketplace, BulkTable.Prepared table, String text,
@@ -448,6 +478,10 @@ public class ConsoleBulkController {
         long judgeable = table.rows().stream().filter(row -> !row.blank()).count();
         base(model, user, marketplace, Tab.PASTE);
         model.addAttribute("stage", "mapping");
+        // the scope the page offers: the one just chosen, else the account's remembered one, else the default (ADR-052)
+        CheckScope.Kind offered = again != null ? again.scope()
+                : stored.map(BulkMappingStore.Stored::scope).map(this::scopeOf).orElseGet(this::defaultScope);
+        model.addAttribute("scopeSelected", scopeName(offered));
         model.addAttribute("targets", BulkTargets.of(marketplace).stream().map(t -> new TargetOption(t.key(), t.label(messages))).toList());
         model.addAttribute("separatorOptions",
                 BulkTargets.SEPARATORS.stream().map(s -> new SeparatorOption(s.key(), s.label(messages))).toList());
@@ -478,7 +512,7 @@ public class ConsoleBulkController {
     private String result(ConsoleUser user, EditorMarketplace marketplace, BulkResult result, List<String> extraNotes,
                           Set<Integer> changed, Model model) {
         if (pilot.enabled()) {
-            pilotMetrics.record(user.clientId(), marketplace.code(), result.rows().stream().filter(BulkResult.Row::checked)
+            pilotMetrics.record(user.clientId(), marketplace.code(), result.scope(), result.rows().stream().filter(BulkResult.Row::checked)
                     .map(row -> {
                         BulkResult.Trademark trademark = row.detail().trademark();
                         String risk = trademark.kind() == BulkResult.Kind.RESULT ? trademark.level() : null;
@@ -491,7 +525,7 @@ public class ConsoleBulkController {
         List<String> notes = new ArrayList<>(extraNotes);
         notes.addAll(result.notes());
         model.addAttribute("result", new BulkResult(result.marketplace(), result.header(), result.rows(), result.counts(), notes,
-                result.disclaimer(), result.sheetBlock(), result.csvHref()));
+                result.disclaimer(), result.sheetBlock(), result.csvHref(), result.scope(), result.skippedFields()));
         feedback.populate(model, user, result.targets());
         feedback.accountId(user).ifPresent(account -> result.rows().forEach(row -> {
             var detail = row.detail();

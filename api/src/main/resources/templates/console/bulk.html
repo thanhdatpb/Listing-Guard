@@ -151,6 +151,27 @@
                 </fieldset>
             </details>
 
+            <!-- The scope (ADR-052): what the check covers when the table has no column for a required field. Remembered with the mapping. -->
+            <fieldset class="lg-bulk__separators" id="scope-choice">
+                <legend class="lg-field__label" th:text="#{bulk.scope.legend}"></legend>
+                <div class="lg-field">
+                    <label class="lg-bulk__remember">
+                        <input type="radio" name="scope" value="content" id="scope-content" aria-describedby="scope-content-help"
+                               th:checked="${scopeSelected == 'content'}">
+                        <span th:text="#{bulk.scope.content}"></span>
+                    </label>
+                    <p class="lg-field__hint" id="scope-content-help" th:text="#{bulk.scope.content.help}"></p>
+                </div>
+                <div class="lg-field">
+                    <label class="lg-bulk__remember">
+                        <input type="radio" name="scope" value="full" id="scope-full" aria-describedby="scope-full-help"
+                               th:checked="${scopeSelected == 'full'}">
+                        <span th:text="#{bulk.scope.full}"></span>
+                    </label>
+                    <p class="lg-field__hint" id="scope-full-help" th:text="#{bulk.scope.full.help}"></p>
+                </div>
+            </fieldset>
+
             <label class="lg-bulk__remember">
                 <input type="checkbox" id="remember" name="remember" value="on" th:checked="${mapping.remember}">
                 <span th:text="#{bulk.remember}"></span>
@@ -173,7 +194,8 @@
                 <span class="lg-pill lg-pill--error" th:text="#{bulk.counts.error(${'' + result.counts.error})}"></span>
                 <span class="lg-pill lg-pill--trademark" th:text="#{bulk.counts.trademark(${'' + result.trademarkRows()})}"></span>
                 <span class="lg-pill lg-pill--warn" th:text="#{bulk.counts.warning(${'' + result.counts.warning})}"></span>
-                <span class="lg-pill lg-pill--clean" th:text="#{bulk.counts.ok(${'' + result.counts.ok})}"></span>
+                <span class="lg-pill lg-pill--clean" th:if="${!result.content}" th:text="#{bulk.counts.ok(${'' + result.counts.ok})}"></span>
+                <span class="lg-pill lg-pill--clean" th:if="${result.content}" th:text="#{bulk.counts.okcontent(${'' + result.counts.okContent})}"></span>
                 <span class="lg-pill" th:text="#{bulk.counts.others(${'' + result.counts.others})}"></span>
             </div>
             <div class="lg-actions">
@@ -228,7 +250,7 @@
                     <td class="lg-num" th:text="${row.line}"></td>
                     <td class="lg-sku"><code class="lg-code" th:if="${row.sku != null}" th:text="${row.sku}"></code><span class="lg-text-muted" th:if="${row.sku == null}">&mdash;</span></td>
                     <td class="lg-col-title" th:text="${row.detail != null and row.detail.listing != null} ? ${row.detail.listing.shortTitle(60)}"></td>
-                    <td><span class="lg-pill" th:classappend="${row.status.name() == 'ERROR'} ? 'lg-pill--error' : (${row.status.name() == 'WARNING'} ? 'lg-pill--warn' : (${row.status.name() == 'OK'} ? 'lg-pill--clean'))" th:text="${row.statusLabel}"></span></td>
+                    <td><span class="lg-pill" th:classappend="${row.status.name() == 'ERROR'} ? 'lg-pill--error' : (${row.status.name() == 'WARNING'} ? 'lg-pill--warn' : (${row.status.name() == 'OK' or row.status.name() == 'OK_CONTENT'} ? 'lg-pill--clean'))" th:text="${row.statusLabel}"></span></td>
                     <td class="lg-num" th:text="${row.findings}"></td>
                     <td class="lg-main">
                         <div class="lg-main__line" th:if="${row.status.name() != 'EMPTY'}">
@@ -269,6 +291,7 @@
         <details class="lg-disclosure" id="sheet-help">
             <summary th:text="#{bulk.sheet.summary}"></summary>
             <p class="lg-text-muted lg-small" th:text="${result.header} ? #{bulk.sheet.withheader} : #{bulk.sheet.noheader}"></p>
+            <p class="lg-text-muted lg-small" th:if="${result.content}" th:text="#{bulk.sheet.content}"></p>
             <label class="lg-sr-only" for="sheet-block" th:text="#{bulk.sheet.label}"></label>
             <textarea class="lg-textarea lg-textarea--mono" id="sheet-block" readonly rows="6" spellcheck="false" th:text="${result.sheetBlock}"></textarea>
         </details>

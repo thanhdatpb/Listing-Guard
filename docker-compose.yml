@@ -85,6 +85,8 @@ services:
       # The most rows and bytes of one paste or file in the bulk check page.
       LISTING_GUARD_CONSOLE_BULK_MAX_ROWS: ${LISTING_GUARD_CONSOLE_BULK_MAX_ROWS:-200}
       LISTING_GUARD_CONSOLE_BULK_MAX_BYTES: ${LISTING_GUARD_CONSOLE_BULK_MAX_BYTES:-1MB}
+      # The scope the bulk check offers first (ADR-052): content, full, or empty to follow the pilot profile.
+      LISTING_GUARD_CONSOLE_BULK_DEFAULT_SCOPE: ${LISTING_GUARD_CONSOLE_BULK_DEFAULT_SCOPE:-}
       # The language of a console page whose reader has not chosen one (ADR-028): en or vi.
       LISTING_GUARD_CONSOLE_DEFAULT_LOCALE: ${LISTING_GUARD_CONSOLE_DEFAULT_LOCALE:-en}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}

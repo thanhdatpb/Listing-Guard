@@ -7,15 +7,30 @@ chức năng đang hoạt động. Tiếng Việt là mặc định. Bạn có t
 
 ## 2. Kiểm, sửa và trả kết quả về Sheet
 
-1. Trong Sheet, sao chép vùng dữ liệu có hàng tiêu đề. Dùng các cột như `SKU`, `Title`, `Description`, `Tags`, `Price`, `Quantity`. Với Etsy, thêm `Who made` và `When made` nếu có.
+1. Trong Sheet, sao chép vùng dữ liệu có hàng tiêu đề. Dùng đúng các cột bạn đang viết: `SKU`, `Title`, `Description`, `Tags`. Bạn **không cần**
+   cột `Category`, `Price`, `Quantity`, `Who made` hay `When made`: những trường đó điền trên Etsy khi tạo listing. Nếu bảng có các cột đó,
+   Console kiểm chúng, và ô trống trong cột có sẵn vẫn là lỗi.
    Trên trang chủ, bấm **Dán từ Sheet**. Chọn Etsy hoặc Amazon và dán vào ô nhập.
-2. Bấm **Tiếp tục: chọn cột**. Xác nhận các cột mà Console tự nhận diện, chỉnh ánh xạ nếu cần, rồi bấm **Kiểm tra N dòng**.
-3. Đọc trạng thái từng hàng. Mở chi tiết để xem trường, quy tắc, nhãn hiệu và lý do. Xem xét trước các finding **HIGH**.
+2. Bấm **Tiếp tục: chọn cột**. Xác nhận các cột mà Console tự nhận diện, chỉnh ánh xạ nếu cần. Mục **Phạm vi kiểm tra** mặc định là
+   **Kiểm nội dung (chỉ các cột có trong bảng)**: trường bảng không có cột không bị báo thiếu. Rồi bấm **Kiểm tra N dòng**.
+
+   ![Bước chọn cột với phạm vi Kiểm nội dung](images/pilot-seller-scope.png)
+
+3. Đọc trạng thái từng hàng. Dòng sạch ghi **Đạt (nội dung)**: không quy tắc nào tìm thấy lỗi hay cảnh báo trong các cột bạn có, nhưng các
+   trường bắt buộc bảng không có cột **chưa được kiểm**, nên đó chưa phải "sẵn sàng đăng". Ghi chú màu xanh phía trên bảng liệt kê các trường đó.
+   Mở chi tiết để xem trường, quy tắc, nhãn hiệu và lý do. Xem xét trước các finding **HIGH**.
    **MEDIUM** cần đọc ngữ cảnh. **LOW** có thể vẫn có finding. **Chưa hoàn tất** nghĩa là còn thiếu dữ liệu hoặc một bước kiểm tra.
 4. Mở **Sửa bảng và kiểm lại**. Sửa ô cần thiết hoặc dán lại bảng đã sửa. Giữ các cột và hàng đúng thứ tự, rồi bấm **Kiểm lại các hàng**.
-5. Bấm **Sao chép cột kết quả**. Dán hai cột trạng thái và tóm tắt vào ô trống bên cạnh dữ liệu của bạn trong Sheet.
+5. Bấm **Sao chép cột kết quả**. Dán ba cột trạng thái, tóm tắt và phạm vi vào ba ô trống bên cạnh dữ liệu của bạn trong Sheet.
 
-![Kết quả kiểm hàng loạt với hai listing tự đặt trong pilot](images/pilot-seller-bulk.png)
+![Kết quả kiểm nội dung hàng loạt với tám listing tự đặt, không có cột category](images/pilot-seller-bulk.png)
+
+Ảnh trên là kết quả của bảng mẫu [`docs/samples/sheet-content-sample.tsv`](samples/sheet-content-sample.tsv) (tám listing tự đặt, bốn cột
+`SKU`, `Title`, `Description`, `Tags`): ba dòng **Lỗi** (title dài 159 ký tự, tag dài 26 ký tự, mô tả trống), hai dòng **Cảnh báo** (tag trùng, cụm
+"Free Shipping" trong title) và ba dòng **Đạt (nội dung)**. Với kiểm đầy đủ, cả tám dòng đều báo **Lỗi** vì bảng không có cột `category`.
+
+Khi chuẩn bị đăng một listing, chọn **Kiểm đầy đủ để đăng** ở bước chọn cột (hoặc dùng **Kiểm tra listing**): lúc đó mọi trường bắt buộc đều
+được kiểm. Lựa chọn của bạn được nhớ cùng cách chọn cột nếu bạn tick *Nhớ cách chọn cột này*. Báo cáo pilot đếm hai loại kiểm tra riêng.
 
 Để kiểm một listing, chọn **Kiểm tra listing**. Bạn có thể chỉnh các trường và kiểm lại từ trang đó. **Lịch sử** mở
 kết quả đã giữ. **Rà định kỳ** nhận file xuất hiện tại để kiểm các listing đang bán. Các thao tác kiểm tra không cập nhật marketplace.

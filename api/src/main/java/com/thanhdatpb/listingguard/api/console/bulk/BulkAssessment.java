@@ -16,7 +16,9 @@ import java.util.List;
  * <p>A row is {@code ERROR} when a listing rule (or a variation rule) found an ERROR; {@code WARNING} for a WARNING, a trademark risk of
  * MEDIUM or HIGH, or any part that is INCOMPLETE (a result that could not be completed is never read as clean); otherwise
  * {@code OK}, which means no listing rule found an error or warning and says nothing about the marketplace or about a trademark
- * that was not checked (the summary says so).
+ * that was not checked (the summary says so). In content scope (ADR-052) the clean status is {@code OK_CONTENT}, "OK (content)", and the
+ * summary names the required fields that were not checked because the table has no column for them: it never reads as a listing that
+ * is ready to publish.
  */
 final class BulkAssessment {
 
@@ -46,7 +48,8 @@ final class BulkAssessment {
                 || hasLevel(trademark.items(), "high") || hasLevel(trademark.items(), "medium")
                 || trademark.kind() == Kind.INCOMPLETE || variation.kind() == Kind.INCOMPLETE
                 || "INCOMPLETE".equals(rules.readiness());
-        Status status = error ? Status.ERROR : warning ? Status.WARNING : Status.OK;
+        // in content scope (ADR-052) a clean row is "OK (content)": nothing was said about the fields the table has no column for
+        Status status = error ? Status.ERROR : warning ? Status.WARNING : rules.content() ? Status.OK_CONTENT : Status.OK;
 
         Item main = null;
         int best = Integer.MAX_VALUE;
@@ -79,6 +82,9 @@ final class BulkAssessment {
             text.append(messages.get("bulk.summary.some", findings, main.message()));
         }
         List<String> notes = new ArrayList<>();
+        if (!rules.skippedFields().isEmpty()) {
+            notes.add(messages.get("bulk.summary.scope.skipped", String.join(", ", rules.skippedFields())));
+        }
         if (trademark.kind() == Kind.NOT_RUN) {
             notes.add(messages.get("bulk.summary.trademark.notrun", trademark.note()));
         } else if (trademark.kind() == Kind.INCOMPLETE) {

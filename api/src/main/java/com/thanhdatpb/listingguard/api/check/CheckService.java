@@ -90,6 +90,52 @@ public class CheckService {
         return check(clientId, request, true);
     }
 
+    /**
+     * {@link #checkDetailed(UUID, CheckRequest)} for a table that holds only some listing fields (ADR-052). With
+     * {@link CheckScope#FULL} this is exactly that method. With a content scope the presence of the fields outside
+     * {@link CheckScope#checkedFields()} is left out, the stored result says so (readiness {@code PARTIAL}, scope {@code CONTENT}) and
+     * the fields it left out are part of its {@code analysisVersion}: a content result is never answered for a full check, nor a full
+     * one for a content check, and two content results answer each other only when they left out the same fields. Plan, quota and the
+     * cache rules are those of {@code check}; a cached answer costs nothing.
+     *
+     * @throws com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException if the client's plan has no {@code listing-rules} pack
+     * @throws com.thanhdatpb.listingguard.api.plan.QuotaExceededException  if the answer is not stored yet and the month's quota is used up
+     */
+    public ScopedCheckResult checkDetailed(UUID clientId, CheckRequest request, CheckScope scope) {
+        if (!scope.content()) {
+            return ScopedCheckResult.full(check(clientId, request, true));
+        }
+        PlanService.Admission admission = plans.requirePack(clientId, Pack.LISTING_RULES);
+        Normalizer normalizer = normalizers.get(request.marketplace());
+        Listing listing = normalizer.normalize(request.listing());
+        String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
+        String contentHash = hasher.hash(listing);
+        ActiveRulesets.Active ruleset = rulesets.get(RulesetConfig.DEFAULT_PACK_ID, marketplace);
+        long rulesetVersionId = ruleset.rulesetVersionId();
+        String packId = ruleset.config().packId();
+        List<String> skippedFields = ruleEngine.skippedFields(listing, ruleset.config(), scope.checkedFields());
+        List<String> skippedRuleIds = ruleEngine.skippedRuleIds(listing, ruleset.config(), scope.checkedFields());
+        String analysisVersion = scope.analysisVersion(ruleset.config().version(), skippedFields);
+
+        Optional<CheckResult> cached = findCached(clientId, marketplace, packId, contentHash, rulesetVersionId, analysisVersion, true);
+        if (cached.isPresent()) {
+            return new ScopedCheckResult(cached.get(), CheckScope.Kind.CONTENT, skippedRuleIds, skippedFields);
+        }
+        plans.requireQuota(admission);
+        RuleRun run = ruleEngine.runDetailed(listing, ruleset.config(), scope.checkedFields());
+        ReadinessScore readiness = readinessScorer.score(run);
+        try {
+            UUID id = transactions.execute(status -> persist(admission, packId, marketplace, contentHash, rulesetVersionId,
+                    analysisVersion, run.findings(), readiness, CheckScope.Kind.CONTENT));
+            return new ScopedCheckResult(toResult(checks.findById(id).orElseThrow(), false, true), CheckScope.Kind.CONTENT,
+                    run.skippedRuleIds(), run.skippedFields());
+        } catch (DataIntegrityViolationException e) {
+            log.debug("Concurrent identical content check for {} {}; answering from the stored result", marketplace, contentHash);
+            return new ScopedCheckResult(findCached(clientId, marketplace, packId, contentHash, rulesetVersionId, analysisVersion, true)
+                    .orElseThrow(() -> e), CheckScope.Kind.CONTENT, skippedRuleIds, skippedFields);
+        }
+    }
+
     private CheckResult check(UUID clientId, CheckRequest request, boolean detailed) {
         PlanService.Admission admission = plans.requirePack(clientId, Pack.LISTING_RULES);
         Normalizer normalizer = normalizers.get(request.marketplace());
@@ -121,7 +167,7 @@ public class CheckService {
         ReadinessScore storedReadiness = readiness;
         try {
             UUID id = transactions.execute(status -> persist(admission, packId, marketplace, contentHash,
-                    rulesetVersionId, analysisVersion, found, storedReadiness));
+                    rulesetVersionId, analysisVersion, found, storedReadiness, CheckScope.Kind.FULL));
             return toResult(checks.findById(id).orElseThrow(), false, detailed);
         } catch (DataIntegrityViolationException e) {
             // another request of this client stored the same listing between our lookup and our insert: answer from its row
@@ -180,11 +226,14 @@ public class CheckService {
      * and rolls back, so does the charge.
      */
     private UUID persist(PlanService.Admission admission, String packId, String marketplace, String contentHash,
-                         long rulesetVersionId, String analysisVersion, List<Finding> found, ReadinessScore readiness) {
+                         long rulesetVersionId, String analysisVersion, List<Finding> found, ReadinessScore readiness,
+                         CheckScope.Kind scope) {
         UUID clientId = admission.clientId();
         plans.charge(admission);
-        ListingCheck saved = checks.saveAndFlush(new ListingCheck(clientId, packId, contentHash, marketplace,
-                CheckStatus.COMPLETED, rulesetVersionId, analysisVersion));
+        ListingCheck created = new ListingCheck(clientId, packId, contentHash, marketplace,
+                CheckStatus.COMPLETED, rulesetVersionId, analysisVersion);
+        created.setScope(scope);
+        ListingCheck saved = checks.saveAndFlush(created);
         if (readiness != null) {
             saved.setDetailedAnalysis(readiness.status().name(), readiness.score(), readiness.ready(), readiness.version());
         }

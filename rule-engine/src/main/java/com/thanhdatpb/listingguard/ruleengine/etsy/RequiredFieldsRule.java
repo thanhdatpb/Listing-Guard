@@ -2,15 +2,19 @@ package com.thanhdatpb.listingguard.ruleengine.etsy;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
-import com.thanhdatpb.listingguard.ruleengine.Rule;
+import com.thanhdatpb.listingguard.ruleengine.FieldScopedRule;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
-/** Every configured field must be present. Which fields are required is decided by the ruleset. */
-public final class RequiredFieldsRule implements Rule {
+/**
+ * Every configured field must be present. Which fields are required is decided by the ruleset. A caller whose data never had a field
+ * can leave it out of the check ({@link FieldScopedRule}, ADR-052); a field that was supplied and is empty is still reported.
+ */
+public final class RequiredFieldsRule implements FieldScopedRule {
 
     public static final String ID = "required_fields";
 
@@ -27,10 +31,20 @@ public final class RequiredFieldsRule implements Rule {
     }
 
     @Override
+    public List<String> scopedFields(Listing listing, RulesetConfig config) {
+        return config.rule(ID).stringListParam("fields");
+    }
+
+    @Override
     public List<Finding> evaluate(Listing listing, RulesetConfig config) {
+        return evaluate(listing, config, Set.of());
+    }
+
+    @Override
+    public List<Finding> evaluate(Listing listing, RulesetConfig config, Set<String> skipped) {
         List<Finding> findings = new ArrayList<>();
         for (String field : config.rule(ID).stringListParam("fields")) {
-            if (!presenceCheck(field).test(listing)) {
+            if (!skipped.contains(field) && !presenceCheck(field).test(listing)) {
                 findings.add(finding(config, field,
                         "Thiếu trường bắt buộc '" + field + "'.",
                         "Bổ sung giá trị cho trường '" + field + "' trước khi publish."));

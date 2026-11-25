@@ -58,6 +58,10 @@ public class ListingCheck {
     @Column(name = "readiness_version", length = 64)
     private String readinessVersion;
 
+    /** {@code FULL} or {@code CONTENT} (ADR-052, V51); a content result also says what it left out in {@code analysisVersion}. */
+    @Column(name = "scope", nullable = false, length = 16)
+    private String scope = CheckScope.Kind.FULL.name();
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -105,6 +109,14 @@ public class ListingCheck {
 
     public String getAnalysisVersion() {
         return analysisVersion;
+    }
+
+    public CheckScope.Kind getScope() {
+        return CheckScope.Kind.valueOf(scope);
+    }
+
+    void setScope(CheckScope.Kind scope) {
+        this.scope = scope.name();
     }
 
     public Instant getCreatedAt() {

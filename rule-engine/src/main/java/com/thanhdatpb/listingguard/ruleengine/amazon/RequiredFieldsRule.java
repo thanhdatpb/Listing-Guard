@@ -2,18 +2,20 @@ package com.thanhdatpb.listingguard.ruleengine.amazon;
 
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.listing.Listing;
+import com.thanhdatpb.listingguard.ruleengine.FieldScopedRule;
 import com.thanhdatpb.listingguard.ruleengine.config.RuleSettings;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetConfig;
 import com.thanhdatpb.listingguard.ruleengine.config.RulesetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
  * Every configured field must be present. Which fields are required is decided by the ruleset, and a product
  * type can override the list (Amazon's required attributes depend on the product type).
  */
-public final class RequiredFieldsRule extends AmazonRule {
+public final class RequiredFieldsRule extends AmazonRule implements FieldScopedRule {
 
     public static final String ID = "required_fields";
 
@@ -30,10 +32,24 @@ public final class RequiredFieldsRule extends AmazonRule {
     }
 
     @Override
+    public List<String> scopedFields(Listing listing, RulesetConfig config) {
+        return config.rule(id(), listing.productType()).stringListParam("fields");
+    }
+
+    @Override
+    public List<Finding> evaluate(Listing listing, RulesetConfig config, Set<String> skipped) {
+        return check(listing, config, config.rule(id(), listing.productType()), skipped);
+    }
+
+    @Override
     List<Finding> check(Listing listing, RulesetConfig config, RuleSettings settings) {
+        return check(listing, config, settings, Set.of());
+    }
+
+    private List<Finding> check(Listing listing, RulesetConfig config, RuleSettings settings, Set<String> skipped) {
         List<Finding> findings = new ArrayList<>();
         for (String field : settings.stringListParam("fields")) {
-            if (!presenceCheck(field).test(listing)) {
+            if (!skipped.contains(field) && !presenceCheck(field).test(listing)) {
                 findings.add(finding(config, settings, field, null,
                         "Thiếu trường bắt buộc '" + field + "'.",
                         "Bổ sung giá trị cho trường '" + field + "' trước khi publish."));
