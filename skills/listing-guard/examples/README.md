@@ -3,6 +3,9 @@
 The inputs and abbreviated results below are fictional illustrations. They do not assert that a real API response will contain
 these findings. A live response, including its message, evidence, disclaimer and versions, takes precedence.
 
+A complete run of the bounded repair loop, from the first check to the final report, is in
+[repair-loop-etsy.md](repair-loop-etsy.md).
+
 ## Etsy listing with a repeated tag
 
 **Input:** Etsy title `Handmade blue ceramic mug`; tags `blue mug`, `blue mug`, `gift`.

@@ -13,6 +13,7 @@ authoritative. This is a quick index, not a promise that every deployment uses t
 | Trademark risk | `catalog_exact` | Exact text match against a catalog mark. |
 | Trademark risk | `catalog_phrase` | Phrase match against a catalog mark. |
 | Trademark risk | `catalog_fuzzy` | Similarity match against a catalog mark. |
+| Trademark risk | `watchlist_match` | Exact word run of an entry in the client's own watchlist (`source` `WATCHLIST`). |
 | Personalization screening | `unsupported_characters` | Text contains characters not allowed by the selected print profile. |
 | Personalization screening | `too_long` | Text exceeds the selected profile's configured length. |
 
