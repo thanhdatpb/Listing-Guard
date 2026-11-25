@@ -23,14 +23,14 @@ class AnalysisFingerprintTest {
         return new TrademarkRuleset(packId, r.version(), r.checkedAt(), r.contentHash(), r.disclaimer(),
                 r.normalization(), r.matching(), r.lexicon(), r.ruleOrder(), r.catalogExact(), r.catalogPhrase(),
                 r.catalogFuzzy(), r.geoSport(), r.colorContainsMark(), r.pureColor(), r.productClasses(),
-                r.genericWords(), r.sourceLinks());
+                r.genericWords(), r.sourceLinks(), r.calibration());
     }
 
     private static TrademarkRuleset withVersion(TrademarkRuleset r, String version) {
         return new TrademarkRuleset(r.packId(), version, r.checkedAt(), r.contentHash(), r.disclaimer(),
                 r.normalization(), r.matching(), r.lexicon(), r.ruleOrder(), r.catalogExact(), r.catalogPhrase(),
                 r.catalogFuzzy(), r.geoSport(), r.colorContainsMark(), r.pureColor(), r.productClasses(),
-                r.genericWords(), r.sourceLinks());
+                r.genericWords(), r.sourceLinks(), r.calibration());
     }
 
     @Test

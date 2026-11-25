@@ -44,7 +44,7 @@ public record TrademarkRuleset(
         PureColor pureColor,
         ProductClasses productClasses,
         GenericWords genericWords,
-        SourceLinks sourceLinks) {
+        SourceLinks sourceLinks, CatalogCalibration calibration) {
 
     public static final String PACK_ID = "trademark-risk";
 
@@ -158,6 +158,11 @@ public record TrademarkRuleset(
             words = Set.copyOf(words);
             contextFields = List.copyOf(contextFields);
         }
+    }
+
+    /** Opt-in caps after existing match precedence. A null section preserves the old ruleset. */
+    public record CatalogCalibration(Cap weak, Cap ordinary) {
+        public record Cap(RiskLevel risk, String note) { }
     }
 
     /**

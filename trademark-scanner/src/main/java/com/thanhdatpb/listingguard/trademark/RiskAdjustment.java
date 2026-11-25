@@ -1,5 +1,7 @@
 package com.thanhdatpb.listingguard.trademark;
 
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals;
+
 /**
  * One reason a catalog finding is reported lower than the level its rule assigns (ADR-009). The original level is never
  * hidden: {@code from} is always the level the rule assigned before any adjustment, and {@code to} is the level this
@@ -11,7 +13,12 @@ package com.thanhdatpb.listingguard.trademark;
  * @param to     the level this reason gives, strictly lower than {@code from}
  * @param note   the ruleset's Vietnamese explanation, with the real values filled in
  */
-public record RiskAdjustment(AdjustmentReason reason, RiskLevel from, RiskLevel to, String note) {
+public record RiskAdjustment(AdjustmentReason reason, RiskLevel from, RiskLevel to, String note,
+                             DistinctivenessSignals distinctiveness) {
+    public RiskAdjustment(AdjustmentReason reason, RiskLevel from, RiskLevel to, String note) {
+        this(reason, from, to, note, null);
+    }
+
 
     public RiskAdjustment {
         if (!from.isDetermined() || !to.isDetermined() || to.ordinal() >= from.ordinal()) {

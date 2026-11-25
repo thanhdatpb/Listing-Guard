@@ -16,6 +16,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
 import com.thanhdatpb.listingguard.api.docs.ApiExamples;
+import com.thanhdatpb.listingguard.trademark.AlgorithmVersions;
+import com.thanhdatpb.listingguard.trademark.AnalysisFingerprint;
+import com.thanhdatpb.listingguard.trademark.config.TrademarkRulesetLoader;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.time.Duration;
@@ -60,6 +63,9 @@ class TrademarkCheckApiIntegrationTest {
 
     @Autowired
     TrademarkCatalogRuntime runtime;
+
+    @Autowired
+    TrademarkCheckStore checkStore;
 
     // ---- request helpers
 
@@ -318,6 +324,24 @@ class TrademarkCheckApiIntegrationTest {
         assertThat(second.get("createdAt")).isEqualTo(first.get("createdAt"));
         assertThat(second.get("findings")).isEqualTo(first.get("findings"));
         assertThat(rows("trademark_check", "id = ?::uuid", first.get("checkId").asText())).isEqualTo(1);
+    }
+
+    @Test
+    void calibratedFingerprintCannotReadTheLegacyCacheEntry() throws Exception {
+        JsonNode result = trademark(KEY_1, etsy("Zorvex mug " + unique(), null));
+        UUID id = UUID.fromString(result.get("checkId").asText());
+        var cache = jdbc.queryForObject("""
+                SELECT client_id, marketplace_code, pack_id, input_hash, ruleset_version_id, analysis_version
+                FROM trademark_check WHERE id = ?
+                """, (rs, row) -> new TrademarkCheckStore.Identity(rs.getObject(1, UUID.class),
+                rs.getString(2), rs.getString(3), rs.getString(4).trim(), rs.getLong(5), rs.getString(6).trim()), id);
+        assertThat(checkStore.findCached(cache)).isPresent();
+        var newRuleset = TrademarkRulesetLoader.loadClasspath("rulesets/trademark-risk-2026-12.yaml");
+        String next = AnalysisFingerprint.of(newRuleset, AlgorithmVersions.CURRENT,
+                java.util.Map.of("marketplace", cache.marketplace())).value();
+        assertThat(next).isNotEqualTo(cache.analysisVersion());
+        assertThat(checkStore.findCached(new TrademarkCheckStore.Identity(cache.clientId(), cache.marketplace(),
+                cache.packId(), cache.inputHash(), cache.rulesetVersionId(), next))).isEmpty();
     }
 
     @Test

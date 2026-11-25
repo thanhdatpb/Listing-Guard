@@ -337,7 +337,7 @@ public class BulkCheckService {
                         finding.suggestion(), finding.mark() == null ? null : messages.get("bulk.item.catalogmark", finding.mark()),
                         withLlmLabel(messages.ruleExplanation(finding.ruleId()),
                                 ConsoleLlmLabel.sentence(messages, ConsoleLlmLabel.reason(finding.riskAdjustments()))), null, null,
-                        FeedbackTarget.trademark(result.checkId(), index), null, finding.start(), finding.end()));
+                        FeedbackTarget.trademark(result.checkId(), index), null, finding.start(), finding.end(), finding.weakCalibrated()));
             }
             boolean complete = result.completeness() == Completeness.COMPLETE;
             String level = result.riskLevel() == RiskLevel.UNKNOWN || result.riskLevel() == null ? null : result.riskLevel().name();

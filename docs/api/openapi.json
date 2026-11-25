@@ -1817,6 +1817,10 @@
       },
       "RiskAdjustmentView" : {
         "properties" : {
+          "distinctiveness" : {
+            "$ref" : "#/components/schemas/TrademarkCalibrationEvidence",
+            "description" : "Unverified catalog data used for a tier-based adjustment."
+          },
           "from" : {
             "description" : "The level the rule assigned before any adjustment.",
             "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
@@ -1827,7 +1831,7 @@
             "type" : "string"
           },
           "reason" : {
-            "description" : "`outside_product_classes`: the request named a product type and none of the mark's Nice classes is one of the product type's. `common_word`: the mark is an ordinary word of the ruleset's list and the match is not an exact or phrase match in a brand field. `llm_descriptive`: a language model read the sentence around the match and thinks the word describes the product (only when the operator turned the LLM judge on, ADR-036); the finding is kept and its note starts with the label.",
+            "description" : "`outside_product_classes`: the request named a product type and none of the mark's Nice classes is one of the product type's. `common_word`: the mark is an ordinary word of the ruleset's list and the match is not an exact or phrase match in a brand field. `catalog_weak_exact` and `catalog_ordinary_exact`: unverified catalog tier caps for an eligible single-token exact match. `llm_descriptive`: a language model read the sentence around the match and thinks the word describes the product (only when the operator turned the LLM judge on, ADR-036); the finding is kept and its note starts with the label.",
             "example" : "outside_product_classes",
             "type" : "string"
           },
@@ -2035,6 +2039,38 @@
             "type" : "integer"
           },
           "warnings" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TrademarkCalibrationEvidence" : {
+        "properties" : {
+          "dictionaryWord" : {
+            "type" : "boolean"
+          },
+          "markKind" : {
+            "enum" : [ "STANDARD_CHARACTER", "WORDS_WITH_DESIGN", "OTHER" ],
+            "type" : "string"
+          },
+          "reason" : {
+            "enum" : [ "DICTIONARY_UNAVAILABLE", "DRAWING_UNKNOWN", "COMMON_OR_REPEATED", "UNIQUE_MULTIWORD", "DEFAULT" ],
+            "type" : "string"
+          },
+          "sameMarkClassCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sameMarkCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "tier" : {
+            "enum" : [ "STRONG", "ORDINARY", "WEAK" ],
+            "type" : "string"
+          },
+          "wordCount" : {
             "format" : "int32",
             "type" : "integer"
           }
@@ -2269,7 +2305,7 @@
             "type" : "string"
           },
           "skippedRuleIds" : {
-            "description" : "Rules that did not run because no catalog is served (`catalogStatus` NOT_CONFIGURED); empty otherwise.",
+            "description" : "Rules that did not run; `catalog_distinctiveness` means tier data was unavailable to the calibrated ruleset.",
             "example" : [ ],
             "items" : {
               "type" : "string"

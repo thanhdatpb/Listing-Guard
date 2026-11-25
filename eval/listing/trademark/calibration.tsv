@@ -1,0 +1,35 @@
+id	group	title	tag	description	brand	shop_name	watchlist	expected
+no-brand-1	DESCRIPTIVE	mug ceramic cup	-	-	-	-	-	LOW
+no-brand-2	DESCRIPTIVE	soy wax	candle	-	-	-	-	LOW
+no-brand-3	DESCRIPTIVE	cotton crewneck	-	handmade shirt	-	-	-	LOW
+no-brand-4	DESCRIPTIVE	blue ceramic bowl	-	-	-	-	-	LOW
+no-brand-5	DESCRIPTIVE	wall print	art	-	-	-	-	LOW
+no-brand-6	DESCRIPTIVE	canvas tote	-	handmade bag	-	-	-	LOW
+no-brand-7	DESCRIPTIVE	gold metal finish	-	-	-	-	-	LOW
+no-brand-8	DESCRIPTIVE	woven cover	linen	-	-	-	-	LOW
+no-brand-9	DESCRIPTIVE	photo stand	-	handmade frame	-	-	-	LOW
+no-brand-10	DESCRIPTIVE	soap handmade bar	-	-	-	-	-	LOW
+no-brand-11	DESCRIPTIVE	serving tray	wood	-	-	-	-	MEDIUM
+no-brand-12	DESCRIPTIVE	clear vase	-	handmade glass	-	-	-	MEDIUM
+no-brand-13	DESCRIPTIVE	silk woven scarf	-	-	-	-	-	MEDIUM
+no-brand-14	DESCRIPTIVE	wall decor	clock	-	-	-	-	MEDIUM
+no-brand-15	DESCRIPTIVE	gift wrap	-	handmade paper	-	-	-	MEDIUM
+brand-1	BRAND_USE	mug product	-	-	mug	-	-	HIGH
+brand-2	BRAND_USE	candle product	-	-	-	candle	-	HIGH
+brand-3	BRAND_USE	shirt product	-	-	shirt	-	-	HIGH
+brand-4	BRAND_USE	blue product	-	-	-	blue	-	HIGH
+brand-5	BRAND_USE	art product	-	-	art	-	-	HIGH
+brand-6	BRAND_USE	bag product	-	-	-	bag	-	HIGH
+brand-7	BRAND_USE	gold product	-	-	gold	-	-	HIGH
+brand-8	BRAND_USE	linen product	-	-	-	linen	-	HIGH
+brand-9	BRAND_USE	frame product	-	-	frame	-	-	HIGH
+brand-10	BRAND_USE	soap product	-	-	-	soap	-	HIGH
+watchlist-1	WATCHLIST	mug product	-	-	-	-	mug	HIGH
+watchlist-2	WATCHLIST	candle product	-	-	-	-	candle	HIGH
+watchlist-3	WATCHLIST	shirt product	-	-	-	-	shirt	HIGH
+watchlist-4	WATCHLIST	blue product	-	-	-	-	blue	HIGH
+watchlist-5	WATCHLIST	art product	-	-	-	-	art	HIGH
+phrase	PHRASE	Crimson Falcons	-	-	-	-	-	HIGH
+strong	BRAND_USE	Zorvex limited edition	-	-	-	-	-	HIGH
+fuzzy	FUZZY	Vexamontt	-	-	-	-	-	MEDIUM
+old	LEGACY	Mug ceramic	-	-	-	-	-	HIGH

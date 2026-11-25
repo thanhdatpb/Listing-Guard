@@ -3,6 +3,28 @@
 - Trạng thái đề xuất, chờ maintainer duyệt mẫu và catalog
 - Phụ thuộc [ADR-009](ADR-009-trademark-risk-scanner.md), [ADR-031](ADR-031-client-trademark-watchlist.md) và [ADR-032](ADR-032-value-backtest-and-labeled-evaluation.md)
 
+## Hiệu chỉnh opt-in bằng tín hiệu P2
+
+Phần này thay thế đề xuất hạ HIGH xuống MEDIUM bằng danh sách mark duyệt tay bên dưới trong phạm vi ruleset
+`trademark-risk-2026-12`. ADR vẫn Proposed. Ruleset `2026-11b` là mặc định cho đến khi maintainer đo catalog thật.
+
+Hiệu chỉnh chạy sau khi chọn ứng viên thắng theo ADR-009. Nó giữ rule ID, vị trí, mark, kiểu match, source và
+bằng chứng. Watchlist giữ mức riêng. Với entry có tier, các match nhiều từ, tier STRONG, match trong
+`brand`/`shop_name` và exact một từ trùng token thương hiệu đã khai báo giữ mức gốc. Fuzzy và các trường
+ngoài title/tag/description không áp caps mới. Với các match exact một từ còn lại, luật unverified
+`catalog_weak_exact` áp trần LOW và `catalog_ordinary_exact` áp trần MEDIUM. Evidence giữ from/to, lý do tiếng
+Việt và dữ liệu P2 có sẵn. Đếm hồ sơ serial live theo ADR-046, không diễn giải thành số chủ sở hữu.
+Supplemental Register và disclaimer thuộc P2b.
+
+Catalog `jsonl-1` hoặc finding thắng thiếu tier giữ mức deterministic cũ, với `INCOMPLETE` và
+`catalog_distinctiveness` trong danh sách bước bỏ qua. Trong ruleset mới, LLM opt-in chỉ xét MEDIUM do
+`catalog_ordinary_exact` tạo. Rà định kỳ trình bày WEAK đã hạ trong nhóm riêng theo listing. ORDINARY đã
+hạ nằm ở nhóm đã biết và không được tính là rủi ro mới. Cache dùng fingerprint của ruleset đã chọn.
+
+Brand dùng trong câu nhưng không được khai báo trong trường brand/shop và chỉ khớp một từ WEAK vẫn có thể
+bị hạ. Fixture chỉ kiểm tra các ranh giới đã nêu. Nhóm ALL_HIGH lịch sử tiếp tục chạy với ruleset cũ và
+nằm ngoài precision/recall. Không suy rộng kết quả tổng hợp ra catalog thật.
+
 ## Bằng chứng tại baseline LG-01
 
 Baseline tại `00944a73234a68323170d03ad8a429ca1e4bc62c` dùng scanner `trademark-risk-2026-11b`, catalog DEMO

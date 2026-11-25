@@ -49,7 +49,8 @@ final class CatalogRule implements TrademarkRule {
                     gram.end(), gram.text(), hit.mark().display(), type, hit.score(),
                     Map.of("mark", hit.mark().display(), "token", snippet, "field", gram.field().name(),
                             "score", String.valueOf(Math.round(hit.score() * 100))),
-                    false, List.of(), hit.mark().sourceIds(), outcome.adjustments()));
+                    false, List.of(), hit.mark().sourceIds(), outcome.adjustments(), null,
+                    context.ruleset().calibration() == null ? null : hit.mark()));
         }
         return result;
     }

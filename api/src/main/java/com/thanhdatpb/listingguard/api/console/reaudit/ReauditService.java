@@ -84,7 +84,7 @@ public class ReauditService {
 
     /** What was found for one listing, before it is called new or known. */
     private record Found(String pack, String ruleId, String source, String field, String mark, String normalizedMark,
-                         UUID watchlistEntry, String level, String message, String suggestion) {
+                         UUID watchlistEntry, String level, String message, String suggestion, boolean calibrated) {
     }
 
     /** One row after its checks. */
@@ -160,6 +160,7 @@ public class ReauditService {
 
         List<Risk> newRisks = new ArrayList<>();
         List<Risk> knownRisks = new ArrayList<>();
+        List<Risk> weakMatches = new ArrayList<>();
         List<Skipped> skipped = new ArrayList<>();
         List<Row> rows = new ArrayList<>();
         int checked = 0;
@@ -170,15 +171,21 @@ public class ReauditService {
             } else {
                 skipped.add(new Skipped(outcome.input().line(), outcome.sku(), outcome.reason()));
             }
+            int actionable = 0;
             for (Found found : outcome.found()) {
-                boolean isNew = isNew(baseline, found);
+                boolean isNew = !found.calibrated() && isNew(baseline, found);
                 Risk risk = new Risk(outcome.input().line(), outcome.sku(), found.pack(), found.ruleId(), found.source(),
                         found.field(), found.mark(), found.level(), messages.get("reaudit.level." + found.level()),
                         found.message(), found.suggestion(), isNew);
-                (isNew ? newRisks : knownRisks).add(risk);
+                if ("low".equals(found.level())) {
+                    weakMatches.add(risk);
+                } else {
+                    (isNew ? newRisks : knownRisks).add(risk);
+                    actionable++;
+                }
             }
             rows.add(new Row(i + 1, outcome.sku(), ordinal(outcome, outcomes, i), outcome.hash(), outcome.status(),
-                    outcome.found().size()));
+                    actionable));
         }
 
         UUID runId = UUID.randomUUID();
@@ -195,7 +202,7 @@ public class ReauditService {
         return new ReauditResult(runId, marketplace.code(), account, adapterId, startedAt, state.catalogVersion,
                 state.watchlistRevision, previous == null ? null : previous.startedAt(),
                 previous == null ? null : previous.catalogVersion(), baseline.catalogVersionMissing(), outcomes.size(), checked,
-                List.copyOf(newRisks), List.copyOf(knownRisks), changes, List.copyOf(skipped), notes,
+                List.copyOf(newRisks), List.copyOf(knownRisks), List.copyOf(weakMatches), changes, List.copyOf(skipped), notes,
                 rulesets.ruleset().disclaimer(), ReauditExport.href(csv));
     }
 
@@ -233,7 +240,7 @@ public class ReauditService {
                 };
                 if (level != null) {
                     found.add(new Found(Pack.LISTING_RULES.id(), finding.ruleId(), "RULE", finding.field(), null, null, null, level,
-                            finding.message(), finding.suggestion()));
+                            finding.message(), finding.suggestion(), false));
                 }
             }
         } catch (QuotaExceededException e) {
@@ -266,7 +273,7 @@ public class ReauditService {
                 state.trademarkIncomplete++;
             }
             for (TrademarkCheckResult.FindingView finding : result.findings()) {
-                if (finding.risk() != RiskLevel.HIGH && finding.risk() != RiskLevel.MEDIUM) {
+                if (finding.risk() != RiskLevel.HIGH && finding.risk() != RiskLevel.MEDIUM && !finding.weakCalibrated()) {
                     continue;
                 }
                 String level = finding.risk().name().toLowerCase(Locale.ROOT);
@@ -274,7 +281,7 @@ public class ReauditService {
                         ? normalizer.normalizeMark(finding.mark()) : null;
                 UUID entry = finding.watchlistEntry() == null ? null : finding.watchlistEntry().entryId();
                 found.add(new Found(Pack.TRADEMARK_RISK.id(), finding.ruleId(), finding.source().name(), finding.field(),
-                        finding.mark(), normalized, entry, level, finding.message(), finding.suggestion()));
+                        finding.mark(), normalized, entry, level, finding.message(), finding.suggestion(), finding.catalogCalibrated()));
             }
         } catch (TrademarkUnavailableException | PlanNotAllowedException e) {
             state.trademarkSkipped++;

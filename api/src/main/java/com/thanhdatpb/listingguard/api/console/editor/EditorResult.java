@@ -100,7 +100,7 @@ public record EditorResult(Readiness readiness, Trademark trademark, List<Group<
      * LLM label.
      */
     public record TrademarkItem(String ruleId, String risk, String field, String matchType, String mark, String message,
-                                String suggestion, Evidence evidence, FeedbackTarget target, String llmReason, String source, List<String> sourceIds) {
+                                String suggestion, Evidence evidence, FeedbackTarget target, String llmReason, String source, List<String> sourceIds, boolean weakCalibrated) {
     }
 
     /** How many findings of the listing rules have this level ({@code error}, {@code warning} or {@code info}). */

@@ -56,28 +56,44 @@ public class FindingCards {
         return List.copyOf(groups);
     }
 
-    /** The trademark findings of an editor result by risk, highest first. */
-    public List<Group> editorTrademark(EditorResult result) {
-        List<Group> groups = new ArrayList<>();
+    /** Presentation only: lower-priority cards and calibrated weak matches stay accessible. */
+    public record TrademarkCards(List<FindingCard> primary, List<FindingCard> more, List<FindingCard> weak) { }
+
+    public TrademarkCards editorTrademark(EditorResult result) {
+        List<FindingCard> regular = new ArrayList<>();
+        List<FindingCard> weak = new ArrayList<>();
         for (EditorResult.Group<EditorResult.TrademarkItem> group : result.trademark().groups()) {
-            List<FindingCard> cards = new ArrayList<>();
             for (EditorResult.TrademarkItem item : group.items()) {
-                cards.add(card("trademark", group.css(), item.ruleId(), item.field(), item.message(), item.suggestion(),
-                        item.mark() == null ? null : messages.get("bulk.item.catalogmark", item.mark()),
+                (item.weakCalibrated() ? weak : regular).add(card("trademark", group.css(), item.ruleId(), item.field(),
+                        item.message(), item.suggestion(), item.mark() == null ? null : messages.get("bulk.item.catalogmark", item.mark()),
                         origin(item.ruleId(), item.mark() != null, null), evidence(item.evidence()), null, null, null,
                         item.llmReason(), null, messages.ruleExplanation(item.ruleId()), item.target()));
             }
-            groups.add(new Group(group.label(), group.css(), List.copyOf(cards)));
         }
-        return List.copyOf(groups);
+        return highlights(regular, weak);
     }
 
-    // ---- a bulk row
+    public TrademarkCards bulkTrademark(List<BulkResult.Item> items, String marketplace) {
+        var sorted = items.stream().sorted(java.util.Comparator.comparingInt(item -> rank(item.level()))).toList();
+        return highlights(bulk(sorted.stream().filter(item -> !item.weakCalibrated()).toList(), "trademark", marketplace),
+                bulk(sorted.stream().filter(BulkResult.Item::weakCalibrated).toList(), "trademark", marketplace));
+    }
 
-    /**
-     * The findings of one check of a bulk row. {@code kind} is {@code rules}, {@code trademark} or {@code variation}. The items carry
-     * their own explanation, with the LLM label of a trademark finding already in it (ADR-036), so the card has no separate LLM line.
-     */
+    public static int rank(String level) {
+        return switch (level) {
+            case "high", "error" -> 0;
+            case "medium", "warning" -> 1;
+            default -> 2;
+        };
+    }
+
+    private static TrademarkCards highlights(List<FindingCard> regular, List<FindingCard> weak) {
+        int first = Math.min(3, regular.size());
+        return new TrademarkCards(List.copyOf(regular.subList(0, first)), List.copyOf(regular.subList(first, regular.size())),
+                List.copyOf(weak));
+    }
+
+    /** The finding cards of one pack for a bulk row. */
     public List<FindingCard> bulk(List<BulkResult.Item> items, String kind, String marketplace) {
         List<FindingCard> cards = new ArrayList<>();
         for (BulkResult.Item item : items) {

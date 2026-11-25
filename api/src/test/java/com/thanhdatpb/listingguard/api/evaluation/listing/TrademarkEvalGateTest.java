@@ -12,6 +12,19 @@ import com.thanhdatpb.listingguard.ruleengine.RuleEngine;
 import com.thanhdatpb.listingguard.ruleengine.RuleRegistry;
 import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.RiskLevel;
+import com.thanhdatpb.listingguard.trademark.FindingSource;
+import com.thanhdatpb.listingguard.trademark.LlmJudgement;
+import com.thanhdatpb.listingguard.trademark.TrademarkCheckInput;
+import com.thanhdatpb.listingguard.trademark.TrademarkScanner;
+import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
+import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals;
+import com.thanhdatpb.listingguard.trademark.catalog.InMemoryTrademarkCatalog;
+import com.thanhdatpb.listingguard.trademark.catalog.MarkStatus;
+import com.thanhdatpb.listingguard.trademark.config.TrademarkRulesetLoader;
+import com.thanhdatpb.listingguard.trademark.normalize.TextNormalizer;
+import com.thanhdatpb.listingguard.trademark.watchlist.Watchlist;
+import com.thanhdatpb.listingguard.trademark.watchlist.WatchlistEntry;
+import com.thanhdatpb.listingguard.trademark.watchlist.WatchlistSettings;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -130,6 +143,117 @@ class TrademarkEvalGateTest {
             assertThat(o.risk()).as(o.sample().id()).isEqualTo(RiskLevel.HIGH);
         });
         enforceBaseline(observations);
+    }
+
+    @Test
+    void calibratesOnlyEligibleSyntheticMatchesPreservingTheEvidenceAndFingerprint() throws IOException {
+        Path fixtures = FIXTURE.getParent();
+        var oldRules = TrademarkRulesetLoader.loadClasspath("rulesets/trademark-risk-2026-11b.yaml");
+        var newRules = TrademarkRulesetLoader.loadClasspath("rulesets/trademark-risk-2026-12.yaml");
+        var normalizer = new TextNormalizer(newRules.normalization());
+        List<CatalogMark> marks = new ArrayList<>();
+        for (String row : Files.readAllLines(fixtures.resolve("calibration-catalog.tsv")).stream().skip(1).toList()) {
+            String[] columns = row.split("\t");
+            var tier = DistinctivenessSignals.Tier.valueOf(columns[1]);
+            boolean weak = tier == DistinctivenessSignals.Tier.WEAK;
+            String serial = "uspto:" + (90000001 + marks.size());
+            marks.add(new CatalogMark(normalizer.normalizeMark(columns[0]), columns[0], List.of(25),
+                    MarkStatus.REGISTERED, false, List.of(serial),
+                    new DistinctivenessSignals(columns[0].split(" ").length, weak ? 12L : 1L, 1,
+                            DistinctivenessSignals.MarkKind.STANDARD_CHARACTER, weak, tier, null)));
+        }
+        var catalog = new InMemoryTrademarkCatalog("synthetic-calibration", marks);
+        var legacy = new InMemoryTrademarkCatalog("synthetic-legacy", normalizer, List.of("Mug"));
+        var before = new TrademarkScanner(oldRules, catalog);
+        var after = new TrademarkScanner(newRules, catalog);
+        var watchSettings = WatchlistSettings.loadClasspath("watchlist/trademark-watchlist-2026-11.yaml");
+        var report = new StringBuilder("""
+                # So sánh hiệu chỉnh trademark trên fixture tổng hợp
+
+                | Ca | Nhóm | Trước | Sau | Finding |
+                | --- | --- | --- | --- | ---: |
+                """);
+        var totals = new java.util.TreeMap<String, int[]>();
+        var seen = new HashSet<String>();
+        boolean ordinaryCovered = false;
+        for (String row : Files.readAllLines(fixtures.resolve("calibration.tsv")).stream().skip(1).toList()) {
+            String[] c = row.split("\t", -1);
+            assertThat(c).hasSize(9);
+            assertThat(seen.add(c[0])).isTrue();
+            var input = new TrademarkCheckInput(c[2], c[3].equals("-") ? List.of() : List.of(c[3]),
+                    present(c[4]), present(c[5]), present(c[6]), null);
+            var watch = c[7].equals("-") ? Watchlist.EMPTY : new Watchlist(watchSettings,
+                    List.of(new WatchlistEntry(c[0], c[7], List.of(), List.of(25), null, null)));
+            var oldResult = (c[1].equals("LEGACY") ? new TrademarkScanner(oldRules, legacy) : before).scan(input, watch);
+            var result = (c[1].equals("LEGACY") ? new TrademarkScanner(newRules, legacy) : after).scan(input, watch);
+            assertThat(oldResult.findings()).as(c[0]).isNotEmpty();
+            assertThat(result.riskLevel().name()).as(c[0]).isEqualTo(c[8]);
+            assertThat(result.findings()).as(c[0]).hasSameSizeAs(oldResult.findings());
+            for (int j = 0; j < result.findings().size(); j++) {
+                var first = oldResult.findings().get(j);
+                var next = result.findings().get(j);
+                assertThat(next.evidence()).usingRecursiveComparison().ignoringFields("riskAdjustments").isEqualTo(first.evidence());
+                assertThat(next.ruleId()).isEqualTo(first.ruleId());
+                if (next.risk() != first.risk()) {
+                    assertThat(next.evidence().riskAdjustments()).singleElement().satisfies(adjustment -> {
+                        assertThat(adjustment.from()).isEqualTo(first.risk());
+                        assertThat(adjustment.to()).isEqualTo(next.risk());
+                        assertThat(adjustment.distinctiveness()).isNotNull();
+                        assertThat(adjustment.note()).contains("chưa xác minh");
+                    });
+                }
+            }
+            if (c[1].equals("WATCHLIST")) {
+                assertThat(result.findings()).allSatisfy(f -> assertThat(f.source()).isEqualTo(FindingSource.WATCHLIST));
+            }
+            if (c[1].equals("LEGACY")) {
+                assertThat(result.skippedRuleIds()).contains("catalog_distinctiveness");
+                assertThat(result.completeness()).isEqualTo(Completeness.INCOMPLETE);
+            } else {
+                assertThat(result.completeness()).isEqualTo(Completeness.COMPLETE);
+            }
+            if (c[1].equals("DESCRIPTIVE") && result.riskLevel() == RiskLevel.MEDIUM) {
+                assertThat(LlmJudgement.eligibleIndexes(result)).containsExactly(0);
+                var judged = LlmJudgement.apply(result, Map.of(0,
+                        new LlmJudgement.Judged(LlmJudgement.Verdict.LIKELY_DESCRIPTIVE, "Đối chứng tổng hợp")), false);
+                assertThat(judged.riskLevel()).isEqualTo(RiskLevel.LOW);
+                assertThat(judged.findings().getFirst().evidence().riskAdjustments().getFirst().distinctiveness())
+                        .isNotNull();
+                ordinaryCovered = true;
+            } else {
+                assertThat(LlmJudgement.eligibleIndexes(result)).isEmpty();
+            }
+
+            int[] counts = totals.computeIfAbsent(c[1], key -> new int[3]);
+            counts[0]++;
+            counts[1] += oldResult.riskLevel() == RiskLevel.HIGH ? 1 : 0;
+            counts[2] += result.riskLevel() == RiskLevel.HIGH ? 1 : 0;
+            report.append("| %s | %s | %s | %s | %d |%n".formatted(c[0], c[1], oldResult.riskLevel(),
+                    result.riskLevel(), result.findings().size()));
+        }
+        assertThat(ordinaryCovered).isTrue();
+        assertThat(totals.get("DESCRIPTIVE")[0]).isGreaterThanOrEqualTo(10);
+        assertThat(totals.get("DESCRIPTIVE")[2]).isZero();
+        for (String group : List.of("BRAND_USE", "WATCHLIST")) {
+            int[] counts = totals.get(group);
+            assertThat(counts[0]).isGreaterThanOrEqualTo(group.equals("WATCHLIST") ? 5 : 10);
+            assertThat(counts[1]).isEqualTo(counts[2]).isEqualTo(counts[0]);
+        }
+        assertThat(after.fingerprint(Map.of()).value()).isNotEqualTo(before.fingerprint(Map.of()).value());
+
+        report.append("""
+
+                | Nhóm | Số ca | HIGH trước | HIGH sau |
+                | --- | ---: | ---: | ---: |
+                """);
+        totals.forEach((group, counts) -> report.append("| %s | %d | %d | %d |%n"
+                .formatted(group, counts[0], counts[1], counts[2])));
+        Files.createDirectories(REPORT.getParent());
+        Files.writeString(REPORT.resolveSibling("trademark-calibration.md"), report);
+    }
+
+    private static String present(String value) {
+        return value.equals("-") ? null : value;
     }
 
     @Test

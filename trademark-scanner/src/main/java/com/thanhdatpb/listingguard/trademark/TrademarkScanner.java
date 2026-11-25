@@ -7,6 +7,7 @@ import com.thanhdatpb.listingguard.trademark.config.TrademarkRuleset;
 import com.thanhdatpb.listingguard.trademark.normalize.NormalizedField;
 import com.thanhdatpb.listingguard.trademark.normalize.TextNormalizer;
 import com.thanhdatpb.listingguard.trademark.rules.Candidate;
+import com.thanhdatpb.listingguard.trademark.rules.CatalogCalibration;
 import com.thanhdatpb.listingguard.trademark.rules.Precedence;
 import com.thanhdatpb.listingguard.trademark.rules.ScanContext;
 import com.thanhdatpb.listingguard.trademark.rules.TrademarkRule;
@@ -164,14 +165,24 @@ public final class TrademarkScanner {
 
         List<TrademarkFinding> findings = new ArrayList<>();
         if (context != null) {
+            CatalogCalibration calibration = ruleset.calibration() == null ? null : new CatalogCalibration(context);
+            if (calibration != null && catalog != null && !catalog.mayHaveDistinctiveness()) {
+                skipped.add(CatalogCalibration.SKIPPED_ID);
+            }
             for (Candidate candidate : Precedence.resolve(ruleset, candidates, fieldOrder)) {
+                if (calibration != null) {
+                    if (CatalogCalibration.missingTier(candidate)) {
+                        skipped.add(CatalogCalibration.SKIPPED_ID);
+                    }
+                    candidate = calibration.apply(candidate);
+                }
                 findings.add(finding(context, candidate, watchlist.settings()));
             }
         }
         Completeness completeness = failed.isEmpty() && skipped.isEmpty() ? Completeness.COMPLETE : Completeness.INCOMPLETE;
         return new TrademarkResult(canonical.hash(), ruleset.version(), catalogVersion,
                 riskLevel(findings, completeness), completeness, findings, List.copyOf(failed), ruleset.disclaimer(),
-                List.copyOf(skipped));
+                List.copyOf(skipped), ruleset.calibration() != null);
     }
 
     private TrademarkFinding finding(ScanContext context, Candidate candidate, WatchlistSettings settings) {

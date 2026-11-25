@@ -174,7 +174,13 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
      */
     public record Item(String level, String levelLabel, String ruleId, String field, String message, String suggestion, String detail,
                        String explanation, String fix, String fixValue, FeedbackTarget target, String value, int spanStart,
-                       int spanEnd) {
+                       int spanEnd, boolean weakCalibrated) {
+
+        public Item(String level, String levelLabel, String ruleId, String field, String message, String suggestion, String detail,
+                    String explanation, String fix, String fixValue, FeedbackTarget target, String value, int spanStart, int spanEnd) {
+            this(level, levelLabel, ruleId, field, message, suggestion, detail, explanation, fix, fixValue, target,
+                    value, spanStart, spanEnd, false);
+        }
 
         public Item(String level, String levelLabel, String ruleId, String field, String message, String suggestion, String detail,
                     String explanation, String fix, String fixValue, FeedbackTarget target) {

@@ -13,10 +13,12 @@ import java.util.TreeMap;
 public final class InMemoryTrademarkCatalog implements TrademarkCatalog {
 
     private final String version;
+    private final boolean distinctiveness;
     private final Map<String, CatalogMark> byNormalized = new TreeMap<>();
 
     public InMemoryTrademarkCatalog(String version, TextNormalizer normalizer, Collection<String> displayMarks) {
         this.version = version;
+        this.distinctiveness = false;
         for (String display : displayMarks) {
             String normalized = normalizer.normalizeMark(display);
             if (normalized.isEmpty()) {
@@ -31,11 +33,17 @@ public final class InMemoryTrademarkCatalog implements TrademarkCatalog {
     /** A catalog of marks that are already normalized, with their metadata. */
     public InMemoryTrademarkCatalog(String version, Collection<CatalogMark> marks) {
         this.version = version;
+        this.distinctiveness = marks.stream().anyMatch(mark -> mark.distinctiveness() != null && mark.distinctiveness().tier() != null);
         for (CatalogMark mark : marks) {
             if (mark.normalized().isEmpty() || byNormalized.putIfAbsent(mark.normalized(), mark) != null) {
                 throw new IllegalArgumentException("Mark is empty or listed twice: '" + mark.display() + "'");
             }
         }
+    }
+
+    @Override
+    public boolean mayHaveDistinctiveness() {
+        return distinctiveness;
     }
 
     @Override

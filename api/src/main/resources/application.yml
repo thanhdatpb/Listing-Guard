@@ -78,7 +78,7 @@ listing-guard:
       - classpath:rulesets/amazon-2026-12c.yaml
   trademark:
     # The trademark ruleset (ADR-009), registered for each marketplace below as pack `trademark-risk` (ADR-010).
-    ruleset: classpath:rulesets/trademark-risk-2026-11b.yaml
+    ruleset: ${LISTING_GUARD_TRADEMARK_RULESET:classpath:rulesets/trademark-risk-2026-11b.yaml}
     watchlist:
       # Each client's own list of marks (ADR-031), scanned by every trademark check next to the catalog. The settings file holds
       # the minimum level of a watchlist finding (HIGH) and its messages; it is versioned and immutable like a ruleset. Point this
