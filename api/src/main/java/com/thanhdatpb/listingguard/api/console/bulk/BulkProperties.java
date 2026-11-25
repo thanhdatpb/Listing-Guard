@@ -10,9 +10,13 @@ import org.springframework.util.unit.DataSize;
  * @param maxRows  most data rows of one paste or file (a header row is not counted, a blank row is); a larger input is refused
  *                 as a whole, never cut, because a cut table would shift the rows against the Sheet it came from
  * @param maxBytes most bytes of one pasted text or one file
+ * @param defaultScope the scope the mapping step offers when the account has not remembered one (ADR-052): {@code content} (check only
+ *                 the columns the table has), {@code full} (every required field), or empty to follow {@code console.pilot}: content
+ *                 while the pilot profile is on, full otherwise. A seller's own choice, remembered with the column mapping, wins
  */
 @ConfigurationProperties(prefix = "listing-guard.console.bulk")
-public record BulkProperties(@DefaultValue("200") int maxRows, @DefaultValue("1MB") DataSize maxBytes) {
+public record BulkProperties(@DefaultValue("200") int maxRows, @DefaultValue("1MB") DataSize maxBytes,
+                             @DefaultValue("") String defaultScope) {
 
     private static final long FORM_OVERHEAD_BYTES = 64 * 1024;
 
@@ -23,6 +27,20 @@ public record BulkProperties(@DefaultValue("200") int maxRows, @DefaultValue("1M
         if (maxBytes.toBytes() < 1024) {
             throw new IllegalArgumentException("listing-guard.console.bulk.max-bytes must be at least 1KB.");
         }
+        defaultScope = defaultScope == null ? "" : defaultScope.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!defaultScope.isEmpty() && !defaultScope.equals("content") && !defaultScope.equals("full")) {
+            throw new IllegalArgumentException("listing-guard.console.bulk.default-scope must be content, full or empty.");
+        }
+    }
+
+    /** The scope a table is checked under when nothing else says (ADR-052): the setting, else content under the pilot profile. */
+    public com.thanhdatpb.listingguard.api.check.CheckScope.Kind scopeFor(boolean pilot) {
+        return switch (defaultScope) {
+            case "content" -> com.thanhdatpb.listingguard.api.check.CheckScope.Kind.CONTENT;
+            case "full" -> com.thanhdatpb.listingguard.api.check.CheckScope.Kind.FULL;
+            default -> pilot ? com.thanhdatpb.listingguard.api.check.CheckScope.Kind.CONTENT
+                    : com.thanhdatpb.listingguard.api.check.CheckScope.Kind.FULL;
+        };
     }
 
     /**

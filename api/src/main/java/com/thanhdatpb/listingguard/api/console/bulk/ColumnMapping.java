@@ -126,8 +126,28 @@ record ColumnMapping(List<String> targets, Map<String, String> separators) {
         return new ColumnMapping(targets, separators);
     }
 
+    /**
+     * The listing fields this mapping gives a column (ADR-052): the keys of the targets that become a field of the listing, spelled as
+     * the rules spell their fields. A content-scope check treats exactly these as supplied; the SKU, the parent SKU, the theme and the
+     * variation attributes are not listing fields.
+     */
+    java.util.Set<String> mappedFields(EditorMarketplace marketplace) {
+        java.util.Set<String> fields = new java.util.LinkedHashSet<>();
+        for (String key : targets) {
+            if (!key.isEmpty() && BulkTargets.find(marketplace, key).filter(Target::listingField).isPresent()) {
+                fields.add(key);
+            }
+        }
+        return fields;
+    }
+
     /** What to remember: the label of every mapped column with its target, and the separator of each list target in use. */
     BulkMappingStore.Stored toStored(EditorMarketplace marketplace, List<String> labels) {
+        return toStored(marketplace, labels, null);
+    }
+
+    /** As above, with the scope the seller chose ({@code content} or {@code full}) so the next table starts from it (ADR-052). */
+    BulkMappingStore.Stored toStored(EditorMarketplace marketplace, List<String> labels, String scope) {
         Map<String, String> columns = new LinkedHashMap<>();
         Map<String, String> used = new LinkedHashMap<>();
         for (int i = 0; i < targets.size() && i < labels.size(); i++) {
@@ -139,6 +159,6 @@ record ColumnMapping(List<String> targets, Map<String, String> separators) {
             BulkTargets.find(marketplace, key).filter(Target::separable)
                     .ifPresent(target -> used.put(target.key(), separatorOf(target)));
         }
-        return new BulkMappingStore.Stored(columns, used);
+        return new BulkMappingStore.Stored(columns, used, scope);
     }
 }

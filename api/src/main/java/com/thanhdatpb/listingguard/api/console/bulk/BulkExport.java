@@ -24,19 +24,41 @@ public final class BulkExport {
     }
 
     static String sheetBlock(ConsoleMessages messages, List<Row> rows, boolean header) {
+        return sheetBlock(messages, rows, header, false);
+    }
+
+    /**
+     * As above; for a table checked in content scope (ADR-052) every line has a third cell that names the scope, so a result copied back
+     * to a Sheet is never read as a check of the whole listing. A table checked in full has the two columns it always had.
+     */
+    static String sheetBlock(ConsoleMessages messages, List<Row> rows, boolean header, boolean content) {
         StringJoiner lines = new StringJoiner("\n");
         if (header) {
-            lines.add(oneLine(messages.get("bulk.export.status")) + "\t" + oneLine(messages.get("bulk.export.summary")));
+            lines.add(oneLine(messages.get("bulk.export.status")) + "\t" + oneLine(messages.get("bulk.export.summary"))
+                    + (content ? "\t" + oneLine(messages.get("bulk.export.scope")) : ""));
         }
         for (Row row : rows) {
             boolean blank = row.status() == Status.EMPTY;
-            lines.add((blank ? "" : defuse(oneLine(row.statusLabel()))) + "\t" + (blank ? "" : defuse(oneLine(row.summary()))));
+            lines.add((blank ? "" : defuse(oneLine(row.statusLabel()))) + "\t" + (blank ? "" : defuse(oneLine(row.summary())))
+                    + (content ? "\t" + scopeCell(messages, row) : ""));
         }
         return lines.toString();
     }
 
-    /** UTF-8 with a byte order mark, so a spreadsheet reads the Vietnamese text; {@code \r\n} between lines. */
+    /** The scope of a row that was judged, named in words; blank for a row that was not (blank, unreadable, not checked). */
+    private static String scopeCell(ConsoleMessages messages, Row row) {
+        return row.checked() ? oneLine(messages.get("bulk.export.scope.content")) : "";
+    }
+
     static String csv(ConsoleMessages messages, List<Row> rows) {
+        return csv(messages, rows, false);
+    }
+
+    /**
+     * UTF-8 with a byte order mark, so a spreadsheet reads the Vietnamese text; {@code \r\n} between lines. A table checked in content
+     * scope (ADR-052) gets a last column that names the scope.
+     */
+    static String csv(ConsoleMessages messages, List<Row> rows, boolean content) {
         StringBuilder out = new StringBuilder("﻿");
         StringJoiner head = new StringJoiner(",");
         head.add(cell(messages.get("bulk.export.line")));
@@ -44,6 +66,9 @@ public final class BulkExport {
         head.add(cell(messages.get("bulk.export.status")));
         head.add(cell(messages.get("bulk.export.findings")));
         head.add(cell(messages.get("bulk.export.summary")));
+        if (content) {
+            head.add(cell(messages.get("bulk.export.scope")));
+        }
         out.append(head).append("\r\n");
         for (Row row : rows) {
             boolean blank = row.status() == Status.EMPTY;
@@ -53,6 +78,9 @@ public final class BulkExport {
             line.add(cell(row.statusLabel()));
             line.add(String.valueOf(row.findings()));
             line.add(cell(blank ? "" : oneLine(row.summary())));
+            if (content) {
+                line.add(cell(scopeCell(messages, row)));
+            }
             out.append(line).append("\r\n");
         }
         return out.toString();

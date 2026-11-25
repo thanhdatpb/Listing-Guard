@@ -28,11 +28,17 @@ public class BulkMappingStore {
     static final int LABEL_MAX_CHARS = 120;
 
     /** {@code columns} maps a column label to a target key of {@code BulkTargets}; {@code separators} maps a list target to a separator key. */
-    public record Stored(Map<String, String> columns, Map<String, String> separators) {
+    public record Stored(Map<String, String> columns, Map<String, String> separators, String scope) {
 
         public Stored {
             columns = Map.copyOf(columns);
             separators = Map.copyOf(separators);
+            // the scope the seller chose with this mapping (ADR-052): "content" or "full"; null when none was saved
+            scope = "content".equals(scope) || "full".equals(scope) ? scope : null;
+        }
+
+        public Stored(Map<String, String> columns, Map<String, String> separators) {
+            this(columns, separators, null);
         }
     }
 
@@ -55,7 +61,8 @@ public class BulkMappingStore {
         }
         try {
             JsonNode root = mapper.readTree(rows.get(0));
-            return Optional.of(new Stored(strings(root.path("columns")), strings(root.path("separators"))));
+            return Optional.of(new Stored(strings(root.path("columns")), strings(root.path("separators")),
+                    root.path("scope").isTextual() ? root.path("scope").textValue() : null));
         } catch (JsonProcessingException | RuntimeException e) {
             // a row that cannot be read is the same as no row: the page falls back to the guess
             return Optional.empty();
@@ -75,7 +82,13 @@ public class BulkMappingStore {
         }
         String json;
         try {
-            json = mapper.writeValueAsString(Map.of("columns", columns, "separators", stored.separators()));
+            Map<String, Object> document = new LinkedHashMap<>();
+            document.put("columns", columns);
+            document.put("separators", stored.separators());
+            if (stored.scope() != null) {
+                document.put("scope", stored.scope());
+            }
+            json = mapper.writeValueAsString(document);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("The column mapping cannot be written as JSON.", e);
         }

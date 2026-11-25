@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.console.bulk;
 
+import com.thanhdatpb.listingguard.api.check.CheckScope;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import java.util.List;
@@ -14,9 +15,22 @@ import java.util.List;
  * @param disclaimer the disclaimer of the active trademark ruleset, printed unchanged next to the table
  * @param sheetBlock two columns, status and summary, one line per input row, to paste into a Sheet
  * @param csvHref    a {@code data:} link to the same rows as a CSV file
+ * @param scope      how much of each listing the rules covered (ADR-052); the pasted block and the CSV name it when it is not FULL
+ * @param skippedFields the required fields no row of a content-scope table could be checked for, because the table has no column for
+ *                   them, in ruleset order; empty for FULL
  */
 public record BulkResult(String marketplace, boolean header, List<Row> rows, Counts counts, List<String> notes, String disclaimer,
-                         String sheetBlock, String csvHref) {
+                         String sheetBlock, String csvHref, CheckScope.Kind scope, List<String> skippedFields) {
+
+    /** A result of the full check. */
+    public BulkResult(String marketplace, boolean header, List<Row> rows, Counts counts, List<String> notes, String disclaimer,
+                      String sheetBlock, String csvHref) {
+        this(marketplace, header, rows, counts, notes, disclaimer, sheetBlock, csvHref, CheckScope.Kind.FULL, List.of());
+    }
+
+    public boolean content() {
+        return scope == CheckScope.Kind.CONTENT;
+    }
 
     /**
      * The statuses of a row. The first three judge the listing; the others say why it was not judged. {@code key} is the message of
@@ -24,6 +38,8 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
      */
     public enum Status {
         OK("bulk.status.ok", "ok", "OK"),
+        /** No rule found an error or warning in the fields the table has; the fields it has no column for were not checked (ADR-052). */
+        OK_CONTENT("bulk.status.ok.content", "ok-content", "OK"),
         WARNING("bulk.status.warning", "warning", "WARNING"),
         ERROR("bulk.status.error", "error", "ERROR"),
         UNREADABLE("bulk.status.unreadable", "unreadable", "OTHER"),
@@ -77,7 +93,7 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
         }
 
         public boolean checked() {
-            return status == Status.OK || status == Status.WARNING || status == Status.ERROR;
+            return status == Status.OK || status == Status.OK_CONTENT || status == Status.WARNING || status == Status.ERROR;
         }
 
         /** The finding the rewrite started from: the first ERROR of the rules, else the first trademark finding; null when none is stored. */
@@ -125,14 +141,31 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
 
     /**
      * @param ran            false when the listing rules did not run for this row ({@code note} says why)
-     * @param readiness      READY, NOT_READY or INCOMPLETE, or null when the rules did not run
+     * @param readiness      READY, NOT_READY, PARTIAL (a content-scope run that left fields out, ADR-052) or INCOMPLETE, or null when
+     *                       the rules did not run
      * @param readinessLabel the label of the readiness, in the language of the page; null when the rules did not run
      * @param score          the readiness score; null when there is none (never zero)
+     * @param scope          the scope this row was checked under
+     * @param skippedFields  the required fields the row was not checked for (ADR-052), in ruleset order; empty for FULL
      */
-    public record Rules(boolean ran, String note, String readiness, String readinessLabel, Integer score, List<Item> items) {
+    public record Rules(boolean ran, String note, String readiness, String readinessLabel, Integer score, List<Item> items,
+                        CheckScope.Kind scope, List<String> skippedFields) {
+
+        public Rules {
+            skippedFields = List.copyOf(skippedFields);
+        }
+
+        /** A row of the full check. */
+        public Rules(boolean ran, String note, String readiness, String readinessLabel, Integer score, List<Item> items) {
+            this(ran, note, readiness, readinessLabel, score, items, CheckScope.Kind.FULL, List.of());
+        }
 
         static Rules notRun(String note) {
             return new Rules(false, note, null, null, null, List.of());
+        }
+
+        public boolean content() {
+            return scope == CheckScope.Kind.CONTENT;
         }
     }
 
@@ -209,11 +242,17 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
     }
 
     /** How many rows have each status. */
-    public record Counts(int total, int ok, int warning, int error, int unreadable, int notChecked, int empty) {
+    public record Counts(int total, int ok, int warning, int error, int unreadable, int notChecked, int empty, int okContent) {
+
+        /** The counts of a table checked in full: no row is {@code OK_CONTENT}. */
+        public Counts(int total, int ok, int warning, int error, int unreadable, int notChecked, int empty) {
+            this(total, ok, warning, error, unreadable, notChecked, empty, 0);
+        }
 
         static Counts of(List<Row> rows) {
             return new Counts(rows.size(), count(rows, Status.OK), count(rows, Status.WARNING), count(rows, Status.ERROR),
-                    count(rows, Status.UNREADABLE), count(rows, Status.NOT_CHECKED), count(rows, Status.EMPTY));
+                    count(rows, Status.UNREADABLE), count(rows, Status.NOT_CHECKED), count(rows, Status.EMPTY),
+                    count(rows, Status.OK_CONTENT));
         }
 
         private static int count(List<Row> rows, Status status) {
@@ -222,7 +261,7 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
 
         /** The rows that were judged. */
         public int judged() {
-            return ok + warning + error;
+            return ok + okContent + warning + error;
         }
 
         public int others() {
@@ -232,8 +271,14 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
 
     static BulkResult of(ConsoleMessages messages, String marketplace, boolean header, List<Row> rows, List<String> notes,
                          String disclaimer) {
-        String csv = BulkExport.csv(messages, rows);
+        return of(messages, marketplace, header, rows, notes, disclaimer, CheckScope.Kind.FULL, List.of());
+    }
+
+    static BulkResult of(ConsoleMessages messages, String marketplace, boolean header, List<Row> rows, List<String> notes,
+                         String disclaimer, CheckScope.Kind scope, List<String> skippedFields) {
+        boolean content = scope == CheckScope.Kind.CONTENT;
+        String csv = BulkExport.csv(messages, rows, content);
         return new BulkResult(marketplace, header, List.copyOf(rows), Counts.of(rows), List.copyOf(notes), disclaimer,
-                BulkExport.sheetBlock(messages, rows, header), BulkExport.csvHref(csv));
+                BulkExport.sheetBlock(messages, rows, header, content), BulkExport.csvHref(csv), scope, skippedFields);
     }
 }
