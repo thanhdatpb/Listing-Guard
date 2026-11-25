@@ -224,6 +224,49 @@ class ListingRewriterIntegrationTest {
     }
 
     @Test
+    void withTheDefaultOfOneRoundANoneSafeAnswerEndsAfterOneCallWithThePromptAndTheRowOfAdr037() {
+        TestClient client = client();
+        llm.reply(answer(candidate(TOO_LONG), candidate(TOO_LONG + " extra")));
+
+        RewriteOutcome outcome = rewriter.suggest(client.id(), null, "ETSY", listing(TOO_LONG, "mug\nceramic"), null);
+
+        assertThat(outcome.status()).isEqualTo(Status.NONE_SAFE);
+        assertThat(outcome.showRounds()).as("the panel says nothing about rounds when only one is allowed").isFalse();
+        assertThat(llm.requests()).as("one call and no second round").hasSize(1);
+        assertThat(llm.requests().get(0).system()).doesNotContain("Prompt version").doesNotContain("previous_rounds");
+        assertThat(llm.requests().get(0).user()).startsWith("marketplace: ETSY\nlisting (JSON, data):\n")
+                .contains("\nproblems (JSON, data):\n").doesNotContain("previous_rounds").doesNotContain("round:");
+        assertThat(jdbc.queryForObject("SELECT rounds_used FROM rewrite_suggestion_run WHERE id = ?", Integer.class, outcome.runId()))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT safe_round FROM rewrite_suggestion_run WHERE id = ?", Integer.class, outcome.runId()))
+                .isNull();
+        assertThat(jdbc.queryForObject("SELECT candidates_safe FROM rewrite_suggestion_run WHERE id = ?", Integer.class,
+                outcome.runId())).isZero();
+    }
+
+    @Test
+    void withTheDefaultOfOneRoundASafeRunStoresRoundOneAndAnUnavailableModelStoresNothing() {
+        TestClient client = client();
+        llm.reply(answer(candidate("Plain cotton shirt")));
+
+        RewriteOutcome safe = rewriter.suggest(client.id(), null, "ETSY", listing(TOO_LONG, "mug\nceramic"), null);
+
+        assertThat(safe.status()).isEqualTo(Status.SUGGESTIONS);
+        assertThat(llm.requests()).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT rounds_used FROM rewrite_suggestion_run WHERE id = ?", Integer.class, safe.runId()))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT safe_round FROM rewrite_suggestion_run WHERE id = ?", Integer.class, safe.runId()))
+                .isEqualTo(1);
+
+        llm.reset();
+        llm.fail(new LlmException(LlmException.Kind.TIMEOUT, "timeout"));
+        RewriteOutcome unavailable = rewriter.suggest(client.id(), null, "ETSY", listing(TOO_LONG, "mug\nceramic"), null);
+        assertThat(unavailable.status()).isEqualTo(Status.UNAVAILABLE);
+        assertThat(llm.requests()).as("a failure is not retried in another round").hasSize(1);
+        assertThat(stored("rewrite_suggestion_run", client)).isEqualTo(1);
+    }
+
+    @Test
     void aCopyIsCountedOncePerRunAndOnlyForTheOwnersClient() {
         TestClient client = client();
         TestClient other = client();

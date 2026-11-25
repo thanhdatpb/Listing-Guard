@@ -261,6 +261,9 @@ listing-guard:
     rewrite:
       enabled: ${LISTING_GUARD_LLM_REWRITE_ENABLED:false}
       max-per-hour: ${LISTING_GUARD_LLM_REWRITE_MAX_PER_HOUR:20}
+      # Repair rounds (ADR-050): 1 asks the model once, as ADR-037 does. 2 or 3 let the model see why a round's proposals were rejected
+      # and answer again, each round being one more request to the provider for the same press. Outside 1 to 3 the API does not start.
+      max-rounds: ${LISTING_GUARD_LLM_REWRITE_MAX_ROUNDS:1}
     providers:
       - id: groq
         base-url: https://api.groq.com/openai/v1

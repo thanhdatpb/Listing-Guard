@@ -58,6 +58,8 @@ services:
       # LISTING_TEXT_ALLOWED is true. With it on, the title, tags and findings of a listing go to that provider on each press.
       LISTING_GUARD_LLM_REWRITE_ENABLED: ${LISTING_GUARD_LLM_REWRITE_ENABLED:-false}
       LISTING_GUARD_LLM_REWRITE_MAX_PER_HOUR: ${LISTING_GUARD_LLM_REWRITE_MAX_PER_HOUR:-20}
+      # Model calls per press (ADR-050): 1 to 3. Above 1, each press can send up to that many requests to the provider.
+      LISTING_GUARD_LLM_REWRITE_MAX_ROUNDS: ${LISTING_GUARD_LLM_REWRITE_MAX_ROUNDS:-1}
       LISTING_GUARD_LLM_GROQ_KEY: ${LISTING_GUARD_LLM_GROQ_KEY:-}
       LISTING_GUARD_LLM_GROQ_LISTING_TEXT_ALLOWED: ${LISTING_GUARD_LLM_GROQ_LISTING_TEXT_ALLOWED:-false}
       LISTING_GUARD_LLM_CLOUDFLARE_KEY: ${LISTING_GUARD_LLM_CLOUDFLARE_KEY:-}

@@ -13,7 +13,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * At most {@code max-per-hour} runs per client in any rolling hour (ADR-037), counted in memory: each run is a paid model call. A
- * deployment with several instances gets the limit per instance.
+ * deployment with several instances gets the limit per instance. A press is one run however many rounds it takes (ADR-050); the
+ * provider's own per-minute and per-day limits (ADR-036) count each round's request.
  */
 @Component
 @ConditionalOnProperty(prefix = "listing-guard.llm.rewrite", name = "enabled", havingValue = "true")
