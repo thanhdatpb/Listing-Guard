@@ -10,6 +10,8 @@ Dockerfile text eol=lf
 catalogs/demo/raw/*.jsonl text eol=lf
 # The published API contract (ADR-022): contract-sha256.txt hashes LF files; keep every checkout byte for byte the release asset
 docs/api/**/*.json text eol=lf
+# The POD profiles (ADR-048): the Console shows the SHA-256 of each file and PodProfilesTest pins it; keep every checkout LF
+api/src/main/resources/pod/*.json text eol=lf
 # The brand assets of the console (ADR-040): the CSS is compared line by line with the design pack; the binaries are never touched
 docs/design/tokens.css text eol=lf
 api/src/main/resources/static/brand/tokens.css text eol=lf

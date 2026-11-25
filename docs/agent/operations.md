@@ -42,6 +42,15 @@ docker compose run --rm eval-listing [--update-baseline]          # eval/listing
 ./mvnw -B -pl api -am test -Dtest=ListingEvalGateTest -Dsurefire.failIfNoSpecifiedTests=false [-Deval.listing.update=true]
 ```
 
+POD print profiles (ADR-048, `docs/implementation/pod-readiness.md`; reads a CSV exported from the blank management system and the
+released profiles, writes only new `pod/<id>-v<n>.json` files; no database access, no network):
+
+```bash
+docker compose run --rm -v ./pod-import:/pod-import admin pod-profile import /pod-import/spec.csv --out=/pod-import/out [--dry-run]
+# from the repository root, straight into api/src/main/resources/pod: the admin job with `pod-profile import <file.csv>`
+# commit the new files, pin the printed SHA-256 in PodProfilesTest, build; sample data: docs/samples/pod-profile-spec-sample.csv
+```
+
 Policy diff (see `docs/policy-monitor.md`; reads maintainer-saved `policies/raw/`, compares hashes in the DB, writes a report):
 
 ```bash

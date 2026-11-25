@@ -31,6 +31,14 @@ public class ConsoleMessages {
         return get(LocaleContextHolder.getLocale(), code, args);
     }
 
+    /**
+     * The message, or {@code fallback} when no language has the key. For a name that comes from data and not from a screen: the
+     * product type of an imported POD profile (ADR-048) has no translation until someone writes one.
+     */
+    public String getOrDefault(String code, String fallback) {
+        return source.getMessage(code, null, fallback, LocaleContextHolder.getLocale());
+    }
+
     public String get(Locale locale, String code, Object... args) {
         Object[] text = new Object[args.length];
         for (int i = 0; i < args.length; i++) {

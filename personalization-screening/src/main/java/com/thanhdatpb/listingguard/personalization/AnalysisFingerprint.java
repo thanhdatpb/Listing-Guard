@@ -22,6 +22,18 @@ public record AnalysisFingerprint(String descriptor, String value) {
 
     public static AnalysisFingerprint of(PersonalizationRuleset ruleset, AlgorithmVersions versions, String marketplace,
                                          String trademarkFingerprint) {
+        return of(ruleset, versions, marketplace, trademarkFingerprint, null);
+    }
+
+    /**
+     * With an imported POD print profile (ADR-048): its id, version, resource SHA-256 and the limit read from it are two more
+     * lines, written <em>only</em> when there is a profile, so the fingerprint, and the analysis version of every result stored
+     * without one, is exactly what it was before profiles could be imported.
+     *
+     * @param supplier the imported profile the screening reads, or null for the ruleset's own print profile alone
+     */
+    public static AnalysisFingerprint of(PersonalizationRuleset ruleset, AlgorithmVersions versions, String marketplace,
+                                         String trademarkFingerprint, SupplierProfile supplier) {
         StringBuilder descriptor = new StringBuilder(FORMAT).append('\n');
         line(descriptor, "pack_id", ruleset.packId());
         line(descriptor, "ruleset_version", ruleset.version());
@@ -30,6 +42,10 @@ public record AnalysisFingerprint(String descriptor, String value) {
         line(descriptor, "rules_version", versions.rules());
         line(descriptor, "marketplace", marketplace);
         line(descriptor, "trademark_fingerprint", trademarkFingerprint == null ? NOT_CONFIGURED : trademarkFingerprint);
+        if (supplier != null) {
+            line(descriptor, "supplier_profile", supplier.key() + ":" + supplier.sha256());
+            line(descriptor, "supplier_max_chars", String.valueOf(supplier.maxChars()));
+        }
         return new AnalysisFingerprint(descriptor.toString(), sha256(descriptor.toString()));
     }
 

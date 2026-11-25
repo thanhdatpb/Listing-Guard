@@ -51,6 +51,15 @@ public record PersonalizationRuleset(String packId, String version, LocalDate ch
             maxLengthByLabel = Map.copyOf(maxLengthByLabel);
         }
 
+        /**
+         * This profile with the length limit an imported POD profile states (ADR-048): the same characters, the limit of
+         * {@code maxChars} for every label (the placeholder label limits are dropped) and a code that names both, so a finding
+         * says which limit it used.
+         */
+        public PrintProfile withSupplierLimit(String supplierKey, int maxChars) {
+            return new PrintProfile(code + "+" + supplierKey, classes, maxChars, Map.of(), allowLowercase, source);
+        }
+
         /** True when the workshop can print the code point (it is in one of the allowed classes). */
         public boolean allows(int codePoint) {
             for (CharClass charClass : classes) {

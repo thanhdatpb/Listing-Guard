@@ -1,0 +1,6 @@
+product_type,variant,print_area_width_mm,print_area_height_mm,max_chars,source_ref,verified_by,verified_at
+t-shirt,S,280,350,,SAMPLE-BLANK-TS-S,Operator A,2026-11-20
+t-shirt,M,300,380,,SAMPLE-BLANK-TS-M,Operator A,2026-11-20
+t-shirt,L,320,400,,SAMPLE-BLANK-TS-L,Operator A,2026-11-20
+t-shirt,XL,,,,,,
+personalized-ornament,,90,90,12,SAMPLE-ORN-7,Operator B,2026-11-21

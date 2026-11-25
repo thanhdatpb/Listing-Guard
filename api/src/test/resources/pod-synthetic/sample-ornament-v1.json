@@ -1,0 +1,11 @@
+{
+  "id": "sample-ornament",
+  "version": 1,
+  "marketplaces": ["ETSY", "AMAZON"],
+  "variationRules": ["sku"],
+  "printAreas": [
+    {"sourceStatus": "VERIFIED", "sourceReference": "ORN-BLANK-7", "maxWidthMm": 90, "maxHeightMm": 90, "maxChars": 12,
+     "verifiedBy": "Operator B", "verifiedAt": "2026-11-21"}
+  ],
+  "personalizationFields": ["text"]
+}

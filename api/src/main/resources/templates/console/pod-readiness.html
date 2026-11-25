@@ -39,9 +39,12 @@
                     <select class="lg-select" id="profileKey" name="profileKey" required
                             th:aria-invalid="${podError == 'pod.error.profile'}">
                         <option value="" th:text="#{pod.profile.select}"></option>
-                        <option th:each="profile : ${profiles}" th:value="${profile.key()}"
-                                th:selected="${profile.key() == draft.profileKey}"
-                                th:text="${@consoleMessages.get(profile.messageKey()) + ' · v' + profile.version}"></option>
+                        <optgroup th:each="group : ${profileGroups}"
+                                  th:label="${@consoleMessages.getOrDefault(group.messageKey(), group.id)}">
+                            <option th:each="profile : ${group.versions}" th:value="${profile.key()}"
+                                    th:selected="${profile.key() == draft.profileKey}"
+                                    th:text="${@consoleMessages.getOrDefault(profile.messageKey(), profile.id) + ' · v' + profile.version + ' · ' + @consoleMessages.get(profile.verified() ? 'pod.profile.status.VERIFIED' : 'pod.profile.status.UNVERIFIED')}"></option>
+                        </optgroup>
                     </select>
                 </div>
                 <div class="lg-field">
@@ -135,8 +138,32 @@
             <p th:if="${result == null}" th:text="${podError != null or notice != null} ? #{pod.unchecked} : #{pod.empty}"></p>
             <div th:if="${release != null}" class="lg-field__hint">
                 <p class="lg-code" th:text="#{pod.version(${release.profile.key()}, ${release.sha256})}"></p>
-                <p th:text="${@consoleMessages.get(release.profile.printArea.messageKey())}"></p>
-                <p class="lg-code" th:if="${release.profile.printArea.sourceReference != null}" th:text="${release.profile.printArea.sourceReference}"></p>
+                <p th:text="${@consoleMessages.get(release.profile.verified() ? 'pod.verification.VERIFIED' : 'pod.verification.UNVERIFIED')}"></p>
+                <table id="pod-print-areas">
+                    <caption th:text="#{pod.areas}"></caption>
+                    <thead>
+                        <tr>
+                            <th scope="col" th:text="#{pod.area.variant}"></th>
+                            <th scope="col" th:text="#{pod.area.size}"></th>
+                            <th scope="col" th:text="#{pod.area.maxchars}"></th>
+                            <th scope="col" th:text="#{pod.area.status}"></th>
+                            <th scope="col" th:text="#{pod.area.source}"></th>
+                            <th scope="col" th:text="#{pod.area.verifiedby}"></th>
+                            <th scope="col" th:text="#{pod.area.verifiedat}"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="area : ${release.profile.areas()}" th:attr="data-status=${area.sourceStatus}">
+                            <th scope="row" th:text="${area.variant != null} ? ${area.variant} : #{pod.area.all}"></th>
+                            <td th:text="${area.maxWidthMm != null and area.maxHeightMm != null ? area.maxWidthMm + ' × ' + area.maxHeightMm : '—'}"></td>
+                            <td th:text="${area.maxChars != null ? area.maxChars : '—'}"></td>
+                            <td th:text="${@consoleMessages.get('pod.profile.status.' + area.sourceStatus)}"></td>
+                            <td class="lg-code" th:text="${area.sourceReference != null ? area.sourceReference : '—'}"></td>
+                            <td th:text="${area.verifiedBy != null ? area.verifiedBy : '—'}"></td>
+                            <td th:text="${area.verifiedAt != null ? area.verifiedAt : '—'}"></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
             <div id="pod-results" th:if="${result != null}">
                 <p th:text="#{pod.checked}"></p>
@@ -199,6 +226,11 @@
                         <li th:each="key : ${production.missing}" th:text="${@consoleMessages.get(key)}"></li>
                         <li th:each="key : ${production.concerns}" th:text="${@consoleMessages.get(key)}"></li>
                     </ul>
+                    <ul th:if="${!production.exceeded.isEmpty()}">
+                        <li th:each="area : ${production.exceeded}"
+                            th:with="label=${area.variant != null} ? ${area.variant} : #{pod.area.all}"
+                            th:text="#{pod.finding.artwork.area(${label}, ${area.maxWidthMm.toPlainString()}, ${area.maxHeightMm.toPlainString()})}"></li>
+                    </ul>
                     <div th:if="${production.variation != null}" th:with="variation=${production.variation}">
                         <p th:text="#{pod.variant.source(${variation.rulesetVersion})}"></p>
                         <p th:text="#{pod.findings.count(${variation.findings.size()})}"></p>
@@ -213,6 +245,8 @@
                     </div>
                     <div th:if="${production.sample != null}" th:with="sample=${production.sample}">
                         <p th:text="#{pod.sample(${sample.rulesetVersion}, ${sample.printProfile})}"></p>
+                        <p class="lg-code" th:if="${production.sampleAnalysisVersion != null}"
+                           th:text="#{pod.sample.version(${production.sampleAnalysisVersion})}"></p>
                         <p th:text="#{pod.findings.count(${sample.findings.size()})}"></p>
                         <p th:each="item : ${sample.findings}" th:text="${item.message}"></p>
                     </div>

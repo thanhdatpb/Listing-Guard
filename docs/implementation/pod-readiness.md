@@ -9,6 +9,39 @@ Trong Web Console, mở **Check Listing → Mức sẵn sàng POD**, chọn Etsy
 
 Hồ sơ được phát hành dưới dạng tài nguyên JSON theo ID và phiên bản. Console hiển thị SHA-256 của tài nguyên. Kiểm thử giữ checksum của từng bản đã phát hành. Khi có thông số được duyệt, thêm tài nguyên phiên bản mới và giữ lại tài nguyên cũ. Để dùng vùng in có trạng thái `VERIFIED`, khai báo tham chiếu nguồn và hai kích thước dương. Hai bản v1 hiện có trạng thái `UNVERIFIED` và để trống giới hạn vùng in, nên kết quả sản xuất là `INCOMPLETE`. Hồ sơ in thử của ADR-016 chỉ phục vụ sàng lọc tham khảo.
 
+## Nhập hồ sơ từ file thông số phôi
+
+Thông số phôi (vùng in, kích thước, giới hạn ký tự) nằm trong hệ thống quản lý phôi nội bộ. Xuất ra CSV UTF-8, phân tách bằng dấu phẩy, dòng đầu là tiêu đề, rồi nhập bằng lệnh admin `pod-profile import`. Mẫu dữ liệu tự đặt: [pod-profile-spec-sample.csv](../samples/pod-profile-spec-sample.csv). Quyết định và lý do nằm trong [ADR-048](../adr/ADR-048-pod-print-profiles-from-supplier-spec-files.md).
+
+| Cột | Ý nghĩa |
+| --- | --- |
+| `product_type` | Hồ sơ mà dòng thuộc về, ví dụ `t-shirt`. Chữ hoa và khoảng trắng được chuẩn hóa thành chữ thường và dấu gạch ngang. Đây là ID hồ sơ. |
+| `variant` hoặc `size` (một trong hai) | Kích cỡ hoặc biến thể, ví dụ `S`, `XL`. Để trống nghĩa là cả sản phẩm, và là mặc định cho kích cỡ không có trong file. |
+| `print_area_width_mm`, `print_area_height_mm` | Thiết kế lớn nhất, tính bằng mm, dùng dấu chấm thập phân, tối đa 3 chữ số thập phân. |
+| `max_chars` | Tuỳ chọn: số ký tự tối đa của chữ cá nhân hóa trên phôi. Có thể bỏ cột hoặc để trống. |
+| `source_ref` | Mã phôi hoặc nhà in cung cấp số liệu. |
+| `verified_by`, `verified_at` | Người xác nhận và ngày xác nhận, dạng `yyyy-MM-dd`. |
+
+```bash
+# kiểm tra file mà không ghi gì
+docker compose run --rm -v ./pod-import:/pod-import admin pod-profile import /pod-import/spec.csv --out=/pod-import/out --dry-run
+# ghi tài nguyên phiên bản mới
+docker compose run --rm -v ./pod-import:/pod-import admin pod-profile import /pod-import/spec.csv --out=/pod-import/out
+# từ thư mục gốc của repository, ghi thẳng vào api/src/main/resources/pod
+./mvnw -B -pl api spring-boot:run -Dspring-boot.run.profiles=admin -Dspring-boot.run.arguments="pod-profile import <file.csv>"
+```
+
+Lệnh chạy trong admin job nên ứng dụng vẫn khởi động và cần cơ sở dữ liệu đang chạy như các lệnh admin khác, nhưng lệnh không đọc hay ghi cơ sở dữ liệu và không gọi mạng. Tuỳ chọn: `--out=<thư mục>` (mặc định `api/src/main/resources/pod`), `--version=<n>`, `--dry-run`, và `--variation-rules`, `--personalization-fields`, `--marketplaces` cho loại sản phẩm chưa có hồ sơ.
+
+- **Trạng thái.** Một dòng là `VERIFIED` chỉ khi có `source_ref` và hai kích thước dương. Dòng thiếu một trong các giá trị đó vẫn được nhập với trạng thái `UNVERIFIED` và kết quả sản xuất vẫn là `INCOMPLETE`. `verified_by`, `verified_at` và `max_chars` được ghi lại nhưng không quyết định trạng thái.
+- **File bị từ chối nguyên cả file**, kèm số dòng, khi thiếu cột, có cột lạ hoặc lặp, có cả `variant` và `size`, kích thước âm, bằng 0 hoặc không phải số, `verified_at` sai định dạng, `max_chars` ngoài 1 đến 9999, hoặc một kích cỡ lặp trong cùng loại sản phẩm. Khi đó không có file nào được ghi.
+- **Phiên bản mới, giữ bản cũ.** Lệnh ghi `<id>-v<n>.json` với `n` lớn hơn phiên bản cao nhất đã phát hành và không bao giờ ghi đè. Dữ liệu giống hệt phiên bản mới nhất thì không ghi gì. `--version` trùng hoặc thấp hơn phiên bản hiện có bị từ chối. Loại sản phẩm đã có hồ sơ kế thừa sàn, quy tắc biến thể và trường chữ cá nhân hóa từ phiên bản mới nhất.
+- **Phát hành.** Commit file mới trong một pull request, ghim SHA-256 mà lệnh in ra trong `PodProfilesTest`, rồi build. Console chỉ đọc hồ sơ đã phát hành cùng bản build.
+
+Khi kiểm tra, trang tra vùng in theo kích cỡ của từng dòng SKU, rồi theo dòng không ghi kích cỡ. Kích cỡ không có vùng in, hoặc vùng in `UNVERIFIED`, giữ kết quả sản xuất ở `INCOMPLETE`. Khi mọi vùng in liên quan đã `VERIFIED`, thiết kế được so với từng vùng: vượt giới hạn thì kết quả là `REVIEW_REQUIRED` và trang nêu kích cỡ cùng giới hạn, còn vừa thì không có phát hiện về thiết kế. Với đồ trang trí, nguồn giới hạn ký tự chỉ được coi là đã xác nhận khi mọi vùng in liên quan `VERIFIED` và có `max_chars`. Khi đó phép thử mẫu cố định dùng giới hạn này thay giới hạn tạm của ADR-016, và trang hiển thị phiên bản phân tích gồm ID, phiên bản và SHA-256 của hồ sơ. Các ký tự được phép vẫn là của bộ quy tắc ADR-016. Điểm cuối `/api/v1/personalization-screenings` chưa đọc hồ sơ nhập.
+
+Trong Console, danh sách hồ sơ nhóm theo loại sản phẩm, bản mới nhất ở trên, và mỗi mục cho biết đã xác minh hay chưa. Sau khi kiểm tra, trang hiển thị bảng vùng in với kích cỡ, kích thước, giới hạn ký tự, trạng thái, nguồn, người xác minh và ngày xác minh.
+
 ## Kết quả và rà soát
 
 - **Quy định sàn** dùng listing-rules hiện có. **Rủi ro nhãn hiệu** dùng scanner và catalog đang phục vụ. Mỗi nhóm có trạng thái riêng. Gói, catalog hoặc đầu vào thiếu có thể làm nhóm tương ứng trả `INCOMPLETE`.
