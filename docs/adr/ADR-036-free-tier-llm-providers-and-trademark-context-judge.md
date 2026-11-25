@@ -5,6 +5,9 @@
 - Builds on: [ADR-009](ADR-009-trademark-risk-scanner.md) (scanner, risk adjustments), [ADR-011](ADR-011-policy-grounded-analyzer.md)
   items 4 and 8 (`LlmProvider`, completeness), [ADR-016](ADR-016-personalization-screening.md) (personalization text),
   [ADR-032](ADR-032-value-backtest-and-labeled-evaluation.md) (the measurement)
+- Amended by: [ADR-051](ADR-051-trademark-judge-evidence-pack.md): with `listing-guard.llm.judge.prompt-version` set to
+  `trademark-judge-2026-12` (default: the prompt below, unchanged) the judge also reads an evidence pack the program computed in code.
+  Which finding it may look at and what it may change stay as decided here.
 - Acceptance convention: keep Proposed until the implementing PR is approved and merged and the maintainer has run the measurement
   below with a real key. Then set Status to Accepted and Date to the merge date.
 
