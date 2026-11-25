@@ -25,10 +25,23 @@ public class RewriteRunStore {
      * What the statistics page shows for a period: runs, runs with at least one safe suggestion, and runs where one was copied.
      * The use-rate is {@code used / withSafe}; it is {@code null} when no run had a safe suggestion, never zero.
      */
-    public record Usage(int runs, int withSafe, int used) {
+    public record Usage(int runs, int withSafe, int used, int safeInRoundOne, int reachedLaterRound, int safeInLaterRound) {
 
         public Double rate() {
             return withSafe == 0 ? null : (double) used / withSafe;
+        }
+
+        /** The share of all runs whose first round already had a safe suggestion; null when there was no run (ADR-050). */
+        public Double roundOneRate() {
+            return runs == 0 ? null : (double) safeInRoundOne / runs;
+        }
+
+        /**
+         * Of the runs that needed a second round or more, the share that then had a safe suggestion: what the extra rounds bought. Null
+         * when no run needed one (ADR-050).
+         */
+        public Double laterRoundRate() {
+            return reachedLaterRound == 0 ? null : (double) safeInLaterRound / reachedLaterRound;
         }
     }
 
@@ -48,16 +61,26 @@ public class RewriteRunStore {
      * @return the id of the stored run
      */
     public UUID record(UUID clientId, UUID account, String marketplace, String modelId, int safe, FeedbackTarget anchor) {
+        return record(clientId, account, marketplace, modelId, safe, 1, safe > 0 ? 1 : null, anchor);
+    }
+
+    /**
+     * @param roundsUsed how many times the model was asked for this press (1 to 3, ADR-050)
+     * @param safeRound  the round that had the first safe suggestion, or null when none had (then {@code safe} is 0)
+     */
+    public UUID record(UUID clientId, UUID account, String marketplace, String modelId, int safe, int roundsUsed, Integer safeRound,
+                       FeedbackTarget anchor) {
         UUID id = UUID.randomUUID();
         Optional<FeedbackFindings.Resolved> resolved = anchor == null ? Optional.empty() : findings.resolve(clientId, anchor);
         jdbc.update("""
                 INSERT INTO rewrite_suggestion_run (id, client_id, account_id, marketplace_code, model_id, anchor_pack, anchor_check_id,
-                    anchor_position, anchor_rule_id, anchor_level, candidates_safe, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    anchor_position, anchor_rule_id, anchor_level, candidates_safe, rounds_used, safe_round, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 id, clientId, account, marketplace.toUpperCase(Locale.ROOT), modelId,
                 resolved.isPresent() ? anchor.pack() : null, resolved.isPresent() ? anchor.checkId() : null,
                 resolved.isPresent() ? anchor.position() : null, resolved.map(FeedbackFindings.Resolved::ruleId).orElse(null),
-                resolved.map(FeedbackFindings.Resolved::level).orElse(null), safe, Timestamp.from(clock.instant()));
+                resolved.map(FeedbackFindings.Resolved::level).orElse(null), safe, roundsUsed, safeRound,
+                Timestamp.from(clock.instant()));
         return id;
     }
 
@@ -79,9 +102,13 @@ public class RewriteRunStore {
     public Usage usage(UUID clientId, Instant from, Instant to) {
         return jdbc.queryForObject("""
                 SELECT count(*) AS runs, count(*) FILTER (WHERE candidates_safe > 0) AS with_safe,
-                       count(*) FILTER (WHERE used_at IS NOT NULL) AS used
+                       count(*) FILTER (WHERE used_at IS NOT NULL) AS used,
+                       count(*) FILTER (WHERE safe_round = 1) AS safe_round_one,
+                       count(*) FILTER (WHERE rounds_used >= 2) AS reached_later,
+                       count(*) FILTER (WHERE safe_round >= 2) AS safe_later
                 FROM rewrite_suggestion_run WHERE client_id = ? AND created_at >= ? AND created_at < ?""",
-                (rs, i) -> new Usage(rs.getInt("runs"), rs.getInt("with_safe"), rs.getInt("used")),
+                (rs, i) -> new Usage(rs.getInt("runs"), rs.getInt("with_safe"), rs.getInt("used"), rs.getInt("safe_round_one"),
+                        rs.getInt("reached_later"), rs.getInt("safe_later")),
                 clientId, Timestamp.from(from), Timestamp.from(to));
     }
 }

@@ -11,17 +11,20 @@ import com.thanhdatpb.listingguard.api.llm.LlmUnavailableException;
 import com.thanhdatpb.listingguard.api.plan.PlanNotAllowedException;
 import com.thanhdatpb.listingguard.api.rewrite.ListingEvaluator.Evaluation;
 import com.thanhdatpb.listingguard.api.rewrite.RewriteOutcome.Status;
+import com.thanhdatpb.listingguard.api.rewrite.RewriteOutcome.Stop;
 import com.thanhdatpb.listingguard.api.rewrite.RewritePrompt.Problem;
+import com.thanhdatpb.listingguard.api.rewrite.RewritePrompt.Reason;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
 import com.thanhdatpb.listingguard.core.finding.Finding;
+import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.TrademarkFinding;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -41,6 +44,12 @@ import org.springframework.stereotype.Service;
  * words, stuffed with a repeated word, or built on a tag that no longer holds the old value is dropped before the checks run. Nothing
  * unverified is ever returned: when the model or a check cannot run the outcome is {@link Status#UNAVAILABLE} and carries no candidate.
  *
+ * <p>With {@code max-rounds} above 1 (ADR-050) a round that was read but had no candidate that passed is followed by another call,
+ * which tells the model why each candidate was rejected: the step, the rule, the field and the limit, and for a new trademark finding
+ * only that a registered mark was added, never its name. The checks stay the only gate: every candidate of every round is judged the
+ * same way, and a round after the first runs only when the one before was readable and had no candidate that passed. With
+ * {@code max-rounds} 1 the prompt, the number of calls and the result are those of ADR-037.
+ *
  * <p>The listing is sent to the provider only as its title and tags with the problems, and is never stored or logged here.
  */
 @Service
@@ -51,9 +60,14 @@ public class ListingRewriter {
     private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+(?:['’][\\p{L}\\p{N}]+)*");
     private static final int MAX_REPEAT = 2;
     private static final int MAX_VALUE_CHARS = 200;
+    private static final int MAX_FEEDBACK_CHARS = 300;
 
     /** What the prompt contains (ADR-036 item 6): only a provider whose listing-text flag is on may receive it. */
     static final Set<LlmDataClass> DATA = Set.of(LlmDataClass.LISTING_TEXT);
+
+    /** The audit purpose of the first round (ADR-036 item 7) and of every round after it (ADR-050). */
+    static final String PURPOSE = "rewrite_suggestion";
+    static final String REPAIR_PURPOSE = "rewrite_repair";
 
     private final LlmClient client;
     private final ListingEvaluator evaluator;
@@ -96,6 +110,8 @@ public class ListingRewriter {
             return RewriteOutcome.of(Status.UNAVAILABLE, title);
         }
         List<IndexedTag> tags = tags(listing);
+        int max = properties.maxRounds();
+        int round = 0;
         try {
             Evaluation base = evaluator.evaluate(clientId, marketplace, listing);
             if (base.problems() == 0) {
@@ -104,24 +120,33 @@ public class ListingRewriter {
             if (!limit.tryAcquire(clientId)) {
                 return RewriteOutcome.of(Status.RATE_LIMITED, title);
             }
-            Answer answer = ask(marketplace, title, tags, base);
-            if (answer == null) {
-                return RewriteOutcome.of(Status.UNAVAILABLE, title);
-            }
-            List<RewritePrompt.Raw> raw = answer.candidates();
-            List<RewriteCandidate> safe = new ArrayList<>();
+            List<Problem> problems = problems(base);
+            List<RewritePrompt.Round> previous = new ArrayList<>();
             Set<String> seen = new HashSet<>();
-            for (RewritePrompt.Raw candidate : raw) {
-                Optional<RewriteCandidate> checked = verify(clientId, marketplace, listing, title, tags, base, candidate,
-                        safe.size() + 1, seen);
-                checked.ifPresent(safe::add);
+            while (round < max) {
+                round++;
+                Answer answer = ask(marketplace, title, tags, problems, previous, round);
+                if (answer == null) {
+                    return RewriteOutcome.ended(Status.UNAVAILABLE, List.of(), null, title, round, max, Stop.UNAVAILABLE);
+                }
+                Judged judged = judge(clientId, marketplace, listing, title, tags, base, answer.candidates(), seen);
+                if (!judged.safe().isEmpty()) {
+                    UUID run = runs.record(clientId, account, marketplace, answer.model(), judged.safe().size(), round, round, anchor);
+                    return RewriteOutcome.ended(Status.SUGGESTIONS, judged.safe(), run, title, round, max, Stop.FOUND);
+                }
+                if (judged.incomplete() || round == max) {
+                    UUID run = runs.record(clientId, account, marketplace, answer.model(), 0, round, null, anchor);
+                    return RewriteOutcome.ended(Status.NONE_SAFE, List.of(), run, title, round, max,
+                            judged.incomplete() ? Stop.CHECK_INCOMPLETE : Stop.ROUNDS_EXHAUSTED);
+                }
+                previous.add(new RewritePrompt.Round(round, answer.candidates().size(), judged.rejected()));
             }
-            UUID run = runs.record(clientId, account, marketplace, answer.model(), safe.size(), anchor);
-            return new RewriteOutcome(safe.isEmpty() ? Status.NONE_SAFE : Status.SUGGESTIONS, safe, run, title);
+            throw new IllegalStateException("max-rounds is at least 1, so the first round always ends the press or continues it");
         } catch (PlanNotAllowedException | TrademarkUnavailableException e) {
             // a pack the plan lacks or a catalog that is not served: the candidates cannot be verified, so none is shown
             log.info("Rewrite suggestions not available: {}", e.getClass().getSimpleName());
-            return RewriteOutcome.of(Status.UNAVAILABLE, title);
+            return round == 0 ? RewriteOutcome.of(Status.UNAVAILABLE, title)
+                    : RewriteOutcome.ended(Status.UNAVAILABLE, List.of(), null, title, round, max, Stop.UNAVAILABLE);
         }
     }
 
@@ -130,20 +155,21 @@ public class ListingRewriter {
     }
 
     /** One call through the shared client, or null when it could not run or its answer is not the JSON the schema describes. */
-    private Answer ask(String marketplace, String title, List<IndexedTag> tags, Evaluation base) {
+    private Answer ask(String marketplace, String title, List<IndexedTag> tags, List<Problem> problems,
+                       List<RewritePrompt.Round> previous, int round) {
         List<String> tagTexts = tags.stream().map(IndexedTag::text).toList();
         try {
-            LlmClient.Result result = client.complete(new LlmClient.Call("rewrite_suggestion",
-                    RewritePrompt.request(mapper, properties, marketplace, title, tagTexts, problems(base)), DATA));
+            LlmClient.Result result = client.complete(new LlmClient.Call(round == 1 ? PURPOSE : REPAIR_PURPOSE,
+                    RewritePrompt.request(mapper, properties, marketplace, title, tagTexts, problems, previous, round), DATA));
             List<RewritePrompt.Raw> parsed = RewritePrompt.parse(mapper, result.text());
             if (parsed == null) {
-                log.info("Rewrite suggestions: the model's answer was not the expected JSON");
+                log.info("Rewrite suggestions: the model's answer was not the expected JSON (round {})", round);
                 return null;
             }
             return new Answer(parsed, result.model());
         } catch (LlmUnavailableException e) {
             // the message never carries listing text (ADR-036); the reason is enough to diagnose
-            log.info("Rewrite suggestions: the model could not be asked ({})", e.reason());
+            log.info("Rewrite suggestions: the model could not be asked ({}, round {})", e.reason(), round);
             return null;
         }
     }
@@ -152,31 +178,81 @@ public class ListingRewriter {
     private static List<Problem> problems(Evaluation base) {
         List<Problem> out = new ArrayList<>();
         for (Finding finding : base.errors()) {
-            out.add(new Problem(finding.ruleId(), finding.field() == null ? "" : finding.field(), cut(finding.value()),
+            out.add(new Problem(finding.ruleId(), finding.field() == null ? "" : finding.field(), cut(finding.value(), MAX_VALUE_CHARS),
                     finding.message()));
         }
         for (TrademarkFinding finding : base.trademark().findings()) {
             out.add(new Problem(finding.ruleId(), finding.evidence().field() == null ? "" : finding.evidence().field(),
-                    cut(finding.evidence().snippet()), finding.message()));
+                    cut(finding.evidence().snippet(), MAX_VALUE_CHARS), finding.message()));
         }
         return out;
     }
 
-    private static String cut(String value) {
+    private static String cut(String value, int max) {
         if (value == null) {
             return "";
         }
-        return value.length() <= MAX_VALUE_CHARS ? value : value.substring(0, MAX_VALUE_CHARS);
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
-    private Optional<RewriteCandidate> verify(UUID clientId, String marketplace, ObjectNode listing, String title,
-                                              List<IndexedTag> tags, Evaluation base, RewritePrompt.Raw raw, int number,
-                                              Set<String> seen) {
+    /** What one round's candidates came to: the ones that passed, why each other one did not, and whether a check could not finish. */
+    private record Judged(List<RewriteCandidate> safe, List<RewritePrompt.Rejected> rejected, boolean incomplete) {
+    }
+
+    private Judged judge(UUID clientId, String marketplace, ObjectNode listing, String title, List<IndexedTag> tags, Evaluation base,
+                         List<RewritePrompt.Raw> raw, Set<String> seen) {
+        List<RewriteCandidate> safe = new ArrayList<>();
+        List<RewritePrompt.Rejected> rejected = new ArrayList<>();
+        boolean incomplete = false;
+        int number = 0;
+        for (RewritePrompt.Raw candidate : raw) {
+            number++;
+            Verdict verdict = verify(clientId, marketplace, listing, title, tags, base, candidate, safe.size() + 1, seen);
+            if (verdict.safe() != null) {
+                safe.add(verdict.safe());
+            } else {
+                rejected.add(new RewritePrompt.Rejected(number, verdict.withhold() ? null : candidate, changed(candidate),
+                        verdict.reasons()));
+                incomplete |= verdict.incomplete();
+            }
+        }
+        return new Judged(safe, rejected, incomplete);
+    }
+
+    /** {@code title} and {@code tags[i]} for what a candidate would change. Names a place, never text. */
+    private static List<String> changed(RewritePrompt.Raw candidate) {
+        List<String> out = new ArrayList<>();
+        if (candidate.title() != null) {
+            out.add("title");
+        }
+        candidate.tags().forEach(tag -> out.add("tags[" + tag.index() + "]"));
+        return out;
+    }
+
+    /**
+     * The verdict on one candidate: {@code safe} when it passed every check, otherwise why not. {@code withhold} is true when the
+     * candidate added a registered mark: the model is then told that, and not what it wrote. {@code incomplete} is true when a rule or
+     * the trademark check could not finish.
+     */
+    private record Verdict(RewriteCandidate safe, List<Reason> reasons, boolean withhold, boolean incomplete) {
+
+        static Verdict passed(RewriteCandidate candidate) {
+            return new Verdict(candidate, List.of(), false, false);
+        }
+
+        static Verdict shape(String field, String detail) {
+            return new Verdict(null, List.of(new Reason("shape", "", field, detail)), false, false);
+        }
+    }
+
+    private Verdict verify(UUID clientId, String marketplace, ObjectNode listing, String title, List<IndexedTag> tags,
+                           Evaluation base, RewritePrompt.Raw raw, int number, Set<String> seen) {
         String newTitle = null;
         if (raw.title() != null) {
             newTitle = raw.title().strip();
-            if (!acceptableTitle(newTitle, title)) {
-                return Optional.empty();
+            String problem = titleProblem(newTitle, title);
+            if (problem != null) {
+                return Verdict.shape("title", problem);
             }
         }
         ObjectNode copy = listing.deepCopy();
@@ -186,23 +262,54 @@ public class ListingRewriter {
         List<RewriteCandidate.TagChange> changes = new ArrayList<>();
         Set<Integer> changed = new HashSet<>();
         for (RewritePrompt.Raw.Tag tag : raw.tags()) {
-            Optional<RewriteCandidate.TagChange> change = tagChange(copy, tags, tag, changed);
-            if (change.isEmpty()) {
-                return Optional.empty();
+            String problem = tagProblem(tags, tag, changed);
+            if (problem != null) {
+                return Verdict.shape("tags[" + tag.index() + "]", problem);
             }
-            changes.add(change.get());
+            changes.add(applyTag(copy, tags, tag));
         }
         if (newTitle == null && changes.isEmpty()) {
-            return Optional.empty();
+            return Verdict.shape("", "the candidate changes nothing");
         }
         if (!seen.add(String.valueOf(newTitle) + "\n" + changes)) {
-            return Optional.empty();
+            return Verdict.shape("", "the same proposal as an earlier candidate");
         }
         Evaluation judged = evaluator.evaluate(clientId, marketplace, copy);
-        if (!accepted(base, judged)) {
-            return Optional.empty();
+        if (accepted(base, judged)) {
+            return Verdict.passed(new RewriteCandidate(number, newTitle, changes));
         }
-        return Optional.of(new RewriteCandidate(number, newTitle, changes));
+        return rejection(base, judged);
+    }
+
+    /** Why the checks did not accept a candidate: the steps that failed, in the words of the checks. Never the name of a mark. */
+    private static Verdict rejection(Evaluation base, Evaluation judged) {
+        List<Reason> reasons = new ArrayList<>();
+        if (!judged.rules().complete()) {
+            reasons.add(new Reason("listing_rule", "", "", "a rule could not run"));
+        }
+        if (judged.trademark().completeness() != Completeness.COMPLETE) {
+            reasons.add(new Reason("trademark", "", "", "the trademark check could not complete"));
+        }
+        for (Finding finding : judged.errors()) {
+            reasons.add(new Reason("listing_rule", finding.ruleId(), finding.field() == null ? "" : finding.field(),
+                    cut(finding.message(), MAX_FEEDBACK_CHARS)));
+        }
+        Set<String> known = base.trademarkSignatures();
+        Set<String> added = new LinkedHashSet<>();
+        for (TrademarkFinding finding : judged.trademark().findings()) {
+            if (!known.contains(Evaluation.signature(finding))) {
+                String field = finding.evidence().field() == null ? "" : finding.evidence().field().replaceAll("\\[\\d+]", "");
+                if (added.add(finding.ruleId() + "|" + field)) {
+                    reasons.add(new Reason("trademark", finding.ruleId(), field, "added a registered mark"));
+                }
+            }
+        }
+        boolean withhold = !added.isEmpty();
+        if (reasons.isEmpty()) {
+            reasons.add(new Reason("progress", "", "", "the candidate does not reduce the ERROR and trademark findings: "
+                    + base.problems() + " before, " + judged.problems() + " after"));
+        }
+        return new Verdict(null, reasons, withhold, !judged.complete());
     }
 
     /** The rules and the trademark check agree: complete, no ERROR, no new trademark finding, and fewer problems than before. */
@@ -212,50 +319,69 @@ public class ListingRewriter {
                 && judged.problems() < base.problems();
     }
 
-    private static boolean acceptableTitle(String candidate, String original) {
-        if (candidate.isEmpty() || !oneLine(candidate) || candidate.equals(original)) {
-            return false;
+    /** Null when the title may go to the checks, otherwise the fixed phrase that says why not. */
+    private static String titleProblem(String candidate, String original) {
+        if (candidate.isEmpty()) {
+            return "the title is empty";
         }
-        return notLongerOrStuffed(candidate, original);
+        if (!oneLine(candidate)) {
+            return "the title has several lines";
+        }
+        if (candidate.equals(original)) {
+            return "the title is the same as the current one";
+        }
+        return wordProblem(candidate, original);
     }
 
     /** No more words than the original, and no word repeated more than twice unless the original already repeated it. */
     static boolean notLongerOrStuffed(String candidate, String original) {
+        return wordProblem(candidate, original) == null;
+    }
+
+    private static String wordProblem(String candidate, String original) {
         List<String> now = words(candidate);
         List<String> before = words(original);
-        if (now.isEmpty() || now.size() > before.size()) {
-            return false;
+        if (now.isEmpty()) {
+            return "the title has no words";
+        }
+        if (now.size() > before.size()) {
+            return "the title has more words than the original";
         }
         Map<String, Integer> was = counts(before);
         for (Map.Entry<String, Integer> entry : counts(now).entrySet()) {
             if (entry.getValue() > Math.max(MAX_REPEAT, was.getOrDefault(entry.getKey(), 0))) {
-                return false;
+                return "a word is repeated more than twice";
             }
         }
-        return true;
+        return null;
     }
 
-    private Optional<RewriteCandidate.TagChange> tagChange(ObjectNode copy, List<IndexedTag> tags, RewritePrompt.Raw.Tag tag,
-                                                           Set<Integer> changed) {
+    /** Null when the tag change may go to the checks, otherwise the fixed phrase that says why not. */
+    private static String tagProblem(List<IndexedTag> tags, RewritePrompt.Raw.Tag tag, Set<Integer> changed) {
         if (tag.index() < 0 || tag.index() >= tags.size() || !changed.add(tag.index())) {
-            return Optional.empty();
+            return "the tag index does not exist or is used twice";
         }
         IndexedTag current = tags.get(tag.index());
         String to = tag.to().strip();
-        if (!current.text().equals(tag.from().strip()) || to.isEmpty() || !oneLine(to) || to.equals(current.text())
-                || words(to).size() > words(current.text()).size()) {
-            return Optional.empty();
+        if (!current.text().equals(tag.from().strip())) {
+            return "the old tag text does not match the tag at that index";
+        }
+        if (to.isEmpty() || !oneLine(to) || to.equals(current.text()) || words(to).size() > words(current.text()).size()) {
+            return "the replacement tag is empty, on several lines, unchanged or longer";
         }
         for (IndexedTag other : tags) {
             if (other != current && other.text().equalsIgnoreCase(to)) {
-                return Optional.empty();
+                return "the replacement tag repeats another tag";
             }
         }
-        if (!(copy.get("tags") instanceof ArrayNode array)) {
-            return Optional.empty();
-        }
-        array.set(current.rawIndex(), to);
-        return Optional.of(new RewriteCandidate.TagChange(tag.index(), current.text(), to));
+        return null;
+    }
+
+    private static RewriteCandidate.TagChange applyTag(ObjectNode copy, List<IndexedTag> tags, RewritePrompt.Raw.Tag tag) {
+        IndexedTag current = tags.get(tag.index());
+        String to = tag.to().strip();
+        ((ArrayNode) copy.get("tags")).set(current.rawIndex(), to);
+        return new RewriteCandidate.TagChange(tag.index(), current.text(), to);
     }
 
     private static boolean oneLine(String text) {

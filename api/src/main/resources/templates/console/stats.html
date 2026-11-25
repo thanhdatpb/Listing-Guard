@@ -82,8 +82,12 @@
                 <div th:replace="~{console/report-fragments :: stat('stat-rewrite-safe', #{stats.rewrite.safe}, ${rewriteUsage.withSafe}, '', null)}"></div>
                 <div th:replace="~{console/report-fragments :: stat('stat-rewrite-used', #{stats.rewrite.used}, ${rewriteUsage.used}, '', null)}"></div>
                 <div th:replace="~{console/report-fragments :: stat('stat-rewrite-rate', #{stats.rewrite.rate}, (${rewriteUsage.rate == null} ? '&mdash;' : ${#numbers.formatPercent(rewriteUsage.rate, 1, 1)}), '', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('stat-rewrite-round1', #{stats.rewrite.round1}, (${rewriteUsage.roundOneRate == null} ? '&mdash;' : ${#numbers.formatPercent(rewriteUsage.roundOneRate, 1, 1)}), '', null)}"></div>
+                <div th:replace="~{console/report-fragments :: stat('stat-rewrite-later', #{stats.rewrite.later}, (${rewriteUsage.laterRoundRate == null} ? '&mdash;' : ${#numbers.formatPercent(rewriteUsage.laterRoundRate, 1, 1)}), '', null)}"></div>
             </div>
             <p class="lg-small lg-text-muted" th:text="#{stats.rewrite.note}"></p>
+            <p class="lg-small lg-text-muted" id="stat-rewrite-rounds-note"
+               th:text="#{stats.rewrite.rounds.note(${rewriteUsage.safeInRoundOne}, ${rewriteUsage.runs}, ${rewriteUsage.reachedLaterRound}, ${rewriteUsage.safeInLaterRound})}"></p>
         </section>
 
         <section id="stats-rules" class="lg-section" aria-labelledby="rules-heading">

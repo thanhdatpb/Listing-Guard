@@ -135,10 +135,11 @@ LISTING_GUARD_LLM_REWRITE_ENABLED=true
 | `listing-guard.llm.rewrite.timeout` | `20s` | carried in the request; the provider's own timeout applies |
 | `listing-guard.llm.rewrite.max-output-tokens` | `900` | upper bound on the answer (a reasoning model spends part of it thinking) |
 | `listing-guard.llm.rewrite.max-listing-chars` | `16000` | the largest listing (as JSON) that is sent and verified |
+| `listing-guard.llm.rewrite.max-rounds` | `1` | most model calls of one press, 1 to 3 (`LISTING_GUARD_LLM_REWRITE_MAX_ROUNDS`, [repair rounds](#repair-rounds-adr-050)); any other value stops the start |
 
 With the switch off there is no route and no button. With it on but the client off, or no provider allowed to receive listing text,
 there is no button and a press answers "unavailable". The requests count against the same per-provider limits as the judge, and the
-audit line has purpose `rewrite_suggestion`.
+audit line has purpose `rewrite_suggestion` (`rewrite_repair` for a second or third round).
 
 **Verification.** A proposal is shown only when all of these hold: it is not empty, one line, not the same as now, not a duplicate,
 has no more words than the original and no word repeated more than twice (unless the original did), and a tag change names the exact
@@ -159,10 +160,52 @@ legal clearance**: the trademark disclaimer is printed with it.
 The button is in the editor, below the findings, and on each bulk row with an `ERROR` or a trademark finding. Copying puts the text on
 the clipboard; nothing changes in the form, the listing or a marketplace.
 
-**What is stored.** One row per finished run in `rewrite_suggestion_run` (migration V42): client, account, marketplace, model id, the
-finding the press came from (the ADR-034 address, with its rule id and level copied), how many proposals were safe, the time, and when a
-proposal was copied, the time and its number. **No title, tag, prompt, answer or note.** The use-rate on **Statistics** is the runs with
-a copy divided by the runs with at least one safe proposal; copying twice counts once.
+### Repair rounds (ADR-050)
+
+With `max-rounds` 1, the default, a press asks the model once and nothing in this section applies: the prompt, the number of calls, the
+result and the stored row are those of ADR-037. With 2 or 3, a press whose first answer was readable but had **no** proposal that passed
+every check asks again, up to that many calls, and tells the model why each proposal was rejected. The checks stay the only gate: every
+proposal of every round is judged exactly as above, and the model never decides that one passes.
+
+- **Only after a readable answer with nothing safe.** A model or provider that cannot be used, an unreadable answer, a missing pack or
+  catalog, or a check that cannot finish ends the press at once (Suggestions are not available, or No safe suggestion for a check that
+  cannot finish); no further round is tried and nothing unchecked is shown.
+- **What the model is told.** From round 2 the request has a `previous_rounds` block (JSON, marked untrusted like the listing). For each
+  rejected proposal it names the step that rejected it (`shape`, `listing_rule`, `trademark`, `progress`), the rule and the field, and the
+  limit that was broken. For a new trademark finding it says only the rule id, the field and "added a registered mark": **never the name
+  of a mark of the catalog or of the client's watchlist, the matched text or the proposal's own text**, so the model cannot learn the
+  watchlist by trying names. No field beyond those of ADR-037 is sent.
+
+  ```json
+  [{"round": 1, "candidatesReturned": 3, "rejected": [
+    {"candidate": 1, "changed": ["title"],
+     "proposal": {"title": "Cotton shirt long long long ...", "tags": []},
+     "reasons": [{"step": "listing_rule", "rule": "title_length", "field": "title", "detail": "<message of the rule: length and limit>"}]},
+    {"candidate": 2, "changed": ["title", "tags[1]"],
+     "reasons": [{"step": "trademark", "rule": "catalog_exact", "field": "title", "detail": "added a registered mark"}]},
+    {"candidate": 3, "changed": ["tags[9]"],
+     "proposal": {"title": null, "tags": [{"index": 9, "to": "mug"}]},
+     "reasons": [{"step": "shape", "rule": "", "field": "tags[9]", "detail": "the tag index does not exist or is used twice"}]}]}]
+  ```
+
+- **Prompt and cache.** The system text, the schema and the marketplace come first; the listing, the problems, `previous_rounds` and the
+  round number follow. With `max-rounds` above 1 the system text carries `Prompt version: rewrite-2`, so its answers never share a cache
+  entry with a deployment that has 1. A cached answer is judged again every time, in every round. A proposal repeated from an earlier
+  round is dropped and reported as a repeat.
+- **Requests.** Each round is its own call of the shared client, through the per-minute and per-day limits, the failover and the audit
+  line of ADR-036. A press takes **one** slot of `max-per-hour`, but it sends **up to `max-rounds` requests to the provider**, so a
+  deployment with 3 can use a provider's free daily limit up to three times as fast when many first rounds fail. The cache absorbs a
+  repeated press of the same listing.
+- **What the seller sees.** With `max-rounds` above 1 the panel adds "Tried N of up to M rounds." and why the press ended, in English and
+  Vietnamese. At most three proposals are shown, all from the round that had a safe one.
+- **Is it worth it?** **Statistics** shows, for the period, the share of runs with a safe suggestion in round 1 and the share of the
+  runs that needed a second round that then had one. If the second share is low, set `max-rounds` back to 1.
+
+**What is stored.** One row per finished run in `rewrite_suggestion_run` (migration V42, and V50 for the rounds): client, account,
+marketplace, model id, the finding the press came from (the ADR-034 address, with its rule id and level copied), how many proposals were
+safe, the number of rounds asked (`rounds_used`) and the round with the first safe proposal (`safe_round`), the time, and when a
+proposal was copied, the time and its number. **No title, tag, prompt, answer, reason or note.** The use-rate on **Statistics** is the
+runs with a copy divided by the runs with at least one safe proposal; copying twice counts once.
 
 **Limits.** The client caches every successful answer, so an unreadable answer repeats until the cache entry expires; the answer is
 verified each time. There is no HTTP API, SDK method or MCP tool for it. `api/src/test/.../rewrite/StubLlm.java` stands in for the model
@@ -178,7 +221,7 @@ publish a listing, and neither makes a listing legally safe: the seller reads th
 | Whose model | The agent's own (Claude Code, Claude Desktop, Codex) | The deployment's provider, with its key (this page) |
 | Key in Listing Guard | None; the MCP server needs only the client API key | Needs `LISTING_GUARD_LLM_*` and the rewrite switch |
 | Who runs it | An agent, when the seller asks it to fix a listing | The seller, pressing a button in the console |
-| Rounds | Up to 3, one draft each, by the skill's [bounded repair loop](../skills/listing-guard/references/repair-loop.md) | One call, up to 3 candidates, shown only when they pass |
+| Rounds | Up to 3, one draft each, by the skill's [bounded repair loop](../skills/listing-guard/references/repair-loop.md) | One call by default, up to 3 candidates, shown only when they pass; with `max-rounds` 2 or 3 it asks again with the reasons (ADR-050) |
 | Who verifies | The API's checks on each draft, compared with the original by the agent | The same checks, run by the server before anything is shown |
 | Quota | Each round can use new results (about 2) | None; the verification is not stored or charged |
 | Listing text leaves | To the agent's model provider, under the agent's own terms | To the deployment's provider, only if `listing-text-allowed` |

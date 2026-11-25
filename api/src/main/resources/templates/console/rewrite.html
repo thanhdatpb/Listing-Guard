@@ -113,6 +113,16 @@
             </div>
         </div>
     </th:block>
+    <!-- ADR-050: how many rounds were tried and why they ended, only when more than one round is allowed -->
+    <p class="lg-text-muted lg-small" id="rewrite-rounds" th:if="${r.showRounds()}">
+        <span th:text="#{rewrite.rounds(${r.rounds}, ${r.maxRounds})}"></span>
+        <th:block th:switch="${r.stop.name()}">
+            <span th:case="'FOUND'" th:text="#{rewrite.stop.found}"></span>
+            <span th:case="'ROUNDS_EXHAUSTED'" th:text="#{rewrite.stop.exhausted}"></span>
+            <span th:case="'CHECK_INCOMPLETE'" th:text="#{rewrite.stop.incomplete}"></span>
+            <span th:case="*" th:text="#{rewrite.stop.unavailable}"></span>
+        </th:block>
+    </p>
     <th:block th:if="${r.status.name() == 'SUGGESTIONS' or r.status.name() == 'NONE_SAFE'}">
         <p class="lg-text-muted lg-small" th:text="#{rewrite.disclaimer}"></p>
         <p class="lg-text-muted lg-small" th:text="${rewriteDisclaimer}"></p>
