@@ -1,0 +1,14 @@
+{
+  "id": "sample-tee",
+  "version": 1,
+  "marketplaces": ["ETSY", "AMAZON"],
+  "variationRules": ["sku", "size", "color"],
+  "printAreas": [
+    {"variant": "S", "sourceStatus": "VERIFIED", "sourceReference": "BLK-TS-01", "maxWidthMm": 280, "maxHeightMm": 350.5,
+     "verifiedBy": "Operator A", "verifiedAt": "2026-11-20"},
+    {"variant": "M", "sourceStatus": "VERIFIED", "sourceReference": "BLK-TS-02", "maxWidthMm": 300, "maxHeightMm": 380,
+     "verifiedBy": "Operator A", "verifiedAt": "2026-11-20"},
+    {"variant": "L", "sourceStatus": "UNVERIFIED", "maxWidthMm": 320, "verifiedBy": "Operator A", "verifiedAt": "2026-11-20"}
+  ],
+  "personalizationFields": []
+}

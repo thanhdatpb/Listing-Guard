@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.client;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccount;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRoles;
 import com.thanhdatpb.listingguard.api.console.ConsoleRole;
+import com.thanhdatpb.listingguard.api.console.editor.PodProfileAdminCommands;
 import com.thanhdatpb.listingguard.api.plan.PlanCode;
 import com.thanhdatpb.listingguard.api.trademark.CatalogAdminCommands;
 import java.io.PrintStream;
@@ -21,6 +22,7 @@ import org.springframework.boot.ApplicationArguments;
  * plan set &lt;client&gt; &lt;plan&gt;      (ADR-013: FREE, SELLER or PRO)
  * catalog list     catalog activate &lt;version&gt;     catalog rollback [--to=&lt;version&gt;]   (ADR-009, PR A2d)
  * account list &lt;client&gt;     account role &lt;email&gt; &lt;ADMIN|MEMBER&gt;   (ADR-031)
+ * pod-profile import &lt;file.csv&gt; [--out=&lt;dir&gt;]   (ADR-048, a supplier spec file into new POD profile versions)
  * </pre>
  */
 public final class AdminCommands {
@@ -37,7 +39,7 @@ public final class AdminCommands {
               plan set <client> <plan>   (plan: FREE, SELLER or PRO)
               account list <client>
               account role <email> <role>   (role: ADMIN or MEMBER; an ADMIN edits the client's trademark watchlist in the console)
-            """ + CatalogAdminCommands.USAGE;
+            """ + CatalogAdminCommands.USAGE + PodProfileAdminCommands.USAGE;
 
     private final ClientProvisioning provisioning;
     private final CatalogAdminCommands catalog;
@@ -98,6 +100,13 @@ public final class AdminCommands {
                 }
                 try {
                     catalog.execute(command, args.subList(2, args.size()), arguments, out);
+                } catch (IllegalArgumentException e) {
+                    throw usage(e.getMessage());
+                }
+            }
+            case "pod-profile import" -> {
+                try {
+                    PodProfileAdminCommands.execute(command, args.subList(2, args.size()), arguments, out);
                 } catch (IllegalArgumentException e) {
                     throw usage(e.getMessage());
                 }

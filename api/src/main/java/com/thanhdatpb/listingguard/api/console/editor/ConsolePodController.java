@@ -88,7 +88,7 @@ class ConsolePodController {
             var rows = draft.rows();
             var width = draft.width();
             var height = draft.height();
-            model.addAttribute("result", readiness.check(user.clientId(), marketplace, release.profile(),
+            model.addAttribute("result", readiness.check(user.clientId(), marketplace, release,
                     listing, mapped.listing(), draft, rows, width, height));
         } catch (IllegalArgumentException e) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -145,7 +145,7 @@ class ConsolePodController {
     private String populate(Model model, ConsoleUser user, EditorForm listing, PodDraft draft) {
         model.addAttribute("listingForm", listing);
         model.addAttribute("draft", draft);
-        model.addAttribute("profiles", profiles.released());
+        model.addAttribute("profileGroups", profiles.groups());
         model.addAttribute("release", profiles.find(draft.profileKey()));
         model.addAttribute("marketplaces", EditorMarketplace.values());
         if (reviewEnabled && user != null) {
