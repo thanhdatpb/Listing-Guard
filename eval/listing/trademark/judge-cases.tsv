@@ -1,0 +1,18 @@
+id	group	ruleset	catalog	mark	title	brand	watchlist	product_type	tsdr	verified	verdict	before	after
+full-1	FULL_EVIDENCE	R12	ORDINARY	Lunaria	Handmade Lunaria ceramic mug	-	-	-	LIVE	none	likely_descriptive	MEDIUM	LOW
+full-2	FULL_EVIDENCE	R12	ORDINARY	Virelle	Soft Virelle cotton shirt	-	-	-	DEAD	false_alarm	likely_descriptive	MEDIUM	LOW
+full-3	FULL_EVIDENCE	R12	ORDINARY	Quenby	Quenby wooden spoon set	-	-	-	-	none	unsure	MEDIUM	MEDIUM
+full-4	FULL_EVIDENCE	R12	ORDINARY	Tamsin	Tamsin enamel camp mug	-	-	mug	LIVE	none	likely_descriptive	MEDIUM	LOW
+partial-1	PARTIAL_EVIDENCE	R12	PARTIAL	Orvane	Orvane glass storage jar	-	-	-	-	-	likely_descriptive	MEDIUM	LOW
+partial-2	PARTIAL_EVIDENCE	R12	PARTIAL	Pellam	Pellam oak serving board	-	-	-	-	-	unsure	MEDIUM	MEDIUM
+conflict-1	VERIFIED_CONFLICT	R12	ORDINARY	Thessaly	Thessaly linen tote	-	-	-	LIVE	confirmed	likely_mark_use	MEDIUM	MEDIUM
+conflict-2	VERIFIED_CONFLICT	R12	ORDINARY	Brindle	Brindle leather wallet	-	-	-	LIVE	confirmed	likely_descriptive	MEDIUM	LOW
+conflict-3	VERIFIED_CONFLICT	R12	ORDINARY	Corwen	Corwen felt coaster	-	-	-	-	false_alarm	likely_mark_use	MEDIUM	MEDIUM
+notier-1	NO_TIER	R11	NOTIER	Calloway	Calloway enamel mug	-	-	mug	-	-	likely_descriptive	MEDIUM	LOW
+notier-2	NO_TIER	R11	NOTIER	Dunmore	Dunmore tin cup	-	-	mug	-	-	unsure	MEDIUM	MEDIUM
+watchlist-1	WATCHLIST	R12	ORDINARY	Eskerfield	Eskerfield enamel mug	-	Eskerfield	-	-	-	likely_descriptive	HIGH	HIGH
+watchlist-2	WATCHLIST	R12	ORDINARY	Halloran	Halloran brass key ring	-	Halloran	-	-	-	likely_descriptive	HIGH	HIGH
+brand-1	BRAND_FIELD	R12	ORDINARY	Fenwick	Plain canvas tote bag	Fenwick	-	-	-	-	likely_descriptive	HIGH	HIGH
+brand-2	BRAND_FIELD	R12	ORDINARY	Gilmore	Plain cotton apron	Gilmore	-	-	-	-	likely_descriptive	HIGH	HIGH
+strong-1	STRONG_TIER	R12	STRONG	Marlowe	Marlowe canvas tote	-	-	-	-	-	likely_descriptive	HIGH	HIGH
+phrase-1	MULTI_WORD	R12	ORDINARY	Silver Harbor	Silver Harbor candle tin	-	-	-	-	-	likely_descriptive	HIGH	HIGH

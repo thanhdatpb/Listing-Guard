@@ -82,7 +82,7 @@ class TrademarkContextJudgeTest {
 
     private static LlmProperties properties(boolean enabled, boolean judge) {
         return new LlmProperties(enabled, List.of(), new LlmProperties.Cache(100, Duration.ofHours(1)),
-                new LlmProperties.Judge(judge, 8, 30, 600, Duration.ofSeconds(5)));
+                new LlmProperties.Judge(judge, 8, 30, 600, Duration.ofSeconds(5), JudgePrompt.DEFAULT_VERSION));
     }
 
     private static TrademarkContextJudge judge(Stub stub, boolean listingTextAllowed, int perDay, boolean enabled) {
