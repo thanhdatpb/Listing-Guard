@@ -2,6 +2,10 @@
 
 These rules apply alongside [CLAUDE.md](../../CLAUDE.md). Paths in code formatting are repository-relative.
 
+The active [contract baseline](../api/baseline/) is v0.10.0. Its OpenAPI and input schema are exact copies from the tag.
+The [v0.6.0 OpenAPI baseline](../api/archive/openapi-v0.6.0.json) is archived outside the active directory so the
+contract tools and release workflow continue to discover exactly one active baseline.
+
 ## Conventions
 
 - When adding an API endpoint, check pack or MCP tool, update the architecture diagrams in `docs/images/` and the product overview in `README.md`.
