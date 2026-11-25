@@ -167,3 +167,25 @@ a copy divided by the runs with at least one safe proposal; copying twice counts
 **Limits.** The client caches every successful answer, so an unreadable answer repeats until the cache entry expires; the answer is
 verified each time. There is no HTTP API, SDK method or MCP tool for it. `api/src/test/.../rewrite/StubLlm.java` stands in for the model
 in the tests.
+
+## Two ways to get an AI fix
+
+Both ways let a model draft the text and let Listing Guard's rules and trademark check judge it. In neither does Listing Guard edit or
+publish a listing, and neither makes a listing legally safe: the seller reads the result and decides.
+
+| | (a) An outside agent through MCP | (b) The **Gợi ý sửa** button (ADR-037) |
+|---|---|---|
+| Whose model | The agent's own (Claude Code, Claude Desktop, Codex) | The deployment's provider, with its key (this page) |
+| Key in Listing Guard | None; the MCP server needs only the client API key | Needs `LISTING_GUARD_LLM_*` and the rewrite switch |
+| Who runs it | An agent, when the seller asks it to fix a listing | The seller, pressing a button in the console |
+| Rounds | Up to 3, one draft each, by the skill's [bounded repair loop](../skills/listing-guard/references/repair-loop.md) | One call, up to 3 candidates, shown only when they pass |
+| Who verifies | The API's checks on each draft, compared with the original by the agent | The same checks, run by the server before anything is shown |
+| Quota | Each round can use new results (about 2) | None; the verification is not stored or charged |
+| Listing text leaves | To the agent's model provider, under the agent's own terms | To the deployment's provider, only if `listing-text-allowed` |
+| Guarantee | The checks are the API's; the draft and the comparison are the agent's, so read the final report | The server shows only candidates that passed every check |
+
+**When to use which.** Use the button for a seller in the console who wants options now, on a deployment whose operator has turned the
+rewrite on and accepted a provider for listing text. Use an agent when there is no LLM key in Listing Guard, when the seller already
+works in an agent, when a draft must stay within the agent's own data terms, or when a listing needs more than one try. Do not run both
+on one listing and merge the answers: each checks its own drafts. Setup and the loop are in the [agent skill guide](agent-skill.md#repair-with-an-agent);
+the decision is [ADR-049](adr/ADR-049-agent-repair-loop.md).

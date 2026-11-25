@@ -42,3 +42,18 @@ lưu không đổi. `.gitattributes` giữ các tài nguyên `pod/*.json` ở LF
 đồng REST và không có migration. Dữ liệu mẫu tự đặt nằm ở `docs/samples/pod-profile-spec-sample.csv`. Xem
 [ADR-048](../adr/ADR-048-pod-print-profiles-from-supplier-spec-files.md) và
 [Kiểm tra mức sẵn sàng POD](../implementation/pod-readiness.md).
+
+
+## Vòng sửa có giới hạn cho agent ngoài
+
+Skill `listing-guard` có mục "Bounded repair loop" và `references/repair-loop.md`: khi seller nhờ sửa listing mà lần kiểm đầu có
+`ERROR` hoặc finding trademark ở title/tags, agent (Claude Code, Claude Desktop, Codex) dùng model của chính nó soạn đúng một bản sửa
+mỗi vòng, gọi lại mọi check đã áp dụng trên đúng bản đó và so finding với bản gốc theo chữ ký (rule id, trường, mark hoặc token). Vòng
+dừng khi hết finding mục tiêu, sau 3 vòng, sau 2 vòng liền không giảm, hoặc ngay khi gặp `quota-exceeded`, `rate-limited`,
+`plan-not-allowed`, `*-not-configured` hay kết quả `INCOMPLETE` (báo giới hạn, không coi là sạch). Mỗi vòng có thể tốn quota (tối đa
+8 lượt cho một listing, gồm lần kiểm đầu), nên agent đọc `get_usage` trước và báo seller số lượt dự kiến khi có nhiều listing. Báo cáo
+cuối gồm bảng cũ và mới theo từng trường, finding còn lại, `analysisVersion`, `completeness`, số vòng và lý do dừng; seller quyết
+định, agent không đăng hay sửa trên sàn. Không có thay đổi API, OpenAPI, công cụ MCP hay migration, và không cần khoá LLM trong
+Listing Guard. Ví dụ tự đặt nằm ở `skills/listing-guard/examples/repair-loop-etsy.md`. `docs/llm.md` so sánh hai cách sửa bằng AI:
+agent ngoài qua MCP (không cần khoá) và nút "Gợi ý sửa" của ADR-037 (cần khoá). `AgentSkillContractTest` mở rộng sang mọi file
+của skill. Xem [ADR-049](../adr/ADR-049-agent-repair-loop.md) và [hai cách sửa bằng AI](../llm.md#two-ways-to-get-an-ai-fix).

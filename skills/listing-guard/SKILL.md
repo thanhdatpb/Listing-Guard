@@ -65,6 +65,34 @@ applicable check again on that exact proposed version. Present it as ready to re
 any findings that remain. If a check is `INCOMPLETE`, unavailable, or refused, state that limitation and do not present the
 version as clean. Never edit the marketplace listing or publish it. Do not perform SEO or give price advice.
 
+## Bounded repair loop
+
+Run it only when the seller asks you to fix the listing **and** the first checks returned an `ERROR` finding or a trademark
+finding in `title` or `tags`. Offering it is fine; starting unasked is not. Procedure, finding signatures and the report
+template are in [references/repair-loop.md](references/repair-loop.md); read it before the first round.
+
+Before the first round, call `get_capabilities`, `get_limits` and `get_usage`. Draft against the returned limits. Each round can
+use new quota, so with several listings tell the seller the worst case (listings × 8 results) and wait for a go-ahead.
+
+Each round, at most three:
+
+1. Write exactly one revision, changing only the `title` and `tags` entries a finding names. Shorten, remove or use a plainer
+   word. No SEO, no new brand, team or character, no word a finding names, no tag that is not a replacement, no more words.
+2. Check that exact revision with every check the first pass used: `check_listing`, `check_trademark`, and `check_variations`
+   when it applied. For a listing already on sale, call `check_listing_edit` with the original as `before` instead.
+3. Compare findings with the original by signature (rule ID, field, mark or token), not by index or message.
+
+Stop at the first that applies:
+
+- A tool returns `quota-exceeded`, `rate-limited`, `plan-not-allowed` or a `*-not-configured` code, or a result is `INCOMPLETE`:
+  report that limit. Do not retry and do not call the draft clean.
+- No `ERROR` and no trademark finding is left in `title` or `tags`, and none is new: done.
+- Three rounds are used, or two rounds in a row did not reduce the findings: report what remains.
+
+Never present a draft with a new trademark finding as an improvement. The final report gives, per field, the original and the
+proposal, the findings that remain, `analysisVersion` and `completeness` per pack, the number of rounds and the stop reason. The
+seller decides; never edit or publish on the marketplace, and never call the result legally safe or cleared.
+
 ## Errors
 
 For MCP tool errors, branch on `code`; for direct REST errors, use `ProblemDetail.type` and `code` from the
@@ -90,4 +118,5 @@ if it is necessary to explain the issue. The API stores a canonical hash and bou
 
 - [Common rule IDs](references/common-rule-ids.md)
 - [Reading trademark findings](references/trademark-findings.md)
+- [Bounded repair loop](references/repair-loop.md)
 - [Worked examples](examples/README.md)
