@@ -102,7 +102,7 @@ the Access mode reach the container ([section 2](#2-environment-variables)).
 | `GET /login`, `POST /login`, `GET /login/verify`, `POST /login/verify`, `/logout` | magic-link sign-in (5 per e-mail and 30 per remote IP per 15 minutes; see [the remote IP issue](#7-open-items)) |
 | `GET /console` | home: the week in figures, what needs attention, the data the checks ran on |
 | `GET /console/check`, `POST /console/check`, `POST /console/check/apply` | the Check listing editor and edit mode (verified fixes, readiness, trademark panel, before and after; costs quota like the API); the *Gợi ý sửa* button only with the LLM rewrite on |
-| `GET /console/bulk` and its `POST` paths | the bulk check: paste from a Sheet or upload (`LISTING_GUARD_CONSOLE_BULK_MAX_ROWS` 200, `..._MAX_BYTES` 1MB) |
+| `GET /console/bulk` and its `POST` paths | the bulk check: paste from a Sheet or upload (`LISTING_GUARD_CONSOLE_BULK_MAX_ROWS` 200, `..._MAX_BYTES` 1MB, `..._DEFAULT_SCOPE` empty: content under the pilot profile, full otherwise; ADR-052) |
 | `GET /console/history` | the client's retained check results, with filters |
 | `GET /console/reaudit` | the periodic re-audit of the listings on sale |
 | `GET /console/watchlist` | the client's own watchlist; only an `ADMIN` account changes it |

@@ -55,6 +55,36 @@ Giá phải là số thập phân thường (`19.99`, dấu chấm, không ký h
 nguyên, như ở trang *Check listing* và `batch-check`. Dòng nào không đọc được sẽ ghi **Không đọc được** kèm lý do, không bị kiểm tra
 và không tốn quota; các dòng khác vẫn chạy. Ô trống nghĩa là trường đó vắng, và quy tắc sẽ báo là thiếu.
 
+### Phạm vi kiểm tra: nội dung hay đầy đủ
+
+Sheet viết title, tag và mô tả thường không có cột `category`, `who_made`, `when_made`, `price` hay `quantity`: những trường đó điền
+trên sàn khi tạo listing. Kiểm đầy đủ báo "Thiếu trường bắt buộc" ở **mọi** dòng của bảng như vậy và che mất lỗi thật (title quá dài, tag
+quá dài, nhãn hiệu). Vì thế bước chọn cột có thêm mục **Phạm vi kiểm tra** ([ADR-052](adr/ADR-052-content-scope-for-sheet-checks.md)):
+
+![Bước chọn cột với mục Phạm vi kiểm tra](images/pilot-seller-scope.png)
+
+| Phạm vi | Làm gì |
+| --- | --- |
+| **Kiểm nội dung (chỉ các cột có trong bảng)** | Trường bắt buộc mà bảng **không có cột** không bị báo thiếu. Mọi quy tắc khác (độ dài, tag, ký tự, từ cấm, nhãn hiệu, watchlist, biến thể) chạy như thường. Cột **có** trong bảng mà ô trống vẫn là lỗi. |
+| **Kiểm đầy đủ để đăng** | Như trước đây: mọi trường bắt buộc đều được kiểm; trường nào bảng không có cột sẽ báo thiếu. Dùng khi chuẩn bị đăng. |
+
+- **Mặc định.** Kiểm nội dung khi máy chủ chạy profile pilot (`listing-guard.console.pilot=true`), kiểm đầy đủ ở mọi trường hợp khác. Người
+  vận hành đặt lại bằng `LISTING_GUARD_CONSOLE_BULK_DEFAULT_SCOPE` (`content` hoặc `full`; xem [deployment.md](deployment.md)). Tick *Nhớ
+  cách chọn cột này* thì tài khoản nhớ cả phạm vi cùng cách chọn cột, và lựa chọn đó thắng mặc định.
+- **File nhận ra** (xuất từ Etsy, flat file Amazon) luôn được kiểm đầy đủ: cột của định dạng đó là cột của chính nó, không có cột nào để
+  thiếu. Trang **Check listing** và API `/api/v1/checks` không có phạm vi và luôn kiểm đầy đủ.
+- **Kết quả kiểm nội dung khác ở bốn điểm.** (1) Một ghi chú cho cả bảng, không phải mỗi dòng một phát hiện: "Bảng không có cột: price,
+  quantity, who_made, when_made, category — chưa kiểm các trường này." (2) Dòng sạch ghi **Đạt (nội dung)**, không phải *Đạt*: nó không
+  có nghĩa là listing sẵn sàng đăng, và phần tóm tắt của dòng ghi "[chưa kiểm: …]". (3) Khối dán vào Sheet và file CSV có thêm cột thứ ba,
+  **Phạm vi**. (4) Kết quả được lưu với độ sẵn sàng *Chỉ kiểm nội dung* (không điểm, không "sẵn sàng") và không bao giờ được dùng lại cho
+  kiểm đầy đủ, hay ngược lại; kiểm cùng bảng ở phạm vi kia tốn thêm một đơn vị quota cho quy tắc listing.
+- **Báo cáo pilot** đếm hai phạm vi riêng và chỉ hiện bảng kiểm nội dung khi kỳ báo cáo có lượt kiểm như vậy.
+
+Ví dụ đo thật: [`docs/samples/sheet-content-sample.tsv`](samples/sheet-content-sample.tsv) có tám listing tự đặt với bốn cột `SKU`, `Title`,
+`Description`, `Tags`. Kiểm đầy đủ: **8/8 dòng Lỗi** (thiếu `price`, `quantity`, `who_made`, `when_made`, `category`). Kiểm nội dung: **3
+dòng Lỗi** (title 159 ký tự, tag 26 ký tự, mô tả trống), 2 dòng Cảnh báo (tag trùng, "Free Shipping" trong title) và 3 dòng Đạt (nội
+dung). Test `SheetContentSampleIntegrationTest` chạy đúng tệp này và giữ các số trên.
+
 ## 3. Tải file
 
 Tab **Tải file** nhận `.csv`, `.tsv` hoặc `.txt` mã hóa UTF-8, dòng đầu là tiêu đề (trong Google Sheets: *Tệp, Tải xuống, Giá trị
@@ -83,6 +113,7 @@ SKU nếu có, trạng thái, số phát hiện và phát hiện chính. Dấu t
 | Trạng thái | Nghĩa |
 | --- | --- |
 | **Đạt** | Không quy tắc listing nào tìm thấy lỗi hay cảnh báo. Không phải lời xác nhận của sàn, và không nói gì về nhãn hiệu nếu dòng ghi "Chưa kiểm tra nhãn hiệu". |
+| **Đạt (nội dung)** | Như *Đạt*, nhưng chỉ cho các cột có trong bảng (kiểm nội dung): các trường bắt buộc bảng không có cột **chưa được kiểm**, nên không có nghĩa là sẵn sàng đăng. |
 | **Cảnh báo** | Có cảnh báo của quy tắc hoặc của nhóm biến thể, rủi ro nhãn hiệu mức trung bình hoặc cao, hoặc một phần kiểm tra chưa đầy đủ (kết quả chưa đầy đủ không bao giờ được đọc là sạch). |
 | **Lỗi** | Một quy tắc tìm thấy lỗi (ERROR). |
 | **Không đọc được** | Dữ liệu dòng sai (ví dụ giá `19,99`); không kiểm tra, không tốn quota. |
@@ -109,7 +140,8 @@ chỉ có trong trang vừa nhận được; nó không được lưu.
 Bấm **Sao chép cột kết quả**. Khối được chép có hai cột, *Trạng thái* và *Tóm tắt*, mỗi dòng của bảng một dòng, **cùng thứ tự với
 bảng đã dán**. Bảng có dòng tiêu đề thì khối bắt đầu bằng một dòng tiêu đề cho hai cột; dòng trống của bảng là dòng trống của khối,
 nên kết quả không bao giờ lệch hàng. Trong Sheet, dán vào **ô đầu tiên của hai cột trống** ngay cạnh bảng gốc, cùng hàng với dòng đầu
-bạn đã chép (dòng tiêu đề nếu có).
+bạn đã chép (dòng tiêu đề nếu có). Khi kiểm nội dung, khối có **ba cột** (thêm *Phạm vi*, ghi "Kiểm nội dung") nên dán vào ba cột trống;
+file CSV cũng có cột đó. Kiểm đầy đủ giữ hai cột như trước.
 
 `[Ảnh chụp: bulk-05-copy-back.png — Sheet với hai cột kết quả đã dán cạnh bảng gốc]`
 

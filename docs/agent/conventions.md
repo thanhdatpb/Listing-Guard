@@ -279,6 +279,16 @@ contract tools and release workflow continue to discover exactly one active base
   verdict). Every printed value goes through `th:text` and every sentence is a message of both bundles (ADR-028: a new text is a key
   in `messages.properties` and `messages_vi.properties`, never a literal in the template, the script or a class), a cell that starts like
   a formula gets a leading apostrophe, and a fix is shown and never applied. A new multipart POST path outside the console needs its entry in `bodyLimitFilter` (`ApiSecurityConfig`) and an ADR.
+- **Content scope** (ADR-052): the bulk check has two scopes, `FULL` (the old check, byte for byte: keep it the code path that calls
+  `CheckService.checkDetailed(clientId, request)`) and `CONTENT` (`CheckService.checkDetailed(.., CheckScope)`), where a `FieldScopedRule`
+  (`required_fields`, Etsy and Amazon) leaves out the presence of a field the table has no column for and a field with a column and an empty
+  cell is still reported. A content result is never ready and has no score (readiness `PARTIAL`, only valid with `listing_check.scope`
+  `CONTENT`, V51), names `skippedRuleIds` and `skippedFields`, and carries the scope and the fields it left out in `analysisVersion` (`+content:`),
+  so it is never answered for a full check and the other way around: **never read a content result as a check of the whole listing, never
+  show its clean row as "Đạt" but as "Đạt (nội dung)", and never give the scope a place in `CheckResult` or `/api/v1` without an additive
+  contract change** (the page, the Sheet block and the CSV name it; the pilot counts it apart, `seller_pilot_daily.scope`). The default is
+  content under `console.pilot` and full otherwise (`listing-guard.console.bulk.default-scope`), the seller's remembered choice wins, a built-in
+  adapter file and every other caller are full, and `analysisVersion` of a full result is still exactly the ruleset's version.
 - **Finding feedback** (ADR-034): a verdict changes no finding, rule, result, cache, `analysisVersion` or charge, and no query of it takes
   `requirePack`, `requireQuota` or `charge`. **Never store, log, export or return the text of a listing with a verdict**: the row copies only
   the rule id, source, level and `analysisVersion`; the note is the reviewer's own words, shown only to its author, and **no statistic, CSV,

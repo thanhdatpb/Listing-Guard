@@ -220,6 +220,7 @@ account.
 | --- | --- | --- |
 | `LISTING_GUARD_CONSOLE_BULK_MAX_ROWS` | `200` | The most data rows of one paste or file (a blank row counts, a header row does not). A larger input is refused as a whole and never cut. At least 1. |
 | `LISTING_GUARD_CONSOLE_BULK_MAX_BYTES` | `1MB` | The most bytes of one pasted text or one file. At least 1KB, and below `spring.servlet.multipart.max-file-size` (10 MB by default). |
+| `LISTING_GUARD_CONSOLE_BULK_DEFAULT_SCOPE` | empty | The scope the column step of the bulk check offers first (ADR-052): `content` (a required field the table has no column for is not reported as missing, and the result says it was not checked) or `full` (every required field, the check as it always was). Empty follows `listing-guard.console.pilot`: `content` with the pilot profile, `full` otherwise. A seller's remembered choice wins. Any other value stops the start. |
 
 - **Nothing the user pastes or uploads is kept.** The text lives in the request, goes back to the user's browser in a hidden field
   between the mapping step and the run, and is not put in the session, a file or a log. The result table is built for the response
