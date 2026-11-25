@@ -7,6 +7,9 @@ import com.thanhdatpb.listingguard.api.console.ConsoleAccount;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRepository;
 import com.thanhdatpb.listingguard.api.console.ConsoleFeedbackSupport;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
+import com.thanhdatpb.listingguard.api.console.ConsolePilot;
+import com.thanhdatpb.listingguard.api.console.PilotMetrics;
+import com.thanhdatpb.listingguard.api.console.PilotDraft;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.console.editor.EditorCost;
 import com.thanhdatpb.listingguard.api.console.editor.EditorMarketplace;
@@ -17,6 +20,7 @@ import com.thanhdatpb.listingguard.input.BuiltinAdapterCatalog;
 import com.thanhdatpb.listingguard.input.ConfiguredCsvAdapter;
 import com.thanhdatpb.listingguard.input.ListingInputAdapter;
 import com.thanhdatpb.listingguard.input.StandardListingAdapter;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -24,8 +28,11 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -117,6 +124,11 @@ public class ConsoleBulkController {
         }
     }
 
+    public record PilotDraftForm(String id, String data, Map<String, String> mapping) { }
+
+    private final ConsolePilot pilot;
+    private final PilotMetrics pilotMetrics;
+    private final Clock clock;
     private final BulkProperties limits;
     private final BulkCheckService service;
     private final BulkMappingStore mappingStore;
@@ -132,8 +144,12 @@ public class ConsoleBulkController {
                                  ConsoleAccountRepository accounts, PlanService plans, ObjectMapper mapper,
                                  ConsoleMessages messages, ConsoleFeedbackSupport feedback,
                                  com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history,
-                                 com.thanhdatpb.listingguard.ruleengine.readiness.ReadinessScorer readiness) {
+                                 com.thanhdatpb.listingguard.ruleengine.readiness.ReadinessScorer readiness,
+                                 ConsolePilot pilot, PilotMetrics pilotMetrics, Clock clock) {
         this.readiness = readiness;
+        this.pilot = pilot;
+        this.pilotMetrics = pilotMetrics;
+        this.clock = clock;
         this.messages = messages;
         this.feedback = feedback;
         this.history = history;
@@ -194,7 +210,7 @@ public class ConsoleBulkController {
      */
     @PostMapping("/console/bulk/run")
     public String run(@RequestParam Map<String, String> params, @AuthenticationPrincipal ConsoleUser user, Model model,
-                      HttpServletResponse response) {
+                      HttpServletRequest request, HttpServletResponse response) {
         noStore(response);
         EditorMarketplace marketplace = marketplace(params.getOrDefault("marketplace", ""));
         String data = params.getOrDefault("data", "");
@@ -226,9 +242,32 @@ public class ConsoleBulkController {
             if (remember) {
                 remember(user, marketplace, mapping.toStored(marketplace, table.labels()));
             }
-            return result(user, marketplace, result, List.of(), model);
+            Set<Integer> changed = Set.of();
+            if (pilot.enabled()) {
+                Set<Integer> checkedLines = new HashSet<>();
+                result.rows().stream().filter(BulkResult.Row::checked).forEach(row -> checkedLines.add(row.line()));
+                Map<Integer, PilotDraft.Fingerprint> fingerprints = new HashMap<>();
+                for (var input : inputs) {
+                    if (checkedLines.contains(input.line()) && input.listing() != null) {
+                        fingerprints.put(input.line(), PilotDraft.Fingerprint.of(input.sku(), input.listing().toString()));
+                    }
+                }
+                var draft = PilotDraft.advance(request.getSession(), PilotDraft.Surface.BULK, clock, user.clientId(),
+                        marketplace.code(), params.get("pilotDraft"), fingerprints);
+                changed = draft.changed();
+                Map<String, String> fields = new LinkedHashMap<>();
+                fields.put("marketplace", marketplace.code());
+                fields.put("delimiter", delimiterName(delimiter));
+                fields.put("header", table.header() ? "yes" : "no");
+                for (int i = 0; i < mapping.targets().size(); i++) {
+                    fields.put("col." + i, mapping.targetOf(i));
+                }
+                mapping.separators().forEach((key, value) -> fields.put("sep." + key, value));
+                model.addAttribute("pilotDraft", new PilotDraftForm(draft.id(), "\n" + data, fields));
+            }
+            return result(user, marketplace, result, List.of(), changed, model);
         } catch (BulkTable.Refused e) {
-            return refuse(user, marketplace, Tab.PASTE, e, null, model, response);
+            return refuse(user, marketplace, Tab.PASTE, e, pilot.enabled() ? data : null, model, response);
         } catch (PlanNotAllowedException e) {
             return refuse(user, marketplace, Tab.PASTE, new BulkTable.Refused(403, messages.get("bulk.error.plan", e.plan(),
                     BulkText.packName(messages, e.pack()))), null, model, response);
@@ -303,7 +342,7 @@ public class ConsoleBulkController {
             if (families) {
                 notes.add(messages.get("bulk.note.adapter.families"));
             }
-            return result(user, marketplace, result, notes, model);
+            return result(user, marketplace, result, notes, Set.of(), model);
         } catch (PlanNotAllowedException e) {
             throw new BulkTable.Refused(403, messages.get("bulk.error.plan", e.plan(), BulkText.packName(messages, e.pack())));
         } catch (QuotaExceededException e) {
@@ -436,7 +475,16 @@ public class ConsoleBulkController {
         return "";
     }
 
-    private String result(ConsoleUser user, EditorMarketplace marketplace, BulkResult result, List<String> extraNotes, Model model) {
+    private String result(ConsoleUser user, EditorMarketplace marketplace, BulkResult result, List<String> extraNotes,
+                          Set<Integer> changed, Model model) {
+        if (pilot.enabled()) {
+            pilotMetrics.record(user.clientId(), marketplace.code(), result.rows().stream().filter(BulkResult.Row::checked)
+                    .map(row -> {
+                        BulkResult.Trademark trademark = row.detail().trademark();
+                        String risk = trademark.kind() == BulkResult.Kind.RESULT ? trademark.level() : null;
+                        return new PilotMetrics.Observation(risk, changed.contains(row.line()));
+                    }).toList());
+        }
         base(model, user, marketplace, Tab.PASTE);
         model.addAttribute("stage", "result");
         model.addAttribute("readinessMax", readiness.config().baseScore());

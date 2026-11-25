@@ -59,6 +59,9 @@ class ConsoleDesignSystemIntegrationTest {
     @Autowired
     BrandAssets assets;
 
+    @Autowired
+    ConsoleAccountRepository accounts;
+
     @MockitoBean
     JavaMailSender mailSender;
 
@@ -141,11 +144,13 @@ class ConsoleDesignSystemIntegrationTest {
     void everyConsolePageRendersInTheShellWithTheRightPageMarked() throws Exception {
         TestClient client = PlanTestSupport.newClient(provisioning, clients, PlanCode.FREE);
         ConsoleUser user = userOf(client);
+        accounts.save(new ConsoleAccount(user.email(), user.clientId()));
         String clientName = clients.findById(client.id()).orElseThrow().getName();
         String[][] pages = {
                 {"/console", "Dashboard"}, {"/console/check", "Check listing"}, {"/console/bulk", "Bulk check"},
-                {"/console/history", "History"}, {"/console/reaudit", "Re-audit"}, {"/console/watchlist", "Watchlist"},
-                {"/console/stats", "Statistics"}, {"/console/report", "Report"}, {"/console/api-keys", "API keys"}};
+                {"/console/check/edit", "Compare a listing edit"}, {"/console/history", "History"}, {"/console/reaudit", "Re-audit"}, {"/console/watchlist", "Watchlist"},
+                {"/console/stats", "Statistics"}, {"/console/report", "Report"}, {"/console/api-keys", "API keys"},
+                {"/console/policy-changes", "Policy changes"}, {"/console/pod-readiness", "POD readiness"}};
 
         for (String[] page : pages) {
             String html = body(mvc.perform(get(page[0]).with(signedIn(user))).andExpect(status().isOk()).andReturn());
@@ -154,11 +159,11 @@ class ConsoleDesignSystemIntegrationTest {
             assertThat(html).as(as).contains("class=\"app-side\"").contains("href=\"#main\"").contains("id=\"main\"")
                     .contains("/brand/tokens.css?v=" + assets.version()).contains("/brand/app.css?v=" + assets.version())
                     .contains("rel=\"icon\"").contains("action=\"/logout\"").contains("app-account__avatar")
-                    .contains(user.email()).contains(clientName).contains("Work").contains("Manage");
+                    .contains(user.email()).contains(clientName).contains(">Check<", ">Monitor<", ">Manage<", ">Experimental<");
             assertThat(html.indexOf("/brand/tokens.css")).as(as + ": tokens before app.css").isLessThan(html.indexOf("/brand/app.css"));
             assertThat(countOf(html, "class=\"app-nav__link\"[^>]*aria-current=\"page\"")).as(as + ": one marked link").isEqualTo(1);
             assertThat(html).as(as).containsPattern("aria-current=\"page\"[^>]*>" + Pattern.quote(page[1]) + "<");
-            assertThat(countOf(html, "class=\"app-nav__link\"")).as(as + ": nine links").isEqualTo(9);
+            assertThat(html).as(as).doesNotContain("href=\"/console/review-queue\"");
         }
     }
 
@@ -167,15 +172,25 @@ class ConsoleDesignSystemIntegrationTest {
         ConsoleUser user = userOf(PlanTestSupport.newClient(provisioning, clients, PlanCode.FREE));
         String html = body(mvc.perform(get("/console").with(signedIn(user))).andReturn());
 
-        int work = html.indexOf(">Work<");
+        int check = html.indexOf(">Check<");
+        int monitor = html.indexOf(">Monitor<");
         int manage = html.indexOf(">Manage<");
-        assertThat(work).isPositive();
-        assertThat(manage).isGreaterThan(work);
-        for (String label : new String[] {">Dashboard<", ">Check listing<", ">Bulk check<", ">History<", ">Re-audit<", ">Watchlist<"}) {
-            assertThat(html.indexOf(label)).as(label).isBetween(work, manage);
+        int experimental = html.indexOf(">Experimental<");
+        assertThat(check).isPositive();
+        assertThat(monitor).isGreaterThan(check);
+        assertThat(manage).isGreaterThan(monitor);
+        assertThat(experimental).isGreaterThan(manage);
+        for (String label : new String[] {">Check listing<", ">Bulk check<", ">Compare a listing edit<"}) {
+            assertThat(html.indexOf(label)).as(label).isBetween(check, monitor);
         }
-        for (String label : new String[] {">Statistics<", ">Report<", ">API keys<"}) {
-            assertThat(html.indexOf(label)).as(label).isGreaterThan(manage);
+        for (String label : new String[] {">History<", ">Re-audit<"}) {
+            assertThat(html.indexOf(label)).as(label).isBetween(monitor, manage);
+        }
+        for (String label : new String[] {">Watchlist<", ">Statistics<", ">Report<", ">API keys<"}) {
+            assertThat(html.indexOf(label)).as(label).isBetween(manage, experimental);
+        }
+        for (String label : new String[] {">Policy changes<", ">POD readiness<"}) {
+            assertThat(html.indexOf(label)).as(label).isGreaterThan(experimental);
         }
         assertThat(html.indexOf(">Sign out<")).isGreaterThan(html.indexOf(">API keys<"));
     }

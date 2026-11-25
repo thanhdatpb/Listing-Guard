@@ -19,6 +19,12 @@
             <p class="lg-page__sub" th:text="#{stats.intro}"></p>
         </div>
         <div class="lg-actions" th:if="${stats != null}">
+            <a class="lg-btn lg-btn--primary" id="pilot-report" th:if="${consoleNavigation != null and consoleNavigation.pilot}"
+               th:href="@{/console/stats/pilot(from=${from},to=${to},marketplace=${marketplaceSelected})}"
+               th:text="#{pilot.report}"></a>
+            <a class="lg-btn" id="pilot-csv" th:if="${consoleNavigation != null and consoleNavigation.pilot}"
+               th:href="@{/console/stats/pilot.csv(from=${from},to=${to},marketplace=${marketplaceSelected})}"
+               th:text="#{pilot.export}"></a>
             <a class="lg-btn" id="stats-csv" th:href="@{/console/stats.csv(from=${from},to=${to},marketplace=${marketplaceSelected})}">
                 <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-download"/></svg>
                 <th:block th:text="#{stats.csv}"></th:block>

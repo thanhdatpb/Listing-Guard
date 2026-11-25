@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -27,7 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Hidden
 @Controller
 @RequestMapping("/console/policy-changes")
-@ConditionalOnProperty(prefix = "listing-guard.console", name = "enabled", havingValue = "true")
+@ConditionalOnExpression("${listing-guard.console.enabled:false} && ${listing-guard.console.policy-changes-enabled:true}")
 public class ConsolePolicyChangesController {
     private static final String VIEW = "console/policy-changes";
     public enum Marketplace { ETSY, AMAZON }

@@ -809,3 +809,40 @@ step is skipped and the result is `INCOMPLETE`. V41 and V42 count requests and r
 periodic re-audit (`listing-guard.console.reaudit.keep-runs`, 20 runs per scope), the feedback buttons and the value dashboard have
 no environment variable and need none: their defaults apply and `docker-compose.prod.yml` does not forward them. The rate limit,
 the retention periods and `LISTING_GUARD_IMAGE_ENABLED` are not forwarded either, so the image checks stay off.
+
+## 11. Chạy pilot cho seller Project Global
+
+Dùng image đã phát hành có ADR-047, host riêng hoặc cổng nội bộ và Compose project riêng.
+Sao chép [mẫu pilot](../deploy/env.pilot.example) thành `.env.pilot`, giới hạn quyền đọc và điền placeholder trên máy chủ.
+Dùng catalog thật `jsonl-2` đã nhập theo [mục 8b](#8b-a-trademark-catalog-from-the-hugging-face-rebuild-convert-elsewhere-copy-import-activate)
+và ghim chính xác phiên bản job in ra. Giữ cả catalog và ruleset ổn định trong hai tuần để kết quả có thể so sánh.
+Chỉ khởi động sau khi đã cấu hình tunnel và chính sách Allow đúng ba email trên Cloudflare Access và trong file env.
+
+```bash
+cp deploy/env.pilot.example .env.pilot
+chmod 600 .env.pilot
+# Điền cấu hình riêng của pilot và cấu hình Access theo mục 5 trước khi chạy Compose.
+docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod config --quiet
+docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod up -d
+```
+
+Để cấp tài khoản mới theo ADR-027, tạm đặt `LISTING_GUARD_CONSOLE_ACCESS_AUTO_CREATE=true` và
+`LISTING_GUARD_CONSOLE_ACCESS_DEFAULT_CLIENT_NAME=project-global`, rồi tạo lại service `api`. Mỗi người trong allowlist
+đăng nhập một lần. Kiểm tra ba tài khoản đang thuộc đúng client, cấp `ADMIN` cho lead, để seller là `MEMBER`, sau đó đặt
+auto-create về `false` và tạo lại service `api`. Tài khoản đã tồn tại giữ nguyên client cũ, nên kiểm tra trước khi mời dùng.
+Không chia sẻ API key với seller.
+
+```bash
+docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod --profile admin run --rm admin account list project-global
+docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod --profile admin run --rm admin account role '<lead-email>' ADMIN
+docker compose --env-file .env.pilot -p listing-guard-pilot --profile prod up -d --force-recreate api
+```
+
+Kiểm tra nhãn **Pilot**, ngôn ngữ VI, trademark catalog **READY**, bảng Sheet và quyền khác nhau giữa hai vai trò.
+Các cờ policy-checks, policy changes, review queue, verified cases, POD, image, LLM và plans/quota đều tắt trong mẫu.
+Giới hạn tốc độ và xác thực API hiện hành vẫn áp dụng. Gửi seller [hướng dẫn một trang](pilot-seller-guide.md).
+
+Hằng tuần, lead mở **Thống kê**, chọn phạm vi ngày UTC, rồi chọn **Báo cáo pilot** để in HTML hoặc **Tải CSV pilot**.
+Giữ bản xuất trong nơi lưu nội bộ đã duyệt. Khi kết thúc hai tuần, xuất báo cáo cuối, gỡ quyền Cloudflare Access dành
+cho pilot và dừng project. Giữ volume theo chính sách lưu trữ của đơn vị. Có thể rollback cấu hình bằng cách tạo lại
+`api` với các cờ từ mẫu production và ruleset mặc định.

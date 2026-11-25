@@ -5,6 +5,7 @@
 .claude
 **/target
 .env
+.env.pilot
 *.md
 docs
 eval

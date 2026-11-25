@@ -252,6 +252,20 @@
         </div>
         <p class="lg-field__hint" th:text="#{bulk.order.note}"></p>
 
+        <details id="pilot-draft" class="lg-disclosure" th:if="${pilotDraft != null}">
+            <summary th:text="#{pilot.edit}"></summary>
+            <form method="post" th:action="@{/console/bulk/run}" enctype="multipart/form-data" id="pilot-recheck-form">
+                <input type="hidden" name="pilotDraft" th:value="${pilotDraft.id}">
+                <input type="hidden" th:each="field : ${pilotDraft.mapping}" th:name="${field.key}" th:value="${field.value}">
+                <label class="lg-field__label" for="pilot-data" th:text="#{pilot.draft}"></label>
+                <textarea class="lg-textarea lg-textarea--mono" id="pilot-data" name="data" rows="6" spellcheck="false"
+                          aria-describedby="pilot-draft-hint" th:text="${pilotDraft.data}"></textarea>
+                <p id="pilot-draft-hint" class="lg-field__hint" th:text="#{pilot.edit.hint}"></p>
+                <p id="pilot-unchecked" class="lg-banner lg-banner--warn" role="status" hidden th:text="#{pilot.unchecked}"></p>
+                <button type="submit" class="lg-btn lg-btn--primary" th:text="#{pilot.recheck}"></button>
+            </form>
+        </details>
+
         <details class="lg-disclosure" id="sheet-help">
             <summary th:text="#{bulk.sheet.summary}"></summary>
             <p class="lg-text-muted lg-small" th:text="${result.header} ? #{bulk.sheet.withheader} : #{bulk.sheet.noheader}"></p>

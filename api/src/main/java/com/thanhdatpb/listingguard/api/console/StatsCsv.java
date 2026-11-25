@@ -48,7 +48,7 @@ final class StatsCsv {
         return rate == null ? "" : String.format(Locale.ROOT, "%.4f", rate);
     }
 
-    private static void line(StringBuilder out, String... cells) {
+    static void line(StringBuilder out, String... cells) {
         for (int i = 0; i < cells.length; i++) {
             if (i > 0) {
                 out.append(',');

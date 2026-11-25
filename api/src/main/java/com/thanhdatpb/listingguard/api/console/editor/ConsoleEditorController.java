@@ -2,13 +2,18 @@ package com.thanhdatpb.listingguard.api.console.editor;
 
 import com.thanhdatpb.listingguard.api.console.ConsoleFeedbackSupport;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
+import com.thanhdatpb.listingguard.api.console.PilotMetrics;
+import com.thanhdatpb.listingguard.api.console.PilotDraft;
+import com.thanhdatpb.listingguard.api.console.ConsolePilot;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.ruleset.RulesetLimitsService;
 import com.thanhdatpb.listingguard.ruleengine.readiness.ReadinessScorer;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Clock;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -44,11 +49,18 @@ public class ConsoleEditorController {
     private final ConsoleFeedbackSupport feedback;
     private final com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history;
     private final ReadinessScorer readiness;
+    private final PilotMetrics pilotMetrics;
+    private final ConsolePilot pilot;
+    private final Clock clock;
 
     public ConsoleEditorController(PlanService plans, RulesetLimitsService rulesetLimits, EditorCheckService checks,
                                    ConsoleMessages messages, ConsoleFeedbackSupport feedback,
-                                   com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history, ReadinessScorer readiness) {
+                                   com.thanhdatpb.listingguard.api.history.CheckHistoryRecorder history, ReadinessScorer readiness,
+                                   PilotMetrics pilotMetrics, ConsolePilot pilot, Clock clock) {
         this.readiness = readiness;
+        this.pilotMetrics = pilotMetrics;
+        this.pilot = pilot;
+        this.clock = clock;
         this.plans = plans;
         this.rulesetLimits = rulesetLimits;
         this.checks = checks;
@@ -71,7 +83,11 @@ public class ConsoleEditorController {
      * typed, next to the result.
      */
     @PostMapping("/console/check")
-    public String check(@ModelAttribute("form") EditorForm form, @AuthenticationPrincipal ConsoleUser user, Model model) {
+    public String check(@ModelAttribute("form") EditorForm form, @RequestParam(required = false) String pilotDraft,
+                        HttpServletRequest request, @AuthenticationPrincipal ConsoleUser user, Model model) {
+        if (pilot.enabled()) {
+            model.addAttribute("pilotDraft", pilotDraft);
+        }
         EditorMarketplace selected = marketplace(form.marketplace());
         EditorListingMapper.Mapped mapped = EditorListingMapper.map(selected, form);
         if (!mapped.valid()) {
@@ -79,6 +95,13 @@ public class ConsoleEditorController {
             return VIEW;
         }
         EditorResult result = checks.check(user.clientId(), selected, mapped.listing());
+        if (pilot.enabled() && (result.readiness().checkId() != null || result.trademark().checkId() != null)) {
+            var draft = PilotDraft.advance(request.getSession(), PilotDraft.Surface.SINGLE, clock, user.clientId(),
+                    selected.code(), pilotDraft, Map.of(1, PilotDraft.Fingerprint.of(null, mapped.listing().toString())));
+            model.addAttribute("pilotDraft", draft.id());
+            String risk = result.trademark().kind() == EditorResult.TrademarkKind.RESULT ? result.trademark().riskLevel() : null;
+            pilotMetrics.record(user.clientId(), selected.code(), List.of(new PilotMetrics.Observation(risk, !draft.changed().isEmpty())));
+        }
         feedback.accountId(user).ifPresent(account -> {
             if (result.readiness().checkId() != null) {
                 history.account(user.clientId(), account, com.thanhdatpb.listingguard.api.plan.Pack.LISTING_RULES.id(),
@@ -120,6 +143,9 @@ public class ConsoleEditorController {
             outcome = EditorFixApplier.apply(messages, form, null, null, null, null);
         }
         populate(model, user, selected, outcome.form(), Map.of());
+        if (pilot.enabled()) {
+            model.addAttribute("pilotDraft", request.getParameter("pilotDraft"));
+        }
         model.addAttribute("notice", outcome.message());
         model.addAttribute("noticeApplied", outcome.applied());
         return VIEW;

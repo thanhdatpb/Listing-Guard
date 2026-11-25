@@ -5,6 +5,7 @@ import com.thanhdatpb.listingguard.api.check.CheckRequest;
 import com.thanhdatpb.listingguard.api.check.CheckResult;
 import com.thanhdatpb.listingguard.api.check.CheckService;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
+import com.thanhdatpb.listingguard.api.console.PilotMetrics;
 import com.thanhdatpb.listingguard.api.console.editor.EditorCost;
 import com.thanhdatpb.listingguard.api.console.editor.EditorMarketplace;
 import com.thanhdatpb.listingguard.api.console.reaudit.ReauditBaselines.Baseline;
@@ -88,7 +89,7 @@ public class ReauditService {
     }
 
     /** One row after its checks. */
-    private record Outcome(Input input, String sku, String hash, String status, String reason, List<Found> found) {
+    private record Outcome(Input input, String sku, String hash, String status, String reason, List<Found> found, String trademarkRisk) {
     }
 
     /** What happens to the run as a whole while the rows are checked. */
@@ -111,10 +112,11 @@ public class ReauditService {
     private final ReauditBaselines baselines;
     private final ConsoleMessages messages;
     private final Clock clock;
+    private final PilotMetrics pilotMetrics;
 
     public ReauditService(CheckService checks, TrademarkCheckService trademarks, TrademarkCatalogRuntime catalog,
                           TrademarkRulesets rulesets, PlanService plans, ReauditStore store, ReauditBaselines baselines,
-                          ConsoleMessages messages, Clock clock) {
+                          ConsoleMessages messages, Clock clock, PilotMetrics pilotMetrics) {
         this.checks = checks;
         this.trademarks = trademarks;
         this.catalog = catalog;
@@ -125,6 +127,7 @@ public class ReauditService {
         this.baselines = baselines;
         this.messages = messages;
         this.clock = clock;
+        this.pilotMetrics = pilotMetrics;
     }
 
     /**
@@ -194,6 +197,9 @@ public class ReauditService {
                 newRisks.size(), previous == null ? null : previous.id());
         ReauditComparison.Changes changes = previous == null ? null : ReauditComparison.compare(store.rows(previous.id()), rows);
         store.save(run, rows);
+        pilotMetrics.record(clientId, marketplace.code(), outcomes.stream()
+                .filter(outcome -> ReauditStore.CHECKED.equals(outcome.status()))
+                .map(outcome -> new PilotMetrics.Observation(outcome.trademarkRisk(), false)).toList());
 
         List<String> notes = notes(trademarkNote, state, baseline);
         List<Risk> all = new ArrayList<>(newRisks);
@@ -226,7 +232,7 @@ public class ReauditService {
         String sku = cleanSku(input.sku());
         if (input.problem() != null) {
             return new Outcome(input, sku, null, ReauditStore.UNREADABLE, messages.get("reaudit.reason.unreadable", input.problem()),
-                    List.of());
+                    List.of(), null);
         }
         String hash = ReauditHasher.hash(input.listing());
         List<Found> found = new ArrayList<>();
@@ -245,21 +251,19 @@ public class ReauditService {
             }
         } catch (QuotaExceededException e) {
             state.quotaNote = state.quotaNote == null ? quota(e) : state.quotaNote;
-            return new Outcome(input, sku, hash, ReauditStore.NOT_CHECKED, quota(e), List.of());
+            return new Outcome(input, sku, hash, ReauditStore.NOT_CHECKED, quota(e), List.of(), null);
         } catch (PlanNotAllowedException e) {
-            return new Outcome(input, sku, hash, ReauditStore.NOT_CHECKED, plan(e), List.of());
+            return new Outcome(input, sku, hash, ReauditStore.NOT_CHECKED, plan(e), List.of(), null);
         } catch (RuntimeException e) {
             // the listing is client data: only the kind of failure and the line are logged
             log.warn("Re-audit: the rule check of line {} failed ({})", input.line(), e.getClass().getSimpleName());
-            return new Outcome(input, sku, hash, ReauditStore.NOT_CHECKED, messages.get("bulk.reason.failed"), List.of());
+            return new Outcome(input, sku, hash, ReauditStore.NOT_CHECKED, messages.get("bulk.reason.failed"), List.of(), null);
         }
-        if (!trademarkOff) {
-            trademark(clientId, marketplace, input, state, found);
-        }
-        return new Outcome(input, sku, hash, ReauditStore.CHECKED, null, List.copyOf(found));
+        String risk = trademarkOff ? null : trademark(clientId, marketplace, input, state, found);
+        return new Outcome(input, sku, hash, ReauditStore.CHECKED, null, List.copyOf(found), risk);
     }
 
-    private void trademark(UUID clientId, EditorMarketplace marketplace, Input input, State state, List<Found> found) {
+    private String trademark(UUID clientId, EditorMarketplace marketplace, Input input, State state, List<Found> found) {
         try {
             TrademarkCheckResult result = trademarks.check(clientId, new CheckRequest(marketplace.code(), input.listing()));
             if (result.catalogStatus() == TrademarkCheckResult.CatalogStatus.SERVED && state.catalogVersion == null) {
@@ -283,6 +287,7 @@ public class ReauditService {
                 found.add(new Found(Pack.TRADEMARK_RISK.id(), finding.ruleId(), finding.source().name(), finding.field(),
                         finding.mark(), normalized, entry, level, finding.message(), finding.suggestion(), finding.catalogCalibrated()));
             }
+            return result.completeness() == Completeness.COMPLETE ? result.riskLevel().name() : null;
         } catch (TrademarkUnavailableException | PlanNotAllowedException e) {
             state.trademarkSkipped++;
         } catch (QuotaExceededException e) {
@@ -292,6 +297,7 @@ public class ReauditService {
             log.warn("Re-audit: the trademark check of line {} failed ({})", input.line(), e.getClass().getSimpleName());
             state.trademarkSkipped++;
         }
+        return null;
     }
 
     private static boolean isNew(Baseline baseline, Found found) {

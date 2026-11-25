@@ -76,6 +76,10 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
             this(index, line, sku, status, statusLabel, findings, main, summary, detail, null);
         }
 
+        public boolean checked() {
+            return status == Status.OK || status == Status.WARNING || status == Status.ERROR;
+        }
+
         /** The finding the rewrite started from: the first ERROR of the rules, else the first trademark finding; null when none is stored. */
         public FeedbackTarget rewriteAnchor() {
             if (detail == null) {

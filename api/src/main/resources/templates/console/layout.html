@@ -80,17 +80,27 @@
     </label>
     <div class="app-side__panel">
         <nav class="app-nav" th:aria-label="#{nav.aria}">
+            <a class="app-nav__link" th:href="@{/console}" th:aria-current="${active == 'dashboard'} ? 'page'"><th:block th:text="#{nav.dashboard}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-home"/></svg></a>
             <p class="app-nav__label" th:text="#{nav.group.work}"></p>
-                <a class="app-nav__link" th:href="@{/console}" th:aria-current="${active == 'dashboard'} ? 'page'"><th:block th:text="#{nav.dashboard}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-home"/></svg></a>
-                <a class="app-nav__link" th:href="@{/console/check}" th:aria-current="${active == 'check'} ? 'page'"><th:block th:text="#{nav.check}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
-                <a class="app-nav__link" th:href="@{/console/bulk}" th:aria-current="${active == 'bulk'} ? 'page'"><th:block th:text="#{nav.bulk}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg></a>
-                <a class="app-nav__link" th:href="@{/console/history}" th:aria-current="${active == 'history'} ? 'page'"><th:block th:text="#{nav.history}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-history"/></svg></a>
-                <a class="app-nav__link" th:href="@{/console/reaudit}" th:aria-current="${active == 'reaudit'} ? 'page'"><th:block th:text="#{nav.reaudit}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-reaudit"/></svg></a>
+            <a class="app-nav__link" th:href="@{/console/check}" th:aria-current="${active == 'check'} ? 'page'"><th:block th:text="#{nav.check}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
+            <a class="app-nav__link" th:href="@{/console/bulk}" th:aria-current="${active == 'bulk'} ? 'page'"><th:block th:text="#{nav.bulk}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg></a>
+            <a class="app-nav__link" th:href="@{/console/check/edit}" th:aria-current="${active == 'edit'} ? 'page'" th:text="#{edit.heading}"></a>
+            <p class="app-nav__label" th:text="#{nav.group.monitor}"></p>
+            <a class="app-nav__link" th:href="@{/console/history}" th:aria-current="${active == 'history'} ? 'page'"><th:block th:text="#{nav.history}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-history"/></svg></a>
+            <a class="app-nav__link" th:href="@{/console/reaudit}" th:aria-current="${active == 'reaudit'} ? 'page'"><th:block th:text="#{nav.reaudit}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-reaudit"/></svg></a>
+            <th:block th:if="${consoleNavigation == null or consoleNavigation.manage}">
+                <p class="app-nav__label" th:text="#{nav.group.manage}"></p>
                 <a class="app-nav__link" th:href="@{/console/watchlist}" th:aria-current="${active == 'watchlist'} ? 'page'"><th:block th:text="#{nav.watchlist}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-watchlist"/></svg></a>
-            <p class="app-nav__label" th:text="#{nav.group.manage}"></p>
                 <a class="app-nav__link" th:href="@{/console/stats}" th:aria-current="${active == 'stats'} ? 'page'"><th:block th:text="#{nav.stats}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-stats"/></svg></a>
-                <a class="app-nav__link" th:href="@{/console/report}" th:aria-current="${active == 'report'} ? 'page'"><th:block th:text="#{nav.report}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-report"/></svg></a>
                 <a class="app-nav__link" th:href="@{/console/api-keys}" th:aria-current="${active == 'keys'} ? 'page'"><th:block th:text="#{nav.keys}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-keys"/></svg></a>
+                <a th:unless="${consoleNavigation != null and consoleNavigation.pilot}" class="app-nav__link" th:href="@{/console/report}" th:aria-current="${active == 'report'} ? 'page'"><th:block th:text="#{nav.report}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-report"/></svg></a>
+            </th:block>
+            <th:block th:if="${consoleNavigation != null and (consoleNavigation.pod or consoleNavigation.policyChanges or consoleNavigation.review)}">
+                <p class="app-nav__label" th:text="#{nav.group.experimental}"></p>
+                <a class="app-nav__link" th:if="${consoleNavigation.review}" th:href="@{/console/review-queue}" th:aria-current="${active == 'review'} ? 'page'" th:text="#{review.heading}"></a>
+                <a class="app-nav__link" th:if="${consoleNavigation.policyChanges}" th:href="@{/console/policy-changes}" th:aria-current="${active == 'impact'} ? 'page'" th:text="#{impact.heading}"></a>
+                <a class="app-nav__link" th:if="${consoleNavigation.pod}" th:href="@{/console/pod-readiness}" th:aria-current="${active == 'pod'} ? 'page'" th:text="#{pod.title}"></a>
+            </th:block>
         </nav>
         <div class="app-side__foot">
             <div class="app-account" th:if="${consoleAccount != null}">

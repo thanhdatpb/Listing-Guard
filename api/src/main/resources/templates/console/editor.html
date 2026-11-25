@@ -23,7 +23,7 @@
             <p class="lg-page__sub" th:text="#{editor.intro}"></p>
         </div>
         <div class="lg-actions">
-            <a class="lg-btn" th:href="@{/console/pod-readiness}" th:text="#{pod.title}"></a>
+            <a class="lg-btn" th:if="${consoleNavigation != null and consoleNavigation.pod}" th:href="@{/console/pod-readiness}" th:text="#{pod.title}"></a>
             <a class="lg-btn" th:href="@{/console/check/edit}" th:text="#{edit.mode.button}"></a>
         </div>
     </div>
@@ -42,6 +42,7 @@
         <form id="editor-form" method="post" th:action="@{/console/check}" th:object="${form}" novalidate
               th:attr="data-i18n-chars=#{js.counter.chars},data-i18n-chars-nolimit=#{js.counter.chars.nolimit},data-i18n-bytes=#{js.counter.bytes},data-i18n-bytes-nolimit=#{js.counter.bytes.nolimit},data-i18n-entries=#{js.counter.entries},data-i18n-entries-nolimit=#{js.counter.entries.nolimit},data-i18n-longest=#{js.counter.longest},data-i18n-over=#{js.counter.over}">
             <input type="hidden" th:field="*{marketplace}">
+            <input th:if="${pilotDraft != null}" type="hidden" name="pilotDraft" th:value="${pilotDraft}">
             <section id="editor-errors" tabindex="-1" data-status="ERROR" class="lg-banner lg-banner--error" role="alert" th:if="${!fieldErrors.isEmpty()}">
                 <p th:text="#{editor.validation.summary}"></p>
                 <ul>
