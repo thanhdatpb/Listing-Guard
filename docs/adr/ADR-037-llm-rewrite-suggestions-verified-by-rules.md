@@ -9,6 +9,8 @@
   [ADR-033](ADR-033-edit-mode-and-check-history.md), [ADR-034](ADR-034-finding-feedback-and-value-dashboard.md),
   [ADR-036](ADR-036-free-tier-llm-providers-and-trademark-context-judge.md) (the shared `LlmClient`, its providers, data routing,
   quota, cache and audit)
+- Amended by: [ADR-050](ADR-050-rewrite-repair-rounds.md): with `max-rounds` above 1 (default 1, which is this ADR unchanged) a press
+  may ask the model again after a round whose proposals all failed the checks, telling it why. The verification below stays the only gate.
 - Acceptance convention: Keep Proposed until the PR implementing this ADR is approved and merged. Then set Status to
   Accepted and Date to the merge date.
 
@@ -91,7 +93,8 @@ same normalizer, ruleset, catalog and watchlist as the stored path and persist n
 ### Limits on cost
 
 Per client, at most `listing-guard.llm.rewrite.max-per-hour` (default 20) runs per hour, counted in memory per instance;
-past it the page asks the seller to try later. Each run is one model call plus at most 3 candidate verifications. The
+past it the page asks the seller to try later. Each run is one model call plus at most 3 candidate verifications (ADR-050: up to
+`max-rounds` calls and verifications when that setting is above its default of 1; a press is still one run for this limit). The
 provider's own timeout bounds the call. A listing larger than a size cap is not offered the button.
 
 ### Console
