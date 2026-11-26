@@ -40,7 +40,7 @@ Ghi tên, revision, URL, giấy phép, ngưỡng xuất và SHA-256 khi chọn n
 
 ### Để sau (P2b)
 
-Owner/party để đếm chủ sở hữu, Supplemental Register và disclaimer cần dữ liệu ngoài các cột ADR-030 đang dùng. P2b xác minh bảng, lineage và độ đầy đủ trước khi bổ sung mỗi tín hiệu.
+Tín hiệu owner/party và lineage đã được thiết kế trong [ADR-054](ADR-054-owner-based-distinctiveness.md). Supplemental Register và disclaimer vẫn cần xác minh nguồn riêng.
 
 ### Đo dữ liệu thật
 

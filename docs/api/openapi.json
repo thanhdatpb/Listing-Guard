@@ -2058,8 +2058,12 @@
             "enum" : [ "STANDARD_CHARACTER", "WORDS_WITH_DESIGN", "OTHER" ],
             "type" : "string"
           },
+          "ownerCountSameMark" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "reason" : {
-            "enum" : [ "DICTIONARY_UNAVAILABLE", "DRAWING_UNKNOWN", "COMMON_OR_REPEATED", "UNIQUE_MULTIWORD", "DEFAULT" ],
+            "enum" : [ "DICTIONARY_UNAVAILABLE", "DRAWING_UNKNOWN", "COMMON_OR_REPEATED", "UNIQUE_MULTIWORD", "DEFAULT", "OWNERS_UNKNOWN", "CROWDED_OWNERS", "DICTIONARY_FEW_OWNERS", "UNIQUE_OWNER_WORD" ],
             "type" : "string"
           },
           "sameMarkClassCount" : {
@@ -2134,6 +2138,11 @@
               "type" : "string"
             },
             "type" : "array"
+          },
+          "ownerCountSameMark" : {
+            "description" : "Estimated distinct current owner names for the matched mark in the catalog snapshot.",
+            "format" : "int64",
+            "type" : "integer"
           },
           "risk" : {
             "description" : "Level of this finding: LOW (informational), MEDIUM or HIGH.",

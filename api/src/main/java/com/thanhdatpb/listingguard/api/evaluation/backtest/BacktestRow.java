@@ -27,7 +27,7 @@ import java.util.TreeSet;
  */
 record BacktestRow(int line, String id, Status status, String problem, Boolean claimed, IssueType issue, String mark,
                    Verdict verdict, Set<Caught> caughtBy, boolean markMatched, MissReason missReason, String missDetail,
-                   Set<String> flaggedRules, Set<String> foundRules, RiskLevel trademarkRisk, List<String> evidence) {
+                   Set<String> flaggedRules, Set<String> foundRules, RiskLevel trademarkRisk, List<String> evidence, BacktestProbe probe) {
 
     enum Status { CHECKED, UNREADABLE, LABEL_INVALID }
 
@@ -40,12 +40,12 @@ record BacktestRow(int line, String id, Status status, String problem, Boolean c
 
     static BacktestRow unreadable(int line, String id, String problem) {
         return new BacktestRow(line, id, Status.UNREADABLE, problem, null, null, null, null, Set.of(), false, null, null,
-                Set.of(), Set.of(), null, List.of());
+                Set.of(), Set.of(), null, List.of(), null);
     }
 
     static BacktestRow labelInvalid(int line, String id, String problem) {
         return new BacktestRow(line, id, Status.LABEL_INVALID, problem, null, null, null, null, Set.of(), false, null, null,
-                Set.of(), Set.of(), null, List.of());
+                Set.of(), Set.of(), null, List.of(), null);
     }
 
     /**
@@ -124,7 +124,7 @@ record BacktestRow(int line, String id, Status status, String problem, Boolean c
         }
         return new BacktestRow(line, id, Status.CHECKED, null, labels.claimed(), labels.issue(), mark, verdict,
                 Set.copyOf(caughtBy), markMatched, reason, detail, Set.copyOf(flagged), Set.copyOf(found), risk,
-                List.copyOf(evidence));
+                List.copyOf(evidence), BacktestProbe.assess(line, id, labels, analysis));
     }
 
     private static MissDiagnosis.Diagnosis diagnose(BacktestLabels.Labels labels, Analysis analysis, BacktestOptions options,

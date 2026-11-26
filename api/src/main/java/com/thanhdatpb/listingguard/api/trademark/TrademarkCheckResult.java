@@ -137,7 +137,7 @@ public record TrademarkCheckResult(
     @Schema(name = "TrademarkCheckFindingView")
     @JsonPropertyOrder({"ruleId", "source", "risk", "field", "start", "end", "snippet", "mark", "matchType", "score",
             "insideColorPhrase", "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "watchlistEntry", "message",
-            "suggestion", "tsdrStatuses"})
+            "suggestion", "tsdrStatuses", "ownerCountSameMark"})
     public record FindingView(
             @Schema(example = "catalog_exact") String ruleId,
             @Schema(description = "Where the finding comes from: CATALOG (a mark of the catalog), CONTEXT (a rule about place, sport "
@@ -180,7 +180,10 @@ public record TrademarkCheckResult(
                             + "be empty. It is information read when this answer is built, not part of the stored result: it "
                             + "never changes `risk`, `analysisVersion` or the cache, and the same stored result can show a "
                             + "newer status later. Read `checkedAt`: the status can be old.")
-            List<TsdrStatusView> tsdrStatuses) {
+            List<TsdrStatusView> tsdrStatuses,
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            @Schema(description = "Estimated distinct current owner names for the matched mark in the catalog snapshot.")
+            Long ownerCountSameMark) {
 
         public boolean weakCalibrated() {
             return risk == RiskLevel.LOW && riskAdjustments.stream()
@@ -214,14 +217,22 @@ public record TrademarkCheckResult(
                            MatchType matchType, Double score, boolean insideColorPhrase, List<String> otherRuleIds,
                            List<String> sourceIds, List<SourceLinkView> sourceLinks, List<RiskAdjustmentView> riskAdjustments,
                            WatchlistEntryView watchlistEntry, String message, String suggestion) {
+            this(ruleId, risk, field, start, end, snippet, mark, matchType, score, insideColorPhrase, otherRuleIds, sourceIds,
+                    sourceLinks, riskAdjustments, watchlistEntry, message, suggestion, null);
+        }
+
+        public FindingView(String ruleId, RiskLevel risk, String field, int start, int end, String snippet, String mark,
+                           MatchType matchType, Double score, boolean insideColorPhrase, List<String> otherRuleIds,
+                           List<String> sourceIds, List<SourceLinkView> sourceLinks, List<RiskAdjustmentView> riskAdjustments,
+                           WatchlistEntryView watchlistEntry, String message, String suggestion, Long ownerCountSameMark) {
             this(ruleId, FindingSource.of(ruleId), risk, field, start, end, snippet, mark, matchType, score, insideColorPhrase,
-                    otherRuleIds, sourceIds, sourceLinks, riskAdjustments, watchlistEntry, message, suggestion, null);
+                    otherRuleIds, sourceIds, sourceLinks, riskAdjustments, watchlistEntry, message, suggestion, null, ownerCountSameMark);
         }
 
         /** The same finding with the TSDR status member set (ADR-009, "TSDR status check"). */
         public FindingView withTsdrStatuses(List<TsdrStatusView> statuses) {
             return new FindingView(ruleId, source, risk, field, start, end, snippet, mark, matchType, score, insideColorPhrase,
-                    otherRuleIds, sourceIds, sourceLinks, riskAdjustments, watchlistEntry, message, suggestion, statuses);
+                    otherRuleIds, sourceIds, sourceLinks, riskAdjustments, watchlistEntry, message, suggestion, statuses, ownerCountSameMark);
         }
     }
 
@@ -297,11 +308,11 @@ public record TrademarkCheckResult(
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record CalibrationEvidence(DistinctivenessSignals.Tier tier, Integer wordCount, Long sameMarkCount,
                                       Integer sameMarkClassCount, DistinctivenessSignals.MarkKind markKind,
-                                      Boolean dictionaryWord, DistinctivenessSignals.Reason reason) {
+                                      Boolean dictionaryWord, DistinctivenessSignals.Reason reason, Long ownerCountSameMark) {
         static CalibrationEvidence of(DistinctivenessSignals signals) {
             return signals == null ? null : new CalibrationEvidence(signals.tier(), signals.wordCount(),
                     signals.sameMarkCount(), signals.sameMarkClassCount(), signals.markKind(),
-                    signals.dictionaryWord(), signals.reason());
+                    signals.dictionaryWord(), signals.reason(), signals.ownerCountSameMark());
         }
     }
 

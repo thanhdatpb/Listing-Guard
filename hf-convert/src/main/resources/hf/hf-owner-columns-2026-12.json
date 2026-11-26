@@ -1,0 +1,14 @@
+{
+  "version": "hf-owner-columns-2026-12",
+  "schemaStatus": "verified",
+  "datasetRevision": "50e430b4c021614e1302bddb45a4afcdcb7823f2",
+  "table": "owner",
+  "serial": "serial_no",
+  "name": "own_name",
+  "party": "own_type_cd",
+  "date": "file_dt_source",
+  "file": "file_name_source",
+  "firstParty": 10,
+  "lastParty": 69,
+  "suffixes": ["INC", "LLC", "LTD", "CORP", "CORPORATION", "CO", "COMPANY", "LIMITED", "PLC", "GMBH", "AG", "SA"]
+}

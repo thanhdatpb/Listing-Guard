@@ -74,7 +74,8 @@ final class BacktestReport {
     @JsonInclude(JsonInclude.Include.ALWAYS)
     record Report(String format, RunInfo run, RowCounts rows, ClaimedSummary claimed, List<ReasonCount> missReasons,
                   List<Missed> missed, int missedNotListed, UnclaimedSummary unclaimed, List<RuleStats> rules,
-                  List<Problem> problems, int problemsNotListed, String note) {
+                  List<Problem> problems, int problemsNotListed, String note,
+                  @JsonInclude(JsonInclude.Include.NON_EMPTY) List<BacktestProbe> probes) {
     }
 
     private static final ObjectMapper JSON = new ObjectMapper()
@@ -206,7 +207,8 @@ final class BacktestReport {
                 List.copyOf(reasonCounts), List.copyOf(missedRows.subList(0, Math.min(LIST_MAX, missedRows.size()))),
                 Math.max(0, missedRows.size() - LIST_MAX), unclaimed, List.copyOf(ruleStats),
                 List.copyOf(problems.subList(0, Math.min(LIST_MAX, problems.size()))),
-                Math.max(0, problems.size() - LIST_MAX), NOTE);
+                Math.max(0, problems.size() - LIST_MAX), NOTE,
+                rows.stream().map(BacktestRow::probe).filter(java.util.Objects::nonNull).toList());
     }
 
     /** Writes both files into {@code dir} (created when missing) and returns the report. */
@@ -337,8 +339,27 @@ final class BacktestReport {
             }
             md.append('\n');
         }
+        if (!report.probes().isEmpty()) {
+            md.append("## Kỳ vọng mức trademark theo dòng\n\n");
+            md.append("| Dòng | Id | Min | Max | Thực tế | Kết quả | Rule nặng nhất | Tier | Số chủ | Số serial | Mức mark đích | Tier mark đích | Số finding |\n");
+            md.append("|---:|---|---|---|---|---|---|---|---:|---:|---|---|---:|\n");
+            for (BacktestProbe probe : report.probes()) {
+                md.append("| ").append(probe.line()).append(" | ").append(cell(probe.id())).append(" | ")
+                        .append(display(probe.min())).append(" | ").append(display(probe.max())).append(" | ")
+                        .append(display(probe.actual())).append(" | ").append(probe.passed() ? "ĐẠT" : "KHÔNG ĐẠT").append(" | ")
+                        .append(cell(probe.finding())).append(" | ").append(display(probe.tier())).append(" | ")
+                        .append(display(probe.owners())).append(" | ").append(display(probe.serials())).append(" | ")
+                        .append(display(probe.namedMarkRisk())).append(" | ").append(display(probe.namedMarkTier())).append(" | ")
+                        .append(probe.findingCount()).append(" |\n");
+            }
+            md.append('\n');
+        }
         md.append("---\n\n").append(report.note()).append('\n');
         return md.toString();
+    }
+
+    private static String display(Object value) {
+        return value == null ? "—" : value.toString();
     }
 
     /** A value in a table cell: no line break, no column separator. */

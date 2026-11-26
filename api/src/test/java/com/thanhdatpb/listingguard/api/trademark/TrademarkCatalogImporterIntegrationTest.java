@@ -163,6 +163,18 @@ class TrademarkCatalogImporterIntegrationTest {
         var catalog = new PostgresTrademarkCatalog(jdbc, transactions, id, version);
         assertThat(catalog.findExact(List.of("mug")).get("mug").distinctiveness()).isEqualTo(signals);
 
+        assertThat(signals.ownerCountSameMark()).isNull();
+
+        String ownerLabel = uniqueLabel();
+        String ownerRow = row.replace("\"COMMON_OR_REPEATED\"}", "\"CROWDED_OWNERS\",\"owner_count_same_mark\":3}");
+        writeTwoSources(ownerLabel, ownerRow.formatted("a"), ownerRow.formatted("b"), "[25]", "[REGISTERED]");
+        Files.writeString(manifest, Files.readString(manifest).replace("jsonl-1", "jsonl-2"));
+        var owners = importSynthetic(ownerLabel);
+        assertThat(jdbc.queryForObject("""
+                SELECT (e.distinctiveness ->> 'owner_count_same_mark')::bigint FROM trademark_entry e
+                  JOIN trademark_catalog_version v ON v.id = e.catalog_version_id WHERE v.version = ?
+                """, Long.class, owners.catalog().version())).isEqualTo(3L);
+
         String legacyLabel = uniqueLabel();
         TrademarkFixtures.syntheticDir(dir, legacyLabel);
         var legacy = importSynthetic(legacyLabel);

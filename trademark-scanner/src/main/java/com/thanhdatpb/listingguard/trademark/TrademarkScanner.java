@@ -199,11 +199,14 @@ public final class TrademarkScanner {
             message = message + " " + adjustment.note();
         }
         String suggestion = Templates.fill(messageTemplate(candidate.ruleId(), false), candidate.placeholders());
+        var mark = candidate.catalogMark();
+        Long ownerCount = ruleset.calibration() == null || mark == null || mark.distinctiveness() == null
+                ? null : mark.distinctiveness().ownerCountSameMark();
         Evidence evidence = new Evidence(candidate.field(), candidate.start(), candidate.end(),
                 context.snippet(field, candidate.start(), candidate.end()), candidate.normalizedToken(),
                 candidate.mark(), candidate.type(), candidate.score(), catalogVersion, candidate.ruleId(),
                 candidate.insideColorPhrase(), candidate.otherRuleIds(), candidate.sourceIds(),
-                candidate.riskAdjustments(), ruleset.sourceLinks().resolve(candidate.sourceIds()));
+                candidate.riskAdjustments(), ruleset.sourceLinks().resolve(candidate.sourceIds()), null, ownerCount);
         return new TrademarkFinding(candidate.ruleId(), candidate.risk(), message, suggestion, evidence);
     }
 

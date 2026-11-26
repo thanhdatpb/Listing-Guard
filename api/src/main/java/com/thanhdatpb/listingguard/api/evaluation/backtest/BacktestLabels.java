@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.api.evaluation.backtest;
 
 import com.thanhdatpb.listingguard.api.batch.BatchConfigException;
+import com.thanhdatpb.listingguard.trademark.RiskLevel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -16,8 +17,12 @@ import java.util.Set;
 final class BacktestLabels {
 
     /** What the labels of one row say. {@code claimed} is null when the cell is blank: the row is then not measured. */
-    record Labels(Boolean claimed, IssueType issue, String mark) {
-    }
+    record Labels(Boolean claimed, IssueType issue, String mark, Bounds bounds) { }
+
+    record Bounds(RiskLevel min, RiskLevel max) { }
+
+    private static final String MIN_RISK = "expected_min_risk";
+    private static final String MAX_RISK = "expected_max_risk";
 
     /** A label cell that cannot be read. The message is Vietnamese and names the column, never the listing's text. */
     static final class LabelException extends RuntimeException {
@@ -38,14 +43,19 @@ final class BacktestLabels {
     private final String markName;
     private final int markIndex;
 
+    private final int minIndex;
+    private final int maxIndex;
+
     private BacktestLabels(String claimedName, int claimedIndex, String issueName, int issueIndex, String markName,
-                           int markIndex) {
+                           int markIndex, int minIndex, int maxIndex) {
         this.claimedName = claimedName;
         this.claimedIndex = claimedIndex;
         this.issueName = issueName;
         this.issueIndex = issueIndex;
         this.markName = markName;
         this.markIndex = markIndex;
+        this.minIndex = minIndex;
+        this.maxIndex = maxIndex;
     }
 
     /**
@@ -58,7 +68,9 @@ final class BacktestLabels {
     static BacktestLabels bind(List<String> header, String claimedColumn, String issueColumn, String markColumn) {
         return new BacktestLabels(claimedColumn, index(header, claimedColumn), issueColumn,
                 issueColumn == null ? -1 : index(header, issueColumn), markColumn,
-                markColumn == null ? -1 : index(header, markColumn));
+                markColumn == null ? -1 : index(header, markColumn),
+                header.contains(MIN_RISK) ? index(header, MIN_RISK) : -1,
+                header.contains(MAX_RISK) ? index(header, MAX_RISK) : -1);
     }
 
     private static int index(List<String> header, String column) {
@@ -87,27 +99,49 @@ final class BacktestLabels {
     Labels read(String[] cells) {
         String claimedText = cells[claimedIndex].trim();
         Boolean claimed = claimed(claimedText);
-        if (claimed == null) {
-            return new Labels(null, null, null);
+        RiskLevel min = risk(cells, minIndex, MIN_RISK);
+        RiskLevel max = risk(cells, maxIndex, MAX_RISK);
+        if (min != null && max != null && min.ordinal() > max.ordinal()) {
+            throw new LabelException(MIN_RISK + " lớn hơn " + MAX_RISK);
+        }
+        Bounds bounds = min == null && max == null ? null : new Bounds(min, max);
+        if (claimed == null && bounds == null) {
+            return new Labels(null, null, null, null);
         }
         String mark = markIndex < 0 ? null : blankToNull(cells[markIndex]);
         if (mark != null && mark.length() > MARK_MAX_CHARS) {
             throw new LabelException("mark '" + markName + "' dài hơn " + MARK_MAX_CHARS + " ký tự; ghi tên mark, không ghi cả đoạn văn.");
         }
-        if (!claimed) {
+        if (claimed == null || !claimed) {
             // the issue of a listing that was not claimed says nothing; it is not read, so a stale cell cannot refuse the row
-            return new Labels(false, null, mark);
+            return new Labels(claimed, null, mark, bounds);
         }
         String issueText = issueIndex < 0 ? null : blankToNull(cells[issueIndex]);
         if (issueText == null) {
-            return new Labels(true, IssueType.UNSPECIFIED, mark);
+            return new Labels(true, IssueType.UNSPECIFIED, mark, bounds);
         }
         Optional<IssueType> issue = IssueType.parse(issueText);
         if (issue.isEmpty()) {
             throw new LabelException("loại vấn đề '" + issueName + "' = '" + clip(issueText) + "' không có trong danh sách ("
                     + IssueType.accepted() + "; hoặc để trống)");
         }
-        return new Labels(true, issue.get(), mark);
+        return new Labels(true, issue.get(), mark, bounds);
+    }
+
+    private static RiskLevel risk(String[] cells, int index, String name) {
+        String value = index < 0 ? null : blankToNull(cells[index]);
+        if (value == null) {
+            return null;
+        }
+        try {
+            RiskLevel level = RiskLevel.valueOf(value.toUpperCase(Locale.ROOT));
+            if (level.isDetermined()) {
+                return level;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // A diagnostic names the column, not the cell.
+        }
+        throw new LabelException(name + " chỉ nhận LOW, MEDIUM, HIGH hoặc ô trống");
     }
 
     private Boolean claimed(String text) {
@@ -144,6 +178,8 @@ final class BacktestLabels {
         if (markName != null) {
             names.add(markName);
         }
+        if (minIndex >= 0) names.add(MIN_RISK);
+        if (maxIndex >= 0) names.add(MAX_RISK);
         return names;
     }
 }

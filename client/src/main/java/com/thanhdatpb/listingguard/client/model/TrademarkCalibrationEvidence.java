@@ -10,7 +10,13 @@ public record TrademarkCalibrationEvidence(
         Integer sameMarkClassCount,
         Boolean dictionaryWord,
         MarkKind markKind,
-        Reason reason) {
+        Reason reason,
+        Long ownerCountSameMark) {
+
+    public TrademarkCalibrationEvidence(Tier tier, Integer wordCount, Long sameMarkCount, Integer sameMarkClassCount,
+                                        Boolean dictionaryWord, MarkKind markKind, Reason reason) {
+        this(tier, wordCount, sameMarkCount, sameMarkClassCount, dictionaryWord, markKind, reason, null);
+    }
 
     public enum Tier {
         STRONG, ORDINARY, WEAK,
@@ -24,6 +30,7 @@ public record TrademarkCalibrationEvidence(
 
     public enum Reason {
         DICTIONARY_UNAVAILABLE, DRAWING_UNKNOWN, COMMON_OR_REPEATED, UNIQUE_MULTIWORD, DEFAULT,
+        OWNERS_UNKNOWN, CROWDED_OWNERS, DICTIONARY_FEW_OWNERS, UNIQUE_OWNER_WORD,
         @JsonEnumDefaultValue UNRECOGNIZED
     }
 }

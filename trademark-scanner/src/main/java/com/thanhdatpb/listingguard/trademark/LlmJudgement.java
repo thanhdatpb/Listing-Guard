@@ -122,7 +122,7 @@ public final class LlmJudgement {
         adjustments.add(new RiskAdjustment(AdjustmentReason.LLM_DESCRIPTIVE, from, RiskLevel.LOW, note, null, basis));
         Evidence evidence = new Evidence(old.field(), old.start(), old.end(), old.snippet(), old.normalizedToken(),
                 old.matchedMark(), old.matchType(), old.score(), old.catalogVersion(), old.ruleId(), old.insideColorPhrase(),
-                old.otherRuleIds(), old.sourceIds(), adjustments, old.sourceLinks(), old.watchlist());
+                old.otherRuleIds(), old.sourceIds(), adjustments, old.sourceLinks(), old.watchlist(), old.ownerCountSameMark());
         return new TrademarkFinding(finding.ruleId(), RiskLevel.LOW, finding.message(), finding.suggestion(), evidence);
     }
 }

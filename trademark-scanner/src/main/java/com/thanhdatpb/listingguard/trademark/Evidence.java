@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.trademark;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.thanhdatpb.listingguard.trademark.watchlist.WatchlistMatch;
 import java.util.List;
 
@@ -28,13 +29,22 @@ import java.util.List;
 public record Evidence(String field, int start, int end, String snippet, String normalizedToken, String matchedMark,
                        MatchType matchType, Double score, String catalogVersion, String ruleId,
                        boolean insideColorPhrase, List<String> otherRuleIds, List<String> sourceIds,
-                       List<RiskAdjustment> riskAdjustments, List<SourceLink> sourceLinks, WatchlistMatch watchlist) {
+                       List<RiskAdjustment> riskAdjustments, List<SourceLink> sourceLinks, WatchlistMatch watchlist,
+                       @JsonInclude(JsonInclude.Include.NON_NULL) Long ownerCountSameMark) {
 
     public Evidence {
         otherRuleIds = List.copyOf(otherRuleIds);
         sourceIds = List.copyOf(sourceIds);
         riskAdjustments = List.copyOf(riskAdjustments);
         sourceLinks = List.copyOf(sourceLinks);
+    }
+
+    public Evidence(String field, int start, int end, String snippet, String normalizedToken, String matchedMark,
+                    MatchType matchType, Double score, String catalogVersion, String ruleId,
+                    boolean insideColorPhrase, List<String> otherRuleIds, List<String> sourceIds,
+                    List<RiskAdjustment> riskAdjustments, List<SourceLink> sourceLinks, WatchlistMatch watchlist) {
+        this(field, start, end, snippet, normalizedToken, matchedMark, matchType, score, catalogVersion, ruleId,
+                insideColorPhrase, otherRuleIds, sourceIds, riskAdjustments, sourceLinks, watchlist, null);
     }
 
     /** Evidence of a finding that does not come from a watchlist. */

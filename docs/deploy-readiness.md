@@ -565,3 +565,8 @@ So sánh severity trước và sau trên cùng listing mẫu, cùng ruleset sau 
 giữ cùng catalog `jsonl-2`, cùng mẫu và cùng cấu hình LLM tắt. Chạy từng listing với `2026-11b` và `2026-12`,
 ghi HIGH/MEDIUM/LOW theo listing và p50/p95 của các lượt chưa cache cho mỗi ruleset. Ghi phiên bản catalog và
 từ điển. Các số liệu cũ ở mục đo Hugging Face tiếp tục là mốc lịch sử.
+
+
+### Owner-based distinctiveness: chưa đo
+
+Schema owner đã đối chiếu ở revision cố định. Phân bố tier, thời gian và mức chiếm đĩa trên catalog thật chưa đo. Xem [runbook kích hoạt catalog](catalog-activation-runbook.md) để chuyển đổi, import và so sánh hai ruleset trên probe trước khi đổi pilot.

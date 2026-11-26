@@ -285,7 +285,8 @@ public class ReauditService {
                         ? normalizer.normalizeMark(finding.mark()) : null;
                 UUID entry = finding.watchlistEntry() == null ? null : finding.watchlistEntry().entryId();
                 found.add(new Found(Pack.TRADEMARK_RISK.id(), finding.ruleId(), finding.source().name(), finding.field(),
-                        finding.mark(), normalized, entry, level, finding.message(), finding.suggestion(), finding.catalogCalibrated()));
+                        finding.mark(), normalized, entry, level, messages.trademarkOwnerCount(finding.message(), finding.ownerCountSameMark()),
+                        finding.suggestion(), finding.catalogCalibrated()));
             }
             return result.completeness() == Completeness.COMPLETE ? result.riskLevel().name() : null;
         } catch (TrademarkUnavailableException | PlanNotAllowedException e) {

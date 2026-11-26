@@ -230,11 +230,12 @@ public class EditorCheckService {
         return groups;
     }
 
-    private static EditorResult.TrademarkItem trademarkItem(TrademarkCheckResult.FindingView finding, Listing listing,
+    private EditorResult.TrademarkItem trademarkItem(TrademarkCheckResult.FindingView finding, Listing listing,
                                                             FeedbackTarget target) {
         String text = EditorEvidence.fieldText(listing, finding.field());
         return new EditorResult.TrademarkItem(finding.ruleId(), finding.risk().name(), finding.field(),
-                finding.matchType().name(), finding.mark(), finding.message(), finding.suggestion(),
+                finding.matchType().name(), finding.mark(), messages.trademarkOwnerCount(finding.message(), finding.ownerCountSameMark()),
+                finding.suggestion(),
                 EditorEvidence.ofSpan(text, finding.start(), finding.end(), finding.snippet()), target,
                 ConsoleLlmLabel.reason(finding.riskAdjustments()), finding.source().name(), finding.sourceIds(), finding.weakCalibrated());
     }

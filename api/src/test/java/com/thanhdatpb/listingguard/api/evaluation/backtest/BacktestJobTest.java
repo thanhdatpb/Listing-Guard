@@ -113,6 +113,35 @@ class BacktestJobTest {
     }
 
     @Test
+    void reportsBoundsForUnclaimedProbeRowsAndKeepsClaimMetricsSeparate() throws IOException {
+        Path input = write("probe.csv", HEADER + ",expected_min_risk,expected_max_risk\n"
+                + plain("S-probe", "Zibblefrax Ceramic Coffee Mug", "", "", "Zibblefrax") + ",MEDIUM,\n"
+                + plain("S-max", "Zibblefrax Ceramic Coffee Mug", "", "", "") + ",,MEDIUM\n");
+        Path mapping = write("mapping.yaml", MAPPING);
+        var catalog = new com.thanhdatpb.listingguard.trademark.catalog.InMemoryTrademarkCatalog("probe", List.of(
+                new com.thanhdatpb.listingguard.trademark.catalog.CatalogMark("zibblefrax", "Zibblefrax", List.of(25),
+                        com.thanhdatpb.listingguard.trademark.catalog.MarkStatus.REGISTERED, false, List.of(),
+                        new com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals(1, 4L, 1,
+                                com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals.MarkKind.STANDARD_CHARACTER,
+                                false, com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals.Tier.STRONG,
+                                com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals.Reason.UNIQUE_OWNER_WORD, 1L))));
+        var probeScanner = new TrademarkScanner(scanner.ruleset(), catalog);
+        BacktestJob.Result result = job(marketplace -> probeScanner, "READY", new ByteArrayOutputStream()).run(options(input, mapping));
+        assertThat(result.claimed()).isZero();
+        JsonNode report = new ObjectMapper().readTree(result.reportDir().resolve(BacktestReport.JSON_FILE).toFile());
+        var passes = report.path("probes").get(0);
+        assertThat(passes.path("passed").asBoolean()).isTrue();
+        assertThat(passes.path("tier").asText()).isEqualTo("STRONG");
+        assertThat(passes.path("owners").asLong()).isEqualTo(1L);
+        assertThat(passes.path("serials").asLong()).isEqualTo(4L);
+        assertThat(passes.path("namedMarkTier").asText()).isEqualTo("STRONG");
+        assertThat(passes.path("findingKeys").isEmpty()).isFalse();
+        assertThat(report.path("probes").get(1).path("passed").asBoolean()).isFalse();
+        assertThat(Files.readString(result.reportDir().resolve(BacktestReport.MARKDOWN_FILE)))
+                .contains("ĐẠT", "KHÔNG ĐẠT").doesNotContain("Ceramic Coffee Mug");
+    }
+
+    @Test
     void reportsRecallMissReasonsAndFalseAlarmsOfASyntheticFile() throws IOException {
         Path input = write("claims.csv", String.join("\n", rows()) + "\n");
         Path mapping = write("mapping.yaml", MAPPING);
