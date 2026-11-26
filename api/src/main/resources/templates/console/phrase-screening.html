@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{phrase.heading}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+    <th:block th:replace="~{console/layout :: htmx}"></th:block>
+    <script th:src="@{/console/phrase-screening.js}" defer></script>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('phrases')}"></header>
+<main id="main" class="lg-page" tabindex="-1">
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{phrase.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{phrase.intro}"></p>
+        </div>
+        <a th:if="${result != null or preview != null}" class="lg-btn" th:href="@{/console/phrase-screening}" th:text="#{phrase.restart}"></a>
+    </div>
+    <p th:fragment="phraseError" th:if="${phraseError != null}" id="phrase-error" class="lg-banner lg-banner--warning" role="alert">
+        <span class="lg-mark" aria-hidden="true"></span><span th:text="${phraseError}"></span>
+    </p>
+    <div th:if="${preview == null and result == null}" class="lg-split lg-section">
+        <section class="lg-card">
+            <h2 th:text="#{phrase.upload}"></h2>
+            <form id="phrase-upload" method="post" th:action="@{/console/phrase-screening/preview}" enctype="multipart/form-data">
+                <input type="hidden" name="mode" value="file">
+                <div th:replace="~{console/phrase-fragments :: marketplace('upload')}"></div>
+                <label class="lg-field__label" for="phrase-file" th:text="#{phrase.file}"></label>
+                <input class="lg-input" type="file" id="phrase-file" name="file" accept=".csv,.tsv" required>
+                <p class="lg-small" th:text="#{phrase.file.hint}"></p>
+                <button class="lg-btn lg-btn--primary" type="submit" th:text="#{phrase.preview}"></button>
+            </form>
+        </section>
+        <section class="lg-card">
+            <h2 th:text="#{phrase.paste}"></h2>
+            <form id="phrase-paste" method="post" th:action="@{/console/phrase-screening/preview}" enctype="multipart/form-data">
+                <input type="hidden" name="mode" value="paste">
+                <div th:replace="~{console/phrase-fragments :: marketplace('paste')}"></div>
+                <label class="lg-field__label" for="phrase-data" th:text="#{phrase.paste.hint}"></label>
+                <textarea id="phrase-data" class="lg-textarea" name="data" rows="7" required></textarea>
+                <button class="lg-btn lg-btn--primary" type="submit" th:text="#{phrase.preview}"></button>
+            </form>
+        </section>
+    </div>
+    <section th:if="${preview != null}" class="lg-card lg-section" id="phrase-preview">
+        <h2 th:text="#{phrase.preview}"></h2>
+        <form id="phrase-run" method="post" th:action="@{/console/phrase-screening/run}" enctype="multipart/form-data"
+              th:attr="data-busy=#{phrase.busy}">
+            <input type="hidden" name="mode" th:value="${preview.mode()}">
+            <input type="hidden" name="marketplace" th:value="${preview.marketplace()}">
+            <textarea name="data" hidden th:text="${preview.carriedData()}"></textarea>
+            <div th:if="${!preview.columns().isEmpty()}" class="lg-split lg-section">
+                <div>
+                    <label class="lg-field__label" for="phrase-column" th:text="#{phrase.mapping.phrase}"></label>
+                    <select id="phrase-column" class="lg-select" name="phraseColumn" required data-phrase-mapping>
+                        <option value="-1" th:text="#{phrase.mapping.choose}"></option>
+                        <option th:each="column : ${preview.columns()}" th:value="${column.index()}" th:text="${column.label()}"
+                                th:selected="${column.index() == preview.phraseColumn()}"></option>
+                    </select>
+                </div>
+                <div>
+                    <label class="lg-field__label" for="phrase-volume" th:text="#{phrase.mapping.volume}"></label>
+                    <select id="phrase-volume" class="lg-select" name="volumeColumn" data-phrase-mapping>
+                        <option value="-1" th:text="#{phrase.mapping.none}"></option>
+                        <option th:each="column : ${preview.columns()}" th:value="${column.index()}" th:text="${column.label()}"
+                                th:selected="${column.index() == preview.volumeColumn()}"></option>
+                    </select>
+                </div>
+            </div>
+            <p th:if="${preview.guessed()}" id="phrase-mapping-guess" th:text="#{phrase.mapping.guessed}"></p>
+            <label th:if="${!preview.columns().isEmpty()}">
+                <input type="checkbox" name="remember" value="true" th:checked="${preview.remember()}">
+                <span th:text="#{phrase.mapping.remember}"></span>
+            </label>
+            <p th:if="${preview.total() != null}" id="phrase-counts"
+               th:text="#{phrase.counts(${preview.total()},${preview.duplicates()},${preview.dropped()},${preview.overflow()})}"></p>
+            <label th:if="${preview.overflow() > 0}" id="phrase-overflow">
+                <input type="checkbox" name="confirmOverflow" value="true">
+                <span th:text="#{phrase.overflow(${preview.max()})}"></span>
+            </label>
+            <div class="lg-actions">
+                <button th:if="${!preview.columns().isEmpty()}" type="submit" class="lg-btn"
+                        th:formaction="@{/console/phrase-screening/preview}" th:text="#{phrase.mapping.preview}"></button>
+                <button id="phrase-submit" class="lg-btn lg-btn--primary" type="submit" th:disabled="${preview.total() == null}"
+                        th:text="#{phrase.run}"></button>
+            </div>
+            <p id="phrase-run-status" role="status"></p>
+        </form>
+    </section>
+    <section th:if="${result != null}" id="phrase-result" class="lg-section" th:with="summary=${result.response().summary()}, unknown=#{phrase.unknown}">
+        <h2 th:text="#{phrase.result}"></h2>
+        <div class="lg-card">
+            <p th:text="#{phrase.coverage(${result.response().catalogVersion() ?: unknown},
+                  ${catalogDate == null ? unknown : #temporals.format(catalogDate, #messages.msg('format.date'))},
+                  ${summary.fuzzySkipped()})}"></p>
+            <p th:if="${result.response().completeness().name() == 'INCOMPLETE'}" class="lg-banner lg-banner--warning">
+                <span class="lg-mark" aria-hidden="true"></span><span th:text="#{phrase.incomplete}"></span>
+            </p>
+            <p th:text="${result.response().disclaimer()}"></p>
+            <p th:text="#{phrase.export.coverage}"></p>
+            <div class="lg-actions">
+                <button id="phrase-copy" type="button" class="lg-btn"
+                        th:attr="data-url=@{/console/phrase-screening/{id}/export(id=${result.id()},kind='text')},
+                                 data-expired=#{phrase.error.expired},data-copied=#{phrase.copied},data-failed=#{phrase.copy.failed}"
+                        th:text="#{phrase.copy}"></button>
+                <a id="phrase-safe-csv" class="lg-btn" th:href="@{/console/phrase-screening/{id}/export(id=${result.id()},kind='safe')}"
+                   th:text="#{phrase.export.safe}"></a>
+                <a id="phrase-full-csv" class="lg-btn" th:href="@{/console/phrase-screening/{id}/export(id=${result.id()},kind='full')}"
+                   th:text="#{phrase.export.full}"></a>
+            </div>
+            <p id="phrase-copy-status" role="status"></p>
+            <textarea id="phrase-copy-fallback" class="lg-textarea" th:aria-label="#{phrase.copy}" readonly hidden></textarea>
+        </div>
+        <nav class="lg-actions lg-section" th:aria-label="#{phrase.groups}">
+            <a th:each="tab : ${tabs}" class="lg-btn" th:classappend="${tab == selected} ? 'lg-btn--primary'"
+               th:aria-current="${tab == selected} ? 'page'"
+               th:href="@{/console/phrase-screening/{id}(id=${result.id()},tab=${tab.name()})}"
+               th:attr="data-phrase-tab=${tab.name()}"
+               th:text="#{phrase.group(${#messages.msg('phrase.verdict.' + tab.name())},
+                         ${tab.name() == 'BLOCK' ? summary.block() : (tab.name() == 'REVIEW' ? summary.review() : summary.clear())})}"></a>
+        </nav>
+        <div class="lg-table-wrap">
+            <table class="lg-table lg-table--scroll">
+                <caption th:text="${#messages.msg('phrase.verdict.' + selected.name())}"></caption>
+                <thead><tr>
+                    <th scope="col" th:text="#{phrase.col.text}"></th>
+                    <th scope="col" th:text="#{phrase.col.volume}"></th>
+                    <th scope="col" th:text="#{phrase.col.verdict}"></th>
+                    <th scope="col" th:text="#{phrase.findings}"></th>
+                </tr></thead>
+                <tbody>
+                <tr th:if="${rows.isEmpty()}"><td colspan="4" th:text="#{phrase.empty.group}"></td></tr>
+                <tr th:each="row : ${rows}" th:with="view=${row.view()}">
+                    <th scope="row" th:text="${view.text()}"></th>
+                    <td th:text="${view.searchVolume() ?: '—'}"></td>
+                    <td>
+                        <span class="lg-pill" th:classappend="${selected.name() == 'BLOCK' ? 'lg-pill--error'
+                                : (selected.name() == 'REVIEW' or !row.exportable() ? 'lg-pill--warn' : 'lg-pill--clean')}"
+                              th:text="${#messages.msg('phrase.verdict.' + selected.name())}"></span>
+                        <p th:if="${view.completeness().name() == 'INCOMPLETE'}" class="lg-small" th:text="#{phrase.row.incomplete}"></p>
+                    </td>
+                    <td>
+                        <span th:if="${row.findings().isEmpty()}" th:text="#{phrase.empty.findings}"></span>
+                        <th:block th:unless="${row.findings().isEmpty()}" th:with="top=${row.findings().get(0)}">
+                            <div th:replace="~{console/phrase-fragments :: finding(${top})}"></div>
+                            <details class="lg-disclosure">
+                                <summary th:text="#{phrase.all.findings(${row.findings().size()})}"></summary>
+                                <th:block th:each="entry : ${row.findings()}">
+                                    <div th:replace="~{console/phrase-fragments :: finding(${entry})}"></div>
+                                    <th:block th:with="target=${entry.target()}">
+                                        <form th:replace="~{console/feedback :: widget(${target})}"></form>
+                                    </th:block>
+                                </th:block>
+                            </details>
+                        </th:block>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+</body>
+</html>

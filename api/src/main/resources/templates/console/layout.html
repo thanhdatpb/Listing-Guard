@@ -84,6 +84,8 @@
             <p class="app-nav__label" th:text="#{nav.group.work}"></p>
             <a class="app-nav__link" th:href="@{/console/check}" th:aria-current="${active == 'check'} ? 'page'"><th:block th:text="#{nav.check}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
             <a class="app-nav__link" th:href="@{/console/bulk}" th:aria-current="${active == 'bulk'} ? 'page'"><th:block th:text="#{nav.bulk}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg></a>
+            <a th:if="${phraseScreeningEnabled == true}" class="app-nav__link" th:href="@{/console/phrase-screening}"
+               th:aria-current="${active == 'phrases'} ? 'page'"><th:block th:text="#{phrase.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg></a>
             <a class="app-nav__link" th:href="@{/console/check/edit}" th:aria-current="${active == 'edit'} ? 'page'" th:text="#{edit.heading}"></a>
             <p class="app-nav__label" th:text="#{nav.group.monitor}"></p>
             <a class="app-nav__link" th:href="@{/console/history}" th:aria-current="${active == 'history'} ? 'page'"><th:block th:text="#{nav.history}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-history"/></svg></a>

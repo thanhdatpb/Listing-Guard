@@ -43,9 +43,11 @@ public class ConsoleStatsController {
     private final NormalizerRegistry normalizers;
     private final ConsoleMessages messages;
     private final ObjectProvider<RewriteRunStore> rewriteRuns;
+    private final ObjectProvider<PhraseConsoleMetrics> phraseMetrics;
 
     public ConsoleStatsController(FeedbackStatsService stats, NormalizerRegistry normalizers, ConsoleMessages messages,
-                                  ObjectProvider<RewriteRunStore> rewriteRuns) {
+                                  ObjectProvider<RewriteRunStore> rewriteRuns, ObjectProvider<PhraseConsoleMetrics> phraseMetrics) {
+        this.phraseMetrics = phraseMetrics;
         this.stats = stats;
         this.normalizers = normalizers;
         this.messages = messages;
@@ -68,6 +70,10 @@ public class ConsoleStatsController {
             model.addAttribute("to", query.to().toString());
             model.addAttribute("marketplaceSelected", query.marketplace() == null ? "" : query.marketplace());
             model.addAttribute("stats", stats.stats(user.clientId(), query));
+            var phrases = phraseMetrics.getIfAvailable();
+            if (phrases != null) {
+                model.addAttribute("phraseWeeks", phrases.weeks(user.clientId(), query));
+            }
             // the use of the rewrite suggestions (ADR-037): only while that feature is on, for the same period
             RewriteRunStore rewrite = rewriteRuns.getIfAvailable();
             if (rewrite != null) {
@@ -94,11 +100,18 @@ public class ConsoleStatsController {
             ReportQuery query = query(from, to, marketplace);
             FeedbackStats result = stats.stats(user.clientId(), query);
             String name = "listing-guard-feedback-" + query.from() + "-" + query.to() + ".csv";
+            String csv = StatsCsv.csv(messages, result);
+            var phrases = phraseMetrics.getIfAvailable();
+            if (phrases != null) {
+                var report = new StringBuilder(csv).append("\r\n");
+                PhraseConsoleMetrics.appendCsv(report, messages, phrases.weeks(user.clientId(), query));
+                csv = report.toString();
+            }
             return ResponseEntity.ok()
                     .cacheControl(org.springframework.http.CacheControl.noStore())
                     .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                     .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(name).build().toString())
-                    .body(StatsCsv.csv(messages, result).getBytes(StandardCharsets.UTF_8));
+                    .body(csv.getBytes(StandardCharsets.UTF_8));
         } catch (InvalidReportPeriodException | ReportPeriodTooLongException | UnknownMarketplaceException
                  | MarketplaceNotYetSupportedException e) {
             return ResponseEntity.badRequest().contentType(new MediaType("text", "plain", StandardCharsets.UTF_8))

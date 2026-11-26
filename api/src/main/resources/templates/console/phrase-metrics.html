@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="weeks" class="lg-section" id="phrase-weekly">
+    <div class="lg-table-wrap"><table class="lg-table">
+        <caption th:text="#{phrase.stats.heading}"></caption>
+        <thead><tr>
+            <th scope="col" th:text="#{phrase.stats.week}"></th>
+            <th scope="col" th:text="#{phrase.stats.runs}"></th>
+            <th scope="col" th:text="#{phrase.stats.submitted}"></th>
+            <th scope="col" th:text="#{phrase.verdict.BLOCK}"></th>
+            <th scope="col" th:text="#{phrase.verdict.REVIEW}"></th>
+            <th scope="col" th:text="#{phrase.verdict.CLEAR}"></th>
+        </tr></thead>
+        <tbody>
+        <tr th:if="${phraseWeeks.isEmpty()}"><td colspan="6" th:text="#{phrase.stats.empty}"></td></tr>
+        <tr th:each="week : ${phraseWeeks}">
+            <th scope="row" th:text="${#temporals.format(week.week(), #messages.msg('format.date'))}"></th>
+            <td th:text="${week.runs()}"></td>
+            <td th:text="${week.submitted()}"></td>
+            <td th:text="${week.share(week.block()) == null ? '—' : #numbers.formatPercent(week.share(week.block()), 1, 1)}"></td>
+            <td th:text="${week.share(week.review()) == null ? '—' : #numbers.formatPercent(week.share(week.review()), 1, 1)}"></td>
+            <td th:text="${week.share(week.clear()) == null ? '—' : #numbers.formatPercent(week.share(week.clear()), 1, 1)}"></td>
+        </tr>
+        </tbody>
+    </table></div>
+    <p class="lg-small" th:text="#{phrase.stats.note}"></p>
+</section>
+</body>
+</html>

@@ -181,6 +181,8 @@ public class PilotReadiness {
         items.add(item("scope", scope == CheckScope.Kind.CONTENT, messages.get(scope == CheckScope.Kind.CONTENT
                 ? "readiness.scope.detail.content" : "readiness.scope.detail.full")));
         items.add(item("fixes", fixes.enabled(), onOff(fixes.enabled())));
+        boolean phrases = flag("listing-guard.phrase-screening.enabled");
+        items.add(item("phrases", phrases, onOff(phrases)));
         // the pilot template switches these off (ADR-047): "in order" is off
         items.add(offItem("ai.policy", flag("listing-guard.analyzer.enabled")));
         items.add(offItem("ai.llm", flag("listing-guard.llm.enabled")));

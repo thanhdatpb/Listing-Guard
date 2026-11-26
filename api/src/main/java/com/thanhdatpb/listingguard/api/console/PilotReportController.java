@@ -8,6 +8,7 @@ import com.thanhdatpb.listingguard.api.report.InvalidReportPeriodException;
 import com.thanhdatpb.listingguard.api.report.ReportPeriodTooLongException;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -27,9 +28,11 @@ public class PilotReportController {
     private final FeedbackStatsService feedback;
     private final PilotMetrics metrics;
     private final ConsoleMessages messages;
+    private final ObjectProvider<PhraseConsoleMetrics> phraseMetrics;
 
     public PilotReportController(ConsoleStatsController statistics, FeedbackStatsService feedback,
-                                 PilotMetrics metrics, ConsoleMessages messages) {
+                                 PilotMetrics metrics, ConsoleMessages messages, ObjectProvider<PhraseConsoleMetrics> phraseMetrics) {
+        this.phraseMetrics = phraseMetrics;
         this.statistics = statistics;
         this.feedback = feedback;
         this.metrics = metrics;
@@ -49,9 +52,12 @@ public class PilotReportController {
             var contentDays = metrics.days(user.clientId(), query, CheckScope.Kind.CONTENT);
             boolean hasContent = contentDays.stream().anyMatch(day -> day.checked() > 0);
             var rules = feedback.stats(user.clientId(), query).byRule().stream().filter(rule -> rule.verdicts() > 0).toList();
+            var phrases = phraseMetrics.getIfAvailable();
+            var phraseWeeks = phrases == null ? null : phrases.weeks(user.clientId(), query);
             response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
             if (!request.getServletPath().endsWith(".csv") && !request.getRequestURI().endsWith(".csv")) {
                 model.addAttribute("pilotDays", days);
+                model.addAttribute("phraseWeeks", phraseWeeks);
                 model.addAttribute("pilotContentDays", hasContent ? contentDays : null);
                 model.addAttribute("pilotRules", rules);
                 model.addAttribute("pilotQuery", query);
@@ -77,6 +83,9 @@ public class PilotReportController {
             for (var rule : rules) {
                 StatsCsv.line(csv, rule.pack(), rule.ruleId(), rule.source(), Long.toString(rule.verdicts()),
                         Long.toString(rule.falsePositive()), StatsCsv.rate(rule.falsePositiveRate()));
+            }
+            if (phraseWeeks != null) {
+                PhraseConsoleMetrics.appendCsv(csv, messages, phraseWeeks);
             }
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
             response.setContentType(new MediaType("text", "csv", StandardCharsets.UTF_8).toString());

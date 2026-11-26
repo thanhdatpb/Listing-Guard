@@ -47,6 +47,16 @@ public class PhraseScreeningService {
 
     @Transactional(timeout = 30)
     public PhraseScreeningResponse screen(AuthenticatedClient client, PhraseScreeningRequest request) {
+        return screen(client.id(), client.keyId(), null, request);
+    }
+
+    /** Check as the signed-in console account resolved by the caller from the current tenant. */
+    @Transactional(timeout = 30)
+    public PhraseScreeningResponse screenConsole(UUID clientId, UUID accountId, PhraseScreeningRequest request) {
+        return screen(clientId, null, java.util.Objects.requireNonNull(accountId), request);
+    }
+
+    private PhraseScreeningResponse screen(UUID clientId, String keyRef, UUID accountId, PhraseScreeningRequest request) {
         if (!properties.enabled()) {
             throw new PhraseScreeningException(HttpStatus.NOT_FOUND, "phrase-screening-disabled",
                     "Phrase screening is disabled.");
@@ -56,24 +66,24 @@ public class PhraseScreeningService {
             throw new PhraseScreeningException(HttpStatus.BAD_REQUEST, "too-many-phrases",
                     "Send at most " + properties.maxPhrases() + " phrases per request.");
         }
-        var admission = plans.requirePack(client.id(), Pack.TRADEMARK_RISK);
+        var admission = plans.requirePack(clientId, Pack.TRADEMARK_RISK);
         String marketplace = normalizers.get(request.marketplace() == null ? "ETSY" : request.marketplace())
                 .marketplace().toUpperCase(Locale.ROOT);
         try {
             // Lock one client until the run and both quota counters are committed. Other clients can run independently.
-            jdbc.queryForObject("SELECT id FROM client WHERE id = ? FOR NO KEY UPDATE", UUID.class, client.id());
+            jdbc.queryForObject("SELECT id FROM client WHERE id = ? FOR NO KEY UPDATE", UUID.class, clientId);
             var startedAt = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
             var day = startedAt.toLocalDate().atStartOfDay().atOffset(ZoneOffset.UTC);
             long used = jdbc.queryForObject("""
                     SELECT COALESCE(SUM(phrase_count), 0) FROM phrase_screening_run
                     WHERE client_id = ? AND created_at >= ? AND created_at < ?
-                    """, Long.class, client.id(), day, day.plusDays(1));
+                    """, Long.class, clientId, day, day.plusDays(1));
             if (used + submitted > properties.maxPhrasesPerDay()) {
                 throw new PhraseScreeningException(HttpStatus.TOO_MANY_REQUESTS, "phrase-daily-limit",
                         "Daily phrase limit exceeded. The limit resets at " + day.plusDays(1) + ".");
             }
 
-            var activeWatchlist = watchlists.active(client.id());
+            var activeWatchlist = watchlists.active(clientId);
             var watchlist = activeWatchlist.watchlist();
             var components = new TreeMap<>(watchlist.fingerprintComponents());
             components.put("watchlist-revision", Long.toString(activeWatchlist.revision()));
@@ -92,10 +102,10 @@ public class PhraseScreeningService {
             var summary = result.summary();
             jdbc.update("""
                     INSERT INTO phrase_screening_run (client_id, api_key_ref, phrase_count, block_count, review_count,
-                        clear_count, fuzzy_skipped_count, duration_ms, catalog_version, ruleset_version, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, client.id(), client.keyId(), submitted, summary.block(), summary.review(), summary.clear(),
-                    summary.fuzzySkipped(), durationMillis, result.catalogVersion(), result.rulesetVersion(), startedAt);
+                        clear_count, fuzzy_skipped_count, duration_ms, catalog_version, ruleset_version, created_at, account_id, marketplace_code)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, clientId, keyRef, submitted, summary.block(), summary.review(), summary.clear(),
+                    summary.fuzzySkipped(), durationMillis, result.catalogVersion(), result.rulesetVersion(), startedAt, accountId, marketplace);
             return PhraseScreeningResponse.of(fingerprint.value(), marketplace, result);
         } catch (CatalogLookupLimitException | QueryTimeoutException e) {
             throw new PhraseScreeningException(HttpStatus.SERVICE_UNAVAILABLE, "phrase-screening-budget",

@@ -27,6 +27,10 @@
                 <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg>
                 <th:block th:text="#{nav.check}"></th:block>
             </a>
+            <a th:if="${phraseScreeningEnabled == true}" id="home-phrase-screening" class="lg-btn" th:href="@{/console/phrase-screening}">
+                <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg>
+                <th:block th:text="#{phrase.heading}"></th:block>
+            </a>
         </div>
     </div>
 

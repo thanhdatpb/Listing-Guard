@@ -32,6 +32,8 @@ Listing Guard suggests and reports. It never edits or publishes a listing and do
 
 Optional [phrase screening](docs/phrase-screening.md) batches up to 2,000 seller keywords or print-text phrases with catalog and watchlist evidence.
 
+The pilot console includes a keyword CSV and print-text screening workflow with session-scoped exports ([guide](docs/pilot-seller-guide.md)).
+
 ## What it checks
 
 State of v0.11.0. "Ready" means it works and its tests pass, within the evidence status of the last column; this release still needs its Oracle A1 and Cloudflare deployment smoke test.

@@ -53,24 +53,8 @@ public final class PhraseScreening {
         var normalizer = new TextNormalizer(ruleset.normalization());
         var backend = scanner.catalog();
 
-        Map<String, Input> unique = new LinkedHashMap<>();
-        int dropped = 0;
-        for (Input input : inputs) {
-            String raw = input.text();
-            if (raw == null || raw.codePointCount(0, raw.length()) > MAX_LENGTH) {
-                dropped++;
-                continue;
-            }
-            String text = CanonicalInput.canonical(raw);
-            String key = normalizer.normalizeMark(text);
-            if (key.isEmpty()) {
-                dropped++;
-                continue;
-            }
-            unique.merge(key, new Input(text, input.searchVolume()), PhraseScreening::mergeVolume);
-        }
-
-        List<Input> phrases = List.copyOf(unique.values());
+        Prepared prepared = prepare(inputs, normalizer);
+        List<Input> phrases = prepared.phrases();
         Set<Integer> fuzzyRows = new LinkedHashSet<>();
         if (backend != null) {
             var ranked = new ArrayList<Integer>(phrases.size());
@@ -128,11 +112,35 @@ public final class PhraseScreening {
 
         int skipped = backend == null ? 0 : phrases.size() - fuzzyRows.size();
         var summary = new PhraseSummary(blocked, review, rows.size() - blocked - review,
-                inputs.size() - dropped - rows.size(), dropped, skipped);
+                prepared.duplicates(), prepared.dropped(), skipped);
         Completeness completeness = backend == null || rows.stream().anyMatch(row -> row.completeness() == Completeness.INCOMPLETE)
                 ? Completeness.INCOMPLETE : Completeness.COMPLETE;
         return new PhraseBatch(List.copyOf(rows), summary, completeness, backend == null ? CatalogStatus.NOT_CONFIGURED : CatalogStatus.SERVED,
                 backend == null ? null : backend.version(), ruleset.version(), ruleset.disclaimer());
+    }
+
+    public record Prepared(List<Input> phrases, int duplicates, int dropped) {}
+
+    /** Report counts from exactly the same preparation used by the analysis. */
+    public static Prepared prepare(List<Input> inputs, TextNormalizer normalizer) {
+        Map<String, Input> unique = new LinkedHashMap<>();
+        int dropped = 0;
+        for (Input input : inputs) {
+            String raw = input.text();
+            if (raw == null || raw.codePointCount(0, raw.length()) > MAX_LENGTH) {
+                dropped++;
+                continue;
+            }
+            String text = CanonicalInput.canonical(raw);
+            String key = normalizer.normalizeMark(text);
+            if (key.isEmpty()) {
+                dropped++;
+                continue;
+            }
+            unique.merge(key, new Input(text, input.searchVolume()), PhraseScreening::mergeVolume);
+        }
+
+        return new Prepared(List.copyOf(unique.values()), inputs.size() - dropped - unique.size(), dropped);
     }
 
     private static Input mergeVolume(Input first, Input next) {

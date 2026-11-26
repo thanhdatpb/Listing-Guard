@@ -181,7 +181,7 @@ public class FeedbackStatsQueries {
     }
 
     private static Clause verdictClause(Scope scope) {
-        StringBuilder sql = new StringBuilder("v.client_id = ? AND v.updated_at >= ? AND v.updated_at < ?");
+        StringBuilder sql = new StringBuilder("v.client_id = ? AND v.updated_at >= ? AND v.updated_at < ? AND v.pack_id <> 'phrase-screening'");
         List<Object> args = new ArrayList<>(List.of(scope.clientId(), utc(scope.from()), utc(scope.toExclusive())));
         if (scope.marketplace() != null) {
             sql.append(" AND v.marketplace_code = ?");
