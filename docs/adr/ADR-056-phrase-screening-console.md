@@ -25,7 +25,7 @@
   theo client và ngày lọc, với mẫu số là các cụm có kết quả BLOCK/REVIEW/CLEAR. Tổng gửi vào gồm dòng trùng và dòng bị bỏ trong lô.
   Lượt M1 cũ thiếu marketplace được tính trong bộ lọc tất cả, không được gán cho một marketplace cụ thể.
 - Tắt cờ để ẩn menu, trang và thống kê phrase screening. V54 additive giữ lịch sử hiện có. Trang Sẵn sàng của pilot
-  báo trạng thái cờ. Không thêm dependency.
+  xác nhận tính năng khi cờ bật. Không thêm dependency.
 - Chưa xác minh tên cột hoặc số đo trên file Cerebro/Magnet thật. Dùng mẫu trong repo để kiểm luồng, sau đó chạy script
   Playwright trên triển khai kiểm thử có dữ liệu tổng hợp và quyền Console.
 
