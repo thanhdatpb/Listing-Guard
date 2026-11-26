@@ -1,0 +1,8 @@
+id	group	text	expected	mark
+P01	BRAND	Zorvex shirt	BLOCK	Zorvex
+P02	BRAND	Crimson Falcons tee	BLOCK	Crimson Falcons
+P03	DESCRIPTIVE	blue mug	CLEAR	Mug
+P04	DESCRIPTIVE	linen tumbler	CLEAR	-
+P05	WATCHLIST	bkwott shirt	BLOCK	Brimwick Otters
+P06	GEO	Northvale Baseball jersey	REVIEW	-
+P07	LEGACY	mug	BLOCK	Mug

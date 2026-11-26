@@ -9,6 +9,7 @@ import com.thanhdatpb.listingguard.client.Operation;
  */
 enum Endpoint {
     CHECKS(Operation.CHECKS),
+    PHRASE_SCREENINGS(Operation.PHRASE_SCREENINGS),
     TRADEMARK_CHECKS(Operation.TRADEMARK_CHECKS),
     VARIATION_CHECKS(Operation.VARIATION_CHECKS),
     LISTING_EDITS(Operation.LISTING_EDITS),

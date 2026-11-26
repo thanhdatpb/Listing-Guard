@@ -34,4 +34,14 @@ public interface TrademarkCatalog {
      * of the normalized mark.
      */
     Map<String, List<CatalogMark>> fuzzyCandidates(Collection<String> normalizedForms, double candidateThreshold);
+
+    /** Bounded batch lookup; implementations may enforce the candidate budget while reading results. */
+    default Map<String, List<CatalogMark>> fuzzyBatchCandidates(Collection<String> forms, double threshold,
+                                                                 int candidateBudget) {
+        var candidates = fuzzyCandidates(forms, threshold);
+        if (candidates.values().stream().mapToLong(List::size).sum() > candidateBudget) {
+            throw new CatalogLookupLimitException();
+        }
+        return candidates;
+    }
 }

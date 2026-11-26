@@ -30,6 +30,8 @@ Trademark checks require an operator loaded catalog, and image checks are disabl
 The optional console keeps magic-link sign-in by default and can use verified Cloudflare Access identities without SMTP (ADR-027).
 Listing Guard suggests and reports. It never edits or publishes a listing and does no SEO.
 
+Optional [phrase screening](docs/phrase-screening.md) batches up to 2,000 seller keywords or print-text phrases with catalog and watchlist evidence.
+
 ## What it checks
 
 State of v0.11.0. "Ready" means it works and its tests pass, within the evidence status of the last column; this release still needs its Oracle A1 and Cloudflare deployment smoke test.

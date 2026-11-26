@@ -26,6 +26,8 @@ import com.thanhdatpb.listingguard.client.model.PersonalizationScreeningResult;
 import com.thanhdatpb.listingguard.client.model.PersonalizationTrademark;
 import com.thanhdatpb.listingguard.client.model.PersonalizationTrademarkFinding;
 import com.thanhdatpb.listingguard.client.model.PersonalizationValue;
+import com.thanhdatpb.listingguard.client.model.PhraseScreeningRequest;
+import com.thanhdatpb.listingguard.client.model.PhraseScreeningResult;
 import com.thanhdatpb.listingguard.client.model.PlansCapability;
 import com.thanhdatpb.listingguard.client.model.Readiness;
 import com.thanhdatpb.listingguard.client.model.RiskAdjustment;
@@ -133,6 +135,11 @@ class ContractConformanceTest {
             entry(RulesetLimits.class, "RulesetLimitsResult"),
             entry(Limit.class, "LimitView"),
             entry(Capabilities.class, "Capabilities"),
+            entry(Capabilities.PhraseScreeningCapability.class, "PhraseScreeningCapability"),
+            entry(PhraseScreeningResult.class, "PhraseScreeningResponse"),
+            entry(PhraseScreeningResult.Row.class, "PhraseRowView"),
+            entry(PhraseScreeningResult.Finding.class, "PhraseFindingView"),
+            entry(PhraseScreeningResult.Summary.class, "PhraseSummary"),
             entry(PackCapability.class, "PackCapability"),
             entry(TrademarkCatalogCapability.class, "TrademarkCatalogCapability"),
             entry(PlansCapability.class, "PlansCapability"),
@@ -149,7 +156,9 @@ class ContractConformanceTest {
             entry(VariationParent.class, "VariationParent"),
             entry(VariationChild.class, "VariationChild"),
             entry(PersonalizationScreeningRequest.class, "PersonalizationScreeningRequest"),
-            entry(PersonalizationValue.class, "PersonalizationValue"));
+            entry(PersonalizationValue.class, "PersonalizationValue"),
+            entry(PhraseScreeningRequest.class, "PhraseScreeningRequest"),
+            entry(PhraseScreeningRequest.Phrase.class, "PhraseInput"));
 
     /** The request record each POST operation sends. */
     static final Map<Operation, Class<?>> REQUEST_OF = Map.of(
@@ -157,7 +166,8 @@ class ContractConformanceTest {
             Operation.TRADEMARK_CHECKS, TrademarkCheckRequest.class,
             Operation.VARIATION_CHECKS, VariationCheckRequest.class,
             Operation.LISTING_EDITS, ListingEditRequest.class,
-            Operation.PERSONALIZATION_SCREENINGS, PersonalizationScreeningRequest.class);
+            Operation.PERSONALIZATION_SCREENINGS, PersonalizationScreeningRequest.class,
+            Operation.PHRASE_SCREENINGS, PhraseScreeningRequest.class);
 
     private static JsonNode doc;
     private static JsonNode schemas;
@@ -201,7 +211,7 @@ class ContractConformanceTest {
     }
 
     @Test
-    void everySchemaReachableFromTheSevenAnswersIsMapped() {
+    void everySchemaReachableFromAllAnswersIsMapped() {
         Set<String> reachable = new LinkedHashSet<>();
         for (Operation operation : Operation.values()) {
             Deque<JsonNode> todo = new ArrayDeque<>();
@@ -213,7 +223,7 @@ class ContractConformanceTest {
     }
 
     @Test
-    void everySuccessExampleOfTheSevenOperationsIsReadWithoutAnUnrecognizedValue() throws Exception {
+    void everySuccessExampleOfAllOperationsIsReadWithoutAnUnrecognizedValue() throws Exception {
         ObjectMapper sdk = Json.newMapper();
         int read = 0;
         for (Operation operation : Operation.values()) {
@@ -232,7 +242,7 @@ class ContractConformanceTest {
     }
 
     @Test
-    void everyDocumentedProblemOfTheSevenOperationsBecomesTheExceptionOfItsCode() throws Exception {
+    void everyDocumentedProblemOfAllOperationsBecomesTheExceptionOfItsCode() throws Exception {
         ObjectMapper sdk = Json.newMapper();
         int read = 0;
         for (Operation operation : Operation.values()) {
@@ -276,7 +286,7 @@ class ContractConformanceTest {
     }
 
     @Test
-    void everyDefinitionReachableFromTheFiveRequestBodiesIsMapped() {
+    void everyDefinitionReachableFromAllRequestBodiesIsMapped() {
         Set<String> reachable = new LinkedHashSet<>();
         Deque<JsonNode> todo = new ArrayDeque<>();
         for (Class<?> request : REQUEST_OF.values()) {

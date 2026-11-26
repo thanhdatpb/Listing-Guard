@@ -64,6 +64,11 @@ final class CatalogHits {
         return hits;
     }
 
+    static boolean fuzzyEligible(TrademarkRuleset.Matching matching, String form) {
+        int chars = form.codePointCount(0, form.length());
+        return chars >= matching.fuzzyMinChars() && chars <= matching.fuzzyMaxChars();
+    }
+
     static List<Hit> fuzzy(ScanContext context) {
         TrademarkRuleset.Matching matching = context.ruleset().matching();
         Set<String> exactForms = new HashSet<>();
@@ -72,9 +77,7 @@ final class CatalogHits {
         List<Gram> eligible = new ArrayList<>();
         Set<String> forms = new LinkedHashSet<>();
         for (Gram gram : grams(context)) {
-            int chars = gram.text().codePointCount(0, gram.text().length());
-            if (chars >= matching.fuzzyMinChars() && chars <= matching.fuzzyMaxChars()
-                    && !exactForms.contains(gram.text())) {
+            if (fuzzyEligible(matching, gram.text()) && !exactForms.contains(gram.text())) {
                 eligible.add(gram);
                 forms.add(gram.text());
             }

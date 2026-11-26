@@ -10,6 +10,8 @@ import com.thanhdatpb.listingguard.client.model.CheckResult;
 import com.thanhdatpb.listingguard.client.model.PersonalizationScreeningRequest;
 import com.thanhdatpb.listingguard.client.model.PersonalizationScreeningResult;
 import com.thanhdatpb.listingguard.client.model.RulesetLimits;
+import com.thanhdatpb.listingguard.client.model.PhraseScreeningRequest;
+import com.thanhdatpb.listingguard.client.model.PhraseScreeningResult;
 import com.thanhdatpb.listingguard.client.model.TrademarkCheckRequest;
 import com.thanhdatpb.listingguard.client.model.TrademarkCheckResult;
 import com.thanhdatpb.listingguard.client.model.TrademarkWatchlist;
@@ -114,6 +116,16 @@ public final class ListingGuardClient implements AutoCloseable {
      */
     public TrademarkCheckResult trademarkChecks(TrademarkCheckRequest request) {
         return await(trademarkChecksAsync(request));
+    }
+
+    /** Screen seller-supplied phrases for trademark references in one request. A run can use quota. */
+    public PhraseScreeningResult screenPhrases(PhraseScreeningRequest request) {
+        return await(screenPhrasesAsync(request));
+    }
+
+    /** The asynchronous form of {@link #screenPhrases(PhraseScreeningRequest)}. */
+    public CompletableFuture<PhraseScreeningResult> screenPhrasesAsync(PhraseScreeningRequest request) {
+        return post(Operation.PHRASE_SCREENINGS, request, PhraseScreeningResult.class);
     }
 
     /** The asynchronous form of {@link #trademarkChecks(TrademarkCheckRequest)}. */

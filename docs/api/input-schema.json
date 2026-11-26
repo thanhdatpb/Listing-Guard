@@ -169,6 +169,24 @@
         }
       ]
     },
+    "PhraseInput": {
+      "description": "One seller-provided phrase and optional search volume.",
+      "type": "object",
+      "properties": {
+        "text": {"type": "string", "description": "Empty phrases or phrases longer than 200 Unicode characters are counted and skipped."},
+        "searchVolume": {"type": "integer", "minimum": 0, "description": "Optional nonnegative search volume, used to rank fuzzy coverage."}
+      }
+    },
+    "PhraseScreeningRequest": {
+      "description": "POST /api/v1/phrase-screenings: 1 to 2000 seller phrases. A deployment can set a lower limit.",
+      "type": "object",
+      "required": ["phrases"],
+      "properties": {
+        "phrases": {"type": "array", "minItems": 1, "maxItems": 2000, "items": {"$ref": "#/$defs/PhraseInput"}},
+        "marketplace": {"$ref": "#/$defs/Marketplace"},
+        "product_type": {"type": "string", "maxLength": 64, "description": "Optional trademark product type."}
+      }
+    },
     "ListingEditRequest": {
       "description": "POST /api/v1/listing-edits: compare the same marketplace listing schema before and after an edit. Variations are independently optional for each side.",
       "type": "object",

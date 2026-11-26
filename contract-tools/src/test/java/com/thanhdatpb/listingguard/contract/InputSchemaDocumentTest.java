@@ -56,7 +56,9 @@ class InputSchemaDocumentTest {
             Map.entry("Image checks#1", "ImageCheckMetadata"),
             Map.entry("Image checks#2", "ImageCheckImage"),
             Map.entry("Trademark checks#1", "TrademarkCheckRequest"),
-            Map.entry("Listing edit comparison#1", "ListingEditRequest"));
+            Map.entry("Listing edit comparison#1", "ListingEditRequest"),
+            Map.entry("Phrase screening#1", "PhraseScreeningRequest"),
+            Map.entry("Phrase screening#2", "PhraseInput"));
 
     /** Definitions the page describes in prose or in the Prices table rather than in a field table. */
     private static final Set<String> PROSE_DEFINITIONS = Set.of(
@@ -73,7 +75,8 @@ class InputSchemaDocumentTest {
             "variation-etsy", "VariationCheckRequest",
             "personalization-order", "PersonalizationScreeningRequest",
             "image-metadata", "ImageCheckMetadata",
-            "listing-edit-example", "ListingEditRequest");
+            "listing-edit-example", "ListingEditRequest",
+            "phrase-screening-example", "PhraseScreeningRequest");
 
     private record Table(String key, Map<String, String> typesByField) {
     }
@@ -189,6 +192,7 @@ class InputSchemaDocumentTest {
         }
         return switch (pageType) {
             case "string" -> types(property).equals(Set.of("string"));
+            case "integer" -> Set.of("integer").equals(types(property));
             case "number" -> Set.of("number").equals(types(property)) || Set.of("integer").equals(types(property));
             case "boolean" -> types(property).equals(Set.of("boolean"));
             case "object" -> types(property).equals(Set.of("object"));
@@ -226,7 +230,7 @@ class InputSchemaDocumentTest {
         return types;
     }
 
-    private static final Pattern FIELD_ROW = Pattern.compile("^\\| `([a-z_]+)` \\| ([^|]+?) \\|.*$");
+    private static final Pattern FIELD_ROW = Pattern.compile("^\\| `([A-Za-z_][A-Za-z0-9_]*)` \\| ([^|]+?) \\|.*$");
 
     /** The field tables of the page (header {@code | Field | Type | Notes |}), keyed by heading and place. */
     private static List<Table> tables(List<String> lines) {

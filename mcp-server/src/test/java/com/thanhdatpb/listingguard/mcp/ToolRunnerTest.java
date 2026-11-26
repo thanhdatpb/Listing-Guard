@@ -104,7 +104,7 @@ class ToolRunnerTest {
     void thereAreExactlyNineToolsWithTheFixedNames() {
         assertThat(catalog.tools()).extracting(ToolSpec::name).containsExactly(
                 "check_listing", "check_trademark", "check_variations", "check_listing_edit", "screen_personalization", "get_limits",
-                "get_usage", "get_capabilities", "get_watchlist");
+                "get_usage", "get_capabilities", "screen_phrases", "get_watchlist");
     }
 
     @Test
@@ -126,9 +126,9 @@ class ToolRunnerTest {
     }
 
     @Test
-    void onlyTheFourReadersAreReadOnlyAndNoToolIsNamedLikeAWrite() {
+    void readersAndPhraseScreeningAreReadOnlyAndNoToolIsNamedLikeAWrite() {
         assertThat(catalog.tools().stream().filter(ToolSpec::readOnly).map(ToolSpec::name))
-                .containsExactlyInAnyOrder("get_limits", "get_usage", "get_capabilities", "get_watchlist");
+                .containsExactlyInAnyOrder("get_limits", "get_usage", "get_capabilities", "screen_phrases", "get_watchlist");
         for (ToolSpec tool : catalog.tools()) {
             assertThat(tool.name()).doesNotContainIgnoringCase("apply").doesNotContainIgnoringCase("publish")
                     .doesNotContainIgnoringCase("fix")
@@ -162,6 +162,8 @@ class ToolRunnerTest {
                         "GET", "/api/v1/rulesets/AMAZON/limits"),
                 Arguments.of("get_usage", map(), "GET", "/api/v1/usage"),
                 Arguments.of("get_capabilities", map(), "GET", "/api/v1/capabilities"),
+                Arguments.of("screen_phrases", map("phrases", List.of(map("text", "fabric", "searchVolume", 14))),
+                        "POST", "/api/v1/phrase-screenings"),
                 Arguments.of("get_watchlist", map(), "GET", "/api/v1/trademark-watchlist"));
     }
 

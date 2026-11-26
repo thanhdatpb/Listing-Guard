@@ -10,6 +10,7 @@ public enum Operation {
     /** {@code POST /api/v1/checks}. */
     CHECKS("POST", "/api/v1/checks"),
     /** {@code POST /api/v1/trademark-checks}. */
+    PHRASE_SCREENINGS("POST", "/api/v1/phrase-screenings"),
     TRADEMARK_CHECKS("POST", "/api/v1/trademark-checks"),
     /** {@code POST /api/v1/variation-checks}. */
     VARIATION_CHECKS("POST", "/api/v1/variation-checks"),

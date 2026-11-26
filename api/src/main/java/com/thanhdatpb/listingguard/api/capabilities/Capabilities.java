@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.capabilities;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +18,12 @@ public record Capabilities(
         @Schema(description = "Whether plans and the monthly quota are applied in this deployment.")
         PlansCapability plans,
         @Schema(description = "Whether `POST /api/v1/checks` returns verified fix suggestions and readiness.")
-        FixesCapability fixes) {
+        FixesCapability fixes,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        @Schema(description = "Present when phrase screening is enabled. If absent, the feature is disabled.")
+        PhraseScreeningCapability phraseScreening) {
+
+    public record PhraseScreeningCapability(boolean enabled, int maxPhrases, int maxFuzzyPhrases, int maxPhrasesPerDay) {}
 
     public record PackCapability(
             @Schema(description = "The pack id (ADR-010).", example = "listing-rules")

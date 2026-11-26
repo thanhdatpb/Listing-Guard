@@ -21,6 +21,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,7 +112,13 @@ public final class TrademarkScanner {
      * @throws com.thanhdatpb.listingguard.trademark.config.UnknownProductTypeException as {@link #scan(TrademarkCheckInput)}
      */
     public TrademarkResult scan(TrademarkCheckInput input, Watchlist watchlist) {
-        CanonicalInput canonical = CanonicalInput.of(input);
+        return scan(CanonicalInput.of(input), watchlist, catalog,
+                context -> WatchlistMatcher.candidates(context, watchlist, normalizer));
+    }
+
+    /** Applies the same rule pipeline with a request-scoped catalog lookup. */
+    TrademarkResult scan(CanonicalInput canonical, Watchlist watchlist, TrademarkCatalog lookup,
+                         Function<ScanContext, List<Candidate>> watchlistCandidates) {
         String productType = canonical.productType();
         Set<Integer> productClasses = productType == null ? null : ruleset.productClasses().classesOf(productType);
         Set<String> failed = new LinkedHashSet<>();
@@ -120,7 +127,7 @@ public final class TrademarkScanner {
         List<String> fieldOrder = new ArrayList<>();
         ScanContext context = null;
         try {
-            context = ScanContext.create(ruleset, catalog, normalizer, canonical, productType, productClasses);
+            context = ScanContext.create(ruleset, lookup, normalizer, canonical, productType, productClasses);
             context.fields().forEach(field -> fieldOrder.add(field.name()));
         } catch (RuntimeException e) {
             log.error("Trademark scan could not normalize the input; every rule is reported as failed", e);
@@ -153,7 +160,7 @@ public final class TrademarkScanner {
             }
             if (!watchlist.isEmpty()) {
                 try {
-                    candidates.addAll(WatchlistMatcher.candidates(context, watchlist, normalizer));
+                    candidates.addAll(watchlistCandidates.apply(context));
                     candidates = WatchlistMatcher.raise(candidates);
                 } catch (RuntimeException e) {
                     log.error("The watchlist rule failed on ruleset {}; keeping the other rules' findings", ruleset.version(), e);

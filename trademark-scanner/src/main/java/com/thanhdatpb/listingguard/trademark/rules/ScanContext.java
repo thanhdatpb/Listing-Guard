@@ -7,6 +7,7 @@ import com.thanhdatpb.listingguard.trademark.normalize.NormalizedField;
 import com.thanhdatpb.listingguard.trademark.normalize.TextNormalizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -91,6 +92,12 @@ public final class ScanContext {
 
     public NormalizedField field(String name) {
         return fields.stream().filter(f -> f.name().equals(name)).findFirst().orElseThrow();
+    }
+
+    /** The same bounded forms and fuzzy eligibility the rules themselves use. */
+    public Stream<String> lookupForms(boolean fuzzyOnly) {
+        return CatalogHits.grams(this).stream().map(CatalogHits.Gram::text)
+                .filter(form -> !fuzzyOnly || CatalogHits.fuzzyEligible(ruleset.matching(), form));
     }
 
     List<CatalogHits.Hit> exactHits() {

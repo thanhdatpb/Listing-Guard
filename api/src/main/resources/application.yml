@@ -1,4 +1,9 @@
 listing-guard:
+  phrase-screening:
+    enabled: ${LISTING_GUARD_PHRASE_SCREENING_ENABLED:false}
+    max-phrases: ${LISTING_GUARD_PHRASE_SCREENING_MAX_PHRASES:2000}
+    max-fuzzy-phrases: ${LISTING_GUARD_PHRASE_SCREENING_MAX_FUZZY_PHRASES:200}
+    max-phrases-per-day: ${LISTING_GUARD_PHRASE_SCREENING_MAX_PHRASES_PER_DAY:20000}
   security:
     # Clients and API keys live in the database and are managed with the admin job (ADR-007). The application
     # starts without any key (it logs a warning and answers 401 until one exists).

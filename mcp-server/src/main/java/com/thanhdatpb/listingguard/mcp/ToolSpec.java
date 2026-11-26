@@ -9,8 +9,8 @@ import java.util.Map;
  * @param title       a short human title
  * @param description what the tool does, in English, written for the agent
  * @param endpoint    the one API call this tool makes
- * @param readOnly    {@code true} for the two readers; the check tools store a result and may cost a quota unit, so they
- *                    are not read-only (they are not destructive and an identical repeat is a free cache hit)
+ * @param readOnly    {@code true} for readers or phrase screening, which does not persist submitted text or mutate resources.
+ *                    Screening still records usage counts and can cost quota
  * @param inputSchema a JSON Schema of {@code type: object}; the arguments are checked against it before any call
  */
 record ToolSpec(
