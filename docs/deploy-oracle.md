@@ -4,13 +4,11 @@ This runbook deploys the production API and PostgreSQL on one Ubuntu 24.04 ARM64
 public ingress; no host port 80, 443 or 8080 is opened. The Compose API port remains bound to `127.0.0.1` for local
 health checks. PostgreSQL and the tunnel have no published ports.
 
-New releases publish `linux/amd64` and `linux/arm64` images. Images tagged through `v0.5.0` are amd64-only; do not
-use one of those tags on the A1 VM. **The release to deploy is `0.10.0`** ([release notes](releases/v0.10.0.md); v0.7.0 through v0.9.0
-were never tagged). Wait until both tag workflows succeed and the GHCR manifest lists `linux/arm64`. Pull by that tag and never by `latest`: `LISTING_GUARD_VERSION=0.10.0` in `.env`. Its `linux/arm64` image
-has not been run on ARM hardware yet, so the first start on the A1 is also its first test: do the smoke test of
-[deploy-readiness.md](deploy-readiness.md#5-smoke-test-after-deploy) right after it. The `docs/deployment.md` runbook covers migration details and the general
-production compose setup. [docs/deploy-readiness.md](deploy-readiness.md) is the pre-deploy review: what is on or off by
-default, the environment variables, the resource budget, the security checklist, a smoke test and the manual steps in order.
+New releases publish `linux/amd64` and `linux/arm64` images. Images tagged through `v0.5.0` are amd64-only.
+For the pilot use **`0.11.0`** once both release workflows pass and the GHCR manifest lists `linux/arm64`.
+Use the fixed tag in `.env` and pull `ghcr.io/thanhdatpb/listing-guard:0.11.0`. Confirm the image is available before
+changing the deployment. The first smoke test of this release on Oracle A1 is still pending.
+See [release notes](releases/v0.11.0.md), [deploy readiness](deploy-readiness.md) and [general deployment](deployment.md).
 
 ## 1. Prepare accounts, DNS and access
 
@@ -85,7 +83,7 @@ cp deploy/env.prod.example .env
 chmod 600 .env
 ```
 
-Set `LISTING_GUARD_VERSION` to a published version **without** its leading `v` (`0.10.0`; a fixed tag, never `latest`, so that a
+Set `LISTING_GUARD_VERSION` to a published version **without** its leading `v` (`0.11.0`; a fixed tag, never `latest`, so that a
 restart or `pull` can never change the version under you), strong unique database credentials,
 and an unused loopback `API_PORT`. The sample resource settings are sized for 2 OCPUs / 12 GB: API memory 2 GB with
 `-XX:MaxRAMPercentage=75.0`, PostgreSQL memory 4 GB, 2 GB shared buffers, 16 MB `work_mem`, and 50 connections.
@@ -461,6 +459,35 @@ re-audit runs, feedback and review/policy records included. Do it only with the 
 **only** the trademark catalog, see
 [8b](#8b-a-trademark-catalog-from-the-hugging-face-rebuild-convert-elsewhere-copy-import-activate); it needs no database restore.
 
+### Upgrade from 0.10.0 to 0.11.0
+
+1. Confirm the release workflows succeeded and the GHCR tag has an `arm64` manifest. Back up the database and keep the
+   current env, catalog manifest, pinned catalog version and activation state. Keep the backup outside the checkout.
+2. Update the versioned deployment files from tag `v0.11.0`. Set `LISTING_GUARD_VERSION=0.11.0` in the deployment env
+   file. For a named pilot project, use its existing `--env-file .env.pilot -p listing-guard-pilot` options on each Compose call.
+3. Pull and recreate the API, then verify Flyway applied V48–V52 and check the version header.
+
+   ```bash
+   docker buildx imagetools inspect ghcr.io/thanhdatpb/listing-guard:0.11.0
+   docker pull ghcr.io/thanhdatpb/listing-guard:0.11.0
+   docker compose --profile prod pull api
+   docker compose --profile prod up -d --no-deps api
+   docker compose --profile prod logs --tail=100 api
+   curl --fail "http://127.0.0.1:$API_PORT/health"
+   curl --fail --silent --show-error --dump-header - --output /dev/null \
+     -H "X-API-Key: $LISTING_GUARD_API_KEY" "http://127.0.0.1:$API_PORT/api/v1/capabilities" |
+     grep -i '^x-listing-guard-version:'
+   ```
+
+   Use the local port and test key from the deployed environment. Expect `X-Listing-Guard-Version: 0.11.0`.
+4. Keep the currently served compatible catalog and its ruleset for the upgrade. Flyway does not require reconverting
+   the catalog. To use owner-based tiers, convert and import a new version, run the 47-probe gate with both rulesets
+   on that version, and review the report before changing activation or the pilot pin. [Catalog activation runbook](catalog-activation-runbook.md)
+
+For catalog-only rollback, restore the old pin or use `admin catalog rollback` when following the activation log.
+For application and schema rollback, restore the pre-upgrade snapshot with the previous deployment files and the
+`0.10.0` image. A restored snapshot excludes writes made after the backup.
+
 ### Update cloudflared
 
 `docker-compose.prod.cloudflared.yml` pins the connector's tag (never `latest`). The tag in the file is **`2026.11.0`**, the latest
@@ -682,15 +709,16 @@ as common (`common_word` is never set, `generic_words` is empty); see
 **1. On the other machine** (a laptop with Docker, or Java 21 and Maven; no database; 3 GB free memory; about 1 GB of disk):
 
 ```bash
-git clone --branch v0.10.0 https://github.com/thanhdatpb/Listing-Guard.git && cd Listing-Guard
+git clone --branch v0.11.0 https://github.com/thanhdatpb/Listing-Guard.git && cd Listing-Guard
 REV=50e430b4c021614e1302bddb45a4afcdcb7823f2          # the dataset commit read on 2026-11-16; pin the one you read
 B=https://huggingface.co/datasets/illeatmyhat/uspto-trademarks/resolve/$REV
 for f in profile/build_lineage.json lookups/status_codes.csv lookups/_sources.json \
          data/intl_class/data_0.parquet data/case_file/data_0.parquet; do
   mkdir -p "catalogs/raw/hf/$(dirname $f)" && curl -fL --retry 3 "$B/$f" -o "catalogs/raw/hf/$f"
 done
-docker compose --profile tools run --rm --build hf-convert --input=hf --output=hf-uspto-2026-10.jsonl
-# Optional after choosing a local wordlist: add --wordlist=english.txt (under catalogs/raw/)
+docker compose --profile tools run --rm --build hf-convert --input=hf --output=hf-uspto-2026-10.jsonl \
+  --distinctiveness=distinctiveness-2026-11
+# This two-table example reproduces the legacy thresholds. For owner data use the activation runbook.
 ```
 
 Với bản chạy V48, xem [quy trình chuyển đổi `jsonl-2` và kích hoạt label mới](trademark-catalog.md#tín-hiệu-distinctiveness-jsonl-2).
@@ -817,9 +845,9 @@ the retention periods and `LISTING_GUARD_IMAGE_ENABLED` are not forwarded either
 
 Trước khi đổi catalog pilot sang bản đếm chủ sở hữu, chạy [cổng so sánh catalog](catalog-activation-runbook.md#4-đo-với-cùng-catalog-kiểm-tra-cổng-rồi-mới-chuyển-pilot).
 
-Dùng image đã phát hành có ADR-047, host riêng hoặc cổng nội bộ và Compose project riêng.
+Dùng image `0.11.0` sau khi phát hành, host riêng hoặc cổng nội bộ và Compose project riêng.
 Sao chép [mẫu pilot](../deploy/env.pilot.example) thành `.env.pilot`, giới hạn quyền đọc và điền placeholder trên máy chủ.
-Dùng catalog thật `jsonl-2` đã nhập theo [mục 8b](#8b-a-trademark-catalog-from-the-hugging-face-rebuild-convert-elsewhere-copy-import-activate)
+Dùng catalog thật `jsonl-2` đã đạt cổng trong [runbook kích hoạt](catalog-activation-runbook.md)
 và ghim chính xác phiên bản job in ra. Giữ cả catalog và ruleset ổn định trong hai tuần để kết quả có thể so sánh.
 Chỉ khởi động sau khi đã cấu hình tunnel và chính sách Allow đúng ba email trên Cloudflare Access và trong file env.
 

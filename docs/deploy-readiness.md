@@ -1,7 +1,7 @@
 # Deploy readiness
 
 The pre-deploy review of the first production deployment on one Oracle Cloud Always Free A1 VM behind Cloudflare Tunnel
-([ADR-019](adr/ADR-019-oracle-a1-cloudflare-tunnel.md), runbook [deploy-oracle.md](deploy-oracle.md)), with release steps for v0.10.0. First written for the
+([ADR-019](adr/ADR-019-oracle-a1-cloudflare-tunnel.md), runbook [deploy-oracle.md](deploy-oracle.md)), with release steps for v0.11.0. First written for the
 release that became v0.8.0 on 2026-11-13 and brought up to date for **v0.9.0** on 2026-11-18 (the checks made for v0.9.0, with their
 results, are in [section 8](#8-v090-pre-release-checks-and-results); sections 1 to 7 keep the review of 2026-11-13 where it still
 holds). It adds no feature. It says what is on and what is not, which variables decide it, whether the VM is big
@@ -64,10 +64,10 @@ and the per-client rate limit are its only protection ([the decision](#decisions
 |---|---|---|---|---|
 | `GET /health` | on | none | the database | real (`200 {"status":"UP"}` or `503 DOWN`) |
 | `POST /api/v1/checks`, `GET /api/v1/checks/{id}` | on | `LISTING_GUARD_FIXES_ENABLED` adds fixes and readiness (off); `LISTING_GUARD_PLANS_ENABLED` adds plans and quota (off) | an API key | real: Etsy rules are mostly `verified` or `secondary`; Amazon rules are WARNING only, `secondary` or `unverified` ([rulesets.md](rulesets.md)) |
-| `POST /api/v1/trademark-checks`, `GET .../{id}` | route on, **answers `503 trademark-not-configured`** | `TRADEMARK_CATALOG_VERSION` or `TRADEMARK_FOLLOW_ACTIVATION=true`; `TSDR_FINDING_STATUS_ENABLED` (off) | **a catalog**: `trademark-import` or `uspto-sync`, with data you supply | **not usable yet**: no real catalog exists, the USPTO converter is unverified against real data, the DEMO catalog is fiction and must never be served to other people |
+| `POST /api/v1/trademark-checks`, `GET .../{id}` | route on, **answers `503 trademark-not-configured`** | `TRADEMARK_CATALOG_VERSION` or `TRADEMARK_FOLLOW_ACTIVATION=true`; `TSDR_FINDING_STATUS_ENABLED` (off) | **a catalog**: `trademark-import` or `uspto-sync`, with data you supply | Needs an imported compatible catalog. The real owner-based build and its 47-probe gate are unmeasured. The DEMO catalog is for tests only. |
 | `POST /api/v1/variation-checks`, `GET .../{id}` | on | none | an API key | real as hints: no rule is `verified`, so no finding is ERROR |
 | `POST /api/v1/personalization-screenings`, `GET .../{id}` | on | none | an API key; a catalog for its trademark part | placeholder: the shipped print profiles are invented; without a catalog the character rules run and the result is `INCOMPLETE` (not stored for reuse, not charged) |
-| `POST /api/v1/image-checks`, `GET .../{id}` | **off** (`503 image-checks-not-configured`) | `LISTING_GUARD_IMAGE_ENABLED`, **which `docker-compose.prod.yml` does not pass on** | an API key | **not usable yet**: every marketplace threshold is null, so every check is `INCOMPLETE`; the bounded decoder and upload staging of ADR-008 are not built, so it must not be enabled for a caller you do not trust |
+| `POST /api/v1/image-checks`, `GET .../{id}` | **off** (`503 image-checks-not-configured`) | `LISTING_GUARD_IMAGE_ENABLED` (forwarded by production Compose) | an API key | **not usable yet**: every marketplace threshold is null, so every check is `INCOMPLETE`; the bounded decoder and upload staging of ADR-008 are not built, so it must not be enabled for a caller you do not trust |
 | `POST /api/v1/listing-edits` | on | none | an API key; a catalog for the trademark part (or a watchlist entry) | real as far as the packs it runs: listing rules, trademark (an `INCOMPLETE` answer instead of `503` for a client with a watchlist entry), optional variation; the comparison text is not stored |
 | `GET`, `PUT /api/v1/trademark-watchlist` | on | none | an API key | real: the client's own data; works with no catalog (the check is then `INCOMPLETE`) |
 | `POST /api/v1/feedback`, `GET /api/v1/feedback/stats` | on | none | an API key | real: what reviewers reported, not a measured precision |
@@ -151,7 +151,7 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 
 | Variable | Notes |
 |---|---|
-| `LISTING_GUARD_VERSION` | a published image tag **without** `v`: `0.10.0` for this release, never `latest`; use no tag through `0.5.0` (amd64 only) |
+| `LISTING_GUARD_VERSION` | a published image tag **without** `v`: `0.11.0` for this release, never `latest`; use no tag through `0.5.0` (amd64 only) |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | strong, unique; the password is a secret |
 | `API_PORT` | an unused port, bound to `127.0.0.1` only |
 | `TUNNEL_TOKEN` | **required with `docker-compose.prod.cloudflared.yml`**; a secret |
@@ -167,7 +167,9 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 | TSDR | `TSDR_DOWNLOAD_ENABLED` false, `LISTING_GUARD_TSDR_API_KEY` (secret), `TSDR_MAX_MARKS` 100, `TSDR_UNMATCHED_PER_RUN` 0, `TSDR_RECHECK_INTERVAL` 30d, `TSDR_FINDING_STATUS_ENABLED` false, `TSDR_STATUS_LOG_RETENTION` 30 |
 | Console | `LISTING_GUARD_CONSOLE_ENABLED` false, `LISTING_GUARD_CONSOLE_BASE_URL`, `LISTING_GUARD_CONSOLE_AUTH_MODE` MAGIC_LINK (or CLOUDFLARE_ACCESS, BOTH), `LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN`, `..._ACCESS_AUD`, `..._ACCESS_CERTS_URL`, `..._ACCESS_CERT_CACHE_TTL` 1h, `..._ACCESS_ALLOWED_DOMAINS`, `..._ACCESS_ALLOWED_EMAILS`, `..._ACCESS_AUTO_CREATE` false, `..._ACCESS_DEFAULT_CLIENT_NAME` (the Access settings only for CLOUDFLARE_ACCESS or BOTH), `LISTING_GUARD_CONSOLE_MAIL_FROM`, `LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS` 5, `SPRING_MAIL_HOST` (the mail settings only for MAGIC_LINK or BOTH), `SPRING_MAIL_PORT` 587, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (secret), `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` true, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` true. The cookie is always Secure (`LISTING_GUARD_CONSOLE_COOKIE_SECURE` is fixed to `"true"`) |
 | Features | `LISTING_GUARD_PLANS_ENABLED` false, `LISTING_GUARD_FIXES_ENABLED` false |
-| Seller pilot | `LISTING_GUARD_CONSOLE_PILOT` false, `LISTING_GUARD_CONSOLE_DEFAULT_LOCALE` en, `LISTING_GUARD_CONSOLE_POLICY_CHANGES_ENABLED` true, `LISTING_GUARD_CONSOLE_POD_ENABLED` true, `LISTING_GUARD_IMAGE_ENABLED` false. The [pilot sample](../deploy/env.pilot.example) enables the pilot and restricts the experiment flags. |
+| Seller pilot | `LISTING_GUARD_CONSOLE_PILOT` false, `LISTING_GUARD_CONSOLE_BULK_DEFAULT_SCOPE` empty (`content` in pilot, `full` otherwise), `LISTING_GUARD_CONSOLE_DEFAULT_LOCALE` en, `LISTING_GUARD_CONSOLE_POLICY_CHANGES_ENABLED` true, `LISTING_GUARD_CONSOLE_POD_ENABLED` true, `LISTING_GUARD_IMAGE_ENABLED` false. The [pilot sample](../deploy/env.pilot.example) pins image 0.11.0 and ruleset `trademark-risk-2026-12`, enables the pilot and restricts the experiment flags. |
+| Experimental packs | `LISTING_GUARD_REVIEW_CASES_ENABLED`, `LISTING_GUARD_VERIFIED_CASES_ENABLED`, `LISTING_GUARD_ANALYZER_ENABLED` and `LISTING_GUARD_IMAGE_ENABLED` all false. The pilot sample also turns off Console Policy Changes and POD. |
+| HF converter (job options) | `--distinctiveness=distinctiveness-2026-12`, `--wordlist` unset, `--owner-columns` uses the shipped schema. The job resolves no remote sources by default. See the [catalog activation runbook](catalog-activation-runbook.md). |
 | Embeddings | `LISTING_GUARD_EMBEDDING_PROVIDER` none, `LISTING_GUARD_EMBEDDING_API_KEY` (secret; with provider `api` the API does not start while it is empty) |
 | LLM judge and rewrite (ADR-036, 037, `docs/llm.md`; off) | `LISTING_GUARD_LLM_ENABLED` false, `LISTING_GUARD_LLM_JUDGE_ENABLED` false, `LISTING_GUARD_LLM_JUDGE_PROMPT_VERSION` `trademark-judge-2026-11` (ADR-051; `trademark-judge-2026-12` adds an evidence pack, not measured with a real model), `LISTING_GUARD_LLM_REWRITE_ENABLED` false, `LISTING_GUARD_LLM_REWRITE_MAX_PER_HOUR` 20, `LISTING_GUARD_LLM_REWRITE_MAX_ROUNDS` 1 (1 to 3; ADR-050, more provider requests per press above 1), `LISTING_GUARD_LLM_GROQ_KEY`, `LISTING_GUARD_LLM_CLOUDFLARE_KEY`, `LISTING_GUARD_LLM_CLOUDFLARE_ACCOUNT_ID`, `LISTING_GUARD_LLM_GEMINI_KEY` (secrets, all empty); `LISTING_GUARD_LLM_<GROQ\|CLOUDFLARE\|GEMINI>_LISTING_TEXT_ALLOWED` false (a provider receives no listing text until set). With it on and no key the API does not start |
 | Policy monitor | `POLICY_MONITOR_STALE_DAYS` 90, `POLICY_MONITOR_KEEP_REPORTS` 12 |
@@ -280,7 +282,7 @@ docker compose --profile prod ps                                   # api and pos
 curl -fsS $BASE/health                                             # 200 {"status":"UP"}
 curl -sS -o /dev/null -w '%{http_code}\n' $BASE/api/v1/usage       # 401 (no key)
 curl -sS -H "$H" $BASE/api/v1/capabilities                         # 200; trademark-risk available:false until a catalog is READY
-curl -sSI -H "$H" $BASE/api/v1/usage | grep -i x-listing-guard-version   # the release you deployed, for example 0.10.0
+curl -sSI -H "$H" $BASE/api/v1/usage | grep -i x-listing-guard-version   # the release you deployed, for example 0.11.0
 curl -sS -H "$H" $BASE/api/v1/usage                                # 200 {"enforced":false,"plan":"FREE",...}
 curl -sS -H "$H" "$BASE/api/v1/rulesets/ETSY/limits"               # 200; rulesetVersion etsy-2026-12, title_length 140 VERIFIED
 curl -sS -H "$H" -H 'Content-Type: application/json' -d '{"marketplace":"ETSY","listing":{"title":"Handmade Mug","description":"A ceramic mug.","tags":["mug","Mug","gift_idea"],"price":{"amount":1999,"divisor":100,"currency_code":"USD"},"taxonomy_path":["Home & Living","Mugs"]}}' $BASE/api/v1/checks
@@ -306,88 +308,94 @@ the same e-mail on the console's own sign-in, open the link in the mail, press *
 **API keys**, create and revoke a key, and read **Report**.
 
 **After a restart or an upgrade:** `docker compose --profile prod logs --tail=100 api` shows `Started`, no `ERROR`; the migration
-count in `flyway_schema_history` is 47 for v0.10.0.
+history in `flyway_schema_history` includes successful migrations V48–V52 after upgrading from v0.10.0.
 
-## 6. Release v0.10.0 and the manual steps, in order
+## 6. Release v0.11.0 and the manual steps, in order
 
-Release notes: [releases/v0.10.0.md](releases/v0.10.0.md). **The last tag is `v0.6.0`; v0.10.0 is pending**, and v0.7.0–v0.9.0 were never tagged: their notes are folded into v0.10.0. The prior rehearsal is in
-[section 8](#8-v090-pre-release-checks-and-results). Order matters because the image must exist before the VM can pull it.
+Release notes: [v0.11.0](releases/v0.11.0.md). v0.10.0 was published on 2026-11-25 and is the active contract baseline.
+Image 0.11.0 becomes deployable after the tag workflows succeed and both platforms are present.
 
 **GitHub (before any server)**
 
-1. Merge the release pull request (`chore/release-v0.10.0`; it holds the `Dockerfile` fix and the notes: **no tag may be pushed from a
-   commit without them**).
-2. Fill the `Released YYYY-MM-DD` line of `docs/releases/v0.10.0.md` (a small commit on `main`, or before the merge) and tag
-   **`v0.10.0` only**:
+1. Merge the release PR `chore/release-v0.11.0`. Set the actual release date in `docs/releases/v0.11.0.md` before tagging.
+2. From the reviewed commit on `main` that includes the release notes and date, create and push the annotated tag:
 
    ```bash
-   git switch main && git pull --ff-only
-   git tag -a v0.10.0 -m "Listing Guard v0.10.0"
-   git push origin refs/tags/v0.10.0
+   git switch main
+   git pull --ff-only origin main
+   git tag -a v0.11.0 -m "Listing Guard v0.11.0"
+   git push origin refs/tags/v0.11.0
    ```
 
-3. Wait for the `Release image` and `Release client SDK` workflows (the `linux/amd64` and `linux/arm64` manifests, the contract assets,
-   the SDK), then publish the draft GitHub Release that `publish-contract` creates. Attach `listing-guard-mcp-0.10.0.jar` by hand
-   (`./mvnw -B -pl mcp-server -am package`).
-4. **Confirm the GHCR package is public.** Check its visibility in GitHub settings after the workflows finish. Prove it from a machine that is not logged in to GHCR:
-   `docker pull ghcr.io/thanhdatpb/listing-guard:0.10.0`, and `docker buildx imagetools inspect ghcr.io/thanhdatpb/listing-guard:0.10.0`
-   must list both `linux/amd64` and `linux/arm64`.
-5. After the tag, move the API baseline in a small pull request (copy `docs/api/openapi.json` and `input-schema.json` of the tag into
-   `docs/api/baseline/` as `openapi-v0.10.0.json` and `input-schema-v0.10.0.json`, delete the old files, set `baseline:` in
-   `docs/api/breaking-changes.yaml` to `v0.10.0` with no exceptions; ADR-022). Never in the release pull request: the baseline is a
-   byte copy of a release that has been published.
+3. Check the **Release image** and **Release client SDK** workflows for `v0.11.0`. Verify the SDK at version 0.11.0 in GitHub Packages.
+4. Verify GHCR can serve the fixed tag and its manifest lists both architectures. On the A1, pull only after that check succeeds:
+
+   ```bash
+   docker buildx imagetools inspect ghcr.io/thanhdatpb/listing-guard:0.11.0
+   docker pull ghcr.io/thanhdatpb/listing-guard:0.11.0
+   ```
+
+5. Check `openapi.json`, `input-schema.json`, `contract-sha256.txt` and `compatibility-report.md` on the GitHub Release.
+   Verify the asset checksums with `sha256sum -c contract-sha256.txt`, review the draft and publish it.
+   The MCP jar may be attached separately after `./mvnw -B -pl mcp-server -am package`.
+6. After publication, open a separate baseline PR (ADR-022). Copy both contract files byte for byte from the v0.11.0 tag into
+   `docs/api/baseline/openapi-v0.11.0.json` and `docs/api/baseline/input-schema-v0.11.0.json`, replace the active v0.10.0
+   files, set `baseline: v0.11.0` in `docs/api/breaking-changes.yaml` with empty exceptions, and run contract verification.
+
+For an existing 0.10.0 VM, use [the upgrade procedure](deploy-oracle.md#upgrade-from-0100-to-0110).
+The [catalog activation runbook](catalog-activation-runbook.md) is the next step for owner-based tiers.
 
 **Oracle**
 
-6. Create the **personal** Oracle account, home region **Tokyo**, plan **Always Free**, and **create a budget alert of 1 USD**
+7. Create the **personal** Oracle account, home region **Tokyo**, plan **Always Free**, and **create a budget alert of 1 USD**
    before the VM. Keep the recovery codes and the account e-mail somewhere you can reach if your laptop is gone: nobody else can
    recover a personal account. A1 capacity in Tokyo was not checked.
-7. Create the VM: Ubuntu 24.04 ARM64, `VM.Standard.A1.Flex`, **2 OCPUs and 12 GB**, boot volume about 100 GB, **no reserved IP
+8. Create the VM: Ubuntu 24.04 ARM64, `VM.Standard.A1.Flex`, **2 OCPUs and 12 GB**, boot volume about 100 GB, **no reserved IP
    needed**, a security list with **SSH (22) from your IP only** (if your IP changes you edit the rule in the OCI console). If it
    reports "Out of capacity", retry later; open nothing else.
-8. Log in, get the repository onto the VM, run `sudo ./deploy/oracle/bootstrap.sh`, then **prove the `deploy` account logs in
+9. Log in, get the repository onto the VM, run `sudo ./deploy/oracle/bootstrap.sh`, then **prove the `deploy` account logs in
    by key before you close the first session**.
-9. Copy the repository into `/opt/listing-guard` and `chown` as in [deploy-oracle.md §3](deploy-oracle.md#3-bootstrap-the-host-and-prepare-the-release-files).
-10. Create `.env` from `deploy/env.prod.example` (`chmod 600`): the required variables, `LISTING_GUARD_VERSION=0.10.0`,
+10. Copy the repository into `/opt/listing-guard` and `chown` as in [deploy-oracle.md §3](deploy-oracle.md#3-bootstrap-the-host-and-prepare-the-release-files).
+11. Create `.env` from `deploy/env.prod.example` (`chmod 600`): the required variables, `LISTING_GUARD_VERSION=0.11.0`,
     `COMPOSE_FILE=docker-compose.prod.yml:docker-compose.prod.cloudflared.yml`.
 
 **Cloudflare**
 
-11. Put the DNS zone on Cloudflare. Create a remotely-managed tunnel, put its token in `.env` as `TUNNEL_TOKEN`, and route the
+12. Put the DNS zone on Cloudflare. Create a remotely-managed tunnel, put its token in `.env` as `TUNNEL_TOKEN`, and route the
     public hostname to `http://api:8080`. The compose file pins `cloudflared` `2026.11.0`; look at the releases page once more
     before you start it ([deploy-oracle.md](deploy-oracle.md#update-cloudflared)).
 
 **Oracle again**
 
-12. `docker compose --profile prod pull`, `up -d`, `ps`, and `curl --fail http://127.0.0.1:<API_PORT>/health`.
-13. Create the first client and key with the admin job (`client create`, `key create`); store the key in the caller's secret
+13. `docker compose --profile prod pull`, `up -d`, `ps`, and `curl --fail http://127.0.0.1:<API_PORT>/health`.
+14. Create the first client and key with the admin job (`client create`, `key create`); store the key in the caller's secret
     store.
 
 **Cloudflare again**
 
-14. Create the Access applications **for `/console/*` (Allow, only your e-mail) and for `/health` (Bypass, or Service Auth with
+15. Create the Access applications **for `/console/*` (Allow, only your e-mail) and for `/health` (Bypass, or Service Auth with
     the monitor's token). Create none for `/api/v1/*`.** Decide whether `/login`, `/login/verify`, `/logout` and `/console` also
     need an application (they are not under `/console/*`), and run the checks from outside. Optionally add a Cloudflare
     rate-limiting rule for `/api/v1/*` ([section 7](#7-open-items), item 3).
 
 **Backups and schedule**
 
-15. Create the R2 bucket and an API token, add lifecycle rules (7 days on `daily/`, 28 on `weekly/`), install the AWS CLI on the
+16. Create the R2 bucket and an API token, add lifecycle rules (7 days on `daily/`, 28 on `weekly/`), install the AWS CLI on the
     VM, fill the `BACKUP_S3_*` variables, run `deploy/oracle/backup.sh` by hand and see the object in R2.
-16. **Rehearse a restore** from that dump on a scratch host or database, with `deploy/oracle/restore.sh`, and note the time. With a
+17. **Rehearse a restore** from that dump on a scratch host or database, with `deploy/oracle/restore.sh`, and note the time. With a
     personal account this is the recovery path if the VM or the account is lost.
-17. Install the schedule: `crontab deploy/oracle/crontab.example` (as `deploy`), after reading the times.
+18. Install the schedule: `crontab deploy/oracle/crontab.example` (as `deploy`), after reading the times.
 
 **Verify and watch**
 
-18. Run the [smoke test](#5-smoke-test-after-deploy) on the VM and from outside; send a few minutes of realistic load and read
+19. Run the [smoke test](#5-smoke-test-after-deploy) on the VM and from outside; send a few minutes of realistic load and read
     `docker stats`.
-19. Add an uptime monitor on `/health` (through the Bypass application or a token it can send) and check that the 1 USD Oracle
+20. Add an uptime monitor on `/health` (through the Bypass application or a token it can send) and check that the 1 USD Oracle
     budget alert exists.
 
 **Later, when you decide**
 
-20. The console (SMTP provider, HTTPS base URL, the Access application on `/console/*`), a real trademark catalog (USPTO data and
+21. The console (SMTP provider, HTTPS base URL, the Access application on `/console/*`), a real trademark catalog (USPTO data and
     its terms, the converter verified against a real file), the TSDR key and the Roadmap items of the README.
 
 ## 7. Open items

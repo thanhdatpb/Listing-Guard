@@ -119,14 +119,11 @@ contract tools and release workflow continue to discover exactly one active base
   does not build the image, so check with `docker build .` (the missing `listing-input-adapters` line made every release build fail
   until v0.8.0). Runtime folders of a deployment (`backups/`, `logs/`, `catalogs/raw/`, `policy-monitor/`, ...) stay in `.gitignore`
   and `.dockerignore`. A new setting that a deployment must control is forwarded by `docker-compose.prod.yml`, listed (commented)
-  in `deploy/env.prod.example` and in the table of `docs/deploy-readiness.md`; a new one-shot job gets a `mem_limit`. **Release status:
-  v0.9.0 is prepared** (`docs/releases/v0.9.0.md`, `Released YYYY-MM-DD` still to fill; PR `chore/release-v0.9.0`; **the last tag is
-  v0.6.0 and no v0.9.0 tag exists until the maintainer pushes it**; **v0.7.0 and v0.8.0 are never tagged**: their notes and everything
-  since are in v0.9.0, and `v0.7.0.md` and `v0.8.0.md` only point there). The pre-release checks (full `verify`, contract check, image
-  build, production Compose smoke test, catalog latency) are recorded in `docs/deploy-readiness.md`, section "v0.9.0". **Tag only from
-  a commit with that PR merged**, then the maintainer follows the "after the tag" list (check both workflows, the amd64 and arm64
-  manifests, the GitHub Release files, the SDK on GitHub Packages, and move the ADR-022 baseline to v0.9.0 in a small PR; the
-  baseline moves only after the tag, never in the release PR). Never make a statement a measurement did not support: the trademark
+  in `deploy/env.prod.example` and in the table of `docs/deploy-readiness.md`; a new one-shot job gets a `mem_limit`. **Tag from the reviewed release commit after its PR is merged** and
+  the actual release date is in the notes. Use the [release checklist](../deploy-readiness.md#6-release-v0110-and-the-manual-steps-in-order)
+  for verification, the two tag workflows, the amd64 and arm64 manifests, the GitHub Release files, the SDK on GitHub Packages,
+  production Compose smoke testing and catalog measurements. The maintainer moves the ADR-022 baseline in a separate PR
+  after the tag's contract has been published. Never make a statement a measurement did not support: the trademark
   check time and false-positive rate on the real catalog, and anything on ARM64 hardware, Oracle or Cloudflare, stay "not measured"
   until someone measures them. CI has an `image` job that runs `docker build` (linux/amd64, not
   pushed) on every pull request, so a `Dockerfile` that misses a module fails the PR. **Deployment decisions** (ADR-019, 2026-11-13):
@@ -136,8 +133,7 @@ contract tools and release workflow continue to discover exactly one active base
   were behind Access. Open: limit console sign-ins by `CF-Connecting-IP` (trusted only from the tunnel connector) and optional Access
   service-token settings in the MCP server (`docs/deploy-readiness.md` section 7). `cloudflared` is pinned in
   `docker-compose.prod.cloudflared.yml` with its source in a comment; update it from the releases page, never to `latest`.
-  `docs/releases/unreleased.md` is an empty frame ("Changes on main since v0.9.0") for the changes after it. After a tag the
-  maintainer moves the ADR-022 baseline.
+  Record changes for the next release in `docs/releases/unreleased.md`.
 - **Hugging Face source** (ADR-030): DuckDB stays in `hf-convert` (never a dependency of `api` or any module the API image
   builds) and the API image stays the Dockerfile's last stage. Never read a column whose name you did not see in the dataset's own
   files (`profile/null_rates.csv` lists them); a new column or a new dataset needs that first. The filters file is immutable and

@@ -11,7 +11,9 @@ Nếu tag hiện tại chưa chứa ADR-054, đo trên máy test với tag mới
 build từ checkout; service import và backtest lấy image theo `LISTING_GUARD_VERSION`.
 
 ```bash
-read -r -p 'Image tag đang chạy (không có v): ' LG_DEPLOY_VERSION
+# Ví dụ khi image đã phát hành và VM đang chạy v0.11.0.
+LG_DEPLOY_VERSION=0.11.0
+# Nếu VM chạy bản mới hơn có ADR-054, đổi biến thành tag thực tế (không có v).
 git fetch origin "refs/tags/v${LG_DEPLOY_VERSION}:refs/tags/v${LG_DEPLOY_VERSION}"
 git checkout --detach "v${LG_DEPLOY_VERSION}"
 test -f docs/adr/ADR-054-owner-based-distinctiveness.md

@@ -5,8 +5,10 @@ Làm theo thứ tự. Mỗi bước có cách kiểm tra; đừng sang bước s
 **1. Deploy.** Sao chép [`deploy/env.pilot.example`](../deploy/env.pilot.example) thành `.env.pilot`, `chmod 600`, điền placeholder, rồi chạy Compose theo
 [deploy-oracle.md mục 11](deploy-oracle.md). Kiểm tra: `/health` trả `UP`, đăng nhập Cloudflare Access thấy nhãn **Pilot**, ngôn ngữ tiếng Việt.
 
-**2. Import catalog.** Import catalog `jsonl-2` đã chuyển đổi (có `--wordlist` nếu bạn đã chọn danh sách) theo
-[deploy-oracle.md mục 8b](deploy-oracle.md), ghim đúng phiên bản job in ra vào `TRADEMARK_CATALOG_VERSION`, tạo lại service `api`. Kiểm tra sau bước 5.
+**2. Đo và ghim catalog.** Trên image `0.11.0`, chạy [runbook kích hoạt catalog](catalog-activation-runbook.md)
+để convert, import và chạy cổng 47 ca trên catalog thật với hai ruleset. **Trạng thái hiện tại: chưa đo.** Sau khi đạt cổng,
+ghi lại phiên bản đầy đủ (gồm digest), ghim vào `TRADEMARK_CATALOG_VERSION` và tạo lại `api`. Giữ
+`LISTING_GUARD_TRADEMARK_RULESET=classpath:rulesets/trademark-risk-2026-12.yaml`. Kiểm tra lại sau bước 5.
 
 **3. Nhập account.** Soạn `accounts.csv` từ [`docs/samples/accounts-template.csv`](samples/accounts-template.csv) (cột `email`, `role`, `display_name`, `client`; một ADMIN cho lead,
 còn lại MEMBER). Chạy thử trước, rồi chạy thật:

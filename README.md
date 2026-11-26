@@ -16,7 +16,9 @@ Input format adapters: [docs/adapters.md](docs/adapters.md)
 
 Self-hosted pre-publish compliance API for Etsy and Amazon listings: deterministic rules, explainable trademark risk, built for sellers, tools and AI agents.
 
-**Latest release notes: [v0.10.0](docs/releases/v0.10.0.md)**. The latest published tag is v0.6.0 until v0.10.0 is tagged and the release workflows succeed. The target GHCR image is `ghcr.io/thanhdatpb/listing-guard:0.10.0` for `linux/amd64` and `linux/arm64`. Deploy by version tag.
+**Latest release notes: [v0.11.0](docs/releases/v0.11.0.md)**. The latest published tag remains v0.10.0 until
+v0.11.0 is tagged and the release workflows finish. The target image is `ghcr.io/thanhdatpb/listing-guard:0.11.0`
+for `linux/amd64` and `linux/arm64`. Deploy by version tag.
 
 ![System architecture: clients and integrations call the Listing Guard API, which uses versioned rulesets, catalog data, PostgreSQL and operational jobs.](docs/images/architecture-overview.svg)
 
@@ -30,7 +32,7 @@ Listing Guard suggests and reports. It never edits or publishes a listing and do
 
 ## What it checks
 
-State of v0.10.0. "Ready" means it works and its tests pass, within the evidence status of the last column; nothing here has run on ARM64 hardware, on Oracle or behind Cloudflare yet.
+State of v0.11.0. "Ready" means it works and its tests pass, within the evidence status of the last column; this release still needs its Oracle A1 and Cloudflare deployment smoke test.
 
 | Endpoint or capability | What it does | Availability | Evidence status |
 |---|---|---|---|
@@ -47,11 +49,14 @@ State of v0.10.0. "Ready" means it works and its tests pass, within the evidence
 | ReviewCase API and Review Queue | Tenant-scoped review, explicit writer grants and audit | **Experimental, off by default** | Console access also requires the Console flag. |
 | Verified cases | Curated cases and tenant-scoped similar-case search | **Experimental, off by default** | Requires Review Queue and reviewer grant. |
 | Policy impact | Proposed reports from approved snapshots and manual re-audit | **Console-dependent, experimental** | The Console is off by default. Reports require operator-supplied snapshots. |
-| POD Readiness | Versioned profiles and separate marketplace, trademark and production results | **Console-dependent, experimental** | The Console is off by default. Shipped manufacturer limits are unverified. |
+| POD Readiness | Versioned profiles, supplier CSV import and independent marketplace, trademark and production results | **Console-dependent, experimental** | Disabled in the pilot sample. Shipped manufacturer limits are unverified. |
 
 | Beyond the endpoints | Availability | Evidence status |
 |---|---|---|
 | Console (check, bulk check, history, re-audit, watchlist, statistics, report, API keys; Vietnamese and English) | Optional, off by default | Integration tests and a look at screenshots; not tried with a real SMTP server or Cloudflare Access team; the Vietnamese copy needs a native reader |
+| [Seller pilot and onboarding](docs/pilot-setup-checklist.md) | Opt-in Cloudflare Access Console with Vietnamese by default | Readiness page, account import and weekly reporting. The real owner-based catalog gate is pending. |
+| [Bulk Sheet content scope](docs/bulk-check.md) | Defaults to content in pilot and full elsewhere | Missing Sheet columns are listed as unchecked. Single listing and API checks still use full scope. |
+| [Owner-based catalog](docs/catalog-activation-runbook.md) | Optional catalog rebuild and activation | Parquet schema verified. The threshold, owner-name matching and 47 probes on the real catalog have yet to be measured or validated. |
 | [Periodic re-audit](docs/reaudit.md) | Ready in the console | The first run of a scope has nothing to compare with |
 | [LLM judge and rewrite suggestions](docs/llm.md) | **Off by default**; free tiers | Not measured on real claims; a verified suggestion is not legal clearance |
 | `hf-convert`, `trademark-import`, `batch-check`, `backtest`, `policy-diff` | Ready as jobs | `hf-convert` ran on one build of the dataset; `backtest` has not been run on a real labelled file |
@@ -156,7 +161,7 @@ The second request needs an operator configured catalog; without one it returns 
 
 ## Deploy
 
-See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production setup, Access, backups, upgrades and health checks. General production settings are in [deployment](docs/deployment.md). Before the first deployment read [deploy readiness](docs/deploy-readiness.md): what is on or off by default, the environment variables, the resource budget, a security checklist, a smoke test and the manual steps in order. The release notes of the version to deploy are in [docs/releases](docs/releases/v0.10.0.md).
+See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production setup, Access, backups, upgrades and health checks. General production settings are in [deployment](docs/deployment.md). Before the first deployment read [deploy readiness](docs/deploy-readiness.md): what is on or off by default, the environment variables, the resource budget, a security checklist, a smoke test and the manual steps in order. The release notes of the version to deploy are in [docs/releases](docs/releases/v0.11.0.md).
 
 ## Roadmap
 
@@ -186,7 +191,7 @@ See the [detailed status and project guide](docs/overview.md) for implemented be
 - [Oracle A1 deployment](docs/deploy-oracle.md)
 - [Deploy readiness](docs/deploy-readiness.md)
 - [Architecture decisions](docs/adr/)
-- [Release notes](docs/releases/v0.10.0.md)
+- [Release notes](docs/releases/v0.11.0.md)
 
 ## License
 
