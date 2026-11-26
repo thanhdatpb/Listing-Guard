@@ -2,7 +2,7 @@
 
 Listing Guard reviews Amazon and Etsy listings before publication. The deterministic checks, trademark scan,
 policy evidence, reviewer decisions and POD readiness have independent meanings. Consult [the overview](docs/overview.md)
-for service boundaries and [the release notes](docs/releases/v0.10.0.md) for deployment status.
+for service boundaries and [the release notes](docs/releases/v0.11.0.md) for deployment status.
 
 ## Module architecture
 
