@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.trademark;
 
+import com.thanhdatpb.listingguard.trademark.catalog.CatalogLookupLimitException;
 import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
 import com.thanhdatpb.listingguard.trademark.catalog.DistinctivenessSignals;
 import com.thanhdatpb.listingguard.trademark.catalog.MarkStatus;
@@ -82,6 +83,16 @@ public final class PostgresTrademarkCatalog implements TrademarkCatalog {
     @Override
     public Map<String, List<CatalogMark>> fuzzyCandidates(Collection<String> normalizedForms,
                                                            double candidateThreshold) {
+        return fuzzyCandidates(normalizedForms, candidateThreshold, 0);
+    }
+
+    @Override
+    public Map<String, List<CatalogMark>> fuzzyBatchCandidates(Collection<String> forms, double threshold, int candidateBudget) {
+        return fuzzyCandidates(forms, threshold, candidateBudget);
+    }
+
+    private Map<String, List<CatalogMark>> fuzzyCandidates(Collection<String> normalizedForms, double candidateThreshold,
+                                                           int candidateBudget) {
         Map<String, List<CatalogMark>> candidates = new LinkedHashMap<>();
         if (normalizedForms.isEmpty()) {
             return candidates;
@@ -89,14 +100,22 @@ public final class PostgresTrademarkCatalog implements TrademarkCatalog {
         transactions.executeWithoutResult(status -> {
             jdbc.queryForObject("SELECT set_config('pg_trgm.similarity_threshold', ?, true)", String.class,
                     BigDecimal.valueOf(candidateThreshold).toPlainString());
+            int[] count = {0};
             jdbc.query("SELECT f.form, " + COLUMNS + " FROM unnest(?::text[]) AS f(form) "
                             + "JOIN trademark_entry e ON e.catalog_version_id = ? AND e.normalized % f.form "
-                            + "ORDER BY f.form COLLATE \"C\", e.normalized COLLATE \"C\"",
+                            + "ORDER BY f.form COLLATE \"C\", e.normalized COLLATE \"C\""
+                            + (candidateBudget > 0 ? " LIMIT ?" : ""),
                     ps -> {
                         ps.setArray(1, ps.getConnection().createArrayOf("text", normalizedForms.toArray()));
                         ps.setLong(2, catalogVersionId);
+                        if (candidateBudget > 0) {
+                            ps.setInt(3, candidateBudget + 1);
+                        }
                     },
                     rs -> {
+                        if (candidateBudget > 0 && ++count[0] > candidateBudget) {
+                            throw new CatalogLookupLimitException();
+                        }
                         candidates.computeIfAbsent(rs.getString("form"), form -> new ArrayList<>()).add(mark(rs));
                     });
         });

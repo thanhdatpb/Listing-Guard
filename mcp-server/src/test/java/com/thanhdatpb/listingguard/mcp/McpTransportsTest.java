@@ -42,7 +42,7 @@ class McpTransportsTest {
 
     private static final ObjectMapper M = ToolResults.newMapper();
     private static final List<String> TOOLS = List.of("check_listing", "check_trademark", "check_variations",
-            "check_listing_edit", "screen_personalization", "get_limits", "get_usage", "get_capabilities", "get_watchlist");
+            "check_listing_edit", "screen_personalization", "get_limits", "get_usage", "get_capabilities", "screen_phrases", "get_watchlist");
 
     private static McpServerConfig httpConfig(ApiStub stub) {
         return new McpServerConfig(ApiStub.KEY, stub.baseUri(), Duration.ofSeconds(5), TransportKind.HTTP,
@@ -69,7 +69,8 @@ class McpTransportsTest {
             assertThat(tool.inputSchema()).as(tool.name()).containsEntry("type", "object").containsKey("properties");
             assertThat(tool.annotations()).as(tool.name()).isNotNull();
             boolean reader = tool.name().equals("get_limits") || tool.name().equals("get_usage")
-                    || tool.name().equals("get_capabilities") || tool.name().equals("get_watchlist");
+                    || tool.name().equals("get_capabilities") || tool.name().equals("get_watchlist")
+                    || tool.name().equals("screen_phrases");
             assertThat(tool.annotations().readOnlyHint()).as(tool.name()).isEqualTo(reader);
             assertThat(tool.annotations().destructiveHint()).as(tool.name()).isFalse();
             assertThat(tool.annotations().openWorldHint()).as(tool.name()).isFalse();

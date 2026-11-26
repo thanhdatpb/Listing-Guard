@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -26,6 +27,7 @@ public final class BodyLimitFilter extends OncePerRequestFilter {
     private final long maxBytes;
     private final ObjectMapper mapper;
     private final Map<String, Long> uploadLimits;
+    private final Map<String, Long> jsonLimits;
 
     public BodyLimitFilter(long maxBytes, ObjectMapper mapper) {
         this(maxBytes, mapper, Map.of());
@@ -47,18 +49,27 @@ public final class BodyLimitFilter extends OncePerRequestFilter {
      *                     whole request path, not a prefix. Every other request keeps {@code maxBytes}
      */
     public BodyLimitFilter(long maxBytes, ObjectMapper mapper, Map<String, Long> uploadLimits) {
+        this(maxBytes, mapper, uploadLimits, Map.of());
+    }
+
+    public BodyLimitFilter(long maxBytes, ObjectMapper mapper, Map<String, Long> uploadLimits,
+                           Map<String, Long> jsonLimits) {
         this.maxBytes = maxBytes;
         this.mapper = mapper;
         this.uploadLimits = Map.copyOf(uploadLimits);
+        this.jsonLimits = Map.copyOf(jsonLimits);
     }
 
     private long limitFor(HttpServletRequest request) {
         String type = request.getContentType();
-        if ("POST".equals(request.getMethod()) && type != null
-                && type.toLowerCase(java.util.Locale.ROOT).startsWith("multipart/form-data")) {
-            Long upload = uploadLimits.get(request.getRequestURI());
-            if (upload != null) {
-                return upload;
+        if ("POST".equals(request.getMethod()) && type != null) {
+            String mediaType = type.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
+            if (type.toLowerCase(Locale.ROOT).startsWith("multipart/form-data")) {
+                return uploadLimits.getOrDefault(request.getRequestURI(), maxBytes);
+            }
+            if ("application/json".equals(mediaType)) {
+                String path = request.getRequestURI().substring(request.getContextPath().length());
+                return jsonLimits.getOrDefault(path, maxBytes);
             }
         }
         return maxBytes;

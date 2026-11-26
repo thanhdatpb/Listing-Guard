@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
   <title id="title">Listing Guard AI agent integration</title>
-  <desc id="desc">A user instructs an AI agent. An Agent Skill is planned. The read-only MCP server exposes eight fixed tools and calls the REST API through the Java client SDK. The API returns unchanged findings and disclaimers. Contract, evaluation and observability components support the integration; a server-side policy analyzer is planned and off by default.</desc>
+  <desc id="desc">A user instructs an AI agent. An Agent Skill is planned. The read-only MCP server exposes ten fixed tools, including phrase screening and calls the REST API through the Java client SDK. The API returns unchanged findings and disclaimers. Contract, evaluation and observability components support the integration; a server-side policy analyzer is planned and off by default.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#315b83"/></marker>
     <style>
@@ -36,7 +36,7 @@
   <rect x="638" y="237" width="358" height="112" rx="15" class="card"/>
   <path d="M662 264h30v34h-30zM668 271h18M668 279h18M668 287h12M672 309h20" class="icon"/>
   <text x="710" y="272" class="label">Fixed tools from ToolCatalog</text>
-  <text x="710" y="300" class="small">check_listing · check_trademark</text>
+  <text x="710" y="300" class="small">check_listing · screen_phrases</text>
   <text x="710" y="326" class="small">check_variations · screen_personalization</text>
   <text x="662" y="378" class="small" textLength="340" lengthAdjust="spacingAndGlyphs">get_limits · get_usage · get_capabilities · get_watchlist</text>
   <rect x="638" y="400" width="358" height="88" rx="15" class="green"/>

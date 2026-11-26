@@ -16,6 +16,8 @@ import com.thanhdatpb.listingguard.client.model.MatchType;
 import com.thanhdatpb.listingguard.client.model.PersonalizationScreeningRequest;
 import com.thanhdatpb.listingguard.client.model.PersonalizationScreeningResult;
 import com.thanhdatpb.listingguard.client.model.PersonalizationValue;
+import com.thanhdatpb.listingguard.client.model.PhraseScreeningRequest;
+import com.thanhdatpb.listingguard.client.model.PhraseScreeningResult;
 import com.thanhdatpb.listingguard.client.model.RiskLevel;
 import com.thanhdatpb.listingguard.client.model.RulesetLimits;
 import com.thanhdatpb.listingguard.client.model.Severity;
@@ -102,6 +104,26 @@ class ClientEndpointsTest {
         assertThat(r.header("X-Request-Id")).matches(UUID_FORMAT);
         assertThat(r.header("Accept")).isEqualTo("application/json");
         assertThat(r.header("User-Agent")).startsWith("listing-guard-client/");
+    }
+
+    @Test
+    void screensPhrasesWithTheTypedSdk() throws Exception {
+        String response = """
+                {"marketplace":"ETSY","catalogStatus":"SERVED","completeness":"COMPLETE","summary":{"block":0,"clear":1},
+                 "phrases":[{"text":"woven pouch","searchVolume":220,"verdict":"CLEAR","completeness":"COMPLETE","findings":[]}]}
+                """;
+        try (ApiStub stub = new ApiStub().replying(Reply.json(200, response))) {
+            var request = new PhraseScreeningRequest(List.of(new PhraseScreeningRequest.Phrase("woven pouch", 220L)),
+                    "ETSY", "bag");
+            var result = stub.client().screenPhrases(request);
+            var sent = stub.only();
+            assertCommonHeaders(sent);
+            assertThat(sent.method()).isEqualTo("POST");
+            assertThat(sent.target()).isEqualTo("/api/v1/phrase-screenings");
+            assertThat(M.readTree(sent.body()).at("/product_type").asText()).isEqualTo("bag");
+            assertThat(M.readTree(sent.body()).at("/phrases/0/searchVolume").asLong()).isEqualTo(220);
+            assertThat(result.phrases().getFirst().verdict()).isEqualTo(PhraseScreeningResult.Verdict.CLEAR);
+        }
     }
 
     @Test

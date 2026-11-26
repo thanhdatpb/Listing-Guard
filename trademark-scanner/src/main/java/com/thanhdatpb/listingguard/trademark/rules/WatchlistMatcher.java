@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.function.Function;
 
 /**
  * The {@code watchlist_match} rule (ADR-031). The mark and every alias of each entry are normalized with the ruleset's
@@ -31,8 +32,13 @@ public final class WatchlistMatcher {
 
     /** The candidates of the watchlist in the context's fields, at the settings' minimum level. Empty for an empty watchlist. */
     public static List<Candidate> candidates(ScanContext context, Watchlist watchlist, TextNormalizer normalizer) {
+        return prepare(watchlist, normalizer).apply(context);
+    }
+
+    /** Normalizes the same watchlist once for a batch of independent fields. */
+    public static Function<ScanContext, List<Candidate>> prepare(Watchlist watchlist, TextNormalizer normalizer) {
         if (watchlist.isEmpty()) {
-            return List.of();
+            return context -> List.of();
         }
         Map<String, Form> forms = new HashMap<>();
         TreeSet<Integer> lengths = new TreeSet<>();
@@ -42,7 +48,11 @@ public final class WatchlistMatcher {
                 add(forms, lengths, normalizer, alias, new Form(entry, alias));
             }
         }
-        RiskLevel minimum = watchlist.settings().minimumRisk();
+        return context -> candidates(context, forms, lengths, watchlist.settings().minimumRisk());
+    }
+
+    private static List<Candidate> candidates(ScanContext context, Map<String, Form> forms,
+                                               TreeSet<Integer> lengths, RiskLevel minimum) {
         List<Candidate> candidates = new ArrayList<>();
         for (NormalizedField field : context.fields()) {
             List<Token> tokens = field.tokens();

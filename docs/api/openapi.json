@@ -120,6 +120,10 @@
             },
             "type" : "array"
           },
+          "phraseScreening" : {
+            "$ref" : "#/components/schemas/PhraseScreeningCapability",
+            "description" : "Present when phrase screening is enabled. If absent, the feature is disabled."
+          },
           "plans" : {
             "$ref" : "#/components/schemas/PlansCapability",
             "description" : "Whether plans and the monthly quota are applied in this deployment."
@@ -1388,6 +1392,242 @@
             },
             "description" : "Results per state of their trademark scan: `COMPLETE`, `INCOMPLETE` or `NOT_CONFIGURED` (no catalog was served).",
             "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "PhraseFindingView" : {
+        "properties" : {
+          "end" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "field" : {
+            "type" : "string"
+          },
+          "mark" : {
+            "type" : [ "string", "null" ]
+          },
+          "matchType" : {
+            "enum" : [ "EXACT", "PHRASE", "FUZZY", "CONTEXT" ],
+            "type" : "string"
+          },
+          "matchedAlias" : {
+            "type" : [ "string", "null" ]
+          },
+          "otherRuleIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "ownerCountSameMark" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "risk" : {
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "UNKNOWN" ],
+            "type" : "string"
+          },
+          "riskAdjustments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RiskAdjustmentView"
+            },
+            "type" : "array"
+          },
+          "ruleId" : {
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "CATALOG", "WATCHLIST", "RULE" ],
+            "type" : "string"
+          },
+          "sourceIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "sourceLinks" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SourceLinkView"
+            },
+            "type" : "array"
+          },
+          "start" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "tier" : {
+            "enum" : [ "STRONG", "ORDINARY", "WEAK" ],
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "PhraseInput" : {
+        "properties" : {
+          "searchVolume" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "text" : {
+            "description" : "Phrase text. Empty values and values over 200 Unicode code points are counted and skipped.",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PhraseRowView" : {
+        "properties" : {
+          "completeness" : {
+            "enum" : [ "COMPLETE", "INCOMPLETE" ],
+            "type" : "string"
+          },
+          "failedRuleIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "findings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PhraseFindingView"
+            },
+            "type" : "array"
+          },
+          "fuzzySkipped" : {
+            "type" : "boolean"
+          },
+          "searchVolume" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "skippedRuleIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "text" : {
+            "type" : "string"
+          },
+          "verdict" : {
+            "enum" : [ "BLOCK", "REVIEW", "CLEAR" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PhraseScreeningCapability" : {
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "maxFuzzyPhrases" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxPhrases" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxPhrasesPerDay" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PhraseScreeningRequest" : {
+        "properties" : {
+          "marketplace" : {
+            "default" : "ETSY",
+            "description" : "Case-insensitive marketplace code.",
+            "maxLength" : 32,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "phrases" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PhraseInput"
+            },
+            "maxItems" : 2000,
+            "minItems" : 1,
+            "type" : "array"
+          },
+          "product_type" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "phrases" ],
+        "type" : "object"
+      },
+      "PhraseScreeningResponse" : {
+        "properties" : {
+          "analysisVersion" : {
+            "type" : "string"
+          },
+          "catalogStatus" : {
+            "enum" : [ "SERVED", "NOT_CONFIGURED" ],
+            "type" : "string"
+          },
+          "catalogVersion" : {
+            "type" : [ "string", "null" ]
+          },
+          "completeness" : {
+            "enum" : [ "COMPLETE", "INCOMPLETE" ],
+            "type" : "string"
+          },
+          "disclaimer" : {
+            "type" : "string"
+          },
+          "marketplace" : {
+            "type" : "string"
+          },
+          "phrases" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PhraseRowView"
+            },
+            "type" : "array"
+          },
+          "rulesetVersion" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/PhraseSummary"
+          }
+        },
+        "type" : "object"
+      },
+      "PhraseSummary" : {
+        "properties" : {
+          "block" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "clear" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "dropped" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "duplicates" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "fuzzySkipped" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "review" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -6000,6 +6240,288 @@
         "tags" : [ "Personalization screening" ]
       }
     },
+    "/api/v1/phrase-screenings" : {
+      "post" : {
+        "description" : "Checks up to 2000 phrases in one batch. CLEAR describes the findings from checks that ran. Inspect completeness and the disclaimer before interpreting a result. Phrase text is not retained.",
+        "operationId" : "screenPhrases",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PhraseScreeningRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "examples" : {
+                  "synthetic" : {
+                    "description" : "synthetic",
+                    "value" : {
+                      "analysisVersion" : "abc123",
+                      "catalogStatus" : "SERVED",
+                      "catalogVersion" : "synthetic",
+                      "completeness" : "COMPLETE",
+                      "disclaimer" : "Chỉ là cảnh báo tham khảo.",
+                      "marketplace" : "ETSY",
+                      "phrases" : [ {
+                        "completeness" : "COMPLETE",
+                        "failedRuleIds" : [ ],
+                        "findings" : [ {
+                          "end" : 6,
+                          "field" : "phrase",
+                          "mark" : "Zorvex",
+                          "matchType" : "EXACT",
+                          "matchedAlias" : null,
+                          "otherRuleIds" : [ ],
+                          "ownerCountSameMark" : 1,
+                          "risk" : "HIGH",
+                          "riskAdjustments" : [ ],
+                          "ruleId" : "catalog_exact",
+                          "source" : "CATALOG",
+                          "sourceIds" : [ "uspto:12345680" ],
+                          "sourceLinks" : [ {
+                            "label" : "USPTO TSDR",
+                            "sourceId" : "uspto:12345680",
+                            "url" : "https://tsdr.uspto.gov/#caseNumber=12345680&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch"
+                          } ],
+                          "start" : 0,
+                          "tier" : "STRONG"
+                        } ],
+                        "fuzzySkipped" : false,
+                        "searchVolume" : 1200,
+                        "skippedRuleIds" : [ ],
+                        "text" : "Zorvex",
+                        "verdict" : "BLOCK"
+                      } ],
+                      "rulesetVersion" : "trademark-risk-2026-12",
+                      "summary" : {
+                        "block" : 1,
+                        "clear" : 0,
+                        "dropped" : 0,
+                        "duplicates" : 0,
+                        "fuzzySkipped" : 0,
+                        "review" : 0
+                      }
+                    }
+                  }
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/PhraseScreeningResponse"
+                }
+              }
+            },
+            "description" : "Screening results and coverage.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request, marketplace or product type, or too many phrases.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API key.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The plan does not include the trademark pack.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Phrase screening is disabled.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request is over the body size limit.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request body is not JSON.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Marketplace is planned but not yet supported.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Client rate limit, daily phrase limit or monthly quota exceeded.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No catalog or enabled watchlist, or processing budget exceeded.",
+            "headers" : {
+              "Deprecation" : {
+                "$ref" : "#/components/headers/Deprecation"
+              },
+              "Sunset" : {
+                "$ref" : "#/components/headers/Sunset"
+              },
+              "X-Listing-Guard-Version" : {
+                "$ref" : "#/components/headers/X-Listing-Guard-Version"
+              }
+            }
+          }
+        },
+        "summary" : "Screen keywords and print text for trademark references",
+        "tags" : [ "Phrase screening" ]
+      }
+    },
     "/api/v1/policy-checks" : {
       "post" : {
         "description" : "Opt-in Etsy analysis. A cache miss can call paid providers. Empty, partial and failed analyses never clear a listing.",
@@ -9925,6 +10447,9 @@
   "tags" : [ {
     "description" : "Compare the findings before and after a listing edit.",
     "name" : "Listing edits"
+  }, {
+    "description" : "Batch trademark reference warnings for keywords and print text.",
+    "name" : "Phrase screening"
   }, {
     "description" : "The images of a listing: format, size, count, background, occupancy and sharpness against a marketplace profile.",
     "name" : "Image checks"

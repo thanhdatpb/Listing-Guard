@@ -60,6 +60,7 @@ Do not use `-DforkCount=0` in this repository: it can change the test working-di
 
 - [Feature status, history and roadmap](docs/agent/status.md) is the detailed record formerly under Context and Planned work.
 - [Operational commands](docs/agent/operations.md) covers policy corpus, catalogs, Compose tasks and job invocations.
+- [Phrase screening](docs/phrase-screening.md) checks short seller phrases via API, SDK or MCP (off by default, ADR-055).
 - [Detailed engineering conventions](docs/agent/conventions.md) preserves pack, schema, UI, API, evaluation and release rules.
 - [Repository guidelines](CONTRIBUTING.md), [ADRs](docs/adr/), [implementation notes](docs/implementation/),
   [Oracle deployment](docs/deploy-oracle.md) and [operations readiness](docs/deploy-readiness.md).

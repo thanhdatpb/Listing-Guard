@@ -162,3 +162,22 @@ Kiểm tra `/api/v1/capabilities` và một check với mẫu probe qua lệnh s
   và phần `distinctiveness` gồm tier, mức bao phủ owner, phiên bản ngưỡng và SHA-256 wordlist.
 - Gửi `report.md` của hai lần backtest với phần kỳ vọng theo dòng và kết quả cổng ở trên. Chỉ gửi kết quả của
   `catalog-probe.csv`, không gửi listing khách, cơ sở dữ liệu, log bí mật, file raw hay wordlist.
+
+
+## Đo độ trễ phrase screening
+
+Chưa đo trên catalog thật. Dùng image chứa ADR-055, bật `LISTING_GUARD_PHRASE_SCREENING_ENABLED=true`, kích hoạt catalog đã
+được duyệt và kiểm tra `/api/v1/capabilities`. Dùng client kiểm thử để tránh tiêu quota của seller. Mặc định 10 lượt sẽ dùng
+10.000 cụm của hạn mức ngày. Nhập API key qua prompt để khỏi lưu trong lịch sử lệnh.
+
+```bash
+export LG_BASE_URL=https://your-listing-guard-host
+read -r -s -p 'Listing Guard test API key: ' LG_API_KEY
+printf '\n'
+export LG_API_KEY
+LG_RUNS=10 ./scripts/measure-phrase-screening.sh
+unset LG_API_KEY
+```
+
+Ghi p50/p95, số lượt, catalog version, ruleset, giới hạn fuzzy, phiên bản image và kiến trúc VM. Dừng nếu request lỗi.
+Đo stress với 2.000 cụm riêng sau khi xác nhận mức độ trễ của 1.000 cụm.

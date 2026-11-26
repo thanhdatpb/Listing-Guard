@@ -15,7 +15,15 @@ public record Capabilities(
         List<PackCapability> packs,
         TrademarkCatalogCapability trademarkCatalog,
         PlansCapability plans,
-        FixesCapability fixes) {
+        FixesCapability fixes,
+        PhraseScreeningCapability phraseScreening) {
+
+    public record PhraseScreeningCapability(boolean enabled, int maxPhrases, int maxFuzzyPhrases, int maxPhrasesPerDay) {}
+
+    public Capabilities(List<PackCapability> packs, TrademarkCatalogCapability trademarkCatalog,
+                        PlansCapability plans, FixesCapability fixes) {
+        this(packs, trademarkCatalog, plans, fixes, null);
+    }
 
     public Capabilities {
         packs = Copies.list(packs);

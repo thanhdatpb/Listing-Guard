@@ -407,6 +407,26 @@ The response groups findings as `newFindings`, `modifiedFindings` (including fin
 feedback flow. The listing itself is not added to history or stored by this endpoint; its pack checks retain their existing hashes,
 bounded evidence and retention behavior.
 
+## Phrase screening
+
+`POST /api/v1/phrase-screenings` checks seller-supplied keywords or print text in a single batch. See the
+[phrase screening guide](phrase-screening.md) for coverage, quotas and evidence.
+
+| Field | Type | Notes |
+|---|---|---|
+| `phrases` | array | 1 to 2,000 phrase objects, or fewer if the deployment sets a lower limit. |
+| `marketplace` | string | Optional. Defaults to ETSY. |
+| `product_type` | string | Optional. A key the active trademark ruleset declares. |
+
+| Field | Type | Notes |
+|---|---|---|
+| `text` | string | Empty values and values over 200 Unicode code points are counted and skipped. |
+| `searchVolume` | integer | Optional nonnegative search volume. |
+
+```json phrase-screening-example
+{"marketplace":"ETSY","phrases":[{"text":"woven storage pouch","searchVolume":22},{"text":"linen tumbler"}]}
+```
+
 ## Checked by a test
 
 The two listing examples above are read out of this file by a test and run through the normalizers (the Amazon example

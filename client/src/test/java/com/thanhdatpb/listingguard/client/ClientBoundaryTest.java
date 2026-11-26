@@ -37,6 +37,7 @@ class ClientBoundaryTest {
         assertThat(Arrays.stream(Operation.values()).map(Operation::path)).containsExactlyInAnyOrder(
                 "/api/v1/checks",
                 "/api/v1/trademark-checks",
+                "/api/v1/phrase-screenings",
                 "/api/v1/variation-checks",
                 "/api/v1/listing-edits",
                 "/api/v1/personalization-screenings",

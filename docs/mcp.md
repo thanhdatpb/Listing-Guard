@@ -262,3 +262,10 @@ tested in the Java client SDK too, and `ApiGatewayTest` checks them again throug
 
 The SDK is the official Java SDK, version 2.1.0, pinned exactly; the module does not use Spring (see
 [ADR-017](adr/ADR-017-mcp-server.md) for why, and for the questions left to the maintainer).
+
+### Batch phrase screening (ADR-055)
+
+Use `screen_phrases` for seller keywords and print text. Check `get_capabilities` for the feature flag and limits.
+The tool does not change listing or watchlist content. Each successful call records counts, can use one quota unit and
+uses the client daily phrase budget. A large response may exceed the MCP client response limit. For large batches use
+the API or Java SDK. See [phrase screening](phrase-screening.md) for fields and coverage.

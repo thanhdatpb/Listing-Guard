@@ -7,6 +7,7 @@ import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.FindingSource;
 import com.thanhdatpb.listingguard.trademark.JudgeBasis;
 import com.thanhdatpb.listingguard.trademark.MatchType;
+import com.thanhdatpb.listingguard.trademark.RiskAdjustment;
 import com.thanhdatpb.listingguard.trademark.RiskLevel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -271,6 +272,11 @@ public record TrademarkCheckResult(
             @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED,
                     description = "Only on `llm_descriptive` when the operator chose the evidence prompt of the LLM judge "
                             + "(ADR-051): what the model was shown besides the sentence, and its reason.") JudgeEvidenceView judgeEvidence) {
+        public static RiskAdjustmentView of(RiskAdjustment adjustment) {
+            return new RiskAdjustmentView(adjustment.reason().code(), adjustment.from(), adjustment.to(), adjustment.note(),
+                    CalibrationEvidence.of(adjustment.distinctiveness()), JudgeEvidenceView.of(adjustment.judge()));
+        }
+
         public RiskAdjustmentView(String reason, RiskLevel from, RiskLevel to, String note) {
             this(reason, from, to, note, null, null);
         }

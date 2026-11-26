@@ -14,6 +14,7 @@ import com.thanhdatpb.listingguard.trademark.Completeness;
 import com.thanhdatpb.listingguard.trademark.RiskLevel;
 import com.thanhdatpb.listingguard.trademark.FindingSource;
 import com.thanhdatpb.listingguard.trademark.LlmJudgement;
+import com.thanhdatpb.listingguard.trademark.PhraseScreening;
 import com.thanhdatpb.listingguard.trademark.TrademarkCheckInput;
 import com.thanhdatpb.listingguard.trademark.TrademarkScanner;
 import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
@@ -46,6 +47,58 @@ class TrademarkEvalGateTest {
     private static final Path FIXTURE = ListingEvalGateTest.LISTING_DIR.resolve("trademark/cases.tsv");
     private static final Path REPORT = ListingEvalGateTest.REPORT_DIR.resolve("trademark.md");
     private static final String FIXTURE_SHA = "3cd398b13c886b387d2c1920a52967314f61699004771753b52d232e42db51a9";
+
+    @Test
+    void syntheticPhraseGateRespectsCatalogTierAndNeverClearsKnownBrandsOrAliases() throws IOException {
+        var ruleset = TrademarkRulesetLoader.loadClasspath("rulesets/trademark-risk-2026-12.yaml");
+        var catalog = new InMemoryTrademarkCatalog("phrase-eval", List.of(
+                phraseMark("mug", "Mug", DistinctivenessSignals.Tier.WEAK, 12L, 30L, "12345678"),
+                phraseMark("blue", "Blue", DistinctivenessSignals.Tier.WEAK, 8L, 19L, "12345679"),
+                phraseMark("zorvex", "Zorvex", DistinctivenessSignals.Tier.STRONG, 1L, 1L, "12345680"),
+                phraseMark("crimson falcons", "Crimson Falcons", DistinctivenessSignals.Tier.ORDINARY, 2L, 3L, "12345681")
+        ));
+        var scanner = new TrademarkScanner(ruleset, catalog);
+        var oldScanner = new TrademarkScanner(ruleset, new InMemoryTrademarkCatalog("before-tier",
+                List.of(new CatalogMark("mug", "Mug"))));
+        var watchlist = new Watchlist(WatchlistSettings.loadClasspath(WatchlistSettings.SHIPPED),
+                List.of(new WatchlistEntry("1", "Brimwick Otters", List.of("Bkwott"), List.of(), "12345682", null)));
+        var sample = Files.readAllLines(FIXTURE.resolveSibling("phrases.tsv"), StandardCharsets.UTF_8);
+        assertThat(sample).hasSize(8);
+        for (String line : sample.subList(1, sample.size())) {
+            String[] row = line.split("\t", -1);
+            boolean legacy = row[1].equals("LEGACY");
+            var result = PhraseScreening.screen(legacy ? oldScanner : scanner,
+                    List.of(new PhraseScreening.Input(row[2], null)), null, watchlist, 200);
+            var checked = result.phrases().getFirst();
+            assertThat(checked.verdict().name()).as(row[0]).isEqualTo(row[3]);
+            assertThat(checked.completeness()).isEqualTo(legacy ? Completeness.INCOMPLETE : Completeness.COMPLETE);
+            if (!row[4].equals("-")) {
+                assertThat(checked.findings()).extracting(PhraseScreening.PhraseFinding::mark).contains(row[4]);
+            }
+            if (row[1].equals("BRAND") || row[1].equals("WATCHLIST")) {
+                assertThat(checked.verdict()).isNotEqualTo(PhraseScreening.Verdict.CLEAR);
+            }
+            if (row[0].equals("P03")) {
+                assertThat(checked.findings()).anySatisfy(finding -> {
+                    assertThat(finding.mark()).isEqualTo("Mug");
+                    assertThat(finding.tier()).isEqualTo(DistinctivenessSignals.Tier.WEAK);
+                    assertThat(finding.ownerCountSameMark()).isEqualTo(12L);
+                    assertThat(finding.sourceLinks().getFirst().url()).contains("tsdr.uspto.gov", "12345678");
+                });
+            }
+            if (legacy) {
+                assertThat(checked.skippedRuleIds()).contains("catalog_distinctiveness");
+            }
+        }
+    }
+
+    private static CatalogMark phraseMark(String normalized, String display, DistinctivenessSignals.Tier tier,
+                                          long owners, long serials, String serial) {
+        return new CatalogMark(normalized, display, List.of(21), MarkStatus.REGISTERED, false, List.of("uspto:" + serial),
+                new DistinctivenessSignals(normalized.contains(" ") ? 2 : 1, serials, 1,
+                        DistinctivenessSignals.MarkKind.STANDARD_CHARACTER, tier == DistinctivenessSignals.Tier.WEAK,
+                        tier, DistinctivenessSignals.Reason.DEFAULT, owners));
+    }
 
     private enum Label { POSITIVE, NEGATIVE, UNLABELLED }
 

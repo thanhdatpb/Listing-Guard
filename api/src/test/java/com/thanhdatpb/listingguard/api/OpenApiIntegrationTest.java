@@ -58,6 +58,26 @@ class OpenApiIntegrationTest {
     }
 
     @Test
+    void theDisabledPhraseEndpointLeavesLegacyCapabilitiesBytesUnchanged() throws Exception {
+        var response = mvc.perform(get("/api/v1/capabilities").header(HEADER, KEY_1)).andExpect(status().isOk())
+                .andReturn().getResponse();
+        String body = response.getContentAsString(StandardCharsets.UTF_8);
+        var capabilities = new ObjectMapper().readValue(body, com.thanhdatpb.listingguard.api.capabilities.Capabilities.class);
+        var legacy = new LegacyCapabilities(capabilities.packs(), capabilities.trademarkCatalog(),
+                capabilities.plans(), capabilities.fixes());
+        assertThat(body).isEqualTo(new ObjectMapper().writeValueAsString(legacy));
+        byte[] previousETagContent = legacy.toString().replaceFirst("^LegacyCapabilities", "Capabilities")
+                .getBytes(StandardCharsets.UTF_8);
+        String previousETag = java.util.HexFormat.of()
+                .formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(previousETagContent));
+        assertThat(response.getHeader("ETag")).isEqualTo("\"%s\"".formatted(previousETag));
+        mvc.perform(post("/api/v1/phrase-screenings").header(HEADER, KEY_1).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"phrases\":[{\"text\":\"cotton\"}]}")).andExpect(status().isNotFound());
+    }
+
+    private record LegacyCapabilities(Object packs, Object trademarkCatalog, Object plans, Object fixes) {}
+
+    @Test
     void swaggerUiIsOffByDefault() throws Exception {
         mvc.perform(get("/swagger-ui/index.html").header(HEADER, KEY_1)).andExpect(status().isNotFound());
         mvc.perform(get("/swagger-ui.html").header(HEADER, KEY_1)).andExpect(status().isNotFound());
@@ -108,7 +128,7 @@ class OpenApiIntegrationTest {
         assertThat(fieldNames(spec.at("/paths"))).containsExactlyInAnyOrder("/api/v1/checks", "/api/v1/checks/{id}",
                 "/api/v1/trademark-checks", "/api/v1/trademark-checks/{id}", "/api/v1/trademark-watchlist", "/api/v1/usage",
                 "/api/v1/variation-checks", "/api/v1/variation-checks/{id}",
-                "/api/v1/personalization-screenings", "/api/v1/personalization-screenings/{id}",
+                "/api/v1/personalization-screenings", "/api/v1/personalization-screenings/{id}", "/api/v1/phrase-screenings",
                 "/api/v1/image-checks", "/api/v1/image-checks/{id}",
                 "/api/v1/rulesets/{marketplace}/limits", "/api/v1/reports/summary", "/api/v1/capabilities",
                 "/api/v1/input-adapters", "/api/v1/feedback", "/api/v1/feedback/stats", "/api/v1/listing-edits",
@@ -127,7 +147,7 @@ class OpenApiIntegrationTest {
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1capabilities/get/responses")))
                 .containsExactlyInAnyOrder("200", "304", "401", "429");
         assertThat(fieldNames(spec.at("/components/schemas/Capabilities/properties")))
-                .containsExactlyInAnyOrder("packs", "trademarkCatalog", "plans", "fixes");
+                .containsExactlyInAnyOrder("packs", "trademarkCatalog", "plans", "fixes", "phraseScreening");
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1rulesets~1{marketplace}~1limits/get/responses")))
                 .containsExactlyInAnyOrder("200", "304", "401", "404", "429");
         assertThat(fieldNames(spec.at("/paths/~1api~1v1~1rulesets~1{marketplace}~1limits")))

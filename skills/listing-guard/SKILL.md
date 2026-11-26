@@ -43,8 +43,13 @@ API's results and never substitutes its own pass/fail decision.
 
 Call only applicable checks, but do not omit a requested check because another pack returned no findings. These tools are
 `check_listing`, `check_trademark`, `check_variations`, `screen_personalization`, `get_limits`, `get_usage`,
-`get_capabilities`, `get_watchlist`, and `check_listing_edit`; their names and parameters are defined by the MCP server's
+`get_capabilities`, `get_watchlist`, `screen_phrases`, and `check_listing_edit`; their names and parameters are defined by the MCP server's
 `ToolCatalog`.
+
+For seller-owned keywords or short print text, call `screen_phrases` with `phrases` (objects with `text` and optional
+`searchVolume`), optional `marketplace` and optional `product_type`. Check capabilities first. Show `completeness` and the
+disclaimer alongside verdicts, and explain when fuzzy coverage was skipped. The call counts usage. Keep buyer text in
+the personalization workflow only.
 
 ## Reporting results
 

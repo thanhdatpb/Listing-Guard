@@ -9,6 +9,7 @@ import com.thanhdatpb.listingguard.api.image.ImageProperties;
 import com.thanhdatpb.listingguard.api.image.ImageRulesets;
 import com.thanhdatpb.listingguard.api.personalization.PersonalizationProperties;
 import com.thanhdatpb.listingguard.api.personalization.PersonalizationRulesets;
+import com.thanhdatpb.listingguard.api.phrase.PhraseScreeningProperties;
 import com.thanhdatpb.listingguard.api.plan.Pack;
 import com.thanhdatpb.listingguard.api.plan.PlanService;
 import com.thanhdatpb.listingguard.api.ruleset.ActiveRulesets;
@@ -48,13 +49,15 @@ public class CapabilitiesService {
     private final FixesProperties fixes;
     private final ImageProperties imageProperties;
     private final ImageRulesets imageRulesets;
+    private final PhraseScreeningProperties phrases;
 
     public CapabilitiesService(ActiveRulesets listingRules, TrademarkRulesets trademarkRulesets,
                                TrademarkProperties trademarkProperties, TrademarkCatalogRuntime trademarkRuntime,
                                VariationRulesets variationRulesets, VariationProperties variationProperties,
                                PersonalizationRulesets personalizationRulesets,
                                PersonalizationProperties personalizationProperties, PlanService plans,
-                               FixesProperties fixes, ImageProperties imageProperties, ImageRulesets imageRulesets) {
+                               FixesProperties fixes, ImageProperties imageProperties, ImageRulesets imageRulesets,
+                               PhraseScreeningProperties phrases) {
         this.listingRules = listingRules;
         this.trademarkRulesets = trademarkRulesets;
         this.trademarkProperties = trademarkProperties;
@@ -67,6 +70,7 @@ public class CapabilitiesService {
         this.fixes = fixes;
         this.imageProperties = imageProperties;
         this.imageRulesets = imageRulesets;
+        this.phrases = phrases;
     }
 
     public Capabilities capabilities() {
@@ -86,7 +90,9 @@ public class CapabilitiesService {
         return new Capabilities(List.copyOf(packs),
                 new TrademarkCatalogCapability(state.name(), trademarkProperties.demoCatalog()),
                 new PlansCapability(plans.enabled()),
-                new FixesCapability(fixes.enabled()));
+                new FixesCapability(fixes.enabled()), phrases.enabled()
+                        ? new Capabilities.PhraseScreeningCapability(true, phrases.maxPhrases(), phrases.maxFuzzyPhrases(),
+                                phrases.maxPhrasesPerDay()) : null);
     }
 
     /** The image ruleset of each marketplace: unlike the other packs, each marketplace has a ruleset of its own. */

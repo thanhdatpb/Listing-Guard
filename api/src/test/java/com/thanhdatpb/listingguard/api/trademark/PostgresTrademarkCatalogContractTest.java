@@ -1,8 +1,10 @@
 package com.thanhdatpb.listingguard.api.trademark;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.thanhdatpb.listingguard.api.TestcontainersConfig;
+import com.thanhdatpb.listingguard.trademark.catalog.CatalogLookupLimitException;
 import com.thanhdatpb.listingguard.trademark.catalog.CatalogMark;
 import com.thanhdatpb.listingguard.trademark.catalog.InMemoryTrademarkCatalog;
 import com.thanhdatpb.listingguard.trademark.catalog.TrademarkCatalog;
@@ -93,6 +95,14 @@ class PostgresTrademarkCatalogContractTest {
         assertThat(zorvex.sourceIds()).containsExactly("S-001", "S-002");
         assertThat(postgres.findExact(List.of("brask")).get("brask").sourceIds()).containsExactly("S-006", "S-007");
         assertThat(postgres.findExact(List.of("quillmark")).get("quillmark").commonWord()).isFalse();
+    }
+
+    @Test
+    void batchCandidateBudgetFailsWithoutPassingOnPartialMatches() {
+        var forms = List.of("zorvx");
+        assertThatThrownBy(() -> postgres.fuzzyBatchCandidates(forms, 0.3, 1))
+                .isInstanceOf(CatalogLookupLimitException.class);
+        assertThat(postgres.fuzzyBatchCandidates(forms, 0.3, 3)).isEqualTo(postgres.fuzzyCandidates(forms, 0.3));
     }
 
     @Test

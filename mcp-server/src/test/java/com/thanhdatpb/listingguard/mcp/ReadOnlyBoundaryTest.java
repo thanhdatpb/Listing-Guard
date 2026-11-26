@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * What the module can never do (ADR-017), checked on its own sources and POM: it only reads and checks, reaches exactly nine
+ * What the module can never do (ADR-017), checked on its own sources and POM: it only reads and checks, reaches exactly ten
  * API paths with GET and POST, and has no database and no internal service behind it.
  */
 class ReadOnlyBoundaryTest {
@@ -28,12 +28,13 @@ class ReadOnlyBoundaryTest {
     }
 
     @Test
-    void theServerCanOnlyIssueGetAndPostToTheNineApiPaths() {
+    void theServerCanOnlyIssueGetAndPostToTheTenApiPaths() {
         assertThat(Arrays.stream(Endpoint.values()).map(Endpoint::method).collect(Collectors.toSet()))
                 .isSubsetOf("GET", "POST");
         assertThat(Arrays.stream(Endpoint.values()).map(Endpoint::path)).containsExactlyInAnyOrder(
                 "/api/v1/checks",
                 "/api/v1/trademark-checks",
+                "/api/v1/phrase-screenings",
                 "/api/v1/variation-checks",
                 "/api/v1/listing-edits",
                 "/api/v1/personalization-screenings",
@@ -50,7 +51,7 @@ class ReadOnlyBoundaryTest {
         assertThat(catalog.tools()).extracting(ToolSpec::endpoint).doesNotHaveDuplicates()
                 .containsExactlyInAnyOrder(Endpoint.values());
         for (ToolSpec tool : catalog.tools()) {
-            assertThat(tool.readOnly()).as(tool.name()).isEqualTo(tool.endpoint().method().equals("GET"));
+            assertThat(tool.readOnly()).as(tool.name()).isEqualTo(tool.endpoint().method().equals("GET") || tool.endpoint() == Endpoint.PHRASE_SCREENINGS);
         }
     }
 
