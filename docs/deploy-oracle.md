@@ -665,6 +665,8 @@ of the API; turn it on only after real statuses are stored. The api container mu
 
 ## 8b. A trademark catalog from the Hugging Face rebuild: convert elsewhere, copy, import, activate
 
+For an owner-enriched catalog, follow the [catalog activation runbook](catalog-activation-runbook.md) for the pinned build, wordlist and rollout gate.
+
 Without a USPTO key, the catalog of this deployment comes from `hf-convert` ([ADR-030](adr/ADR-030-hugging-face-uspto-parquet-source.md)),
 which turns the public Parquet rebuild of the USPTO data into one `jsonl-2` file. **Convert on another machine and copy only the
 `.jsonl` file to the VM**: the conversion needs 2 GB of DuckDB memory plus 0.5 GB of heap (a 3 GB container), 775 MB of download
@@ -812,6 +814,8 @@ no environment variable and need none: their defaults apply and `docker-compose.
 the retention periods and `LISTING_GUARD_IMAGE_ENABLED` are not forwarded either, so the image checks stay off.
 
 ## 11. Chạy pilot cho seller Project Global
+
+Trước khi đổi catalog pilot sang bản đếm chủ sở hữu, chạy [cổng so sánh catalog](catalog-activation-runbook.md#4-đo-với-cùng-catalog-kiểm-tra-cổng-rồi-mới-chuyển-pilot).
 
 Dùng image đã phát hành có ADR-047, host riêng hoặc cổng nội bộ và Compose project riêng.
 Sao chép [mẫu pilot](../deploy/env.pilot.example) thành `.env.pilot`, giới hạn quyền đọc và điền placeholder trên máy chủ.

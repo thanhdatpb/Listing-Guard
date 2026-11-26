@@ -96,7 +96,7 @@ class HfConvertJobTest {
         HfFixture.lookup(dataset, FILTERS, Map.of());
         Files.writeString(raw.resolve("words.txt"), "Mug\nmug\n");
 
-        var result = job(false).run(raw, "hf", "with-signals.jsonl", false, "words.txt");
+        var result = job(false).run(raw, "hf", "with-signals.jsonl", false, "words.txt", DistinctivenessThresholds.LEGACY, null);
         var report = result.report();
         assertThat(report.deadRemoved()).isEqualTo(1);
         assertThat(report.recordsWritten()).isEqualTo(4);
@@ -138,7 +138,7 @@ class HfConvertJobTest {
         HfFixture.lookup(dataset, FILTERS, Map.of());
         Files.writeString(raw.resolve("words.txt"), "cup\n");
 
-        var result = job(false).run(raw, "hf", "thresholds.jsonl", false, "words.txt");
+        var result = job(false).run(raw, "hf", "thresholds.jsonl", false, "words.txt", DistinctivenessThresholds.LEGACY, null);
         assertThat(result.report().distinctiveness().topWeak()).containsExactly(
                 new HfConversionReport.MarkCount("zorvexa", 3), new HfConversionReport.MarkCount("vexalon", 1));
         assertThat(result.report().distinctiveness().topStrong()).isEmpty();
@@ -149,6 +149,84 @@ class HfConvertJobTest {
         assertThat(entries).extracting(e -> e.mark().distinctiveness().reason())
                 .containsExactly(Reason.COMMON_OR_REPEATED, Reason.DRAWING_UNKNOWN, Reason.COMMON_OR_REPEATED);
         assertThat(entries.get(1).mark().distinctiveness().markKind()).isEqualTo(MarkKind.OTHER);
+    }
+
+    @Test
+    void countsDistinctCurrentOwnersAndRetainsTheLegacyOutput() throws Exception {
+        String live = code(MarkStatus.REGISTERED);
+        List<Integer> classes = List.copyOf(FILTERS.niceClasses());
+        List<CaseRow> cases = new java.util.ArrayList<>();
+        List<ClassRow> intl = new java.util.ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            String mark = i < 3 ? "Bluespark" : i < 6 ? "Mug" : i < 8 ? "Candle" : i == 8 ? "Quillmont Tees" : "Vexalon";
+            String serial = Integer.toString(90000500 + i);
+            cases.add(CaseRow.live(serial, mark, i == 9 ? "602" : live));
+            intl.add(ClassRow.of(serial, 1, "%03d".formatted(classes.get(i % 3))));
+        }
+        HfFixture.caseFile(dataset, "data_0", cases);
+        HfFixture.intlClass(dataset, "data_0", intl);
+        HfFixture.lineage(dataset, cases.size(), intl.size());
+        HfFixture.lookup(dataset, FILTERS, Map.of());
+        Files.writeString(raw.resolve("words.txt"), "mug\ncandle\n");
+
+        var missing = job(false).run(raw, "hf", "missing-owner.jsonl", false, "words.txt");
+        assertThat(missing.report().distinctiveness().owners().state()).isEqualTo("MISSING");
+        assertThat(missing.report().distinctiveness().tierDistribution()).isEqualTo(Map.of("WEAK", 0L, "STRONG", 0L, "ORDINARY", 4L));
+        assertThat(Files.readString(missing.output())).contains("OWNERS_UNKNOWN").doesNotContain("owner_count_same_mark");
+        var old = job(false).run(raw, "hf", "before-owner.jsonl", false, "words.txt", DistinctivenessThresholds.LEGACY, null);
+
+        ownerShard("""
+                ('90000500','10','Former Name',@BUILD@,'@DAILY@'),
+                ('90000500','40','Bluespark Inc.',@BUILD@,'@DAILY@'),
+                ('90000500','70','Correspondent Name',@BUILD@,'@DAILY@'),
+                ('90000501','40','BLUEspark L.L.C.',@BUILD@,'@DAILY@'),
+                ('90000502','40','Bluespark COMPANY LIMITED',@BUILD@,'@DAILY@'),
+                ('90000502','45','Stale Name', DATE '2025-01-01','stale.xml'),
+                ('90000503','30','Seller A',@BUILD@,'@DAILY@'),
+                ('90000504','40','Seller B',@BUILD@,'@DAILY@'),
+                ('90000505','40','Seller C',@BUILD@,'@DAILY@'),
+                ('90000506','40','Seller A',@BUILD@,'@DAILY@'),
+                ('90000507','40','Seller A LLC',@BUILD@,'@DAILY@'),
+                ('90000508','40','Seller C',@BUILD@,'@DAILY@'),
+                ('90000509','40','Excluded Owner',@BUILD@,'@DAILY@')
+                """.replace("@BUILD@", "DATE '" + HfFixture.BUILD + "'").replace("@DAILY@", HfFixture.DAILY),
+                "own_name");
+        var result = job(false).run(raw, "hf", "owners.jsonl", false, "words.txt");
+        var report = result.report().distinctiveness();
+        assertThat(report.tierDistribution()).isEqualTo(Map.of("WEAK", 1L, "STRONG", 2L, "ORDINARY", 1L));
+        assertThat(report.owners().marksWithCount()).isEqualTo(4L);
+        var entry = CatalogManifest.parse("catalogs:\n" + HfConvertMain.manifestEntry(result, FILTERS)).catalogs().getFirst();
+        var byMark = CatalogImport.prepare(entry, raw, NORMALIZER, NormalizationIdentity.of(RULESET)).entries().stream()
+                .collect(java.util.stream.Collectors.toMap(item -> item.mark().normalized(), item -> item.mark().distinctiveness()));
+        assertThat(byMark.get("bluespark").ownerCountSameMark()).isEqualTo(1);
+        assertThat(byMark.get("bluespark").sameMarkCount()).isEqualTo(3);
+        assertThat(byMark.get("bluespark").reason()).isEqualTo(Reason.UNIQUE_OWNER_WORD);
+        assertThat(byMark.get("mug").ownerCountSameMark()).isEqualTo(3);
+        assertThat(byMark.get("candle").reason()).isEqualTo(Reason.DICTIONARY_FEW_OWNERS);
+        var legacy = job(false).run(raw, "hf", "legacy.jsonl", false, "words.txt", DistinctivenessThresholds.LEGACY, null);
+        assertThat(Files.readAllBytes(legacy.output())).isEqualTo(Files.readAllBytes(old.output()));
+        assertThat(Files.readString(legacy.output())).doesNotContain("owner_count_same_mark");
+        var noWords = job(false).run(raw, "hf", "no-words-owner.jsonl", false);
+        assertThat(noWords.report().distinctiveness().tierDistribution()).containsEntry("ORDINARY", 4L);
+    }
+
+    @Test
+    void refusesOwnerShardWithUnexpectedSchemaAndNamesActualColumns() throws Exception {
+        ownerShard("('90000000','30','Example LLC',DATE '2026-01-01','x.xml')", "different_name");
+        assertThatThrownBy(() -> job(false).run(raw, "hf", "bad-owner.jsonl", false))
+                .isInstanceOf(HfConvertException.class).hasMessageContaining("actual columns:")
+                .hasMessageContaining("different_name=VARCHAR").hasMessageContaining("own_name=VARCHAR");
+        assertThat(raw.resolve("bad-owner.jsonl")).doesNotExist();
+    }
+
+    private void ownerShard(String rows, String nameColumn) throws Exception {
+        var folder = Files.createDirectories(dataset.resolve("data/owner"));
+        try (var db = java.sql.DriverManager.getConnection("jdbc:duckdb:"); var sql = db.createStatement()) {
+            sql.execute("CREATE TABLE owners (serial_no VARCHAR, own_type_cd VARCHAR, " + nameColumn
+                    + " VARCHAR, file_dt_source DATE, file_name_source VARCHAR)");
+            sql.execute("INSERT INTO owners VALUES " + rows);
+            sql.execute("COPY owners TO '" + HfDataset.duckdbPath(folder.resolve("data_0.parquet")) + "' (FORMAT PARQUET)");
+        }
     }
 
     @Test

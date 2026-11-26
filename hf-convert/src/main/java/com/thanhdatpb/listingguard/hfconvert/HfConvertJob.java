@@ -61,6 +61,11 @@ public final class HfConvertJob {
     }
 
     Result run(Path rawDir, String input, String output, boolean overwrite, String wordlist) throws IOException {
+        return run(rawDir, input, output, overwrite, wordlist, DistinctivenessThresholds.DEFAULT_VERSION, null);
+    }
+
+    Result run(Path rawDir, String input, String output, boolean overwrite, String wordlist,
+               String thresholds, String ownerColumns) throws IOException {
         Path root = rawDir.toAbsolutePath().normalize();
         if (!Files.isDirectory(root)) {
             throw new IllegalArgumentException("The raw directory " + root + " does not exist.");
@@ -106,7 +111,7 @@ public final class HfConvertJob {
                     new HfCatalogConverter.Settings(options.allowNetwork(), options.strict(), options.memoryLimit(),
                             options.threads(), temp));
             try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(part), BUFFER_BYTES)) {
-                report = converter.convert(dataset, out, dictionary);
+                report = converter.convert(dataset, out, dictionary, thresholds, ownerColumns);
             } catch (IOException | RuntimeException e) {
                 Files.deleteIfExists(part);
                 throw e;

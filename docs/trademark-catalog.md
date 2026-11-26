@@ -128,6 +128,11 @@ names, the measurements and the open questions). The job needs no USPTO key, no 
 
 ## Tín hiệu distinctiveness (jsonl-2)
 
+Từ [ADR-054](adr/ADR-054-owner-based-distinctiveness.md), `hf-convert` mặc định dùng ngưỡng `distinctiveness-2026-12`
+và đọc bảng `owner` nếu có. Trường tùy chọn `owner_count_same_mark` là số tên chủ chuẩn hóa theo lineage hiện hành.
+Thiếu owner thì ORDINARY khi đã có từ điển và drawing hợp lệ. Truyền `--distinctiveness=distinctiveness-2026-11`
+để tái lập JSONL cũ. Xem [runbook](catalog-activation-runbook.md) để đo trước khi kích hoạt.
+
 `hf-convert` tạo `jsonl-2`. Mỗi dòng thêm `word_count`, `same_mark_count`, `same_mark_class_count`,
 `mark_kind`, `dictionary_word`, `distinctiveness_tier` và `distinctiveness_reason` theo
 [ADR-046](adr/ADR-046-catalog-distinctiveness-signals.md). Các trường này tùy chọn khi import.
@@ -155,7 +160,7 @@ docker compose --profile prod --profile admin run --rm admin catalog activate <v
 ```
 
 Report có phân bố theo nhãn chuẩn hóa duy nhất, tối đa 50 nhãn WEAK và 50 nhãn STRONG, số serial, dung lượng,
-thời gian và checksum. Giữ báo cáo thật ngoài Git. Scanner chỉ mang metadata và tiếp tục chấm theo quy tắc hiện hành.
+thời gian và checksum. Giữ báo cáo thật ngoài Git. Ruleset scanner giữ nguyên logic của từng phiên bản. Ruleset 2026-12 đọc tier của catalog đang phục vụ.
 
 
 ## Keeping the status of marks current: `tsdr-status`

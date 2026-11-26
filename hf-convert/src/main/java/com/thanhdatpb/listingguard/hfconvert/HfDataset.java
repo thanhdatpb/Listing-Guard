@@ -88,7 +88,14 @@ public sealed interface HfDataset {
 
         /** The {@code *.parquet} files of a table, sorted by name, each hashed. */
         public List<ParquetFile> files(String table) throws IOException {
+            return files(table, false);
+        }
+
+        List<ParquetFile> files(String table, boolean optional) throws IOException {
             Path folder = dir.resolve("data").resolve(table);
+            if (optional && Files.notExists(folder)) {
+                return List.of();
+            }
             if (!Files.isDirectory(folder)) {
                 throw new HfConvertException("The input folder " + label + " has no data/" + table + "/ folder; download "
                         + "data/" + table + "/*.parquet of the dataset there.");
@@ -99,7 +106,7 @@ public sealed interface HfDataset {
                         .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".parquet"))
                         .sorted().toList();
             }
-            if (paths.isEmpty()) {
+            if (paths.isEmpty() && !optional) {
                 throw new HfConvertException("data/" + table + "/ of " + label + " holds no .parquet file.");
             }
             List<ParquetFile> files = new ArrayList<>();

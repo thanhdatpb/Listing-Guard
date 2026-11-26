@@ -24,6 +24,7 @@ import java.util.List;
  * @param watchlistEntry    the watchlist entry the finding comes from, or {@code null} when {@code source} is not {@code WATCHLIST}
  * @param message           what was found
  * @param suggestion        what to consider
+ * @param ownerCountSameMark estimated distinct current owner names from the catalog snapshot, or null
  * @param tsdrStatuses      the last USPTO TSDR status of the source records, with the date it was checked. Empty when the
  *                          deployment does not show it (it is off by default) or none of the source records was checked; the
  *                          API leaves the member out in the first case and the SDK, a tolerant reader, reads it as empty
@@ -47,7 +48,17 @@ public record TrademarkCheckFinding(
         WatchlistMatch watchlistEntry,
         String message,
         String suggestion,
-        List<TsdrStatus> tsdrStatuses) {
+        List<TsdrStatus> tsdrStatuses,
+        Long ownerCountSameMark) {
+
+    public TrademarkCheckFinding(String ruleId, TrademarkFindingSource source, RiskLevel risk, String field, int start, int end,
+                                 String snippet, String mark, MatchType matchType, Double score, boolean insideColorPhrase,
+                                 List<String> otherRuleIds, List<String> sourceIds, List<SourceLink> sourceLinks,
+                                 List<RiskAdjustment> riskAdjustments, WatchlistMatch watchlistEntry, String message,
+                                 String suggestion, List<TsdrStatus> tsdrStatuses) {
+        this(ruleId, source, risk, field, start, end, snippet, mark, matchType, score, insideColorPhrase, otherRuleIds,
+                sourceIds, sourceLinks, riskAdjustments, watchlistEntry, message, suggestion, tsdrStatuses, null);
+    }
 
     public TrademarkCheckFinding {
         tsdrStatuses = Copies.list(tsdrStatuses);

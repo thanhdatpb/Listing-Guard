@@ -37,7 +37,7 @@ public final class HfConvertMain {
     static final String DEFAULT_RULESET = "classpath:rulesets/trademark-risk-2026-11b.yaml";
     private static final Set<String> FLAGS = Set.of("overwrite", "strict", "allow-network", "help");
     private static final Set<String> KEYS = Set.of("input", "output", "filters", "min-year", "memory-limit", "threads",
-            "ruleset", "wordlist");
+            "ruleset", "wordlist", "distinctiveness", "owner-columns");
 
     private HfConvertMain() {
     }
@@ -77,7 +77,8 @@ public final class HfConvertMain {
                     + threads + ".");
             HfConvertJob job = new HfConvertJob(filters, new TextNormalizer(ruleset.normalization()), ruleset.version(),
                     new HfConvertJob.Options(network, strict, memory, threads));
-            HfConvertJob.Result result = job.run(rawDir, input, output, overwrite, options.get("wordlist"));
+            HfConvertJob.Result result = job.run(rawDir, input, output, overwrite, options.get("wordlist"),
+                    options.getOrDefault("distinctiveness", DistinctivenessThresholds.DEFAULT_VERSION), options.get("owner-columns"));
             summary(result, filters, out, err);
             return 0;
         } catch (IllegalArgumentException | HfConvertException e) {
@@ -98,6 +99,7 @@ public final class HfConvertMain {
                 + report.deadRemoved() + " not live, " + report.filteredTotal() + " filtered, " + report.recordErrors()
                 + " record errors.");
         report.filtered().forEach((reason, count) -> out.println("  filtered " + reason + ": " + count));
+        out.println("Owner data: " + report.distinctiveness().owners().state());
         out.println("Report: " + result.reportFile().getFileName());
         if (report.completeness() == Completeness.INCOMPLETE) {
             err.println("hf-convert: the conversion is INCOMPLETE; do not deploy it before you read the problems:");
@@ -216,8 +218,9 @@ public final class HfConvertMain {
                                   [--overwrite] [--strict] [--allow-network] [--min-year=<yyyy>]
                                   [--filters=classpath:<path>|file:<path>] [--memory-limit=2GB] [--threads=2]
                                   [--ruleset=classpath:<path>|file:<path>]
-                Reads $CATALOGS_DIR/raw/<input>/data/{case_file,intl_class}/*.parquet (plus profile/build_lineage.json and
-                lookups/status_codes.csv) and writes $CATALOGS_DIR/raw/<name>.jsonl (jsonl-1) and <name>.jsonl.report.json.
+                                  [--distinctiveness=distinctiveness-2026-12|distinctiveness-2026-11] [--owner-columns=file:<path>]
+                Reads $CATALOGS_DIR/raw/<input>/data/{case_file,intl_class,owner}/*.parquet (owner is optional) (plus profile/build_lineage.json and
+                lookups/status_codes.csv) and writes $CATALOGS_DIR/raw/<name>.jsonl (jsonl-2) and <name>.jsonl.report.json.
                 No network unless --allow-network (HF_CONVERT_ALLOW_NETWORK=true). See docs/trademark-catalog.md.""";
     }
 }

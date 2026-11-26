@@ -155,6 +155,11 @@ public final class HfCatalogConverter {
     }
 
     HfConversionReport convert(HfDataset dataset, OutputStream jsonl, Path wordlist) throws IOException {
+        return convert(dataset, jsonl, wordlist, DistinctivenessThresholds.DEFAULT_VERSION, null);
+    }
+
+    HfConversionReport convert(HfDataset dataset, OutputStream jsonl, Path wordlist, String thresholdsVersion,
+                               String ownerConfig) throws IOException {
         long started = System.nanoTime();
         if (dataset.remote() && !settings.allowNetwork()) {
             throw new HfConvertException("The input " + dataset.label() + " needs the network, which is off; download "
@@ -165,6 +170,8 @@ public final class HfCatalogConverter {
             throw new HfConvertException("The filters " + filters.version() + " are for the dataset " + filters.dataset()
                     + ", not " + dataset.datasetId() + ".");
         }
+        DistinctivenessThresholds thresholds = DistinctivenessThresholds.load(thresholdsVersion);
+        HfOwnerColumns owner = thresholds.usesOwners() ? HfOwnerColumns.load(ownerConfig) : null;
         List<HfDataset.ParquetFile> localCaseFiles = List.of();
         List<HfDataset.ParquetFile> localIntlFiles = List.of();
         if (dataset instanceof HfDataset.Local local) {
@@ -173,9 +180,15 @@ public final class HfCatalogConverter {
         }
         try (Connection connection = open(dataset)) {
             Run run = new Run(connection, dataset);
-            run.caseFiles = dataset.remote() ? run.remoteFiles(HfDataset.CASE_FILE) : localCaseFiles;
-            run.intlFiles = dataset.remote() ? run.remoteFiles(HfDataset.INTL_CLASS) : localIntlFiles;
-            return run.execute(jsonl, started, wordlist);
+            run.caseFiles = dataset.remote() ? run.remoteFiles(HfDataset.CASE_FILE, false) : localCaseFiles;
+            run.intlFiles = dataset.remote() ? run.remoteFiles(HfDataset.INTL_CLASS, false) : localIntlFiles;
+            run.owner = owner;
+            if (owner != null) {
+                run.ownerFiles = dataset instanceof HfDataset.Local local
+                        ? local.files(owner.table(), true) : run.remoteFiles(owner.table(), true);
+                run.validateOwnerSchema();
+            }
+            return run.execute(jsonl, started, wordlist, thresholds);
         } catch (SQLException e) {
             throw new HfConvertException("DuckDB failed: " + e.getMessage(), e);
         }
@@ -238,6 +251,9 @@ public final class HfCatalogConverter {
         private final Map<String, Long> deadByStatus = new TreeMap<>();
         private List<HfDataset.ParquetFile> caseFiles;
         private List<HfDataset.ParquetFile> intlFiles;
+        private List<HfDataset.ParquetFile> ownerFiles = List.of();
+        private HfOwnerColumns owner;
+        private long ownerRows;
         private long recordErrors;
         private long deadRemoved;
         private long written;
@@ -248,10 +264,17 @@ public final class HfCatalogConverter {
             this.dataset = dataset;
         }
 
-        HfConversionReport execute(OutputStream jsonl, long started, Path wordlist) throws SQLException, IOException {
+        HfConversionReport execute(OutputStream jsonl, long started, Path wordlist, DistinctivenessThresholds thresholds)
+                throws SQLException, IOException {
             List<HfConversionReport.FileReport> files = new ArrayList<>();
             long caseRows = rows(caseFiles, files);
             long intlRows = rows(intlFiles, files);
+            ownerRows = rows(ownerFiles, files);
+            Long expectedOwners = ownerFiles.isEmpty() ? null : expectedOwnerRows();
+            if (expectedOwners != null && ownerRows < expectedOwners) {
+                throw new HfConvertException("Owner files hold " + ownerRows + " rows; " + HfDataset.LINEAGE
+                        + " declares " + expectedOwners + ". Download all owner shards.");
+            }
 
             HfConversionReport.Lineage lineage = lineage();
             HfConversionReport.LookupCheck lookup = lookupCheck();
@@ -275,7 +298,7 @@ public final class HfCatalogConverter {
 
             stageCandidates();
             String wordlistSha256 = stageWords(wordlist);
-            DistinctivenessThresholds thresholds = DistinctivenessThresholds.load();
+            stageOwnerCounts();
             buildSignals(thresholds, wordlist != null);
             HfConversionReport.Distinctiveness signals = summarizeSignals(thresholds, wordlistSha256);
 
@@ -306,7 +329,7 @@ public final class HfCatalogConverter {
 
         // --- the files ---
 
-        List<HfDataset.ParquetFile> remoteFiles(String table) throws SQLException {
+        List<HfDataset.ParquetFile> remoteFiles(String table, boolean optional) throws SQLException {
             HfDataset.Remote remote = (HfDataset.Remote) dataset;
             List<HfDataset.ParquetFile> files = new ArrayList<>();
             try (Statement statement = connection.createStatement();
@@ -319,7 +342,7 @@ public final class HfCatalogConverter {
                             null));
                 }
             }
-            if (files.isEmpty()) {
+            if (files.isEmpty() && !optional) {
                 throw new HfConvertException(remote.glob(table) + " matches no file.");
             }
             return files;
@@ -608,9 +631,84 @@ public final class HfCatalogConverter {
             return HexFormat.of().formatHex(digest.digest());
         }
 
+        private void validateOwnerSchema() throws SQLException {
+            for (var shard : ownerFiles) {
+                Map<String, String> actual = new TreeMap<>();
+                try (Statement statement = connection.createStatement();
+                     ResultSet columns = statement.executeQuery("DESCRIBE SELECT * FROM read_parquet("
+                             + literal(shard.duckdbPath()) + ")")) {
+                    while (columns.next()) {
+                        actual.put(columns.getString(1), columns.getString(2));
+                    }
+                }
+                if (!actual.entrySet().containsAll(owner.expectedTypes().entrySet())) {
+                    throw new HfConvertException("Owner schema mismatch in " + shard.name() + ": expected "
+                            + new TreeMap<>(owner.expectedTypes()) + "; actual columns: " + actual + ".");
+                }
+            }
+        }
+
+        private Long expectedOwnerRows() throws IOException {
+            if (dataset instanceof HfDataset.Local local && local.has(HfDataset.LINEAGE)) {
+                JsonNode value = JSON.readTree(Files.readString(local.dir().resolve(HfDataset.LINEAGE)))
+                        .path("row_counts").path(owner.table());
+                return value.isIntegralNumber() ? value.longValue() : null;
+            }
+            return null;
+        }
+
+        private void stageOwnerCounts() throws SQLException {
+            try (Statement statement = connection.createStatement()) {
+                if (ownerFiles.isEmpty()) {
+                    statement.execute("CREATE TEMP TABLE owner_counts (normalized VARCHAR, owner_count BIGINT)");
+                    return;
+                }
+                String suffixPattern = "(?:^| )(?:" + String.join("|", owner.suffixes())
+                        + ")(?: (?:" + String.join("|", owner.suffixes()) + "))*$";
+                statement.execute("""
+                        CREATE TEMP TABLE owner_counts AS
+                        WITH latest_party AS (
+                            SELECT c.serial, o.%s AS raw_name
+                            FROM candidates c
+                            JOIN classified l ON l.serial_no = c.serial
+                            JOIN read_parquet(%s) o ON o.%s = c.serial
+                              AND o.%s IS NOT DISTINCT FROM l.dt AND o.%s IS NOT DISTINCT FROM l.fn
+                            WHERE regexp_full_match(trim(o.%s), '[0-9]{2}')
+                              AND TRY_CAST(trim(o.%s) AS INTEGER) BETWEEN %d AND %d
+                            QUALIFY TRY_CAST(trim(o.%s) AS INTEGER) = max(TRY_CAST(trim(o.%s) AS INTEGER))
+                                OVER (PARTITION BY c.serial)
+                        ), names AS (
+                            SELECT serial, nullif(regexp_replace(trim(regexp_replace(upper(replace(raw_name, '.', '')),
+                                '[[:punct:][:space:]\\p{P}]+', ' ', 'g')), %s, ''), '') AS owner_name
+                            FROM latest_party
+                        )
+                        SELECT c.normalized,
+                            CASE WHEN count(*) FILTER (WHERE n.owner_name IS NULL) = 0
+                                 THEN count(DISTINCT n.owner_name) END AS owner_count
+                        FROM candidates c LEFT JOIN names n USING (serial) GROUP BY c.normalized
+                        """.formatted(owner.name(), list(ownerFiles), owner.serial(), owner.date(), owner.file(),
+                        owner.party(), owner.party(), owner.firstParty(), owner.lastParty(), owner.party(), owner.party(),
+                        literal(suffixPattern)));
+            }
+        }
+
         private void buildSignals(DistinctivenessThresholds thresholds, boolean dictionaryAvailable) throws SQLException {
             String allowedClasses = filters.niceClasses().stream().map(String::valueOf).collect(Collectors.joining(", "));
             String dictionaryMatch = dictionaryAvailable ? "d.word IS NOT NULL" : "NULL::BOOLEAN";
+            String decision = thresholds.usesOwners() ? """
+                    WHEN owner_count IS NULL THEN 'OWNERS_UNKNOWN'
+                    WHEN word_count = 1 AND owner_count >= %d THEN 'CROWDED_OWNERS'
+                    WHEN word_count = 1 AND dictionary_word AND owner_count <= %d THEN 'DICTIONARY_FEW_OWNERS'
+                    WHEN word_count = 1 AND NOT dictionary_word AND owner_count = %d THEN 'UNIQUE_OWNER_WORD'
+                    WHEN mark_kind = 'STANDARD_CHARACTER' AND word_count >= %d AND owner_count = %d THEN 'UNIQUE_MULTIWORD'
+                    """.formatted(thresholds.weakOwnerMinimum(), thresholds.dictionaryOwnerMaximum(),
+                    thresholds.strongOwnerCount(), thresholds.strongWordMinimum(), thresholds.strongOwnerCount()) : """
+                    WHEN word_count = 1 AND (dictionary_word OR serial_count >= %d OR class_count >= %d)
+                        THEN 'COMMON_OR_REPEATED'
+                    WHEN mark_kind = 'STANDARD_CHARACTER' AND word_count >= %d AND serial_count <= %d
+                        AND class_count <= %d THEN 'UNIQUE_MULTIWORD'
+                    """.formatted(thresholds.weakSerialMinimum(), thresholds.weakClassMinimum(), thresholds.strongWordMinimum(),
+                    thresholds.strongSerialMaximum(), thresholds.strongClassMaximum());
             try (Statement statement = connection.createStatement()) {
                 statement.execute("""
                         CREATE TEMP TABLE signals AS
@@ -624,29 +722,27 @@ public final class HfCatalogConverter {
                             WHERE CAST(nice AS INTEGER) IN (%s)
                             GROUP BY normalized
                         ), evidence AS (
-                            SELECT stats.*, classes.class_count, len(string_split(normalized, ' ')) AS word_count,
-                                   %s AS dictionary_word
+                            SELECT stats.*, classes.class_count, len(string_split(stats.normalized, ' ')) AS word_count,
+                                   %s AS dictionary_word, o.owner_count
                             FROM stats JOIN classes USING (normalized)
-                            LEFT JOIN (SELECT DISTINCT word FROM dictionary) d ON d.word = normalized
+                            LEFT JOIN owner_counts o USING (normalized)
+                            LEFT JOIN (SELECT DISTINCT word FROM dictionary) d ON d.word = stats.normalized
                         ), reasons AS (
                             SELECT *, CASE
                                 WHEN dictionary_word IS NULL THEN 'DICTIONARY_UNAVAILABLE'
                                 WHEN mark_kind = 'OTHER' THEN 'DRAWING_UNKNOWN'
-                                WHEN word_count = 1 AND (dictionary_word OR serial_count >= %d OR class_count >= %d)
-                                    THEN 'COMMON_OR_REPEATED'
-                                WHEN mark_kind = 'STANDARD_CHARACTER' AND word_count >= %d AND serial_count <= %d
-                                    AND class_count <= %d THEN 'UNIQUE_MULTIWORD'
+                                %s
                                 ELSE 'DEFAULT' END AS reason
                             FROM evidence
                         )
                         SELECT *, CASE reason
                             WHEN 'COMMON_OR_REPEATED' THEN 'WEAK'
+                            WHEN 'CROWDED_OWNERS' THEN 'WEAK'
                             WHEN 'UNIQUE_MULTIWORD' THEN 'STRONG'
+                            WHEN 'UNIQUE_OWNER_WORD' THEN 'STRONG'
                             ELSE 'ORDINARY' END AS tier
                         FROM reasons
-                        """.formatted(allowedClasses, dictionaryMatch, thresholds.weakSerialMinimum(),
-                        thresholds.weakClassMinimum(), thresholds.strongWordMinimum(), thresholds.strongSerialMaximum(),
-                        thresholds.strongClassMaximum()));
+                        """.formatted(allowedClasses, dictionaryMatch, decision));
             }
         }
 
@@ -662,8 +758,13 @@ public final class HfCatalogConverter {
                     distribution.put(rs.getString(1), rs.getLong(2));
                 }
             }
+            long known = scalar("SELECT count(owner_count) FROM signals");
+            long unknown = distribution.values().stream().mapToLong(Long::longValue).sum() - known;
+            var coverage = new HfConversionReport.OwnerCoverage(owner == null ? "DISABLED" : ownerFiles.isEmpty() ? "MISSING" : "PRESENT",
+                    owner == null ? null : owner.version(), owner == null ? null : owner.schemaStatus(),
+                    owner == null ? null : owner.datasetRevision(), ownerRows, known, unknown);
             return new HfConversionReport.Distinctiveness(thresholds.version(), dictionarySha, distribution,
-                    top(Tier.WEAK, "DESC"), top(Tier.STRONG, "ASC"));
+                    top(Tier.WEAK, "DESC"), top(Tier.STRONG, "ASC"), coverage);
         }
 
         private List<HfConversionReport.MarkCount> top(Tier tier, String order) throws SQLException {
@@ -682,7 +783,7 @@ public final class HfCatalogConverter {
             try (Statement statement = connection.createStatement();
                  ResultSet rs = statement.executeQuery("""
                          SELECT c.serial, c.status, c.display, c.classes, s.word_count, s.serial_count, s.class_count,
-                                s.mark_kind, s.dictionary_word, s.tier, s.reason
+                                s.mark_kind, s.dictionary_word, s.tier, s.reason, s.owner_count
                          FROM candidates c JOIN signals s USING (normalized) ORDER BY c.serial
                          """)) {
                 while (rs.next()) {
@@ -697,7 +798,7 @@ public final class HfCatalogConverter {
                     DistinctivenessSignals signals = new DistinctivenessSignals(rs.getInt("word_count"),
                             rs.getLong("serial_count"), rs.getInt("class_count"), MarkKind.valueOf(rs.getString("mark_kind")),
                             rs.getObject("dictionary_word", Boolean.class), Tier.valueOf(rs.getString("tier")),
-                            Reason.valueOf(rs.getString("reason")));
+                            Reason.valueOf(rs.getString("reason")), rs.getObject("owner_count", Long.class));
                     json.setAll((ObjectNode) JSON.valueToTree(signals));
                     writer.write(JSON.writeValueAsString(json));
                     writer.write('\n');

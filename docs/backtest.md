@@ -119,3 +119,11 @@ không bị claim. Marketplace: <ETSY/AMAZON>. Ruleset <phiên bản>, catalog n
 Số liệu chỉ đúng cho file này; mẫu nhỏ thì sai số lớn. Listing không bị claim vẫn có thể vi phạm, nên tỉ lệ báo nhầm là cận trên.
 Kết quả là cảnh báo tham khảo, không phải kết luận pháp lý. Listing Guard không sửa hay đăng listing.
 ```
+
+
+## Kỳ vọng trademark theo dòng
+
+Hai cột tùy chọn `expected_min_risk` và `expected_max_risk` nhận LOW, MEDIUM, HIGH hoặc để trống. Kết quả
+`INCOMPLETE`, kết quả thiếu catalog và mức chưa xác định không đạt cổng. Báo cáo kèm tier, số chủ và số serial của
+finding nặng nhất nếu có dữ liệu. Cổng độc lập với nhãn claim và precision/recall. Xem lệnh chạy bộ mẫu tổng hợp và
+cách so finding trước/sau trong [runbook](catalog-activation-runbook.md).

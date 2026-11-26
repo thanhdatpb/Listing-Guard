@@ -366,7 +366,8 @@ public class BulkCheckService {
             for (int index = 0; index < result.findings().size(); index++) {
                 TrademarkCheckResult.FindingView finding = result.findings().get(index);
                 String level = finding.risk().name().toLowerCase(Locale.ROOT);
-                items.add(new Item(level, BulkText.level(messages, level), finding.ruleId(), finding.field(), finding.message(),
+                items.add(new Item(level, BulkText.level(messages, level), finding.ruleId(), finding.field(),
+                        messages.trademarkOwnerCount(finding.message(), finding.ownerCountSameMark()),
                         finding.suggestion(), finding.mark() == null ? null : messages.get("bulk.item.catalogmark", finding.mark()),
                         withLlmLabel(messages.ruleExplanation(finding.ruleId()),
                                 ConsoleLlmLabel.sentence(messages, ConsoleLlmLabel.reason(finding.riskAdjustments()))), null, null,

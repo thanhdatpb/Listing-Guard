@@ -62,6 +62,20 @@ class BacktestLabelsTest {
     }
 
     @Test
+    void acceptsBoundsWithoutClaimLabelsAndRejectsInvalidOrReversedBounds() {
+        var probe = BacktestLabels.bind(List.of("claimed", "mark", "expected_min_risk", "expected_max_risk"),
+                "claimed", null, "mark");
+        var row = probe.read(new String[] {"", "Zibblefrax", "medium", ""});
+        assertThat(row.claimed()).isNull();
+        assertThat(row.mark()).isEqualTo("Zibblefrax");
+        assertThat(row.bounds().min()).isEqualTo(RiskLevel.MEDIUM);
+        assertThatThrownBy(() -> probe.read(new String[] {"", "", "HIGH", "LOW"}))
+                .isInstanceOf(BacktestLabels.LabelException.class).hasMessageContaining("expected_min_risk");
+        assertThatThrownBy(() -> probe.read(new String[] {"", "", "", "UNKNOWN"}))
+                .isInstanceOf(BacktestLabels.LabelException.class).hasMessageContaining("expected_max_risk");
+    }
+
+    @Test
     void parsesTheCommandLine() {
         BacktestOptions options = BacktestOptions.parse(new DefaultApplicationArguments("--input=a.csv", "--mapping=m.yaml",
                 "--marketplace=ETSY", "--claimed-column=claimed", "--catch-severity=error", "--catch-trademark-risk=high",

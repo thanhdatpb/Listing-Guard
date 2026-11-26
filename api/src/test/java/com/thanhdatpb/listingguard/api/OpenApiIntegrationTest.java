@@ -247,7 +247,7 @@ class OpenApiIntegrationTest {
         assertThat(fieldNames(spec.at("/components/schemas/TrademarkCheckFindingView/properties"))).containsExactlyInAnyOrder(
                 "ruleId", "source", "risk", "field", "start", "end", "snippet", "mark", "matchType", "score",
                 "insideColorPhrase", "otherRuleIds", "sourceIds", "sourceLinks", "riskAdjustments", "watchlistEntry", "message",
-                "suggestion", "tsdrStatuses");
+                "suggestion", "tsdrStatuses", "ownerCountSameMark");
         // the client's watchlist (ADR-031): its own operations name themselves, so no other operation id moves
         assertThat(spec.at("/paths/~1api~1v1~1trademark-watchlist/get/operationId").asText()).isEqualTo("getTrademarkWatchlist");
         assertThat(spec.at("/paths/~1api~1v1~1trademark-watchlist/put/operationId").asText()).isEqualTo("replaceTrademarkWatchlist");

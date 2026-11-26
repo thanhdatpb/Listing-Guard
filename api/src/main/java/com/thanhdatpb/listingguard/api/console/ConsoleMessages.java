@@ -51,6 +51,10 @@ public class ConsoleMessages {
         return get("pilot.pack." + id);
     }
 
+    public String trademarkOwnerCount(String message, Long count) {
+        return count == null ? message : message + " " + get("trademark.owner.count", count);
+    }
+
     /** What the rule checks, in the language of the page; {@code null} when no language has a sentence for it. */
     public String ruleExplanation(String ruleId) {
         return ruleExplanation(LocaleContextHolder.getLocale(), ruleId);

@@ -53,7 +53,7 @@ public class TrademarkCheckStore {
                    c.expires_at, c.skipped_rule_ids, c.watchlist_revision, c.watchlist_version, c.watchlist_entries,
                    f.rule_id, f.risk, f.field, f.span_start, f.span_end, f.snippet, f.matched_mark, f.match_type,
                    f.score, f.inside_color_phrase, f.other_rule_ids, f.source_ids, f.source_links, f.risk_adjustments,
-                   f.watchlist_entry, f.message, f.suggestion
+                   f.watchlist_entry, f.message, f.suggestion, f.owner_count_same_mark
             FROM trademark_check c
             JOIN ruleset_version r ON r.id = c.ruleset_version_id
             LEFT JOIN trademark_catalog_version v ON v.id = c.catalog_version_id
@@ -67,8 +67,8 @@ public class TrademarkCheckStore {
     private static final String INSERT_FINDING = """
             INSERT INTO trademark_check_finding (check_id, position, rule_id, risk, field, span_start, span_end, snippet,
                 matched_mark, match_type, score, inside_color_phrase, other_rule_ids, source_ids, source_links,
-                risk_adjustments, message, suggestion, watchlist_entry)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?::jsonb)""";
+                risk_adjustments, message, suggestion, watchlist_entry, owner_count_same_mark)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?::jsonb, ?)""";
 
     /** Writes and reads the two JSON columns of a finding; the views are plain records of strings and levels. */
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -196,6 +196,7 @@ public class TrademarkCheckStore {
                     ps.setString(17, finding.message());
                     ps.setString(18, finding.suggestion());
                     ps.setString(19, evidence.watchlist() == null ? null : json(watchlistView(evidence.watchlist())));
+                    ps.setObject(20, evidence.ownerCountSameMark(), Types.BIGINT);
                 }
 
                 @Override
@@ -275,7 +276,8 @@ public class TrademarkCheckStore {
                 readJson(rs.getString("source_links"), new TypeReference<List<TrademarkCheckResult.SourceLinkView>>() { }),
                 readJson(rs.getString("risk_adjustments"),
                         new TypeReference<List<TrademarkCheckResult.RiskAdjustmentView>>() { }),
-                watchlistEntry(rs.getString("watchlist_entry")), rs.getString("message"), rs.getString("suggestion"));
+                watchlistEntry(rs.getString("watchlist_entry")), rs.getString("message"), rs.getString("suggestion"),
+                rs.getObject("owner_count_same_mark", Long.class));
     }
 
     private static TrademarkCheckResult.WatchlistEntryView watchlistEntry(String text) {

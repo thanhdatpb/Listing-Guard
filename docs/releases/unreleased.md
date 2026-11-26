@@ -139,3 +139,20 @@ bằng tiếng Anh trong bundle tiếng Việt (Title, Tags, Class, Serial, Trad
 [ADR-053](../adr/ADR-053-pilot-onboarding-kit.md).
 
 ADR-022: không đổi OpenAPI hay input schema.
+
+
+## Owner-based trademark distinctiveness
+
+Converter mặc định dùng ngưỡng 2026-12 theo số tên chủ khác nhau. Ngưỡng 2026-11 vẫn chọn được. JSONL-2 cũ vẫn đọc được.
+V52 giữ số ước lượng trong bản ghi finding để GET đọc lại sau đổi catalog. Backtest báo kỳ vọng theo dòng và hỗ trợ kiểm tra
+mất finding. Xem [ADR-054](../adr/ADR-054-owner-based-distinctiveness.md) và [runbook](../catalog-activation-runbook.md).
+
+ADR-022, additive against the preceding OpenAPI on main
+
+- `response-property-added` at `schema TrademarkCalibrationEvidence.ownerCountSameMark`
+- `response-enum-value-added` at `schema TrademarkCalibrationEvidence.reason` for `CROWDED_OWNERS`,
+  `DICTIONARY_FEW_OWNERS`, `OWNERS_UNKNOWN` and `UNIQUE_OWNER_WORD`
+- `response-property-added` at `schema TrademarkCheckFindingView.ownerCountSameMark`
+
+Against v0.10.0 the owner count on the finding is additive; the calibration and judge objects are already
+listed as additions from earlier work. Input schema unchanged.

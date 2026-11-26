@@ -66,7 +66,10 @@ public record HfConversionReport(
     public record MarkCount(String mark, long count) { }
 
     public record Distinctiveness(String thresholdsVersion, String dictionarySha256, Map<String, Long> tierDistribution,
-                                  List<MarkCount> topWeak, List<MarkCount> topStrong) { }
+                                  List<MarkCount> topWeak, List<MarkCount> topStrong, OwnerCoverage owners) { }
+
+    public record OwnerCoverage(String state, String columnsVersion, String schemaStatus, String verifiedRevision,
+                                long rowsRead, long marksWithCount, long marksWithoutCount) { }
 
     /** The data-file keys of a manifest entry. */
     public record Source(String sourceName, String url, String license, String sourceDate) {
