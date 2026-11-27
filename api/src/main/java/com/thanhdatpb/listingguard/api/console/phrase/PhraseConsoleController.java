@@ -42,6 +42,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -106,7 +107,7 @@ public class PhraseConsoleController {
     @PostMapping({"/preview", "/run"})
     public String submit(@AuthenticationPrincipal ConsoleUser user, HttpSession session,
                          @ModelAttribute InputForm form, @RequestParam(required = false) MultipartFile file,
-                         HttpServletRequest request, HttpServletResponse response, Model model) throws IOException {
+                         HttpServletRequest request, HttpServletResponse response, Model model, RedirectAttributes redirect) throws IOException {
         var owner = owner(user, session);
         boolean run = request.getRequestURI().endsWith("/run");
         boolean fileMode = "file".equals(form.mode());
@@ -142,8 +143,8 @@ public class PhraseConsoleController {
                         prepared.phrases().isEmpty() ? "phrase.error.mapping" : "phrase.error.overflow");
             }
             var result = service.screenConsole(owner.client(), owner.account(), new PhraseScreeningRequest(batch, marketplace, null));
-            if (table != null && Boolean.TRUE.equals(form.remember())) {
-                remember(owner.account(), table, selection);
+            if (table != null && Boolean.TRUE.equals(form.remember()) && remember(owner.account(), table, selection)) {
+                redirect.addFlashAttribute("mappingSaved", true);
             }
             return "redirect:" + PATH + "/" + results.store(owner, result).id();
         } catch (CharacterCodingException e) {
@@ -293,14 +294,15 @@ public class PhraseConsoleController {
         return new Selection(phrase, phrase == volume ? -1 : volume, phrase >= 0 || volume >= 0);
     }
 
-    private void remember(UUID account, PhraseInputTable table, Selection selection) {
+    private boolean remember(UUID account, PhraseInputTable table, Selection selection) {
         String phrase = header(table, selection.phrase());
         if (phrase != null) {
-            jdbc.update("""
+            return jdbc.update("""
                     INSERT INTO console_phrase_mapping (account_id, phrase_header, volume_header) VALUES (?, ?, ?)
                     ON CONFLICT (account_id) DO UPDATE SET phrase_header = EXCLUDED.phrase_header, volume_header = EXCLUDED.volume_header
-                    """, account, phrase, header(table, selection.volume()));
+                    """, account, phrase, header(table, selection.volume())) > 0;
         }
+        return false;
     }
 
     private static String header(PhraseInputTable table, int index) {

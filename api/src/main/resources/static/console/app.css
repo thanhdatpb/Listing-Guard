@@ -3,7 +3,7 @@
    Rules, held by tests (ConsoleAppCssTest, ConsoleContrastTest):
    - Every color, space, radius and shadow is a variable of /brand/tokens.css. This file writes no color code of its own (no hex, no
      rgb(), no hsl()); a shade the tokens lack is derived below from tokens with color-mix().
-   - Dark follows the system (prefers-color-scheme) through the tokens; nothing here switches a scheme.
+   - The tokens follow the system unless the Console theme control selects a scheme. Printing uses the light tokens.
    - No gradient, no emoji, no one-sided colored border on a card, no red except for a problem (red is --danger, --accent only marks).
    - A component is a class with the "lg-" prefix (BEM: lg-card, lg-card__head, lg-btn--primary), so it cannot meet the class names of
      the pages that were written before it. The shell of the page has the "app-" prefix.
@@ -11,7 +11,6 @@
    Load order on a console page: /brand/tokens.css, then this file, then the page's own sheet when it has one (editor.css, bulk.css). */
 
 :root {
-  color-scheme: light dark;
   --side-width: 240px;
   /* Shades the tokens do not name, derived from them so both schemes follow. Pairs of text and ground that use them are checked for
      contrast by ConsoleContrastTest; keep the two lists together. */
@@ -107,6 +106,15 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 }
 .app-side__brand { display: block; margin: var(--space-1) var(--space-2) var(--space-6); }
 .app-side__logo { display: block; height: 28px; width: auto; }
+.lg-lockup__light, .lg-lockup__dark { display: none; }
+@media screen {
+  :root[data-console-theme] .lg-lockup > picture { display: none; }
+  :root[data-console-theme="light"] .lg-lockup__light,
+  :root[data-console-theme="dark"] .lg-lockup__dark { display: block; }
+}
+.app-theme { margin: 0 var(--space-2) var(--space-3); }
+.app-theme .lg-select { min-width: 0; width: 100%; }
+.app-nav__label--icon { display: flex; align-items: center; gap: var(--space-2); }
 .app-side__toggle, .app-side__menu { display: none; }
 .app-side__panel { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 
@@ -203,6 +211,7 @@ body:has(> .app-side) { padding-left: var(--side-width); }
     color: var(--ink);
     cursor: pointer;
   }
+  .app-theme { margin: 0 var(--space-2); }
   .app-side__menu:hover { background: var(--hover); }
   .app-side__toggle:focus-visible + .app-side__menu { outline: 2px solid var(--brand); outline-offset: 2px; }
   .app-side__toggle:checked + .app-side__menu { background: var(--brand-subtle); color: var(--brand-text); }
@@ -212,7 +221,10 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 }
 
 @media print {
-  .app-side, .app-skip { display: none; }
+  .app-side, .app-skip, .app-theme, .lg-working, .lg-lockup > picture, .lg-lockup__dark { display: none; }
+  .lg-lockup__light { display: block; }
+  body .lg-table-wrap { overflow: visible; max-block-size: none; }
+  .lg-table thead th { position: static; }
   body:has(> .app-side) { padding-left: 0; }
   @page pilot { size: A4 portrait; margin: 12mm; }
   #pilot-print {
@@ -229,6 +241,33 @@ body:has(> .app-side) { padding-left: var(--side-width); }
   #pilot-print table { width: 100%; font-size: 9pt; }
   #pilot-print th, #pilot-print td { padding: 3pt; }
   #pilot-print tr { break-inside: avoid; }
+}
+
+.lg-working:not([hidden]) { color: var(--ink-muted); margin-block: var(--space-2); }
+.lg-working:not([hidden])::before {
+  content: "";
+  display: inline-block;
+  inline-size: var(--space-3);
+  block-size: var(--space-3);
+  margin-inline-end: var(--space-2);
+  border: 2px solid var(--brand);
+  border-block-start-color: transparent;
+  border-radius: var(--radius-full);
+  vertical-align: middle;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lg-working:not([hidden])::before { animation: lg-working-spin .8s linear infinite; }
+}
+@keyframes lg-working-spin { to { transform: rotate(1turn); } }
+.lg-toast:not(:empty) { display: flex; align-items: center; gap: var(--space-2); }
+.lg-toast:not(:empty)::before {
+  content: "";
+  flex: none;
+  inline-size: var(--space-2);
+  block-size: var(--space-3);
+  border: solid var(--success);
+  border-width: 0 2px 2px 0;
+  transform: rotate(40deg);
 }
 
 /* ---------- button ---------- */
@@ -346,9 +385,12 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 
 /* The wrapper scrolls sideways on a narrow screen instead of squeezing the columns. It is positioned so that a word only a screen reader hears (an
    absolute box in a far column) stays inside it: without that the box leaves the wrapper and makes the whole page scroll sideways. */
-.lg-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-1); }
+.lg-table-wrap { position: relative; overflow: auto; max-block-size: 32rem; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-1); }
 .lg-table { width: 100%; font-size: 14px; line-height: 20px; }
 .lg-table--scroll { min-width: 40rem; }
+@media screen {
+  .lg-table thead th { position: sticky; inset-block-start: 0; z-index: 1; }
+}
 .lg-table th {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);

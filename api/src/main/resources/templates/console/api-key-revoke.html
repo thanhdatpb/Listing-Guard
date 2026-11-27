@@ -33,7 +33,7 @@
         </ul>
     </section>
 
-    <form method="post" th:action="@{/console/api-keys/{id}/revoke(id=${key.keyId})}">
+    <form data-console-submit method="post" th:action="@{/console/api-keys/{id}/revoke(id=${key.keyId})}">
         <div class="lg-actions">
             <button type="submit" class="lg-btn lg-btn--destructive" th:text="#{revoke.submit}"></button>
             <a class="lg-btn" th:href="@{/console/api-keys}" th:text="#{revoke.cancel}"></a>

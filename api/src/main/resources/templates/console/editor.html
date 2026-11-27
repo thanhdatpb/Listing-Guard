@@ -39,7 +39,7 @@
 
         <!-- The sentences of the live counters (editor.js) are written here: the script holds no text (ADR-028). They are patterns
              with {0}, {1}; the script fills in the numbers. -->
-        <form id="editor-form" method="post" th:action="@{/console/check}" th:object="${form}" novalidate
+        <form id="editor-form" data-console-submit method="post" th:action="@{/console/check}" th:object="${form}" novalidate
               th:attr="data-i18n-chars=#{js.counter.chars},data-i18n-chars-nolimit=#{js.counter.chars.nolimit},data-i18n-bytes=#{js.counter.bytes},data-i18n-bytes-nolimit=#{js.counter.bytes.nolimit},data-i18n-entries=#{js.counter.entries},data-i18n-entries-nolimit=#{js.counter.entries.nolimit},data-i18n-longest=#{js.counter.longest},data-i18n-over=#{js.counter.over}">
             <input type="hidden" th:field="*{marketplace}">
             <input th:if="${pilotDraft != null}" type="hidden" name="pilotDraft" th:value="${pilotDraft}">

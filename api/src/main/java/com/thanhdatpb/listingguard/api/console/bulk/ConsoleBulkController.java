@@ -244,8 +244,8 @@ public class ConsoleBulkController {
             CheckScope checkScope = scope == CheckScope.Kind.CONTENT ? CheckScope.content(mapping.mappedFields(marketplace))
                     : CheckScope.FULL;
             BulkResult result = service.run(user.clientId(), marketplace, inputs, table.header(), checkScope);
-            if (remember) {
-                remember(user, marketplace, mapping.toStored(marketplace, table.labels(), scopeName(scope)));
+            if (remember && remember(user, marketplace, mapping.toStored(marketplace, table.labels(), scopeName(scope)))) {
+                model.addAttribute("mappingSaved", true);
             }
             Set<Integer> changed = Set.of();
             if (pilot.enabled()) {
@@ -625,8 +625,11 @@ public class ConsoleBulkController {
         return stored(user, marketplace).map(s -> (Set<String>) new HashSet<>(s.columns().keySet())).orElse(Set.of());
     }
 
-    private void remember(ConsoleUser user, EditorMarketplace marketplace, BulkMappingStore.Stored stored) {
-        accountId(user).ifPresent(id -> mappingStore.save(id, marketplace.code(), stored));
+    private boolean remember(ConsoleUser user, EditorMarketplace marketplace, BulkMappingStore.Stored stored) {
+        return accountId(user).map(id -> {
+            mappingStore.save(id, marketplace.code(), stored);
+            return true;
+        }).orElse(false);
     }
 
     private Optional<java.util.UUID> accountId(ConsoleUser user) {

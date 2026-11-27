@@ -19,13 +19,14 @@
         </div>
         <a th:if="${result != null or preview != null}" class="lg-btn" th:href="@{/console/phrase-screening}" th:text="#{phrase.restart}"></a>
     </div>
+    <p class="lg-banner lg-banner--success lg-toast lg-section" role="status" th:if="${mappingSaved == true}" th:text="#{console.mapping.saved}"></p>
     <p th:fragment="phraseError" th:if="${phraseError != null}" id="phrase-error" class="lg-banner lg-banner--warning" role="alert">
         <span class="lg-mark" aria-hidden="true"></span><span th:text="${phraseError}"></span>
     </p>
     <div th:if="${preview == null and result == null}" class="lg-split lg-section">
         <section class="lg-card">
             <h2 th:text="#{phrase.upload}"></h2>
-            <form id="phrase-upload" method="post" th:action="@{/console/phrase-screening/preview}" enctype="multipart/form-data">
+            <form id="phrase-upload" data-console-submit method="post" th:action="@{/console/phrase-screening/preview}" enctype="multipart/form-data">
                 <input type="hidden" name="mode" value="file">
                 <div th:replace="~{console/phrase-fragments :: marketplace('upload')}"></div>
                 <label class="lg-field__label" for="phrase-file" th:text="#{phrase.file}"></label>
@@ -36,7 +37,7 @@
         </section>
         <section class="lg-card">
             <h2 th:text="#{phrase.paste}"></h2>
-            <form id="phrase-paste" method="post" th:action="@{/console/phrase-screening/preview}" enctype="multipart/form-data">
+            <form id="phrase-paste" data-console-submit method="post" th:action="@{/console/phrase-screening/preview}" enctype="multipart/form-data">
                 <input type="hidden" name="mode" value="paste">
                 <div th:replace="~{console/phrase-fragments :: marketplace('paste')}"></div>
                 <label class="lg-field__label" for="phrase-data" th:text="#{phrase.paste.hint}"></label>

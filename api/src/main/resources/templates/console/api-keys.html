@@ -24,13 +24,13 @@
         </div>
     </div>
 
-    <div class="lg-banner lg-banner--success lg-section" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
+    <div class="lg-banner lg-banner--success lg-toast lg-section" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
     <div class="lg-banner lg-banner--error lg-section" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
 
     <!-- The key that was just issued: said once, with the way to copy it. The warning is the banner, not a border on a box. -->
     <section class="lg-banner lg-banner--warning lg-section" id="new-key" th:if="${issued != null}" aria-labelledby="new-key-heading">
         <div class="lg-banner__body">
-            <h2 id="new-key-heading" class="lg-banner__title" th:text="#{keys.new.heading}"></h2>
+            <h2 id="new-key-heading" class="lg-banner__title lg-toast" role="status" th:text="#{keys.new.heading}"></h2>
             <p th:text="#{keys.new.warning}"></p>
             <div class="lg-secret">
                 <label for="new-secret" class="lg-sr-only" th:text="#{keys.new.label}"></label>
@@ -41,7 +41,7 @@
                     <th:block th:text="#{keys.copy}"></th:block>
                 </button>
             </div>
-            <p id="copy-status" role="status" aria-live="polite"></p>
+            <p class="lg-toast" id="copy-status" role="status" aria-live="polite"></p>
             <p class="lg-small"><span th:text="#{keys.new.keyid}"></span> <code class="lg-code" th:text="${issued.keyId}"></code><span th:text="#{keys.new.keyid.after}"></span></p>
         </div>
     </section>
@@ -51,7 +51,7 @@
             <span th:text="#{keys.active.heading}"></span>
             <span class="lg-text-muted lg-small" id="key-count" th:text="#{keys.count(${#strings.toString(activeCount)}, ${#strings.toString(maxActiveKeys)})}"></span>
         </h2>
-        <div class="lg-empty" id="no-keys" th:if="${keys.isEmpty()}"><p class="lg-empty__text" th:text="#{keys.none}"></p></div>
+        <div class="lg-empty" id="no-keys" th:if="${keys.isEmpty()}"><p class="lg-empty__text" th:text="#{keys.none}"></p><p th:if="${canCreate and demoWorkspace != true}" class="lg-empty__text" th:text="#{keys.none.next}"></p></div>
         <div class="lg-table-wrap" th:unless="${keys.isEmpty()}">
             <table class="lg-table lg-table--scroll" id="keys-table">
                 <caption class="lg-sr-only" th:text="#{keys.active.heading}"></caption>
@@ -80,7 +80,7 @@
     <th:block th:if="${demoWorkspace}"><p role="note" th:text="#{demo.workspace.keys}"></p></th:block><section class="lg-card lg-section" aria-labelledby="create-heading" th:unless="${demoWorkspace}">
         <h2 id="create-heading" class="lg-card__title" th:text="#{keys.create.heading}"></h2>
         <p class="lg-text-muted" id="limit-message" th:unless="${canCreate}" th:text="#{keys.limit.message(${#strings.toString(maxActiveKeys)})}"></p>
-        <form id="create-form" class="lg-form" method="post" th:action="@{/console/api-keys}" th:if="${canCreate}">
+        <form id="create-form" data-console-submit class="lg-form" method="post" th:action="@{/console/api-keys}" th:if="${canCreate}">
             <div class="lg-field">
                 <label class="lg-field__label" for="label"><span th:text="#{keys.label.label}"></span> <span class="lg-text-muted" th:text="#{keys.label.optional(${#strings.toString(maxLabelLength)})}"></span></label>
                 <input class="lg-input" type="text" id="label" name="label" autocomplete="off" aria-describedby="label-hint" th:attr="maxlength=${maxLabelLength}" th:value="${label}">

@@ -75,9 +75,9 @@
                 <th scope="col" th:text="#{history.col.marketplace}"></th>
                 <th scope="col" th:text="#{history.col.sku}"></th>
                 <th scope="col" class="lg-num" th:text="#{history.col.rows}"></th>
-                <th scope="col" th:text="#{history.col.errors}"></th>
-                <th scope="col" th:text="#{history.col.trademarks}"></th>
-                <th scope="col" th:text="#{history.col.feedback}"></th>
+                <th scope="col" class="lg-num" th:text="#{history.col.errors}"></th>
+                <th scope="col" class="lg-num" th:text="#{history.col.trademarks}"></th>
+                <th scope="col" class="lg-num" th:text="#{history.col.feedback}"></th>
                 <th scope="col"><span class="lg-sr-only" th:text="#{history.col.result}"></span></th>
             </tr>
             </thead>
@@ -89,9 +89,9 @@
                 <td th:text="${row.marketplace()}"></td>
                 <td class="lg-sku"><code class="lg-code" th:if="${row.sku() != null}" th:text="${row.sku()}"></code><span class="lg-text-muted" th:if="${row.sku() == null}">&mdash;</span></td>
                 <td class="lg-num" th:text="${#numbers.formatInteger(row.rowCount(), 1)}"></td>
-                <td><span class="lg-pill lg-pill--error" th:if="${row.errors() > 0}" th:text="${#numbers.formatInteger(row.errors(), 1)}"></span><span class="lg-text-muted" th:if="${row.errors() == 0}">0</span></td>
-                <td><span class="lg-pill lg-pill--trademark" th:if="${row.trademarks() > 0}" th:text="${#numbers.formatInteger(row.trademarks(), 1)}"></span><span class="lg-text-muted" th:if="${row.trademarks() == 0}">0</span></td>
-                <td class="lg-text-muted lg-nowrap">
+                <td class="lg-num"><span class="lg-pill lg-pill--error" th:if="${row.errors() > 0}" th:text="${#numbers.formatInteger(row.errors(), 1)}"></span><span class="lg-text-muted" th:if="${row.errors() == 0}">0</span></td>
+                <td class="lg-num"><span class="lg-pill lg-pill--trademark" th:if="${row.trademarks() > 0}" th:text="${#numbers.formatInteger(row.trademarks(), 1)}"></span><span class="lg-text-muted" th:if="${row.trademarks() == 0}">0</span></td>
+                <td class="lg-num lg-text-muted lg-nowrap">
                     <th:block th:if="${row.feedbackTotal() == 0}">&mdash;</th:block>
                     <th:block th:if="${row.feedbackTotal() > 0 and row.feedbackGiven() == 0}" th:text="#{history.feedback.none}"></th:block>
                     <th:block th:if="${row.feedbackGiven() > 0}" th:text="#{history.feedback.given(${#strings.toString(row.feedbackGiven())}, ${#strings.toString(row.feedbackTotal())})}"></th:block>
@@ -103,7 +103,7 @@
         </table>
     </div>
 
-    <div class="lg-pager" th:unless="${history.rows().isEmpty()}">
+    <div class="lg-pager" role="group" th:aria-label="#{console.pagination}" th:unless="${history.rows().isEmpty()}">
         <p class="lg-small lg-text-muted" id="history-shown"
            th:text="#{history.shown(${#strings.toString(history.first())}, ${#strings.toString(history.last())}, ${#strings.toString(history.total())})}"></p>
         <nav class="lg-actions" th:if="${history.pages() > 1}" th:aria-label="#{history.pagination}">

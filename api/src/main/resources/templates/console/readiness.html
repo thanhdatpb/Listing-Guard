@@ -18,6 +18,7 @@
             <h1 th:text="#{readiness.heading}"></h1>
             <p class="lg-page__sub" th:text="#{readiness.intro}"></p>
         </div>
+        <a class="lg-btn lg-btn--primary" th:href="@{/console/readiness}" th:text="#{readiness.refresh}"></a>
     </div>
 
     <div class="lg-banner lg-banner--success lg-section" id="readiness-summary" role="status" th:if="${view.ready()}">
