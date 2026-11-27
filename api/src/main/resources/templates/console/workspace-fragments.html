@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- Parts the workspace pages share (ADR-059). A state is a word and a shape: the icon is drawn once in the sidebar's sprite and is decorative, the
+     word is the state. No text is written here (ADR-028). -->
+
+<!-- The status of a listing: code is draft, ready_to_export, exported or live; label is its word. -->
+<span th:fragment="status(code, label)" class="lg-chip lg-chip--neutral"><svg class="lg-icon" aria-hidden="true" focusable="false"><use th:href="${'#lg-i-s-' + code}"/></svg><span th:text="${label}"></span></span>
+
+<!-- The check state of a listing. The background check is a later change (W2): every listing says it has not been checked. -->
+<span th:fragment="unchecked" class="lg-chip lg-chip--neutral"><svg class="lg-icon" aria-hidden="true" focusable="false"><use href="#lg-i-unchecked"/></svg><span th:text="#{workspace.check.none}"></span></span>
+
+<!-- A value that a guess filled in: it says so, in a word and a shape, until the person confirms it. -->
+<span th:fragment="guessed" class="lg-chip lg-chip--flag"><svg class="lg-icon" aria-hidden="true" focusable="false"><use href="#lg-i-guess"/></svg><span th:text="#{workspace.guessed}"></span></span>
+
+<!-- A message above the page's content: notice (role status) and error (role alert), from the redirect that brought the person here. -->
+<th:block th:fragment="notices">
+    <div class="lg-banner lg-banner--success lg-section" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" id="error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
+</th:block>
+
+<!-- The fields of an earlier step, put back as hidden fields so the next step has them. -->
+<th:block th:fragment="carry(fields)">
+    <input type="hidden" th:each="field : ${fields}" th:name="${field.key}" th:value="${field.value}">
+</th:block>
+</body>
+</html>

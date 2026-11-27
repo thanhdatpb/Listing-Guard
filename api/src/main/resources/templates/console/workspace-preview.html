@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.preview.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- Step 4 (ADR-059): what writing would do, before anything is written: new, updated, unchanged and wrong rows, every problem with its row, and
+     what happens to the template. The write button runs the same reading again, so what is written is what the page described at that
+     moment; a row with a problem is never written. No text is written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace-import')}"></header>
+<main class="lg-page" id="workspace-preview">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{workspace.preview.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{workspace.preview.intro(${kindLabel})}"></p>
+        </div>
+    </div>
+
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <div class="lg-banner lg-banner--error lg-section" id="preview-blocking" role="alert" th:if="${blocking != null}"><p th:text="${blocking}"></p></div>
+    <div class="lg-banner lg-banner--info lg-section" id="preview-template" th:unless="${blocking != null}"><p th:text="${actionLabel}"></p></div>
+
+    <div class="lg-grid lg-grid--stats lg-section" id="preview-counts">
+        <div class="lg-card"><p class="lg-stat__label" th:text="#{workspace.preview.rows}"></p><p class="lg-stat__value lg-num" id="count-rows" th:text="${plan.counts().rows()}"></p></div>
+        <div class="lg-card"><p class="lg-stat__label" th:text="#{workspace.preview.created}"></p><p class="lg-stat__value lg-num" id="count-created" th:text="${plan.counts().created()}"></p></div>
+        <div class="lg-card"><p class="lg-stat__label" th:text="#{workspace.preview.updated}"></p><p class="lg-stat__value lg-num" id="count-updated" th:text="${plan.counts().updated()}"></p></div>
+        <div class="lg-card"><p class="lg-stat__label" th:text="#{workspace.preview.unchanged}"></p><p class="lg-stat__value lg-num" id="count-unchanged" th:text="${plan.counts().unchanged()}"></p></div>
+        <div class="lg-card"><p class="lg-stat__label" th:text="#{workspace.preview.errors}"></p><p class="lg-stat__value lg-num" id="count-errors" th:text="${plan.counts().errors()}"></p></div>
+    </div>
+
+    <div class="lg-banner lg-banner--warning lg-section" id="preview-ignored" th:if="${plan.ignoredCells() > 0}"><p th:text="#{workspace.preview.ignored(${#strings.toString(plan.ignoredCells())})}"></p></div>
+    <div class="lg-banner lg-banner--warning lg-section" id="preview-unlinked" th:if="${customize and plan.customizationsUnlinked() > 0}"><p th:text="#{workspace.preview.unlinked(${#strings.toString(plan.customizationsUnlinked())})}"></p></div>
+    <div class="lg-banner lg-banner--info lg-section" id="preview-header-diff" th:if="${!plan.headerAdded().isEmpty() or !plan.headerRemoved().isEmpty()}">
+        <div class="lg-banner__body">
+            <p class="lg-banner__title" th:text="#{workspace.preview.headerdiff}"></p>
+            <p th:if="${!plan.headerAdded().isEmpty()}" th:text="#{workspace.preview.headeradded(${#strings.listJoin(plan.headerAdded(), ', ')})}"></p>
+            <p th:if="${!plan.headerRemoved().isEmpty()}" th:text="#{workspace.preview.headerremoved(${#strings.listJoin(plan.headerRemoved(), ', ')})}"></p>
+        </div>
+    </div>
+
+    <section class="lg-card lg-section" id="preview-issues" aria-labelledby="issues-heading" th:if="${!issues.isEmpty()}">
+        <h2 id="issues-heading" class="lg-card__title" th:text="#{workspace.preview.issues}"></h2>
+        <div class="lg-table-wrap">
+            <table class="lg-table lg-table--scroll lg-table--dense">
+                <caption class="lg-sr-only" th:text="#{workspace.preview.issues}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" class="lg-num" th:text="#{workspace.preview.line}"></th>
+                    <th scope="col" th:text="#{workspace.col.sku}"></th>
+                    <th scope="col" th:text="#{workspace.preview.problem}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="issue : ${issues}">
+                    <td class="lg-num" th:text="${issue.line()}"></td>
+                    <td class="lg-sku"><code class="lg-code" th:text="${issue.sku()}"></code></td>
+                    <td><svg class="lg-icon" aria-hidden="true" focusable="false"><use href="#lg-i-warn"/></svg> <span th:text="${issue.text()}"></span></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="lg-text-muted" th:if="${moreIssues > 0}" th:text="#{workspace.preview.more(${#strings.toString(moreIssues)})}"></p>
+    </section>
+
+    <form class="lg-actions" id="commit-form" method="post" th:action="@{/console/workspace/import/commit}">
+        <th:block th:replace="~{console/workspace-fragments :: carry(${carry})}"></th:block>
+        <button type="submit" class="lg-btn lg-btn--primary" id="commit-button" th:disabled="${!plan.canWrite()}" th:text="#{workspace.preview.commit}"></button>
+        <a class="lg-btn" th:href="@{/console/workspace/import/mapping(stage=${carry.get('stage')},mode='import',account=${carry.get('account')},kind=${carry.get('kind')},owner=${carry.get('owner')},status=${carry.get('status')},sheet=${carry.get('sheet')},fieldRow=${carry.get('fieldRow')},firstDataRow=${carry.get('firstDataRow')},skuCol=${carry.get('skuCol')})}" th:text="#{workspace.back}"></a>
+    </form>
+    <p class="lg-text-muted" th:unless="${plan.canWrite()}" th:text="#{workspace.preview.nothing}"></p>
+</main>
+</body>
+</html>

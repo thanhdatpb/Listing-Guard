@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.accounts.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- Seller accounts and their templates (ADR-059). Every account of the client reads the page; only an ADMIN creates or changes an account and
+     uploads a template. A template is a version: another header is another version, and the older one stays for the listings that use it.
+     No text is written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace-accounts')}"></header>
+<main class="lg-page" id="workspace-accounts">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{workspace.accounts.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{workspace.accounts.intro}"></p>
+        </div>
+    </div>
+
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <div class="lg-banner lg-banner--info lg-section" id="accounts-readonly" th:unless="${admin}"><p th:text="#{workspace.accounts.readonly}"></p></div>
+
+    <section class="lg-card lg-section" id="account-create" aria-labelledby="create-heading" th:if="${admin}">
+        <h2 id="create-heading" class="lg-card__title" th:text="#{workspace.accounts.create}"></h2>
+        <form class="lg-form" method="post" th:action="@{/console/workspace/accounts}">
+            <div class="lg-field">
+                <label class="lg-field__label" for="new-name" th:text="#{workspace.accounts.name}"></label>
+                <input class="lg-input" type="text" id="new-name" name="name" required maxlength="120" autocomplete="off">
+                <p class="lg-field__hint" th:text="#{workspace.accounts.name.hint}"></p>
+            </div>
+            <div class="lg-field">
+                <label class="lg-field__label" for="new-marketplace" th:text="#{workspace.accounts.marketplace}"></label>
+                <select class="lg-select" id="new-marketplace" name="marketplace">
+                    <option th:each="m : ${marketplaces}" th:value="${m[0]}" th:text="${m[1]}"></option>
+                </select>
+            </div>
+            <div class="lg-field">
+                <label class="lg-field__label" for="new-brand" th:text="#{workspace.accounts.brand}"></label>
+                <input class="lg-input" type="text" id="new-brand" name="brand" maxlength="120" autocomplete="off">
+            </div>
+            <div class="lg-field">
+                <label class="lg-field__label" for="new-format" th:text="#{workspace.accounts.format}"></label>
+                <select class="lg-select" id="new-format" name="exportFormat">
+                    <option th:each="f : ${formats}" th:value="${f[0]}" th:text="${f[1]}"></option>
+                </select>
+                <p class="lg-field__hint" th:text="#{workspace.accounts.format.hint}"></p>
+            </div>
+            <div class="lg-actions"><button type="submit" class="lg-btn lg-btn--primary" th:text="#{workspace.accounts.create.submit}"></button></div>
+        </form>
+    </section>
+
+    <div class="lg-empty" id="accounts-empty" th:if="${rows.isEmpty()}">
+        <h2 class="lg-empty__title" th:text="#{workspace.accounts.empty.title}"></h2>
+        <p class="lg-empty__text" th:text="#{workspace.accounts.empty.text}"></p>
+    </div>
+
+    <section class="lg-card lg-section" th:each="row : ${rows}" th:attr="data-account=${row.account().id()}" th:aria-labelledby="${'account-' + row.account().id()}">
+        <h2 class="lg-card__title" th:id="${'account-' + row.account().id()}"><span th:text="${row.account().name()}"></span> <span class="lg-pill lg-pill--brand" th:text="${row.marketplace()}"></span>
+            <span class="lg-pill lg-pill--warn" th:unless="${row.account().enabled()}" th:text="#{workspace.accounts.disabled}"></span></h2>
+        <ul class="lg-kv">
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.accounts.listings}"></span><span class="lg-kv__value lg-num" th:text="${row.listings()}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.accounts.brand}"></span><span class="lg-kv__value" th:text="${row.account().brand()}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.accounts.format}"></span><span class="lg-kv__value" th:text="${row.formatLabel()}"></span></li>
+        </ul>
+
+        <h3 class="lg-section-title" th:text="#{workspace.accounts.templates}"></h3>
+        <p class="lg-text-muted" th:if="${row.etsy()}" th:text="#{workspace.accounts.etsy.note}"></p>
+        <p class="lg-text-muted" th:if="${row.templates().isEmpty() and !row.etsy()}" th:text="#{workspace.accounts.templates.empty}"></p>
+        <div class="lg-table-wrap" th:unless="${row.templates().isEmpty()}">
+            <table class="lg-table lg-table--dense">
+                <caption class="lg-sr-only" th:text="#{workspace.accounts.templates}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{workspace.tpl.kind}"></th>
+                    <th scope="col" class="lg-num" th:text="#{workspace.tpl.version}"></th>
+                    <th scope="col" th:text="#{workspace.tpl.format}"></th>
+                    <th scope="col" th:text="#{workspace.tpl.file}"></th>
+                    <th scope="col" class="lg-num" th:text="#{workspace.tpl.columns}"></th>
+                    <th scope="col" th:text="#{workspace.tpl.created}"></th>
+                    <th scope="col" th:if="${admin}"><span class="lg-sr-only" th:text="#{workspace.tpl.download}"></span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="t : ${row.templates()}">
+                    <td th:text="${t.kind()}"></td>
+                    <td class="lg-num"><span th:text="${t.version()}"></span> <span class="lg-pill lg-pill--clean" th:if="${t.current()}" th:text="#{workspace.tpl.current}"></span></td>
+                    <td th:text="${t.format()}"></td>
+                    <td class="lg-ellip"><span th:text="${t.file()}"></span> <code class="lg-code" th:if="${t.sha() != null}" th:text="${t.sha()}"></code></td>
+                    <td class="lg-num" th:text="${t.columns()}"></td>
+                    <td class="lg-nowrap" th:text="${t.created()}"></td>
+                    <td th:if="${admin}"><a th:if="${t.hasFile()}" th:href="@{/console/workspace/templates/{id}/file(id=${t.id()})}" th:text="#{workspace.tpl.download}"></a></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="lg-actions" th:if="${admin and !row.etsy()}">
+            <a class="lg-btn" th:href="@{/console/workspace/import(mode='template',account=${row.account().id()})}" th:text="#{workspace.accounts.template.upload}"></a>
+        </div>
+
+        <details class="lg-disclosure" th:if="${admin}">
+            <summary th:text="#{workspace.accounts.edit}"></summary>
+            <form class="lg-form" method="post" th:action="@{/console/workspace/accounts/{id}(id=${row.account().id()})}">
+                <div class="lg-field">
+                    <label class="lg-field__label" th:for="${'name-' + row.account().id()}" th:text="#{workspace.accounts.name}"></label>
+                    <input class="lg-input" type="text" th:id="${'name-' + row.account().id()}" name="name" required maxlength="120" th:value="${row.account().name()}">
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" th:for="${'brand-' + row.account().id()}" th:text="#{workspace.accounts.brand}"></label>
+                    <input class="lg-input" type="text" th:id="${'brand-' + row.account().id()}" name="brand" maxlength="120" th:value="${row.account().brand()}">
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label" th:for="${'format-' + row.account().id()}" th:text="#{workspace.accounts.format}"></label>
+                    <select class="lg-select" th:id="${'format-' + row.account().id()}" name="exportFormat">
+                        <option th:each="f : ${formats}" th:value="${f[0]}" th:selected="${f[0] == row.account().exportFormat().name()}" th:text="${f[1]}"></option>
+                    </select>
+                </div>
+                <div class="lg-field">
+                    <label class="lg-field__label"><input type="checkbox" name="enabled" value="on" th:checked="${row.account().enabled()}"> <span th:text="#{workspace.accounts.enabled}"></span></label>
+                </div>
+                <div class="lg-actions"><button type="submit" class="lg-btn" th:text="#{workspace.accounts.save}"></button></div>
+            </form>
+        </details>
+    </section>
+</main>
+</body>
+</html>
