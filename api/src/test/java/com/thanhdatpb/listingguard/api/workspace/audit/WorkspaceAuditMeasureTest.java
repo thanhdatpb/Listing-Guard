@@ -98,10 +98,16 @@ class WorkspaceAuditMeasureTest {
         private final List<CatalogMark> marks = new ArrayList<>();
         private final int[] sizes;
         private final Map<String, int[]> postings = new HashMap<>();
+        private static final int[] NONE = new int[0];
+        /** Scratch space of one lookup; the audit is measured on one thread, so a lookup may reuse it. */
+        private final int[] counts;
+        private final int[] touched;
 
         IndexedCatalog(String version, List<String> normalizedMarks) {
             this.version = version;
             sizes = new int[normalizedMarks.size()];
+            counts = new int[normalizedMarks.size()];
+            touched = new int[normalizedMarks.size()];
             Map<String, List<Integer>> building = new HashMap<>();
             for (String normalized : normalizedMarks) {
                 int id = marks.size();
@@ -142,19 +148,23 @@ class WorkspaceAuditMeasureTest {
                 if (query.isEmpty()) {
                     continue;
                 }
-                Map<Integer, int[]> shared = new HashMap<>();
+                int touchedCount = 0;
                 for (String trigram : query) {
-                    for (int id : postings.getOrDefault(trigram, new int[0])) {
-                        shared.computeIfAbsent(id, k -> new int[1])[0]++;
+                    for (int id : postings.getOrDefault(trigram, NONE)) {
+                        if (counts[id]++ == 0) {
+                            touched[touchedCount++] = id;
+                        }
                     }
                 }
                 List<CatalogMark> candidates = new ArrayList<>();
-                shared.forEach((id, count) -> {
-                    double similarity = (double) count[0] / (query.size() + sizes[id] - count[0]);
+                for (int i = 0; i < touchedCount; i++) {
+                    int id = touched[i];
+                    double similarity = (double) counts[id] / (query.size() + sizes[id] - counts[id]);
                     if (similarity >= threshold) {
                         candidates.add(marks.get(id));
                     }
-                });
+                    counts[id] = 0;
+                }
                 if (!candidates.isEmpty()) {
                     candidates.sort(Comparator.comparing(CatalogMark::normalized));
                     result.put(form, candidates);
@@ -207,6 +217,9 @@ class WorkspaceAuditMeasureTest {
         long start = System.nanoTime();
         for (int i = 0; i < listings; i++) {
             long t0 = System.nanoTime();
+            if (i > 0 && i % 1000 == 0) {
+                System.out.println("workspace-audit-measure: " + i + " listings, " + (System.nanoTime() - start) / 1_000_000 + " ms");
+            }
             // about 1 listing in 20 carries a mark of the catalog, with the case, punctuation and extra spaces of a seller
             boolean marked = i % 20 == 0;
             String title = "  " + word(random) + "  " + (marked ? catalogMarks.get(random.nextInt(marks)).toUpperCase(Locale.ROOT) + "!!" : word(random)) + " "
@@ -292,7 +305,7 @@ class WorkspaceAuditMeasureTest {
                 | Audit of all listings | %d ms (%.0f listings per second) |
                 | Per listing, median / p95 / max | %.2f / %.2f / %.2f ms |
                 | Peak heap during the audit (sum of heap pool peaks) | %.0f MB |
-                | Rule findings with a position attempted | %d |
+                | Rule findings (error or warning) | %d |
                 | Trademark findings (high or medium) | %d, mapped to a span %d, no span %d |
                 | Marked pieces for the detail pages | %d |
                 | Alert summary of %d rows | %d ms, %d characters |
