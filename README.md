@@ -65,6 +65,8 @@ State of v0.11.0. "Ready" means it works and its tests pass, within the evidence
 | [Bulk Sheet content scope](docs/bulk-check.md) | Defaults to content in pilot and full elsewhere | Missing Sheet columns are listed as unchecked. Single listing and API checks still use full scope. |
 | [Owner-based catalog](docs/catalog-activation-runbook.md) | Optional catalog rebuild and activation | Parquet schema verified. The threshold, owner-name matching and 47 probes on the real catalog have yet to be measured or validated. |
 | [Periodic re-audit](docs/reaudit.md) | Ready in the console | The first run of a scope has nothing to compare with |
+| [Listing workspace (ADR-059)](docs/workspace.md) | Optional, off by default | Imports and mappings use synthetic workbooks. Real Amazon templates are unverified. A listing editor, cloning and export by account template are pending. |
+| [Background audit, inline highlights and e-mail alerts (ADR-061)](docs/workspace.md#9-rà-nền-tô-đỏ-và-email-adr-061) | Optional, off by default | No performance measurements on PostgreSQL with the real trademark catalog. E-mail has not been tried with a real SMTP server. |
 | [LLM judge and rewrite suggestions](docs/llm.md) | **Off by default**; free tiers | Not measured on real claims; a verified suggestion is not legal clearance |
 | `hf-convert`, `trademark-import`, `batch-check`, `backtest`, `policy-diff` | Ready as jobs | `hf-convert` ran on one build of the dataset; `backtest` has not been run on a real labelled file |
 | `uspto-convert`, `uspto-sync`, `tsdr-status` | Offline modes only | Unverified against real USPTO data; the downloads are off and unverified |
@@ -119,6 +121,48 @@ design tokens ([ADR-040](docs/adr/ADR-040-console-visual-identity-and-design-sys
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/reaudit-result-dark.png">
   <img src="docs/images/console/reaudit-result-light.png" alt="The re-audit result: the facts of the run, the counts of new and known risks and the button that exports the list to fix.">
 </picture>
+
+### Listing workspace
+
+The screens use fictional listing and trademark data.
+
+**Listing workspace.** Filter stored listings by seller account, marketplace, owner, listing status or audit status.
+
+<!-- Generate with ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test after setting the variables in docs/workspace.md.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-list-dark.png">
+  <img src="docs/images/console/workspace-list-light.png" alt="Listing workspace with filters above a table of stored listings, including the audit status and a New risk badge.">
+</picture>
+-->
+
+**Map the columns.** Confirm which workbook columns hold the SKU, title, description and other listing fields before previewing the import.
+
+<!-- Generate with ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test after setting the variables in docs/workspace.md.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-mapping-dark.png">
+  <img src="docs/images/console/workspace-mapping-light.png" alt="Import column mapping with source field names, target selectors and a button to preview the import.">
+</picture>
+-->
+
+**Open a listing.** The audited content marks the matching words, and the focused tooltip and findings table explain why they were flagged.
+
+<!-- Generate with ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test after setting the variables in docs/workspace.md.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-detail-dark.png">
+  <img src="docs/images/console/workspace-detail-light.png" alt="Listing detail with a highlighted match in the audited title, an open New risk tooltip and a table of findings.">
+</picture>
+-->
+
+**Background audit.** Follow progress by seller account, see why each audit ran and choose whether to receive e-mail alerts.
+
+<!-- Generate with ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test after setting the variables in docs/workspace.md.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-audit-dark.png">
+  <img src="docs/images/console/workspace-audit-light.png" alt="Background audit with account progress, recent audit runs and their reasons, and a personal e-mail alerts checkbox.">
+</picture>
+-->
+
+See the [workspace guide](docs/workspace.md) for the sheet confirmation and import preview.
 
 History, the watchlist, statistics, the report and API keys are on the same system: [the project guide](docs/overview.md) says what each page does.
 
@@ -180,6 +224,7 @@ See [Oracle A1 behind Cloudflare Tunnel](docs/deploy-oracle.md) for production s
 - Evaluate retrieval, then implement the optional policy analyzer and real LLM adapter ([ADR-011](docs/adr/ADR-011-policy-grounded-analyzer.md)).
 - Continue contract compatibility and Java SDK evolution ([ADR-022](docs/adr/ADR-022-api-contract-and-compatibility.md), [ADR-023](docs/adr/ADR-023-java-client-sdk.md)).
 - Review variation sources and real workshop print profiles ([ADR-015](docs/adr/ADR-015-variation-checks.md), [ADR-016](docs/adr/ADR-016-personalization-screening.md)).
+- Verify listing workspace templates against real Amazon templates (.xlsm/.txt); editor, cloning and export by account template.
 
 See the [detailed status and project guide](docs/overview.md) for implemented behavior and remaining work.
 
@@ -192,6 +237,7 @@ See the [detailed status and project guide](docs/overview.md) for implemented be
 - [Policy change monitor](docs/policy-monitor.md)
 - [Input schema](docs/input-schema.md)
 - [Listing health report and batch check](docs/batch-check.md)
+- [Listing workspace](docs/workspace.md)
 - [MCP server](docs/mcp.md)
 - [Integration guide](docs/integration-guide.md)
 - [Deployment](docs/deployment.md)

@@ -81,3 +81,8 @@ ADR-061 (V58, off by default, behind `LISTING_GUARD_WORKSPACE_AUDIT_ENABLED`; ne
   Compose files). `workspace purge` and `workspace export` cover the new `workspace_*` tables.
 - Contract (ADR-022): no `/api/v1` change; `./mvnw -B -pl contract-tools verify` is recorded in the pull request.
 - Not measured: a run on real PostgreSQL with the real catalog (command in `docs/deploy-readiness.md`). Not run: Playwright in a browser, real SMTP, Docker Compose.
+
+## Documentation
+
+- Documented the listing workspace import, background audit, inline highlights and e-mail alerts in the README and workspace guide.
+- Added an opt-in Playwright integration test to capture the live synthetic workspace in light and dark themes.
