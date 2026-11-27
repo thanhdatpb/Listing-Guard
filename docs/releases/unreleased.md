@@ -49,3 +49,30 @@ See the [workspace guide](../workspace.md).
 - Contract (ADR-022): no `/api/v1` change, so no additive or breaking line.
 - Not verified: no real Amazon template; the column-name guesses are `unverified`. Not measured: import time and memory at 10,000 rows. W2 (background
   check), W3 (editor, cloning) and W4 (export to `.xlsm`/`.txt`) are not done.
+
+## Workspace background audit, highlights and e-mail alerts
+
+ADR-061 (V58, off by default, behind `LISTING_GUARD_WORKSPACE_AUDIT_ENABLED`; needs the workspace and the Console) audits the listings stored by the workspace
+(ADR-059) in the background, marks the words a finding points at in the stored text, and can e-mail a summary of new risks. See the
+[workspace guide](../workspace.md#9-rà-nền-tô-đỏ-và-email-adr-061).
+
+- **Queue.** A PostgreSQL table (`SELECT … FOR UPDATE SKIP LOCKED`, a lease, a configurable number of workers, one instance, no broker). A run stopped halfway is taken
+  again and finishes without redoing or double-counting. Triggers: after an import (only the rows it wrote), after a save (synchronous, `WorkspaceAudit.auditNow`),
+  a new catalog, a changed watchlist, a changed ruleset (found by comparing the analysis context, so a change made while the API was stopped is found too), an optional
+  cron (`LISTING_GUARD_WORKSPACE_AUDIT_SCHEDULE_CRON`, empty by default) and the ADMIN button "Rà lại tài khoản".
+- **Checks.** Exactly `CheckService.checkDetailed` (content scope of the template, ADR-052) and `TrademarkCheckService.check`; a listing whose input hash and analysis
+  version are unchanged is skipped. A listing whose trademark part did not run is "Chưa rà đủ", never clean. "Rủi ro mới" follows ADR-035 per listing (a listing audited
+  for the first time has nothing to compare with).
+- **Positions.** `core` `Finding` gains two optional components `matchStart` and `matchEnd` (the old constructors are unchanged; the three word-matching rules set
+  them; nothing stores or returns them: no `/api/v1` change). Trademark spans are mapped from the canonical (NFC, stripped) text back to the stored text; when a span
+  cannot be proved, the field alone is marked.
+- **Console (flag on).** Page "Rà nền" (progress x/y by seller account refreshed with htmx, history with the catalog and watchlist used and the number of new risks,
+  an ADMIN button, the person's own e-mail switch), a state column and filter in the list, the marked content and the findings table on the detail page, a
+  "Listing có rủi ro mới" card on the home pages. Design tokens only, state words and icons, VI and EN.
+- **E-mail (`LISTING_GUARD_WORKSPACE_ALERTS_EMAIL_ENABLED`, off by default).** One plain-text summary for each person after a run (owner: own listings; every ADMIN: all, with
+  the count by seller account), a short excerpt around each match and never the listing, a daily cap (`..._DAILY_CAP`, 3), a switch for each person, the SMTP of the
+  sign-in link; the `dev` profile logs the e-mail.
+- **Operations.** New settings `LISTING_GUARD_WORKSPACE_AUDIT_*` and `LISTING_GUARD_WORKSPACE_ALERTS_EMAIL_*` (`deploy/env.pilot.example`, `deploy/env.prod.example`, both
+  Compose files). `workspace purge` and `workspace export` cover the new `workspace_*` tables.
+- Contract (ADR-022): no `/api/v1` change; `./mvnw -B -pl contract-tools verify` is recorded in the pull request.
+- Not measured: a run on real PostgreSQL with the real catalog (command in `docs/deploy-readiness.md`). Not run: Playwright in a browser, real SMTP, Docker Compose.
