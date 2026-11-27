@@ -35,7 +35,7 @@
             <section class="lg-card" aria-labelledby="upload-heading">
                 <h2 id="upload-heading" class="lg-card__title" th:text="#{reaudit.upload.heading}"></h2>
                 <p class="lg-text-muted lg-small" th:text="#{reaudit.upload.text}"></p>
-                <form id="reaudit-form" class="lg-form" method="post" enctype="multipart/form-data" th:action="@{/console/reaudit/run}">
+                <form id="reaudit-form" data-console-submit class="lg-form" method="post" enctype="multipart/form-data" th:action="@{/console/reaudit/run}">
                     <div class="lg-field">
                         <label class="lg-drop" for="file">
                             <span class="lg-drop__title" th:text="#{bulk.file.label}"></span>

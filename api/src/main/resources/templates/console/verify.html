@@ -23,6 +23,7 @@
         </div>
         <p class="lg-auth__error" th:unless="${valid}" role="alert" th:text="#{verify.invalid}"></p>
         <div class="lg-auth__foot">
+            <div th:replace="~{console/layout :: themeSwitch}"></div>
             <div th:replace="~{console/layout :: languageSwitch}"></div>
         </div>
     </div>

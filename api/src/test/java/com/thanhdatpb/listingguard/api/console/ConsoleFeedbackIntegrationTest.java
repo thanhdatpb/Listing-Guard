@@ -233,7 +233,7 @@ class ConsoleFeedbackIntegrationTest {
         assertThat(empty).contains("class=\"lg-empty__steps\"").containsPattern("class=\"lg-btn lg-btn--primary\"[^>]*href=\"/console/bulk\"");
         assertThat(countOf(withoutShell(page), "lg-btn--primary")).as("one brand button on the screen").isEqualTo(1);
         assertThat(page).containsPattern("class=\"lg-btn\"[^>]*href=\"/console/check\"");
-        assertThat(page).doesNotContain("<script");
+        assertThat(page.substring(page.indexOf("<main"))).doesNotContain("<script");
     }
 
     @Test
@@ -251,7 +251,8 @@ class ConsoleFeedbackIntegrationTest {
         String page = html(mvc.perform(get("/console").with(signedIn(user))).andExpect(status().isOk()));
 
         assertThat(page).doesNotContain("id=\"home-empty\"").contains("id=\"home-cards\"").contains("class=\"lg-chart\"")
-                .contains("<rect").doesNotContain("<script");
+                .contains("<rect");
+        assertThat(page.substring(page.indexOf("<main"))).doesNotContain("<script");
         assertThat(between(page, "id=\"card-checked\"", "</div>")).contains("class=\"lg-stat__value\">1<");
         assertThat(between(page, "id=\"card-error\"", "</div>")).contains("class=\"lg-stat__value\">" + withError + "<");
         assertThat(between(page, "id=\"card-feedback\"", "</div>")).contains("1 of 2 verdicts");

@@ -17,6 +17,7 @@
 <header th:replace="~{console/layout :: nav('bulk')}"></header>
 <main class="lg-page" id="bulk-page">
     <span id="main" tabindex="-1"></span>
+    <p class="lg-banner lg-banner--success lg-toast lg-section" role="status" th:if="${mappingSaved == true}" th:text="#{console.mapping.saved}"></p>
     <div class="lg-page__head">
         <div>
             <h1 th:text="#{bulk.heading}"></h1>
@@ -28,7 +29,7 @@
 
     <!-- Step 1: paste or upload -->
     <div class="lg-card lg-section" th:if="${stage == 'form'}">
-        <form id="paste-form" method="post" enctype="multipart/form-data" th:action="@{/console/bulk/prepare}"
+        <form id="paste-form" data-console-submit method="post" enctype="multipart/form-data" th:action="@{/console/bulk/prepare}"
               th:if="${tab.key == 'paste'}">
             <input type="hidden" name="source" value="paste">
             <div th:replace="~{console/bulk-fragments :: top('paste-marketplace')}"></div>
@@ -51,7 +52,7 @@
             </div>
         </form>
 
-        <form id="file-form" method="post" enctype="multipart/form-data" th:action="@{/console/bulk/prepare}"
+        <form id="file-form" data-console-submit method="post" enctype="multipart/form-data" th:action="@{/console/bulk/prepare}"
               th:if="${tab.key == 'file'}">
             <input type="hidden" name="source" value="file">
             <div th:replace="~{console/bulk-fragments :: top('file-marketplace')}"></div>
@@ -91,7 +92,7 @@
             <ul><li th:each="problem : ${mapping.problems}" th:text="${problem}"></li></ul>
         </div>
 
-        <form id="run-form" method="post" enctype="multipart/form-data" th:action="@{/console/bulk/run}">
+        <form id="run-form" data-console-submit method="post" enctype="multipart/form-data" th:action="@{/console/bulk/run}">
             <input type="hidden" name="marketplace" th:value="${marketplace.code}">
             <input type="hidden" name="delimiter" th:value="${mapping.delimiter}">
             <input type="hidden" name="header" th:value="${mapping.header} ? 'yes' : 'no'">
@@ -274,7 +275,7 @@
 
         <details id="pilot-draft" class="lg-disclosure" th:if="${pilotDraft != null}">
             <summary th:text="#{pilot.edit}"></summary>
-            <form method="post" th:action="@{/console/bulk/run}" enctype="multipart/form-data" id="pilot-recheck-form">
+            <form method="post" th:action="@{/console/bulk/run}" enctype="multipart/form-data" id="pilot-recheck-form" data-console-submit>
                 <input type="hidden" name="pilotDraft" th:value="${pilotDraft.id}">
                 <input type="hidden" th:each="field : ${pilotDraft.mapping}" th:name="${field.key}" th:value="${field.value}">
                 <label class="lg-field__label" for="pilot-data" th:text="#{pilot.draft}"></label>

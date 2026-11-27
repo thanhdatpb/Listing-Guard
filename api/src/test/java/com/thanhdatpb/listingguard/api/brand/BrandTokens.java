@@ -1,5 +1,6 @@
 package com.thanhdatpb.listingguard.api.brand;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -35,13 +36,30 @@ public final class BrandTokens {
     public static BrandTokens load() {
         BrandTokens tokens = new BrandTokens();
         String css = read(BRAND.resolve("tokens.css"));
-        int dark = css.indexOf("@media (prefers-color-scheme: dark)");
+        int dark = css.indexOf("@media screen and (prefers-color-scheme: dark)");
         if (dark < 0) {
             throw new IllegalStateException("tokens.css has no dark block");
         }
         collect(css.substring(css.indexOf(":root"), dark), tokens.light);
         tokens.dark.putAll(tokens.light);
         collect(css.substring(dark), tokens.dark);
+        tokens.derive(read(APP_CSS));
+        return tokens;
+    }
+
+    public static BrandTokens fromDesign() {
+        var tokens = new BrandTokens();
+        try {
+            var definitions = new ObjectMapper().readTree(DESIGN.resolve("tokens.json").toFile()).path("color").path("tokens");
+            for (var definition : definitions) {
+                String name = definition.path("name").asText();
+                var value = definition.path("value");
+                tokens.light.put(name, rgb(value.path("light").asText().substring(1)));
+                tokens.dark.put(name, rgb(value.path("dark").asText().substring(1)));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
         tokens.derive(read(APP_CSS));
         return tokens;
     }

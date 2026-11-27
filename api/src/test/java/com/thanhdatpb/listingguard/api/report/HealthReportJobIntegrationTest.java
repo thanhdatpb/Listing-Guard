@@ -315,7 +315,7 @@ class HealthReportJobIntegrationTest {
         String html = html(job().run(options(c.name(), FROM, TO, null)).dir());
 
         assertThat(html).contains("--brand:").contains("--ink:").contains("--surface-1:").contains("--danger-subtle:")
-                .contains("--font-sans:").contains("--radius-lg:").contains("@media (prefers-color-scheme: dark)");
+                .contains("--font-sans:").contains("--radius-lg:").contains("@media screen and (prefers-color-scheme: dark)");
         assertThat(html).contains("background:var(--surface-0)").contains("color:var(--ink)").contains("font-family:var(--font-sans)")
                 .contains(".warn{background:var(--warning-subtle);color:var(--warning)}");
         // what the old style wrote on its own, and what a single file cannot use

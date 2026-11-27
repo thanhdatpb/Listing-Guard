@@ -70,6 +70,27 @@ class BrandTokensInSyncTest {
         assertThat(pairs).contains("lockup-horizontal.svg", "lockup-horizontal-reverse.svg", "symbol.svg", "favicon.ico", "icon-180.png");
     }
 
+    @Test
+    void theExplicitDarkPaletteMatchesTheSystemDarkPaletteAndDesign() throws IOException {
+        String css = BrandTokens.read(BrandTokens.BRAND.resolve("tokens.css"));
+        String system = declarations(css, ":root:not([data-console-theme=\"light\"])");
+        String explicit = declarations(css, ":root[data-console-theme=\"dark\"]");
+        assertThat(system.strip()).isEqualTo(explicit.strip());
+        var design = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(BrandTokens.DESIGN.resolve("tokens.json").toFile());
+        for (var definition : design.path("color").path("tokens")) {
+            String name = definition.path("name").asText();
+            assertThat(system).contains("--" + name + ": " + definition.path("value").path("dark").asText() + ";");
+            assertThat(declarations(css, ":root {")).contains("--" + name + ": " + definition.path("value").path("light").asText() + ";");
+        }
+    }
+
+    private static String declarations(String css, String selector) {
+        int start = css.indexOf(selector);
+        assertThat(start).as(selector).isGreaterThanOrEqualTo(0);
+        return css.substring(css.indexOf('{', start) + 1, css.indexOf('}', start));
+    }
+
     /** The two {@code theme-color} metas of the layout are the page ground of each scheme, so they cannot drift from the tokens. */
     @Test
     void theThemeColorsOfTheLayoutAreThePageGroundOfEachScheme() {

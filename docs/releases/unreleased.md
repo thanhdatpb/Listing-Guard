@@ -49,3 +49,8 @@ See the [workspace guide](../workspace.md).
 - Contract (ADR-022): no `/api/v1` change, so no additive or breaking line.
 - Not verified: no real Amazon template; the column-name guesses are `unverified`. Not measured: import time and memory at 10,000 rows. W2 (background
   check), W3 (editor, cloning) and W4 (export to `.xlsm`/`.txt`) are not done.
+
+## Console consistency and theme
+
+ADR-060 standardizes pilot Console navigation icons, scrollable table headers, loading and save feedback. The Console
+offers light, dark and system themes; printed reports use the light palette. Added a local DEMO screenshot gallery script.
