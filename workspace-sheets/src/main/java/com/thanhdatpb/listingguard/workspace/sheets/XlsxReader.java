@@ -55,6 +55,11 @@ final class XlsxReader {
         }
     }
 
+    /** XLSM when the main part is macro-enabled, else XLSX. Opens the package (its directory only) and reads no sheet. */
+    static SheetFormat format(byte[] bytes, SheetLimits limits) {
+        return withPackage(bytes, limits, (pkg, format) -> format);
+    }
+
     static WorkbookInfo inspect(byte[] bytes, SheetLimits limits) {
         return withPackage(bytes, limits, (pkg, format) -> {
             List<WorkbookInfo.SheetInfo> sheets = new ArrayList<>();

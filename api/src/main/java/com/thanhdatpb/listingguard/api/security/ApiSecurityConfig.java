@@ -76,6 +76,7 @@ public class ApiSecurityConfig {
     public FilterRegistrationBean<BodyLimitFilter> bodyLimitFilter(ApiProperties properties, ImageProperties images,
                                                                    ConsoleProperties console, BulkProperties bulk,
                                                                    PhraseScreeningProperties phrases,
+                                                                   com.thanhdatpb.listingguard.api.workspace.WorkspaceProperties workspace,
                                                                    ObjectMapper mapper) {
         // the image endpoint takes a multipart body of its own, larger limit, but only while image checks are enabled: when
         // they are off a large upload gets the ordinary 413 and is never staged (ADR-008). The POSTs of the console's bulk
@@ -94,6 +95,10 @@ public class ApiSecurityConfig {
                     com.thanhdatpb.listingguard.api.console.phrase.PhraseConsoleController.REQUEST_BYTES);
             uploads.put("/console/phrase-screening/run",
                     com.thanhdatpb.listingguard.api.console.phrase.PhraseConsoleController.REQUEST_BYTES);
+        }
+        if (console.enabled() && workspace.enabled()) {
+            // the workspace's upload step takes a file or pasted cells up to the larger of its two limits (ADR-059)
+            uploads.put("/console/workspace/import/upload", workspace.requestLimitBytes());
         }
         Map<String, Long> jsonLimits = phrases.enabled()
                 ? Map.of("/api/v1/phrase-screenings", PhraseScreeningProperties.MAX_BODY_BYTES) : Map.of();

@@ -2,6 +2,7 @@ package com.thanhdatpb.listingguard.api.workspace;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -34,7 +35,8 @@ public class WorkspaceConfig {
     @Bean
     @ConditionalOnProperty(prefix = "listing-guard.workspace", name = "enabled", havingValue = "true")
     public WorkspaceStartupCheck workspaceStartupCheck(WorkspaceProperties properties, Environment environment) {
-        DataSize multipart = environment.getProperty("spring.servlet.multipart.max-file-size", DataSize.class, DataSize.ofMegabytes(1));
+        DataSize multipart = Binder.get(environment).bind("spring.servlet.multipart.max-file-size", DataSize.class)
+                .orElse(DataSize.ofMegabytes(1));
         long needed = Math.max(properties.importMaxBytes().toBytes(), properties.maxTemplateBytes().toBytes());
         if (needed > multipart.toBytes()) {
             throw new IllegalStateException("listing-guard.workspace: import-max-bytes and max-template-bytes (" + needed

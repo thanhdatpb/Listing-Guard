@@ -20,7 +20,7 @@ public final class SheetReader {
     private SheetReader() {
     }
 
-    /** The format of the bytes, or a {@link SheetRejected}. */
+    /** The format of the bytes, or a {@link SheetRejected}. A workbook that is not a readable package is refused here, before any sheet is read. */
     public static SheetFormat detect(byte[] bytes, SheetLimits limits) {
         if (bytes == null || bytes.length == 0) {
             throw new SheetRejected(Reason.EMPTY, "The file is empty.");
@@ -29,7 +29,8 @@ public final class SheetReader {
             throw new SheetRejected(Reason.TOO_LARGE, "The file is larger than " + limits.maxBytes() + " bytes.");
         }
         if (startsWith(bytes, ZIP)) {
-            return SheetFormat.XLSX;
+            // XLSM when the workbook's main part is macro-enabled: the macro project itself is never opened
+            return XlsxReader.format(bytes, limits);
         }
         if (startsWith(bytes, OLE)) {
             throw new SheetRejected(encrypted(bytes) ? Reason.ENCRYPTED : Reason.UNSUPPORTED,

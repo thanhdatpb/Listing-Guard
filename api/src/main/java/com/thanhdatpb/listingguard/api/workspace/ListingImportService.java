@@ -110,11 +110,21 @@ public class ListingImportService {
             String target = null;
             String origin = "none";
             if (current != null) {
-                String remembered = kind == TemplateKind.ETSY_FIELDS ? current.mapping().source().get(column.header().strip())
-                        : current.mapping().targets().get(column.key());
-                if (remembered != null && allowed.contains(remembered)) {
-                    target = remembered;
-                    origin = "remembered";
+                if (kind == TemplateKind.ETSY_FIELDS) {
+                    String remembered = current.mapping().source().get(column.header().strip());
+                    if (remembered != null && allowed.contains(remembered)) {
+                        target = remembered;
+                        origin = "remembered";
+                    }
+                } else if (current.columns().stream().anyMatch(c -> c.key().equals(column.key()))) {
+                    // a column the template already has: its mapping is what a person confirmed, and "keep as it is" is part of it
+                    String remembered = current.mapping().targets().get(column.key());
+                    if (remembered != null && allowed.contains(remembered)) {
+                        target = remembered;
+                        origin = "remembered";
+                    }
+                    view.add(finish(targets, account, claimed, column, target, origin));
+                    continue;
                 }
             }
             if (target == null) {
@@ -124,16 +134,22 @@ public class ListingImportService {
                     origin = "guessed";
                 }
             }
-            if (target != null) {
-                boolean multiple = targets.find(account.marketplace(), target).map(Target::multiple).orElse(false);
-                if (!multiple && !claimed.add(target)) {
-                    target = null;
-                    origin = "none";
-                }
-            }
-            view.add(new MappingColumn(column.index(), column.header(), target == null ? "" : target, origin));
+            view.add(finish(targets, account, claimed, column, target, origin));
         }
         return new MappingView(view, current);
+    }
+
+    /** A target that takes one column goes to the first column that claims it. */
+    private static MappingColumn finish(StandardTargets targets, SellerAccount account, Set<String> claimed, TemplateColumn column, String target,
+                                        String origin) {
+        if (target != null) {
+            boolean multiple = targets.find(account.marketplace(), target).map(Target::multiple).orElse(false);
+            if (!multiple && !claimed.add(target)) {
+                target = null;
+                origin = "none";
+            }
+        }
+        return new MappingColumn(column.index(), column.header(), target == null ? "" : target, origin);
     }
 
     // ------------------------------------------------------------------ plan
@@ -143,11 +159,11 @@ public class ListingImportService {
     }
 
     /** One data row that can be written, before the template of the write is known. */
-    private record Draft(int line, String sku, String parentSku, ListingRole role, String title, Map<String, String> data,
+    record Draft(int line, String sku, String parentSku, ListingRole role, String title, Map<String, String> data,
                          ObjectNode fields, UUID owner, boolean ownerExplicit, Existing existing, boolean unchanged) {
     }
 
-    private static final class Prepared {
+    static final class Prepared {
         Plan plan;
         SellerAccount account;
         Template current;
@@ -160,7 +176,7 @@ public class ListingImportService {
         boolean mappingChanged;
     }
 
-    private Prepared prepare(Actor actor, Params p, SheetGrid grid) {
+    Prepared prepare(Actor actor, Params p, SheetGrid grid) {
         Prepared prep = new Prepared();
         prep.account = accounts.find(actor.clientId(), p.accountId()).orElseThrow(() -> new WorkspaceException("account.unknown"));
         if (!prep.account.enabled()) {
@@ -219,7 +235,7 @@ public class ListingImportService {
         boolean useChosen = actor.admin() || p.kind() == TemplateKind.ETSY_FIELDS || current == null;
         if (p.kind() == TemplateKind.ETSY_FIELDS) {
             Map<String, Integer> seen = new HashMap<>();
-            Mapping source = new Mapping(Map.of(), p.separators(), new LinkedHashMap<>());
+            Map<String, String> sourceMap = new LinkedHashMap<>();
             List<String> allowed = templateService.allowedTargets(p.kind());
             for (TemplateColumn column : fileColumns) {
                 String target = p.targets().get(column.index());
@@ -233,10 +249,10 @@ public class ListingImportService {
                 }
                 uses.add(new ColumnUse(uniqueKey(seen, target), column.header(), target));
                 if (!column.header().strip().isEmpty()) {
-                    source.source().put(column.header().strip(), target);
+                    sourceMap.put(column.header().strip(), target);
                 }
             }
-            prep.mapping = new Mapping(current != null ? current.mapping().targets() : identity(), p.separators(), source.source());
+            prep.mapping = new Mapping(current != null ? current.mapping().targets() : identity(), p.separators(), sourceMap);
             separators.putAll(p.separators());
         } else {
             Map<Integer, String> chosen = new LinkedHashMap<>();

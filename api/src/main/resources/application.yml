@@ -5,6 +5,17 @@ listing-guard:
     catalog-dir: ${LISTING_GUARD_DEMO_CATALOG_DIR:catalogs/demo}
     feedback-percent: ${LISTING_GUARD_DEMO_FEEDBACK_PERCENT:35}
     false-positive-percent: ${LISTING_GUARD_DEMO_FALSE_POSITIVE_PERCENT:25}
+  # The listing workspace (ADR-059): the one place that stores listing text. Off by default; while it is off no bean exists, the Console has no
+  # menu entry and every /console/workspace path is a 404. An import larger than spring.servlet.multipart.max-file-size is refused at start-up:
+  # raise LISTING_GUARD_MULTIPART_MAX_FILE_SIZE and LISTING_GUARD_MULTIPART_MAX_REQUEST_SIZE together with import-max-bytes.
+  workspace:
+    enabled: ${LISTING_GUARD_WORKSPACE_ENABLED:false}
+    # own: a MEMBER changes only the listings they are responsible for; all: every listing of the client. ADMIN always changes everything.
+    member-edit-scope: ${LISTING_GUARD_WORKSPACE_MEMBER_EDIT_SCOPE:own}
+    max-template-bytes: ${LISTING_GUARD_WORKSPACE_MAX_TEMPLATE_BYTES:10MB}
+    import-max-bytes: ${LISTING_GUARD_WORKSPACE_IMPORT_MAX_BYTES:20MB}
+    import-max-rows: ${LISTING_GUARD_WORKSPACE_IMPORT_MAX_ROWS:10000}
+    history-keep: ${LISTING_GUARD_WORKSPACE_HISTORY_KEEP:20}
   phrase-screening:
     enabled: ${LISTING_GUARD_PHRASE_SCREENING_ENABLED:false}
     max-phrases: ${LISTING_GUARD_PHRASE_SCREENING_MAX_PHRASES:2000}
@@ -362,8 +373,8 @@ spring:
     multipart:
       # The upload limits of the image checks (ADR-008), taken from listing-guard.image so that there is one place to change them.
       # They hold for every multipart request, and the API has no other multipart endpoint.
-      max-file-size: ${listing-guard.image.max-file-size:10MB}
-      max-request-size: ${listing-guard.image.max-request-size:60MB}
+      max-file-size: ${LISTING_GUARD_MULTIPART_MAX_FILE_SIZE:${listing-guard.image.max-file-size:10MB}}
+      max-request-size: ${LISTING_GUARD_MULTIPART_MAX_REQUEST_SIZE:${listing-guard.image.max-request-size:60MB}}
   http:
     converters:
       # ADR-020: Spring Boot 4 serializes request and response bodies with Jackson 3 (tools.jackson) when it is on the classpath,
