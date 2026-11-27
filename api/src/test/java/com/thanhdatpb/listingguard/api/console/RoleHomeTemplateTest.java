@@ -55,7 +55,7 @@ class RoleHomeTemplateTest {
         try (var css = getClass().getResourceAsStream("/static/console/role-home.css")) {
             String styles = new String(css.readAllBytes(), StandardCharsets.UTF_8);
             assertThat(styles).contains("@media print", "size: A4 portrait", ".pilot-screen { display: none; }",
-                    "var(--brand-text)", "var(--space-2)")
+                    "var(--brand-text)", "var(--space-2)", "body:has(.lg-role-home) > #demo-banner { position: static; }")
                     .doesNotContainPattern("#[\\da-fA-F]{6}\\b").doesNotContain("gradient(");
         }
     }
