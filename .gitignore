@@ -39,6 +39,7 @@ Thumbs.db
 # Env / secrets
 .env
 .env.pilot
+.env.demo
 .env.local
 
 # Raw policy documents (copyrighted marketplace text); only policies/manifest.yaml is committed

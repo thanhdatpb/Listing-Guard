@@ -88,7 +88,8 @@ public class PhraseScreeningService {
             var components = new TreeMap<>(watchlist.fingerprintComponents());
             components.put("watchlist-revision", Long.toString(activeWatchlist.revision()));
             components.put("phrase-screening", PhraseScreening.VERSION + "/fuzzy-" + properties.maxFuzzyPhrases());
-            var serving = !runtime.ready() && !watchlist.isEmpty() ? null : runtime.serving(marketplace, components);
+            var demo = runtime.demoServing(clientId, marketplace, components);
+            var serving = demo.orElseGet(() -> !runtime.ready() && !watchlist.isEmpty() ? null : runtime.serving(marketplace, components));
             var unserved = serving == null ? runtime.withoutCatalog(marketplace, components) : null;
             var scanner = serving == null ? unserved.scanner() : serving.scanner();
             var fingerprint = serving == null ? unserved.fingerprint() : serving.fingerprint();

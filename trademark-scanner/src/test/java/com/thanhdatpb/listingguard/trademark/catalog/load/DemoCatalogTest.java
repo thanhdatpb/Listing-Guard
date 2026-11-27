@@ -76,8 +76,10 @@ class DemoCatalogTest {
         // the default catalogs directory and the default catalog version carry no demo
         String application = Files.readString(Path.of("..", "api", "src", "main", "resources", "application.yml"),
                 StandardCharsets.UTF_8);
-        assertThat(application).doesNotContain("catalogs/demo").doesNotContain("demo-fictional");
-        assertThat(application).contains("catalogs-dir: ${CATALOGS_DIR:catalogs}");
+        assertThat(application).doesNotContain("demo-fictional")
+                .contains("catalogs-dir: ${CATALOGS_DIR:catalogs}")
+                .contains("catalog-version: ${LISTING_GUARD_TRADEMARK_CATALOG_VERSION:}")
+                .contains("enabled: ${LISTING_GUARD_DEMO_ENABLED:false}");
         String compose = Files.readString(Path.of("..", "docker-compose.yml"), StandardCharsets.UTF_8);
         assertThat(compose).doesNotContain("demo-fictional");
         assertThat(compose).contains("LISTING_GUARD_TRADEMARK_CATALOG_VERSION: ${TRADEMARK_CATALOG_VERSION:-}");

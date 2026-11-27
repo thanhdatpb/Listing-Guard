@@ -77,7 +77,7 @@
         </div>
     </section>
 
-    <section class="lg-card lg-section" aria-labelledby="create-heading">
+    <th:block th:if="${demoWorkspace}"><p role="note" th:text="#{demo.workspace.keys}"></p></th:block><section class="lg-card lg-section" aria-labelledby="create-heading" th:unless="${demoWorkspace}">
         <h2 id="create-heading" class="lg-card__title" th:text="#{keys.create.heading}"></h2>
         <p class="lg-text-muted" id="limit-message" th:unless="${canCreate}" th:text="#{keys.limit.message(${#strings.toString(maxActiveKeys)})}"></p>
         <form id="create-form" class="lg-form" method="post" th:action="@{/console/api-keys}" th:if="${canCreate}">

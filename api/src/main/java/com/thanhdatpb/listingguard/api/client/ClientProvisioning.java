@@ -257,7 +257,16 @@ public class ClientProvisioning {
         return keys.findByClient_IdOrderByCreatedAtAsc(client.getId());
     }
 
+    public static final class DemoKeyForbiddenException extends IllegalArgumentException {
+        public DemoKeyForbiddenException() {
+            super("A demo workspace cannot issue API keys.");
+        }
+    }
+
     private String store(Client client, String secret, String label) {
+        if (clients.isDemoWorkspace(client.getId())) {
+            throw new DemoKeyForbiddenException();
+        }
         String keyId = newKeyId();
         keys.save(new ApiKey(client, keyId, ApiKeyHasher.sha256Hex(secret), label));
         return keyId;

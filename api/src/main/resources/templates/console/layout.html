@@ -29,8 +29,8 @@
 <span th:fragment="demoText" th:text="#{demo.banner}"></span>
 
 <!-- Shown on every console page while the configured trademark catalog version starts with "demo-" (ConsoleModelAdvice). -->
-<div th:fragment="demoBanner" th:if="${demoCatalog}" id="demo-banner" role="note" class="lg-banner lg-banner--warning lg-banner--sticky">
-    <span th:replace="~{console/layout :: demoText}"></span>
+<div th:fragment="demoBanner" th:if="${demoCatalog == true or demoWorkspace == true}" id="demo-banner" role="note" class="lg-banner lg-banner--warning lg-banner--sticky">
+    <th:block th:if="${demoWorkspace}"><svg class="lg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/></svg> <span th:text="#{demo.workspace.banner}"></span></th:block><th:block th:unless="${demoWorkspace}"><span th:replace="~{console/layout :: demoText}"></span></th:block>
 </div>
 
 <!-- The links that change the language of the page (ConsoleLanguageAdvice): each language is named in itself, on purpose. -->

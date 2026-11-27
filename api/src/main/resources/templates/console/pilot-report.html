@@ -6,7 +6,7 @@
     <title th:text="#{pilot.report}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
 </head>
-<body>
+<body><th:block th:if="${demoWorkspace}"><div th:replace="~{console/layout :: demoBanner}"></div></th:block>
 <main class="lg-page" id="pilot-print">
     <a class="lg-btn pilot-screen" th:href="@{/console/stats(from=${pilotQuery.from},to=${pilotQuery.to},marketplace=${pilotQuery.marketplace})}"
        th:text="#{stats.title}"></a>

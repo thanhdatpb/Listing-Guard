@@ -12,6 +12,6 @@ public class PlanConfig {
     /** The clock that decides which UTC month a result is counted in. A test replaces it with a controllable one. */
     @Bean
     public Clock planClock() {
-        return Clock.systemUTC();
+        return new com.thanhdatpb.listingguard.api.demo.DemoClock();
     }
 }

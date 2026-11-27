@@ -135,9 +135,14 @@ public class TrademarkCheckService {
         WatchlistService.Active watchlist = watchlists == null ? WatchlistService.Active.NONE : watchlists.active(clientId);
         // the watchlist and, when the LLM judge is on (ADR-036), its prompt and models are part of the analysis version; with both
         // absent the map is empty and the fingerprint is the one a check always had
-        Map<String, String> components = new java.util.TreeMap<>(watchlist.watchlist().fingerprintComponents());
-        components.putAll(judge.fingerprintComponents(new JudgeContext(clientId, marketplace, null)));
-        Prepared prepared = prepare(marketplace, watchlist, components);
+        var watchlistComponents = watchlist.watchlist().fingerprintComponents();
+        var demo = runtime.demoServing(clientId, marketplace, watchlistComponents);
+        Prepared prepared = demo.map(serving -> new Prepared(serving.scanner(), serving.fingerprint().value(), serving.catalogVersionId()))
+                .orElseGet(() -> {
+                    Map<String, String> components = new java.util.TreeMap<>(watchlistComponents);
+                    components.putAll(judge.fingerprintComponents(new JudgeContext(clientId, marketplace, null)));
+                    return prepare(marketplace, watchlist, components);
+                });
         TrademarkScanner scanner = prepared.scanner();
         String fingerprint = prepared.fingerprint();
         Long catalogVersionId = prepared.catalogVersionId();
@@ -158,7 +163,8 @@ public class TrademarkCheckService {
         // the judge may be given an evidence pack (ADR-051): the Nice classes of the declared product type come from the ruleset's own
         // mapping, and the client's id lets it read this client's verified decisions and no other's
         Set<Integer> productClasses = productType == null ? null : scanner.ruleset().productClasses().classesOf(productType);
-        TrademarkResult result = judge.judge(input, scanner.scan(input, watchlist.watchlist()), scanner.catalog(),
+        TrademarkResult scanned = scanner.scan(input, watchlist.watchlist());
+        TrademarkResult result = demo.isPresent() ? scanned : judge.judge(input, scanned, scanner.catalog(),
                 new JudgeContext(clientId, marketplace, productClasses));
         try {
             return transactions.execute(status -> {
@@ -210,8 +216,9 @@ public class TrademarkCheckService {
         Listing listing = normalizer.normalize(request.listing());
         String marketplace = normalizer.marketplace().toUpperCase(Locale.ROOT);
         WatchlistService.Active watchlist = watchlists == null ? WatchlistService.Active.NONE : watchlists.active(clientId);
-        return prepare(marketplace, watchlist, watchlist.watchlist().fingerprintComponents()).scanner()
-                .scan(input(listing, null), watchlist.watchlist());
+        var components = watchlist.watchlist().fingerprintComponents();
+        return runtime.demoServing(clientId, marketplace, components).map(TrademarkCatalogRuntime.Serving::scanner)
+                .orElseGet(() -> prepare(marketplace, watchlist, components).scanner()).scan(input(listing, null), watchlist.watchlist());
     }
 
     /**
@@ -227,7 +234,8 @@ public class TrademarkCheckService {
      * the check can run without one (ADR-031). The batch job and the console use it before they call {@link #check}.
      */
     public boolean available(UUID clientId) {
-        return runtime.ready() || (watchlists != null && !watchlists.active(clientId).watchlist().isEmpty());
+        return runtime.demoStatus(clientId).map(status -> status.state() == TrademarkCatalogRuntime.State.READY)
+                .orElseGet(() -> runtime.ready() || (watchlists != null && !watchlists.active(clientId).watchlist().isEmpty()));
     }
 
     private TrademarkCheckResult withTsdrStatus(TrademarkCheckResult result) {
