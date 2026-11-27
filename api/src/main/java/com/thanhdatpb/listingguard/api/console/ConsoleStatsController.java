@@ -40,13 +40,15 @@ public class ConsoleStatsController {
     private static final int ECHO_LIMIT = 32;
 
     private final FeedbackStatsService stats;
+    private final ConsolePilot pilot;
     private final NormalizerRegistry normalizers;
     private final ConsoleMessages messages;
     private final ObjectProvider<RewriteRunStore> rewriteRuns;
     private final ObjectProvider<PhraseConsoleMetrics> phraseMetrics;
 
     public ConsoleStatsController(FeedbackStatsService stats, NormalizerRegistry normalizers, ConsoleMessages messages,
-                                  ObjectProvider<RewriteRunStore> rewriteRuns, ObjectProvider<PhraseConsoleMetrics> phraseMetrics) {
+                                  ObjectProvider<RewriteRunStore> rewriteRuns, ObjectProvider<PhraseConsoleMetrics> phraseMetrics, ConsolePilot pilot) {
+        this.pilot = pilot;
         this.phraseMetrics = phraseMetrics;
         this.stats = stats;
         this.normalizers = normalizers;
@@ -63,6 +65,7 @@ public class ConsoleStatsController {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         model.addAttribute("email", user.email());
         model.addAttribute("marketplaces", normalizers.supported());
+        model.addAttribute("roleHomeEnabled", pilot.roleHome());
         model.addAttribute("maxDays", stats.maxDays());
         try {
             ReportQuery query = query(from, to, marketplace);

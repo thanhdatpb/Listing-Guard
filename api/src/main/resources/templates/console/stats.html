@@ -21,7 +21,7 @@
         <div class="lg-actions" th:if="${stats != null}">
             <a class="lg-btn lg-btn--primary" id="pilot-report" th:if="${consoleNavigation != null and consoleNavigation.pilot}"
                th:href="@{/console/stats/pilot(from=${from},to=${to},marketplace=${marketplaceSelected})}"
-               th:text="#{pilot.report}"></a>
+               th:text="${roleHomeEnabled == true} ? #{manager.report} : #{pilot.report}"></a>
             <a class="lg-btn" id="pilot-csv" th:if="${consoleNavigation != null and consoleNavigation.pilot}"
                th:href="@{/console/stats/pilot.csv(from=${from},to=${to},marketplace=${marketplaceSelected})}"
                th:text="#{pilot.export}"></a>

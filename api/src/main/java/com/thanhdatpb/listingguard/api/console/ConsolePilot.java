@@ -24,6 +24,10 @@ public class ConsolePilot implements WebMvcConfigurer {
         return environment.getProperty("listing-guard.console.pilot", Boolean.class, false);
     }
 
+    public boolean roleHome() {
+        return enabled() && flag("console.role-home-enabled", false);
+    }
+
     public boolean policyChanges() {
         return flag("console.policy-changes-enabled", true);
     }

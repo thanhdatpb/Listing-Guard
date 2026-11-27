@@ -30,14 +30,17 @@ Client `demo` có dữ liệu POD tự đặt để trình bày Listing Guard. C
 
 ## Kịch bản 5 phút
 
-1. Mở **Trang chủ** và **Lịch sử**, chỉ ra băng demo, xu hướng tuần và một finding đã có phản hồi.
-2. Vào **Kiểm keyword**, nạp [CSV mẫu](samples/demo-keywords.csv) và xem nhóm cảnh báo do catalog hoặc watchlist kích hoạt.
-3. Kiểm lại áo có từ `Zibblefrax`, rồi bỏ từ đó trong chế độ sửa. So sánh hai kết quả.
-4. Mở **Rà định kỳ**, **Watchlist** và **Báo cáo pilot**. Dùng khoảng ngày 6 tuần để xem toàn bộ lượt seed.
+1. Mở **Tổng quan** với tài khoản ADMIN demo. Chọn 30 ngày, chỉ ra băng demo, số listing có lỗi chặn và phần tình trạng dữ liệu.
+2. Mở **Báo cáo cho quản lý**, chọn **In / lưu PDF**, xem một trang A4. Tải CSV nếu cần bảng chi tiết.
+3. Vào **Kiểm keyword**, nạp [CSV mẫu](samples/demo-keywords.csv) và xem nhóm cảnh báo do catalog hoặc watchlist kích hoạt.
+4. Kiểm lại áo có từ `Zibblefrax`, rồi bỏ từ đó trong chế độ sửa. So sánh hai kết quả.
+5. Chuyển sang phiên MEMBER đã cấp riêng để xem **Việc của tôi**. Dùng kỳ 90 ngày trong phiên ADMIN để xem toàn bộ lượt seed từ 6 tuần.
 
 ## Kiểm thử trình duyệt
 
 Sau khi seed, chạy `scripts/test-console-demo-workspace.py` với `LG_DEMO_STORAGE_STATE` trỏ đến file phiên Playwright đã đăng nhập. Có thể đặt thêm `LG_REAL_STORAGE_STATE` để đối chiếu với một client thật. Giữ hai file phiên bên máy chạy kiểm thử.
+
+Để kiểm tra trang chủ theo vai trò, chạy `python scripts/test-console-role-home.py` với `LG_MANAGER_STORAGE_STATE` và `LG_MEMBER_STORAGE_STATE`. Dùng tài khoản MEMBER thử nghiệm riêng vì script sẽ ẩn hướng dẫn trên tài khoản đó. Có thể đặt `LG_DEMO_URL` nếu đổi cổng.
 
 ## Trên máy chủ
 

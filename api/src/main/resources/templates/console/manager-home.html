@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{manager.home}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+    <link rel="stylesheet" th:href="@{/console/role-home.css(v=${assetVersion})}">
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('dashboard')}"></header>
+<main class="lg-page lg-role-home" id="main">
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{manager.home}"></h1>
+            <p class="lg-page__sub" th:text="#{manager.period(${overview.period.from},${overview.period.to})}"></p>
+        </div>
+        <a class="lg-btn lg-btn--primary" id="manager-report-link"
+           th:href="@{/console/stats/pilot(from=${overview.period.from},to=${overview.period.to})}" th:text="#{manager.report}"></a>
+    </div>
+    <nav class="lg-actions" th:aria-label="#{manager.period.label}">
+        <a class="lg-btn" th:each="days : ${periods}" th:href="@{/console/(days=${days})}"
+           th:aria-current="${overview.period.days() == days} ? 'true' : null" th:text="#{manager.period.days(${days})}"></a>
+    </nav>
+    <div th:replace="~{console/role-home-fragments :: overview}"></div>
+</main>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<main th:fragment="printReport" id="pilot-print" class="lg-page lg-role-home lg-manager-print">
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{manager.report}"></h1>
+            <p th:text="#{manager.period(${overview.period.from},${overview.period.to})}"></p>
+            <p class="lg-small" th:text="#{manager.generated(${#temporals.format(overview.generatedAt,'yyyy-MM-dd HH:mm','UTC')})}"></p>
+            <p class="lg-small" th:if="${overview.period.marketplace != null}" th:text="${overview.period.marketplace}"></p>
+        </div>
+        <div class="lg-actions pilot-screen">
+            <a class="lg-btn" th:href="@{/console/stats(from=${overview.period.from},to=${overview.period.to},marketplace=${overview.period.marketplace})}"
+               th:text="#{stats.title}"></a>
+            <a class="lg-btn" th:href="@{/console/stats/pilot.csv(from=${overview.period.from},to=${overview.period.to},marketplace=${overview.period.marketplace})}"
+               th:text="#{pilot.export}"></a>
+            <button type="button" class="lg-btn lg-btn--primary" id="manager-print-button" hidden th:text="#{manager.print}"></button>
+        </div>
+    </div>
+    <ul class="lg-manager-summary">
+        <li th:text="#{manager.summary.checks(${overview.checks},${overview.errors})}"></li>
+        <li th:text="#{manager.summary.holds(${overview.catalogHolds},${overview.watchlistHolds})}"></li>
+        <li th:text="#{manager.summary.feedback(${overview.activeAccounts},${overview.feedbackCount})}"></li>
+    </ul>
+    <div th:replace="~{console/role-home-fragments :: overview}"></div>
+    <p class="lg-small" th:text="#{manager.limitations}"></p>
+</main>
+
+<div th:fragment="overview">
+    <p class="lg-empty lg-section" id="manager-empty" th:if="${overview.empty()}" th:text="#{manager.empty}"></p>
+    <dl class="lg-manager-metrics lg-section" th:aria-label="#{manager.metrics}">
+        <div class="lg-card"><dt th:text="#{manager.checks}"></dt><dd id="manager-checks" th:text="${overview.checks}"></dd></div>
+        <div class="lg-card"><dt th:text="#{manager.errors}"></dt><dd id="manager-errors" th:text="${overview.errors}"></dd></div>
+        <div class="lg-card"><dt th:text="#{manager.catalog.holds}"></dt><dd id="manager-catalog-count" th:text="${overview.catalogHolds}"></dd></div>
+        <div class="lg-card"><dt th:text="#{manager.watchlist.holds}"></dt><dd id="manager-watchlist-count" th:text="${overview.watchlistHolds}"></dd></div>
+        <div class="lg-card" th:if="${overview.keywords != null}">
+            <dt th:text="#{manager.keywords}"></dt><dd id="manager-keywords" th:text="${overview.keywords}"></dd>
+        </div>
+        <div class="lg-card" th:if="${overview.keywordBlocks != null}">
+            <dt th:text="#{manager.keywords.blocks}"></dt><dd id="manager-keyword-blocks" th:text="${overview.keywordBlocks}"></dd>
+        </div>
+        <div class="lg-card"><dt th:text="#{manager.feedback}"></dt>
+            <dd id="manager-false-positive" th:text="${overview.falsePositiveRate == null} ? #{manager.no.feedback} : ${#numbers.formatPercent(overview.falsePositiveRate,1,1)}"></dd>
+        </div>
+        <div class="lg-card"><dt th:text="#{manager.active}"></dt><dd id="manager-active" th:text="${overview.activeAccounts}"></dd></div>
+    </dl>
+    <section class="lg-card lg-section" aria-labelledby="manager-chart-heading" th:with="chart=${overview.chart}">
+        <h2 id="manager-chart-heading" th:text="#{manager.trend}"></h2>
+        <svg class="lg-chart lg-manager-chart" role="img" aria-labelledby="manager-chart-heading" focusable="false"
+             th:attr="viewBox=|0 0 ${chart.width} ${chart.height}|">
+            <g th:each="tick : ${chart.ticks}">
+                <line class="lg-chart__axis" th:attr="x1=${chart.left},x2=${chart.width - 8},y1=${tick.y},y2=${tick.y}"></line>
+                <text class="lg-chart__label" text-anchor="end" th:attr="x=${chart.left - 6},y=${tick.y + 4}" th:text="${tick.value}"></text>
+            </g>
+            <g th:each="col, it : ${chart.columns}">
+                <rect class="lg-chart__bar" rx="4" th:classappend="${it.last} ? 'lg-chart__bar--now'"
+                      th:attr="x=${col.bar.x},y=${col.bar.y},width=${col.bar.width},height=${col.bar.height}"></rect>
+                <text class="lg-chart__value" text-anchor="middle" th:attr="x=${col.labelX},y=${col.bar.y - 6}" th:text="${col.week.checked}"></text>
+                <text class="lg-chart__label" text-anchor="middle" th:attr="x=${col.labelX},y=${chart.baseline + 18}" th:text="${col.week.label}"></text>
+            </g>
+        </svg>
+        <details class="pilot-screen">
+            <summary th:text="#{home.chart.table}"></summary>
+            <table class="lg-table" id="manager-weekly-table">
+                <caption class="lg-sr-only" th:text="#{manager.trend}"></caption>
+                <thead><tr>
+                    <th scope="col" th:text="#{home.chart.col.week}"></th>
+                    <th scope="col" th:text="#{manager.checks}"></th>
+                    <th scope="col" th:text="#{manager.errors}"></th>
+                </tr></thead>
+                <tbody><tr th:each="col : ${chart.columns}">
+                    <th scope="row" th:text="${col.week.isoWeek}"></th>
+                    <td th:text="${col.week.checked}"></td><td th:text="${col.week.withError}"></td>
+                </tr></tbody>
+            </table>
+        </details>
+    </section>
+    <div class="lg-manager-ranked lg-section">
+        <section class="lg-card">
+            <h2 th:text="#{manager.top.rules}"></h2>
+            <p th:if="${overview.rules.isEmpty()}" th:text="#{manager.no.rules}"></p>
+            <ol th:unless="${overview.rules.isEmpty()}"><li th:each="rule : ${overview.rules}">
+                <code th:text="${rule.ruleId}"></code> <span th:text="#{manager.findings(${rule.findings})}"></span>
+            </li></ol>
+        </section>
+        <section class="lg-card">
+            <h2 th:text="#{manager.top.marks}"></h2>
+            <p th:if="${overview.marks.isEmpty()}" th:text="#{manager.no.marks}"></p>
+            <ol th:unless="${overview.marks.isEmpty()}"><li th:each="mark : ${overview.marks}">
+                <span th:text="${mark.name}"></span> <span th:text="${mark.watchlist} ? #{manager.mark.watchlist} : #{manager.mark.catalog}"></span>
+                <span th:text="#{manager.results(${mark.checks})}"></span>
+            </li></ol>
+        </section>
+    </div>
+    <section class="lg-card lg-section" id="manager-data" th:with="data=${overview.data}">
+        <h2 th:text="#{manager.data}"></h2>
+        <dl class="lg-manager-data">
+            <div><dt th:text="#{manager.catalog.version}"></dt>
+                <dd><span aria-hidden="true" class="lg-manager-marker"></span>
+                    <span th:text="${data.catalogVersion != null} ? ${data.catalogVersion} : #{manager.catalog.none}"></span></dd></div>
+            <div><dt th:text="#{manager.source.date}"></dt><dd th:text="${data.catalogDate != null} ? ${data.catalogDate} : #{manager.source.none}"></dd></div>
+            <div><dt th:text="#{nav.watchlist}"></dt><dd th:text="#{manager.watchlist.entries(${data.watchlistEntries})}"></dd></div>
+            <div><dt th:text="#{manager.gate}"></dt><dd><span aria-hidden="true" class="lg-manager-marker"></span>
+                <span th:text="${overview.catalogGatePassed} ? #{manager.gate.passed} : #{manager.gate.unknown}"></span></dd></div>
+        </dl>
+    </section>
+</div>
+</body>
+</html>

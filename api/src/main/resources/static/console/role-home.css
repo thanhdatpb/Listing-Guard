@@ -1,0 +1,41 @@
+.lg-manager-metrics, .lg-manager-data, .lg-manager-ranked {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-3);
+}
+.lg-manager-metrics dd, .lg-manager-data dd { margin: 0; overflow-wrap: anywhere; }
+.lg-manager-metrics dd { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.lg-manager-ranked li { overflow-wrap: anywhere; }
+.lg-manager-marker {
+  display: inline-block;
+  width: var(--space-2);
+  height: var(--space-2);
+  margin-inline-end: var(--space-1);
+  border: 1px solid var(--brand-text);
+  border-radius: var(--radius-sm);
+}
+.lg-manager-chart { display: block; }
+#manager-print-button[hidden] { display: none; }
+
+@media print {
+  @page manager { size: A4 portrait; margin: 12mm; }
+  #pilot-print.lg-manager-print {
+    page: manager;
+    max-width: none;
+    padding: 0;
+    font-size: 9pt;
+    line-height: 1.35;
+  }
+  body:has(.lg-manager-print) #demo-banner { position: static; }
+  .lg-manager-print .pilot-screen { display: none; }
+  .lg-manager-print .lg-page__head, .lg-manager-print .lg-section { margin-block: var(--space-2); }
+  .lg-manager-print .lg-card { background: inherit; color: inherit; border-color: currentColor; padding: var(--space-2); box-shadow: none; break-inside: avoid; }
+  .lg-manager-print h1 { font-size: 17pt; line-height: 1.2; }
+  .lg-manager-print h2, .lg-manager-print .lg-manager-metrics dd { font-size: 11pt; line-height: 1.3; }
+  .lg-manager-print p, .lg-manager-print ol, .lg-manager-print ul, .lg-manager-print dl { margin-block: var(--space-1); }
+  .lg-manager-print .lg-manager-metrics, .lg-manager-print .lg-manager-data { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .lg-manager-print .lg-manager-ranked { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lg-manager-print .lg-manager-chart { max-height: 43mm; }
+  .lg-manager-print .lg-chart__axis { stroke: currentColor; }
+  .lg-manager-print .lg-chart__bar, .lg-manager-print .lg-chart__value, .lg-manager-print .lg-chart__label { fill: currentColor; }
+}

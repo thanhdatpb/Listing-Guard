@@ -42,7 +42,7 @@ class ConsolePageCssTest {
     @Test
     void thePageSheetsAreTheOnesThatAreStillNeeded() throws IOException {
         assertThat(sheets()).extracting(path -> path.getFileName().toString())
-                .containsExactly("app.css", "bulk.css", "editor.css");
+                .containsExactly("app.css", "bulk.css", "editor.css", "role-home.css");
     }
 
     @Test

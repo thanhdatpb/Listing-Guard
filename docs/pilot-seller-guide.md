@@ -59,3 +59,9 @@ Tên cột của Cerebro/Magnet chưa được xác minh với file thật. Có 
 
 Mở **Kiểm keyword** và dán mỗi slogan hoặc cụm chữ trên một dòng. Xem trước rồi chạy kiểm. Mở nguồn của các cảnh báo trước
 khi chọn chữ để in. Giữ nguyên chữ từ nguồn của bạn để kiểm lại khi cần. Chỉ gửi nội dung của seller, tránh đưa thông tin cá nhân của người mua.
+
+## Trang chủ theo vai trò
+
+**Việc của tôi** là trang chủ của seller. Dùng **Kiểm tra hàng loạt** để bắt đầu từ Sheet, **Kiểm keyword** nếu tính năng đã bật, hoặc **Sửa listing** để so sánh trước và sau. Mục **Listing cần sửa** dựa trên lượt gần nhất đã ghi cho tài khoản của bạn. Nút **Ẩn hướng dẫn này** chỉ áp dụng cho tài khoản đang đăng nhập.
+
+Quản lý thấy **Tổng quan**. Chọn 7, 30 hoặc 90 ngày để xem chỉ số, rồi mở **Báo cáo cho quản lý** để in A4 hoặc lưu PDF. CSV vẫn tải từ báo cáo pilot.

@@ -28,10 +28,15 @@ public class PilotReportController {
     private final FeedbackStatsService feedback;
     private final PilotMetrics metrics;
     private final ConsoleMessages messages;
+    private final ConsolePilot pilot;
+    private final RoleHomeService roleHome;
     private final ObjectProvider<PhraseConsoleMetrics> phraseMetrics;
 
     public PilotReportController(ConsoleStatsController statistics, FeedbackStatsService feedback,
-                                 PilotMetrics metrics, ConsoleMessages messages, ObjectProvider<PhraseConsoleMetrics> phraseMetrics) {
+                                 PilotMetrics metrics, ConsoleMessages messages, ObjectProvider<PhraseConsoleMetrics> phraseMetrics,
+                                 ConsolePilot pilot, RoleHomeService roleHome) {
+        this.pilot = pilot;
+        this.roleHome = roleHome;
         this.phraseMetrics = phraseMetrics;
         this.statistics = statistics;
         this.feedback = feedback;
@@ -46,6 +51,12 @@ public class PilotReportController {
             throws java.io.IOException {
         try {
             var query = statistics.query(from, to, marketplace);
+            boolean csvRequest = request.getServletPath().endsWith(".csv") || request.getRequestURI().endsWith(".csv");
+            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+            if (pilot.roleHome() && !csvRequest) {
+                model.addAttribute("overview", roleHome.overview(user.clientId(), query));
+                return "console/pilot-report";
+            }
             var days = metrics.days(user.clientId(), query);
             // checks made in content scope (ADR-052) are counted apart and shown only when the period has some: with none, the report
             // is exactly what it was
@@ -54,8 +65,7 @@ public class PilotReportController {
             var rules = feedback.stats(user.clientId(), query).byRule().stream().filter(rule -> rule.verdicts() > 0).toList();
             var phrases = phraseMetrics.getIfAvailable();
             var phraseWeeks = phrases == null ? null : phrases.weeks(user.clientId(), query);
-            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
-            if (!request.getServletPath().endsWith(".csv") && !request.getRequestURI().endsWith(".csv")) {
+            if (!csvRequest) {
                 model.addAttribute("pilotDays", days);
                 model.addAttribute("phraseWeeks", phraseWeeks);
                 model.addAttribute("pilotContentDays", hasContent ? contentDays : null);

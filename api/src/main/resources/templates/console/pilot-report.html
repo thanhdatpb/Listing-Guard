@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="#{pilot.report}"></title>
+    <title th:text="${overview != null} ? #{manager.report} : #{pilot.report}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
-</head>
+<th:block th:if="${overview != null}"><link rel="stylesheet" th:href="@{/console/role-home.css(v=${assetVersion})}">
+    <script defer th:src="@{/console/manager-print.js(v=${assetVersion})}"></script></th:block></head>
 <body><th:block th:if="${demoWorkspace}"><div th:replace="~{console/layout :: demoBanner}"></div></th:block>
-<main class="lg-page" id="pilot-print">
+<th:block th:if="${overview != null}"><main th:replace="~{console/role-home-fragments :: printReport}"></main></th:block><main class="lg-page" id="pilot-print" th:unless="${overview != null}">
     <a class="lg-btn pilot-screen" th:href="@{/console/stats(from=${pilotQuery.from},to=${pilotQuery.to},marketplace=${pilotQuery.marketplace})}"
        th:text="#{stats.title}"></a>
     <a class="lg-btn pilot-screen" th:href="@{/console/stats/pilot.csv(from=${pilotQuery.from},to=${pilotQuery.to},marketplace=${pilotQuery.marketplace})}"
