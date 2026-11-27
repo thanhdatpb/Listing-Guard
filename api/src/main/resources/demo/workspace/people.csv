@@ -1,0 +1,5 @@
+key,email,role
+admin,workspace-reviewer@example.test,ADMIN
+avery,avery.owner@example.test,MEMBER
+blake,blake.owner@example.test,MEMBER
+casey,casey.owner@example.test,MEMBER
