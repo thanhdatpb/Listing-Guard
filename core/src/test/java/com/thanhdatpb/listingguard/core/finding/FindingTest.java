@@ -42,4 +42,26 @@ class FindingTest {
 
         assertThat(finding.withoutFix()).isSameAs(finding);
     }
+
+    @Test
+    void aSpanIsOptionalAndTravelsWithTheFindingAndNeverChangesTheOldForm() {
+        Finding old = new Finding("r", Severity.WARNING, "title", "bad", "m", "s", "v1");
+        Finding spanned = old.withSpan(3, 6);
+
+        assertThat(old.matchStart()).isNull();
+        assertThat(spanned.matchStart()).isEqualTo(3);
+        assertThat(spanned.matchEnd()).isEqualTo(6);
+        assertThat(spanned.withoutFix()).isSameAs(spanned);
+        assertThat(new Finding("r", Severity.WARNING, "title", "bad", "m", "s", "v1", FIX).withSpan(1, 2).withoutFix().matchStart())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void anEmptySpanIsNoPositionAndAHalfSpanIsRefused() {
+        Finding old = new Finding("r", Severity.WARNING, "title", "bad", "m", "s", "v1");
+
+        assertThat(old.withSpan(4, 4)).isSameAs(old);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new Finding("r", Severity.INFO, "f", null, "m", "s", "v", null, 1, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

@@ -64,7 +64,8 @@ public final class ProhibitedContentRule extends AmazonRule {
             if (matcher.find()) {
                 findings.add(finding(config, settings, path, matcher.group(),
                         "Phát hiện " + kind + " trong " + path + ": " + Texts.quote(matcher.group()) + ".",
-                        "Xoá " + kind + " khỏi nội dung listing; không đưa liên kết ngoài hay thông tin liên hệ vào tiêu đề, bullet point hoặc mô tả."));
+                        "Xoá " + kind + " khỏi nội dung listing; không đưa liên kết ngoài hay thông tin liên hệ vào tiêu đề, bullet point hoặc mô tả.")
+                        .withSpan(matcher.start(), matcher.end()));
             }
         }));
         return findings;
