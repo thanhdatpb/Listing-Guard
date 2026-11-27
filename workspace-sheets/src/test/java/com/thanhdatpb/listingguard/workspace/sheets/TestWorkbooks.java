@@ -69,6 +69,93 @@ final class TestWorkbooks {
         }
     }
 
+
+    /**
+     * A flat file with the things a writer must not lose: a styled data column (two decimals), three list validations (literal, a range on
+     * another sheet, a defined name), a validation of another kind, a defined name and a second sheet with the lists. Row 4 and 5 hold example
+     * data. Column A is SKU, B the product type, C the size, D the color, E the price.
+     */
+    static byte[] withValidations() throws IOException {
+        try (XSSFWorkbook book = new XSSFWorkbook()) {
+            Sheet template = book.createSheet("Template");
+            row(template, 0, "TemplateType=synthetic", "Version=0.0");
+            row(template, 1, "Seller SKU", "Product Type", "Size", "Color", "Price");
+            row(template, 2, "item_sku", "feed_product_type", "size_name", "color_name", "standard_price");
+            row(template, 3, "EX-1", "SHIRT", "S", "Blue", "");
+            row(template, 4, "EX-2", "MUG", "M", "Red", "");
+            org.apache.poi.ss.usermodel.CellStyle money = book.createCellStyle();
+            money.setDataFormat(book.createDataFormat().getFormat("0.00"));
+            template.getRow(3).createCell(4).setCellStyle(money);
+            Sheet values = book.createSheet("Valid Values");
+            org.apache.poi.ss.usermodel.Name name = book.createName();
+            name.setNameName("Colors");
+            name.setRefersToFormula("'Valid Values'!$C$1:$C$3");
+            row(values, 0, "SHIRT", "MUG", "Blue");
+            row(values, 1, "HAT", "", "Red");
+            org.apache.poi.ss.usermodel.DataValidationHelper helper = template.getDataValidationHelper();
+            add(template, helper.createValidation(helper.createExplicitListConstraint(new String[] {"S", "M", "L"}),
+                    new org.apache.poi.ss.util.CellRangeAddressList(3, 2000, 2, 2)));
+            add(template, helper.createValidation(helper.createFormulaListConstraint("'Valid Values'!$A$1:$B$2"),
+                    new org.apache.poi.ss.util.CellRangeAddressList(3, 2000, 1, 1)));
+            add(template, helper.createValidation(helper.createFormulaListConstraint("Colors"),
+                    new org.apache.poi.ss.util.CellRangeAddressList(3, 2000, 3, 3)));
+            add(template, helper.createValidation(helper.createDecimalConstraint(
+                    org.apache.poi.ss.usermodel.DataValidationConstraint.OperatorType.GREATER_THAN, "0", null),
+                    new org.apache.poi.ss.util.CellRangeAddressList(3, 2000, 4, 4)));
+            return write(book);
+        }
+    }
+
+    private static void add(Sheet sheet, org.apache.poi.ss.usermodel.DataValidation validation) {
+        sheet.addValidationData(validation);
+    }
+
+    /** A flat file whose list rule is a formula that cannot be resolved without guessing. */
+    static byte[] withIndirectValidation() throws IOException {
+        try (XSSFWorkbook book = new XSSFWorkbook()) {
+            Sheet template = book.createSheet("Template");
+            row(template, 0, "a_one", "b_two");
+            org.apache.poi.ss.usermodel.DataValidationHelper helper = template.getDataValidationHelper();
+            template.addValidationData(helper.createValidation(helper.createFormulaListConstraint("INDIRECT(\"X1\")"),
+                    new org.apache.poi.ss.util.CellRangeAddressList(1, 100, 1, 1)));
+            return write(book);
+        }
+    }
+
+    /** The package with an extension-list rule (the form for a list on another sheet) added to its first sheet. */
+    static byte[] withExtensionRule(byte[] xlsx) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(xlsx)); ZipOutputStream zip = new ZipOutputStream(out)) {
+            for (ZipEntry entry; (entry = in.getNextEntry()) != null; ) {
+                byte[] content = in.readAllBytes();
+                if (entry.getName().equals("xl/worksheets/sheet1.xml")) {
+                    String xml = new String(content, StandardCharsets.UTF_8);
+                    String ext = "<extLst><ext uri=\"{CCE6A557-97BC-4b89-ADB6-D9C93CAAB3DF}\" "
+                            + "xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\">"
+                            + "<x14:dataValidations count=\"1\" xmlns:xm=\"http://schemas.microsoft.com/office/excel/2006/main\">"
+                            + "<x14:dataValidation type=\"list\" allowBlank=\"1\"><x14:formula1><xm:f>Other!$A$1:$A$3</xm:f></x14:formula1>"
+                            + "<xm:sqref>F4:F100</xm:sqref></x14:dataValidation></x14:dataValidations></ext></extLst>";
+                    int end = xml.lastIndexOf("</worksheet>");
+                    content = (xml.substring(0, end) + ext + "</worksheet>").getBytes(StandardCharsets.UTF_8);
+                }
+                put(zip, entry.getName(), content);
+            }
+        }
+        return out.toByteArray();
+    }
+
+    /** The bytes of one part of a package, or null. */
+    static byte[] part(byte[] zip, String name) throws IOException {
+        try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(zip))) {
+            for (ZipEntry entry; (entry = in.getNextEntry()) != null; ) {
+                if (entry.getName().equals(name)) {
+                    return in.readAllBytes();
+                }
+            }
+        }
+        return null;
+    }
+
     private static void row(Sheet sheet, int index, String... cells) {
         Row row = sheet.createRow(index);
         for (int i = 0; i < cells.length; i++) {

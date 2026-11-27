@@ -7,7 +7,11 @@ package com.thanhdatpb.listingguard.workspace.sheets;
 public class SheetRejected extends RuntimeException {
 
     public enum Reason {
-        TOO_LARGE, TOO_MANY_ROWS, TOO_MANY_COLUMNS, ENCRYPTED, CORRUPT, ZIP_BOMB, UNSUPPORTED, EMPTY, SHEET_NOT_FOUND
+        TOO_LARGE, TOO_MANY_ROWS, TOO_MANY_COLUMNS, ENCRYPTED, CORRUPT, ZIP_BOMB, UNSUPPORTED, EMPTY, SHEET_NOT_FOUND,
+        /** writing: a cell is longer than Excel's 32,767 characters */
+        CELL_TOO_LONG,
+        /** writing: a cell holds a character the chosen text encoding cannot write */
+        UNENCODABLE
     }
 
     private final Reason reason;
