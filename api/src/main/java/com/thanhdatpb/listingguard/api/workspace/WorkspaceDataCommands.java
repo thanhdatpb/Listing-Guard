@@ -54,7 +54,7 @@ public class WorkspaceDataCommands {
 
     /** The workspace tables in delete order (children first). */
     static final List<String> TABLES = List.of("workspace_alert_log", "workspace_alert_pref", "workspace_listing_finding",
-            "workspace_listing_audit", "workspace_audit_run", "workspace_listing_history", "workspace_customization", "workspace_listing",
+            "workspace_listing_audit", "workspace_audit_run", "workspace_status_override", "workspace_listing_history", "workspace_customization", "workspace_listing",
             "workspace_template", "workspace_import_stage", "workspace_account");
 
     private final JdbcTemplate jdbc;
@@ -268,7 +268,10 @@ public class WorkspaceDataCommands {
                 + "a.audited_at AS audit_at, a.catalog_version AS audit_catalog, a.watchlist_version AS audit_watchlist, "
                 + "(SELECT COALESCE(json_agg(json_build_object('rule', f.rule_id, 'level', f.level, 'source', f.source, 'field', f.field, "
                 + "'start', f.span_start, 'end', f.span_end, 'mark', f.mark, 'serial', f.serial, 'new', f.is_new) ORDER BY f.position)::text, '[]') "
-                + "FROM workspace_listing_finding f WHERE f.listing_id = l.id AND f.client_id = l.client_id) AS audit_findings "
+                + "FROM workspace_listing_finding f WHERE f.listing_id = l.id AND f.client_id = l.client_id) AS audit_findings, "
+                + "(SELECT COALESCE(json_agg(json_build_object('opened_by', o.opened_by, 'reason', o.reason, 'opened_at', o.opened_at, "
+                + "'content_hash', o.content_hash, 'audit_state', o.audit_state, 'block_reasons', o.block_reasons) ORDER BY o.id)::text, '[]') "
+                + "FROM workspace_status_override o WHERE o.listing_id = l.id AND o.client_id = l.client_id) AS status_overrides "
                 + "FROM workspace_listing l LEFT JOIN workspace_listing_audit a ON a.listing_id = l.id AND a.client_id = l.client_id "
                 + "WHERE l.client_id = ? AND l.template_id = ? "
                 + (includeDeleted ? "" : "AND l.deleted_at IS NULL ") + "ORDER BY l.sku, l.id", rs -> {
@@ -295,6 +298,11 @@ public class WorkspaceDataCommands {
                 audit.put("state", rs.getString("audit_state")).put("audited_at", String.valueOf(rs.getObject("audit_at", java.time.OffsetDateTime.class)))
                         .put("catalog_version", rs.getString("audit_catalog")).put("watchlist_version", rs.getString("audit_watchlist"));
                 audit.set("findings", parse(rs.getString("audit_findings")));
+            }
+            // the reasons an ADMIN gave for letting a blocked listing go (ADR-062); a workspace that never used them exports as before
+            com.fasterxml.jackson.databind.JsonNode overrides = parse(rs.getString("status_overrides"));
+            if (overrides.size() > 0) {
+                json.set("status_overrides", overrides);
             }
             row.add(json.toString());
             appendRow(tsv, row);

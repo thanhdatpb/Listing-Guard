@@ -158,26 +158,36 @@ class WorkspaceRulesTest {
         assertThat(constraint(sql, "ck_workspace_listing_role")).containsExactlyElementsOf(names(WorkspaceTypes.ListingRole.values()));
         assertThat(constraint(sql, "ck_workspace_listing_status")).containsExactlyElementsOf(names(WorkspaceTypes.ListingStatus.values()));
         assertThat(constraint(sql, "ck_workspace_listing_source")).containsExactlyElementsOf(names(WorkspaceTypes.ListingSource.values()));
-        assertThat(constraint(sql, "ck_workspace_history_kind")).containsExactlyElementsOf(names(WorkspaceTypes.ChangeKind.values()));
+        // V59 (ADR-062) replaced the kinds of change; the value list it writes is the one the enum has
+        String editor = Files.readString(Path.of("src/main/resources/db/migration/V59__workspace_editor_and_cloning.sql"), StandardCharsets.UTF_8);
+        assertThat(constraint(editor, "ck_workspace_history_kind")).containsExactlyElementsOf(names(WorkspaceTypes.ChangeKind.values()));
+        assertThat(constraint(editor, "ck_workspace_override_state")).contains("CLEAN", "WARNING", "ERROR", "NEW_RISK", "INCOMPLETE", "NONE", "STALE");
         assertThat(constraint(sql, "ck_workspace_template_format")).contains("XLSX", "XLSM", "TSV", "CSV", "BUILTIN");
     }
 
     @Test
     void everyTableOfTheMigrationIsAdditiveAndEveryChildPointsToItsParentThroughTheClient() throws IOException {
-        // V57 is the workspace, V58 the background audit (ADR-061); both are additive and both belong to the purge and the export
+        // V57 is the workspace, V58 the background audit (ADR-061), V59 the editor and the clone (ADR-062); all belong to the purge and the export.
+        // V57 and V58 only create; V59 creates one table and replaces one CHECK of the history (its only ALTER and its only DROP).
+        String editor = Files.readString(Path.of("src/main/resources/db/migration/V59__workspace_editor_and_cloning.sql"), StandardCharsets.UTF_8);
         String sql = Files.readString(Path.of("src/main/resources/db/migration/V57__listing_workspace.sql"), StandardCharsets.UTF_8) + "\n"
                 + Files.readString(Path.of("src/main/resources/db/migration/V58__workspace_background_audit.sql"), StandardCharsets.UTF_8);
 
         assertThat(sql).doesNotContainIgnoringCase("ALTER TABLE").doesNotContainIgnoringCase("DROP ");
-        Matcher tables = Pattern.compile("CREATE TABLE (workspace_\\w+)").matcher(sql);
+        assertThat(editor.lines().filter(line -> line.toUpperCase(java.util.Locale.ROOT).startsWith("ALTER TABLE")).toList())
+                .hasSize(2).first().isEqualTo("ALTER TABLE workspace_listing_history DROP CONSTRAINT ck_workspace_history_kind;");
+        assertThat(editor).contains("ALTER TABLE workspace_listing_history ADD CONSTRAINT ck_workspace_history_kind CHECK (change_kind IN (");
+        assertThat(editor).containsOnlyOnce("DROP ").doesNotContainIgnoringCase("TRUNCATE").doesNotContainIgnoringCase("DELETE FROM");
+        String all = sql + "\n" + editor;
+        Matcher tables = Pattern.compile("CREATE TABLE (workspace_\\w+)").matcher(all);
         List<String> created = new ArrayList<>();
         while (tables.find()) {
             created.add(tables.group(1));
         }
         assertThat(created).containsExactlyInAnyOrderElementsOf(WorkspaceDataCommands.TABLES);
         // each table but the account has a client_id column, so every statement and the purge can filter by it
-        created.forEach(table -> assertThat(sql.substring(sql.indexOf("CREATE TABLE " + table))).contains("client_id"));
-        assertThat(sql).contains("REFERENCES workspace_account (id, client_id)").contains("REFERENCES workspace_template (id, client_id)")
+        created.forEach(table -> assertThat(all.substring(all.indexOf("CREATE TABLE " + table))).contains("client_id"));
+        assertThat(all).contains("REFERENCES workspace_account (id, client_id)").contains("REFERENCES workspace_template (id, client_id)")
                 .contains("REFERENCES workspace_listing (id, client_id)");
     }
 
