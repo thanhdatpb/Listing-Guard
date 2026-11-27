@@ -9,11 +9,15 @@ $markdownFiles = @((Join-Path $RepositoryRoot 'README.md')) + @(
 )
 $failures = [System.Collections.Generic.List[string]]::new()
 $linkPattern = '\]\((?<target>[^)\s]+)(?:\s+[^)]*)?\)'
+$imagePattern = '(?is)<(?:img|source)\b[^>]*?\b(?:src|srcset)\s*=\s*"(?<sources>[^"]+)"'
 
 foreach ($markdownFile in $markdownFiles) {
-    $content = [System.IO.File]::ReadAllText($markdownFile)
-    foreach ($match in [regex]::Matches($content, $linkPattern)) {
-        $target = $match.Groups['target'].Value.Trim('<', '>')
+    $content = [regex]::Replace([System.IO.File]::ReadAllText($markdownFile), '(?s)<!--.*?-->', '')
+    $targets = @([regex]::Matches($content, $linkPattern) | ForEach-Object { $_.Groups['target'].Value.Trim('<', '>') })
+    foreach ($match in [regex]::Matches($content, $imagePattern)) {
+        $targets += @($match.Groups['sources'].Value -split '\s*,\s*' | ForEach-Object { ($_.Trim() -split '\s+', 2)[0] })
+    }
+    foreach ($target in $targets) {
         if ($target -match '^(?:[a-z][a-z0-9+.-]*:|//)' -or $target.StartsWith('#')) {
             continue
         }
@@ -52,4 +56,4 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-Write-Output "Checked $($markdownFiles.Count) Markdown files and 3 SVG documents; no missing relative links or XML errors."
+Write-Output "Checked $($markdownFiles.Count) Markdown files and 3 SVG documents; no missing relative links, images or XML errors."

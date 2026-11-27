@@ -64,6 +64,28 @@ Từ Google Sheet: **File → Download → Microsoft Excel (.xlsx)** (hoặc `.t
 3. **Cột**: ánh xạ cột → trường chuẩn. Ánh xạ được nhớ theo template (như Kiểm hàng loạt nhớ ánh xạ), lần sau chỉ cần xem lại. Cột có chữ *Đoán* chỉ là gợi ý. Với Etsy, nhiều cột `TAG1…TAG13` cùng gán cho `Tags` thì thành danh sách; cột không đặt được vào mục cố định nào được giữ làm passthrough.
 4. **Xem trước**: số dòng **mới / cập nhật / không đổi / lỗi**, từng lỗi kèm số dòng, và việc sẽ làm với template. Chỉ khi bấm *Ghi vào kho* mới ghi.
 
+
+<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-import-sheet-dark.png">
+  <img src="images/console/workspace-import-sheet-light.png" alt="Xác nhận sheet Template, dòng tên field, dòng dữ liệu đầu và cột SKU trong file Excel tổng hợp.">
+</picture>
+-->
+
+<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-mapping-dark.png">
+  <img src="images/console/workspace-mapping-light.png" alt="Import column mapping with source field names, target selectors and a button to preview the import.">
+</picture>
+-->
+
+<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-preview-dark.png">
+  <img src="images/console/workspace-preview-light.png" alt="Xem trước nhập dữ liệu với số dòng mới, cập nhật, không đổi và lỗi, cùng bảng giải thích lỗi theo dòng.">
+</picture>
+-->
+
 Chưa có template Amazon cho tài khoản: lần nhập đầu (ADMIN) tạo template từ chính file đó.
 
 Chạy lại cùng file **không nhân đôi** và không đổi phiên bản listing. Lỗi theo dòng (dòng lỗi không bị ghi và không bị đoán): thiếu SKU, SKU quá dài, **SKU trùng trong file** (mọi dòng có SKU đó), SKU cha trùng chính nó, **parent không tồn tại** (không có trong file cũng không có trong tài khoản), dòng "con" không có SKU cha, người phụ trách không phải tài khoản của nhóm, listing của người khác (MEMBER, `own`). Việc ghi chạy trong một giao dịch, tuần tự theo tài khoản bán; listing bị người khác sửa giữa lúc xem trước và ghi được giữ nguyên và báo là xung đột.
@@ -73,6 +95,14 @@ Giới hạn mặc định: 10.000 dòng, 20 MB, 1.500 cột. File có mật kh�
 ## 6. Trang của Console
 
 - **Danh sách listing**: lọc theo tài khoản, sàn, trạng thái, người phụ trách; tìm theo SKU hoặc tiêu đề; listing con nằm dưới listing cha; phân trang 50 dòng. Cột *Kiểm tra* là **Chưa kiểm** khi rà nền tắt; khi bật là **Sạch / Cảnh báo / Lỗi / Rủi ro mới / Chưa rà đủ** (chữ và biểu tượng) kèm bộ lọc theo trạng thái rà ([mục 9](#9-rà-nền-tô-đỏ-và-email-adr-061)).
+
+<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-list-dark.png">
+  <img src="images/console/workspace-list-light.png" alt="Danh sách listing với bộ lọc và cột trạng thái rà, gồm một dòng có rủi ro mới.">
+</picture>
+-->
+
 - **Rà nền** (chỉ khi bật): tiến độ x/y theo tài khoản bán, lịch sử lượt rà, nút Rà lại tài khoản (ADMIN), công tắc email của riêng bạn.
 - **Chi tiết** (chỉ đọc): các trường theo thứ tự template (cột passthrough có nhãn), listing con, dòng Amazon Custom, lịch sử. ADMIN đổi người phụ trách hoặc xoá.
 - **Tài khoản và template**: danh sách tài khoản, các version template (ADMIN tải được file gốc), form thêm/sửa tài khoản.
@@ -102,7 +132,7 @@ Giới hạn mặc định: 10.000 dòng, 20 MB, 1.500 cột. File có mật kh�
 
 - Chưa đối chiếu với file Excel/template Amazon thật (số sheet, tên sheet, số dòng cài đặt, tên cột `item_sku`...). Cần file thật của HappyC để chuyển các đoán sang `verified`.
 - Chưa đo bộ nhớ và thời gian khi nhập 10.000 dòng thật. Để đo: bật `LISTING_GUARD_WORKSPACE_ENABLED=true` và hai biến multipart `25MB`/`60MB` trong `.env`, chạy `docker compose up --build`, nhập một file 10.000 dòng bằng trang Nhập dữ liệu và ghi `docker stats` của container `api` cùng thời gian từ lúc bấm *Ghi vào kho* đến khi trang trả lời.
-- Chưa có Playwright/ảnh chụp trên Docker Compose; test tự động chạy bằng Testcontainers trong CI.
+- Test giao diện bằng Playwright dùng Testcontainers và dữ liệu tổng hợp. Xem [cách chụp lại ảnh](#10-chụp-lại-ảnh).
 - Dung lượng ước tính: xem `docs/deploy-readiness.md`, mục kho listing.
 
 ## 9. Rà nền, tô đỏ và email (ADR-061)
@@ -164,9 +194,25 @@ Mỗi trạng thái có **chữ và biểu tượng**, màu chỉ là phụ. M�
 
 Trang chi tiết có khối **Nội dung đã rà**: mỗi trường (tiêu đề, bullet, tag, mô tả, search terms, brand) được in đúng như đã lưu, kể cả khoảng trắng thừa; đoạn khớp được bọc trong `<mark>` có **biểu tượng, gạch chân (liền cho Lỗi/rủi ro cao, lượn sóng cho Cảnh báo/trung bình) và tooltip** (nhãn, nguồn, mức, serial, liên kết TSDR khi ruleset có mẫu) mô tả bằng `aria-describedby`; tooltip hiện khi rê chuột và khi focus. Vị trí là offset trong **text gốc của kho** (UTF-16): kết quả trademark nằm trên text chuẩn hoá (NFC, bỏ khoảng trắng hai đầu) và được ánh xạ về text gốc theo cụm ký tự; nếu không chứng minh được vị trí thì để trống và chỉ đánh dấu ở **mức trường**. Ba luật khớp chữ (`banned_words`, `prohibited_content`, `title_promotional_terms`) báo vị trí; luật độ dài, số lượng, ký tự lặp, thiếu trường chưa có vị trí.
 
+
+<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-detail-dark.png">
+  <img src="images/console/workspace-detail-light.png" alt="Chi tiết listing có chữ tô đỏ, tooltip đang mở bằng focus và bảng phát hiện.">
+</picture>
+-->
+
 ### 9.6 Email
 
 Sau mỗi lượt có rủi ro mới, mỗi người nhận **tối đa một email** một lượt: người phụ trách listing nhận listing của mình; **mọi ADMIN** của client nhận tất cả (kể cả listing chưa có người phụ trách) kèm số listing theo tài khoản bán. Bảng `SKU | Tài khoản | Trường | Nhãn | Mức`, một **đoạn ngắn** quanh chỗ khớp, link mở Console. Không bao giờ gửi cả listing, tiêu đề đầy đủ hay mô tả. Mỗi người **tự tắt** trên trang Rà nền. Vượt trần ngày thì không gửi và phần chưa báo vào email lần sau. Gửi bằng SMTP của đăng nhập magic link (`SPRING_MAIL_HOST`, `LISTING_GUARD_CONSOLE_MAIL_FROM`); ứng dụng không khởi động nếu bật email mà thiếu hai biến này (trừ profile `dev`). **Profile `dev` (demo-local) ghi email ra log** như link đăng nhập, và chỉ nên dùng với dữ liệu tổng hợp. Ngôn ngữ email là `LISTING_GUARD_CONSOLE_DEFAULT_LOCALE` (`en` mặc định).
+
+
+<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-audit-dark.png">
+  <img src="images/console/workspace-audit-light.png" alt="Trang rà nền với tiến độ theo tài khoản, lịch sử lượt rà và công tắc email cá nhân.">
+</picture>
+-->
 
 ### 9.7 Xoá, xuất, đo
 
@@ -180,4 +226,37 @@ Sau mỗi lượt có rủi ro mới, mỗi người nhận **tối đa một em
   ```
 
 - **Chưa đo**: thời gian và RAM của một lượt rà thật trên PostgreSQL thật và catalog USPTO thật (lệnh ở `docs/deploy-readiness.md`).
-- Chưa xác minh: câu chữ VI và EN chưa được người bản ngữ xem lại; chưa chạy trình duyệt thật (Playwright); chưa kiểm email qua SMTP thật.
+- Chưa xác minh: câu chữ VI và EN chưa được người bản ngữ xem lại; chưa kiểm email qua SMTP thật.
+
+## 10. Chụp lại ảnh
+
+Chạy từ thư mục gốc repo với Java 21, Docker Desktop (hoặc Docker trên Linux) và Python. Test tự khởi động PostgreSQL
+Testcontainers và server Spring Boot cổng ngẫu nhiên. Trình duyệt chỉ truy cập server cục bộ. File Excel, tên listing, watchlist
+và email dùng trong test đều là dữ liệu tổng hợp; catalog DEMO chỉ phục vụ client của test. Email dùng profile `dev` để ghi log.
+
+Windows (PowerShell):
+
+```powershell
+py -m pip install playwright
+py -m playwright install chromium
+$env:LG_WORKSPACE_PYTHON = "py"
+$env:LG_RUN_WORKSPACE_BROWSER = "1"
+$env:LG_WORKSPACE_SCREENSHOTS = "docs/images/console"
+./mvnw.cmd -B -pl api -am "-Dtest=WorkspaceBrowserIntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
+```
+
+Trên Windows, `mvnw.cmd` là bản tương ứng của `./mvnw`. Nếu dùng `python` thay cho `py`, dùng cùng lệnh đó để cài Playwright và đặt `LG_WORKSPACE_PYTHON`.
+
+Linux (bash):
+
+```bash
+python3 -m pip install playwright
+python3 -m playwright install chromium
+LG_RUN_WORKSPACE_BROWSER=1 LG_WORKSPACE_SCREENSHOTS=docs/images/console \
+  ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+Bỏ `LG_WORKSPACE_SCREENSHOTS` để chỉ kiểm luồng trên trình duyệt. Khi `LG_RUN_WORKSPACE_BROWSER` không bằng `1`, JUnit
+bỏ qua cả test. Ảnh được chụp ở viewport 1280 × 820. Trang dài lấy tối đa 1.800 px theo chiều dọc. Nếu máy có Pillow, script
+tối ưu PNG không mất dữ liệu. Sau khi chụp, kiểm tra đủ 12 ảnh, tooltip, chế độ sáng/tối, bố cục và dữ liệu mẫu trước khi bỏ
+comment các khối `<picture>` trong README và tài liệu này.

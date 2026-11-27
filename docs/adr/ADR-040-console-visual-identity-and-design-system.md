@@ -2,7 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-11-16
-- Depends on: [ADR-014](ADR-014-listing-workspace.md) (the console and its editor), [ADR-027](ADR-027-console-login-options.md) (the
+- Depends on: [ADR-014](ADR-014-listing-workspace.md) (the console and its editor), [ADR-027](ADR-027-console-access-login.md) (the
   sign-in pages are public), [ADR-028](ADR-028-console-localization.md) (no sentence in a template or a script),
   [ADR-034](ADR-034-finding-feedback-and-value-dashboard.md) (static files, the vendored htmx, `ConsoleVendorResources`)
 - Source: the design pack in [docs/design/](../design/README.md) (Listing Guard Design System v2, 2026-11-15)
