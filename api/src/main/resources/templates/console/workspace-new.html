@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.new.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- Step 1 of a new listing (ADR-062): choose the seller account whose template the form is made from. No text is written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace')}"></header>
+<main class="lg-page" id="workspace-new">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <a class="lg-page__crumb" th:href="@{/console/workspace}" th:text="#{workspace.detail.back}"></a>
+            <h1 th:text="#{workspace.new.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{workspace.new.choose}"></p>
+        </div>
+    </div>
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <div class="lg-empty" id="workspace-new-empty" th:if="${sellerAccounts.isEmpty()}">
+        <h2 class="lg-empty__title" th:text="#{workspace.empty.accounts.title}"></h2>
+        <p class="lg-empty__text" th:text="#{workspace.empty.accounts.text}"></p>
+        <p><a class="lg-btn lg-btn--primary" th:href="@{/console/workspace/accounts}" th:text="#{workspace.nav.accounts}"></a></p>
+    </div>
+    <ul class="lg-plain" id="workspace-new-accounts" th:unless="${sellerAccounts.isEmpty()}">
+        <li th:each="a : ${sellerAccounts}"><a class="lg-btn" th:href="@{/console/workspace/new(account=${a.id()})}"><span th:text="${a.name()}"></span></a></li>
+    </ul>
+</main>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${creating} ? #{workspace.new.title} : #{workspace.edit.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+    <script th:src="@{/console/editor.js}" defer></script>
+</head>
+<body>
+<!-- The editor and the new-listing form of the workspace (ADR-062). The columns are those of the template, grouped by the standard field they were given
+     (the five bullets side by side), each with the name of the column as the file wrote it; the columns no field was given are folded away. The
+     counters are the console's editor.js (its sentences come from the form's data-i18n attributes); the limits come from the active ruleset. Without a script
+     the page is a plain form. Every value goes through th:text or th:value. No text is written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace')}"></header>
+<main class="lg-page" id="workspace-edit">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <a class="lg-page__crumb" th:if="${creating}" th:href="@{/console/workspace}" th:text="#{workspace.detail.back}"></a>
+            <a class="lg-page__crumb" th:unless="${creating}" th:href="@{/console/workspace/listings/{id}(id=${listing.id()})}" th:text="#{workspace.edit.back}"></a>
+            <h1 th:if="${creating}" th:text="#{workspace.new.heading}"></h1>
+            <h1 th:unless="${creating}" th:text="${listing.sku()}"></h1>
+            <p class="lg-page__sub" th:if="${creating}" th:text="#{workspace.new.sub(${account.name()}, ${marketplaceLabel})}"></p>
+            <p class="lg-page__sub" th:unless="${creating}" th:text="${listing.title()}"></p>
+        </div>
+        <div class="lg-actions" th:unless="${creating}">
+            <span th:replace="~{console/workspace-fragments :: status(${listing.status().name().toLowerCase()}, ${statusLabel})}"></span>
+            <th:block th:if="${auditOn != true}"><span th:replace="~{console/workspace-fragments :: unchecked}"></span></th:block><th:block th:if="${auditOn == true}"><span th:replace="~{console/workspace-fragments :: auditState(${audit == null ? 'none' : audit.state.code}, ${audit == null ? #messages.msg('workspace.check.none') : audit.state.label})}"></span></th:block>
+        </div>
+    </div>
+
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+
+    <section class="lg-banner lg-banner--warning lg-section" id="edit-conflict" role="alert" th:if="${conflict != null}">
+        <div class="lg-banner__body">
+            <p class="lg-banner__title" th:text="#{workspace.edit.conflict.title}"></p>
+            <p th:text="#{workspace.edit.conflict.text}"></p>
+            <div class="lg-table-wrap" th:if="${!conflict.isEmpty()}">
+                <table class="lg-table lg-table--dense" id="edit-conflict-table">
+                    <caption class="lg-sr-only" th:text="#{workspace.edit.conflict.title}"></caption>
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{workspace.detail.field}"></th>
+                        <th scope="col" th:text="#{workspace.edit.conflict.base}"></th>
+                        <th scope="col" th:text="#{workspace.edit.conflict.yours}"></th>
+                        <th scope="col" th:text="#{workspace.edit.conflict.theirs}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${conflict}" th:attr="data-theirs=${row.theirsChanged},data-yours=${row.yoursChanged}">
+                        <th scope="row" class="lg-wrap"><code class="lg-code" th:text="${row.header}"></code></th>
+                        <td class="lg-wrap"><span th:if="${row.base != null}" th:text="${row.base}"></span><span class="lg-text-muted" th:if="${row.base == null}">&mdash;</span></td>
+                        <td class="lg-wrap"><span th:text="${row.yours}"></span> <span class="lg-chip lg-chip--flag" th:if="${row.yoursChanged}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-guess"/></svg><span th:text="#{workspace.edit.conflict.edited}"></span></span></td>
+                        <td class="lg-wrap"><span th:text="${row.theirs}"></span> <span class="lg-chip lg-chip--flag" th:if="${row.theirsChanged}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-warn"/></svg><span th:text="#{workspace.edit.conflict.edited.other}"></span></span></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p th:if="${conflict.isEmpty()}" th:text="#{workspace.edit.conflict.none}"></p>
+            <p><a class="lg-btn lg-btn--primary" id="edit-reload" th:href="@{/console/workspace/listings/{id}/edit(id=${listing.id()})}" th:text="#{workspace.edit.conflict.reload}"></a></p>
+        </div>
+    </section>
+
+    <section class="lg-banner lg-banner--info lg-section" id="edit-readonly" th:if="${!creating and !canEdit}">
+        <div class="lg-banner__body">
+            <p th:text="#{workspace.edit.readonly}"></p>
+            <form method="post" id="edit-clone-mine" th:action="@{/console/workspace/clone}">
+                <input type="hidden" name="listing" th:value="${listing.id()}">
+                <button type="submit" class="lg-btn lg-btn--primary" th:text="#{workspace.edit.clone.mine}"></button>
+            </form>
+        </div>
+    </section>
+    <div class="lg-banner lg-banner--info lg-section" id="edit-newer-template" th:if="${!creating and newerTemplate == true}"><p th:text="#{workspace.edit.newer}"></p></div>
+    <div class="lg-banner lg-banner--info lg-section" id="edit-limits-unknown" th:if="${!creating and limitsKnown == false}"><p th:text="#{workspace.edit.limits.unknown}"></p></div>
+
+    <section class="lg-banner lg-banner--info lg-section" id="edit-compared" th:if="${compared != null}">
+        <div class="lg-banner__body">
+            <p class="lg-banner__title" th:text="#{workspace.edit.compared.title}"></p>
+            <p><span th:text="#{workspace.edit.compared.text}"></span> <a th:href="@{/console/workspace/listings/{id}(id=${comparedFrom.id()})}"><code class="lg-code" th:text="${comparedFrom.sku()}"></code></a></p>
+        </div>
+    </section>
+    <section class="lg-banner lg-banner--warning lg-section" id="edit-title-warning" th:if="${compared != null and compared.titleWarning()}">
+        <div class="lg-banner__body">
+            <p class="lg-banner__title" th:text="#{workspace.edit.title.warning}"></p>
+            <p id="edit-title-original" th:if="${compared.sameAsOriginal()}" th:text="#{workspace.edit.title.original}"></p>
+            <p id="edit-title-others" th:if="${!sameTitleOthers.isEmpty()}"><span th:text="#{workspace.edit.title.others}"></span>
+                <th:block th:each="m : ${sameTitleOthers}"><a th:href="@{/console/workspace/listings/{id}(id=${m.id()})}"><code class="lg-code" th:text="${m.sku()}"></code></a> </th:block></p>
+            <p class="lg-text-muted" th:text="#{workspace.edit.title.note}"></p>
+        </div>
+    </section>
+
+    <div class="lg-empty" th:if="${groups.isEmpty()}">
+        <h2 class="lg-empty__title" th:text="#{workspace.edit.empty.title}"></h2>
+        <p class="lg-empty__text" th:text="#{workspace.edit.empty.text}"></p>
+    </div>
+
+    <form id="editor-form" class="lg-section" method="post" th:unless="${groups.isEmpty()}"
+          th:action="${creating} ? @{/console/workspace/new} : @{/console/workspace/listings/{id}/edit(id=${listing.id()})}"
+          th:attr="data-i18n-chars=#{js.counter.chars},data-i18n-chars-nolimit=#{js.counter.chars.nolimit},data-i18n-bytes=#{js.counter.bytes},data-i18n-bytes-nolimit=#{js.counter.bytes.nolimit},data-i18n-entries=#{js.counter.entries},data-i18n-entries-nolimit=#{js.counter.entries.nolimit},data-i18n-longest=#{js.counter.longest},data-i18n-over=#{js.counter.over}">
+        <input type="hidden" name="version" th:unless="${creating}" th:value="${listing.version()}">
+        <input type="hidden" name="account" th:if="${creating}" th:value="${account.id()}">
+        <p class="lg-text-muted" th:text="${creating} ? #{workspace.new.intro} : #{workspace.edit.intro}"></p>
+
+        <fieldset class="lg-edit-group" th:each="g : ${groups}" th:attr="data-target=${g.target}">
+            <legend th:text="${g.label}"></legend>
+            <p class="lg-edit-group__hint" th:if="${g.hint != null}" th:text="${g.hint}"></p>
+            <div class="lg-edit-group__fields">
+                <div class="lg-field" th:each="f : ${g.fields}">
+                    <label class="lg-field__label" th:for="${f.id}"><span class="lg-edit-source" th:text="#{workspace.edit.column}"></span> <code class="lg-code" th:text="${f.header}"></code>
+                        <span class="lg-chip lg-chip--flag" th:if="${f.untouched}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-unchecked"/></svg><span th:text="#{workspace.edit.untouched}"></span></span>
+                        <span class="lg-text-muted" th:if="${f.readOnly and !creating}" th:text="#{workspace.edit.fixed}"></span></label>
+                    <textarea class="lg-textarea" rows="3" th:if="${f.multiline}" th:id="${f.id}" th:name="${f.name}" th:readonly="${f.readOnly}"
+                              th:aria-describedby="${f.counterMode != ''} ? ${f.id + '-counter'}" th:text="${f.body}"></textarea>
+                    <input class="lg-input" type="text" autocomplete="off" th:unless="${f.multiline}" th:id="${f.id}" th:name="${f.name}" th:value="${f.value}" th:readonly="${f.readOnly}"
+                           th:aria-describedby="${f.counterMode != ''} ? ${f.id + '-counter'}">
+                    <p class="lg-field__hint counter" th:if="${f.counterMode != ''}" th:id="${f.id + '-counter'}"
+                       th:attr="data-counter-for=${f.id},data-mode=${f.counterMode},data-limit=${f.limit}" th:text="${f.limitText}"></p>
+                </div>
+            </div>
+        </fieldset>
+
+        <details class="lg-disclosure lg-section" id="edit-passthrough" th:if="${!passthrough.isEmpty()}">
+            <summary th:text="#{workspace.edit.passthrough(${#strings.toString(passthrough.size())})}"></summary>
+            <p class="lg-text-muted" th:text="#{workspace.edit.passthrough.hint}"></p>
+            <div class="lg-edit-group__fields">
+                <div class="lg-field" th:each="f : ${passthrough}">
+                    <label class="lg-field__label" th:for="${f.id}"><span class="lg-edit-source" th:text="#{workspace.edit.column}"></span> <code class="lg-code" th:text="${f.header}"></code>
+                        <span class="lg-chip lg-chip--flag" th:if="${f.untouched}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-unchecked"/></svg><span th:text="#{workspace.edit.untouched}"></span></span></label>
+                    <textarea class="lg-textarea" rows="2" th:if="${f.multiline}" th:id="${f.id}" th:name="${f.name}" th:readonly="${f.readOnly}" th:text="${f.body}"></textarea>
+                    <input class="lg-input" type="text" autocomplete="off" th:unless="${f.multiline}" th:id="${f.id}" th:name="${f.name}" th:value="${f.value}" th:readonly="${f.readOnly}">
+                </div>
+            </div>
+        </details>
+
+        <div class="lg-actions" th:if="${canEdit}">
+            <button type="submit" class="lg-btn lg-btn--primary" id="edit-save" th:text="${creating} ? #{workspace.new.create} : #{workspace.edit.save}"></button>
+            <a class="lg-btn" th:unless="${creating}" th:href="@{/console/workspace/listings/{id}(id=${listing.id()})}" th:text="#{workspace.edit.cancel}"></a>
+            <a class="lg-btn" th:if="${creating}" th:href="@{/console/workspace}" th:text="#{workspace.edit.cancel}"></a>
+        </div>
+    </form>
+
+    <th:block th:unless="${creating}">
+        <section class="lg-card lg-section" id="edit-actions" aria-labelledby="edit-actions-heading">
+            <h2 id="edit-actions-heading" class="lg-card__title" th:text="#{workspace.edit.actions}"></h2>
+            <div class="lg-actions">
+                <form method="post" th:action="@{/console/workspace/clone}"><input type="hidden" name="listing" th:value="${listing.id()}"><button type="submit" class="lg-btn" id="edit-clone" th:text="#{workspace.edit.clone}"></button></form>
+                <form method="post" th:action="@{/console/workspace/clone}" th:if="${isParent or hasChildren}"><input type="hidden" name="listing" th:value="${listing.id()}"><input type="hidden" name="family" value="1"><button type="submit" class="lg-btn" id="edit-clone-family" th:text="#{workspace.edit.clone.family}"></button></form>
+                <a class="lg-btn" id="edit-history" th:href="@{/console/workspace/listings/{id}/history(id=${listing.id()})}" th:text="#{workspace.edit.history}"></a>
+                <form method="post" th:if="${canEdit and listing.status().name() == 'DRAFT'}" th:action="@{/console/workspace/status}"><input type="hidden" name="listing" th:value="${listing.id()}"><button type="submit" class="lg-btn" id="edit-ready" th:text="#{workspace.edit.ready}"></button></form>
+                <form method="post" th:if="${canEdit and listing.status().name() == 'READY_TO_EXPORT'}" th:action="@{/console/workspace/listings/{id}/draft(id=${listing.id()})}"><button type="submit" class="lg-btn" id="edit-draft" th:text="#{workspace.edit.draft}"></button></form>
+            </div>
+        </section>
+
+        <th:block th:if="${auditOn == true}"><th:block th:replace="~{console/workspace-fragments :: auditDetail}"></th:block></th:block>
+
+        <section class="lg-card lg-section" id="edit-suggestions" aria-labelledby="edit-suggestions-heading" th:if="${auditOn == true and audit != null}">
+            <h2 id="edit-suggestions-heading" class="lg-card__title" th:text="#{workspace.edit.suggestions}"></h2>
+            <p class="lg-text-muted" th:text="#{workspace.edit.suggestions.intro}"></p>
+            <ul class="lg-plain">
+                <li th:each="f : ${audit.findings}" th:if="${f.suggestion != null and !f.suggestion.isBlank()}">
+                    <span class="lg-chip lg-chip--audit" th:classappend="${f.severity == 'severe'} ? 'lg-chip--audit-error' : 'lg-chip--audit-warning'"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use th:href="${f.severity == 'severe' ? '#lg-i-risk-severe' : '#lg-i-warn'}"/></svg><span th:text="${f.levelLabel}"></span></span>
+                    <strong th:if="${!f.fieldLabel.isEmpty()}" th:text="${f.fieldLabel}"></strong>
+                    <span th:text="${f.suggestion}"></span>
+                </li>
+            </ul>
+        </section>
+    </th:block>
+</main>
+</body>
+</html>

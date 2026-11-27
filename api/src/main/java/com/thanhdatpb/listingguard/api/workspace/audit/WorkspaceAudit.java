@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -93,14 +95,23 @@ public class WorkspaceAudit {
         return Optional.empty();
     }
 
-    /** An import wrote listings: the new and changed ones are audited, in the queue, after the import commits. */
+    /**
+     * An import wrote listings: the new and changed ones are audited, in the queue, after the import commits. The listener works in a
+     * transaction of its own: after the commit the transaction of the publisher is over, and what a listener of that phase does inside it is
+     * not a transaction any more (ADR-062 §2: the check service reads through JPA, which refuses "no active transaction").
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onImported(WorkspaceEvents.ListingsImported event) {
         request(event.clientId(), event.accountId(), Reason.IMPORT, event.listingIds(), event.actorId());
     }
 
-    /** A listing was saved: it is audited at once, and a person who saved it sees the answer on the next page. */
+    /**
+     * A listing was saved: it is audited at once, and a person who saved it sees the answer on the next page. Like {@link #onImported}, in a
+     * transaction of its own: the editor says this inside its transaction and the audit must read what was committed.
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onSaved(WorkspaceEvents.ListingSaved event) {
         auditNow(event.clientId(), event.listingId());
         AlertService alert = alerts.getIfAvailable();

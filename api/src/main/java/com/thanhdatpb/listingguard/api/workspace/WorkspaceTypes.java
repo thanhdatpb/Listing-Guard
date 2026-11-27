@@ -44,8 +44,9 @@ public final class WorkspaceTypes {
         IMPORT, CLONE, NEW
     }
 
+    /** The kinds of change a history row records. Each equals a value of {@code ck_workspace_history_kind} (V59); EXPORT is written by a later change. */
     public enum ChangeKind {
-        IMPORT, EDIT, OWNER, DELETE
+        IMPORT, EDIT, OWNER, DELETE, NEW, CLONE, RESTORE, STATUS, EXPORT
     }
 
     public static <E extends Enum<E>> Optional<E> parse(Class<E> type, String text) {

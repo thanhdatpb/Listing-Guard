@@ -15,7 +15,7 @@ import java.util.Map;
 /**
  * Builds the standard fields of one row from the columns a person confirmed (ADR-059). The result has the shape of the standard input
  * ({@code docs/input-schema.md}): text fields as strings, list fields as arrays, variation attributes in {@code attributes}. It only maps
- * and cleans (trim, drop blanks): it never dedupes, truncates, converts a price or a quantity, or corrects a value, because a later check
+ * and cleans (trim, drop blanks): it never dedupes, truncates, converts a price, or corrects a value (a whole quantity becomes the JSON number the standard input asks for), because a later check
  * must see what the seller wrote.
  */
 final class StandardFields {
@@ -31,6 +31,8 @@ final class StandardFields {
             return fields.hasNonNull("title") ? fields.get("title").asText() : null;
         }
     }
+
+    private static final java.util.regex.Pattern WHOLE_NUMBER = java.util.regex.Pattern.compile("[+-]?\\d{1,18}");
 
     private final StandardTargets targets;
     private final ObjectMapper mapper;
@@ -69,7 +71,22 @@ final class StandardFields {
                         role = ListingRole.CHILD;
                     }
                 }
-                case TEXT, PRICE, INTEGER, THEME -> fields.put(target.key(), value);
+                case TEXT, PRICE, THEME -> fields.put(target.key(), value);
+                // a quantity is a JSON number in the standard input and a string is not accepted (docs/input-schema.md): a whole number is written
+                // as one, anything else stays the text the seller wrote, which the checks then report as missing
+                case INTEGER -> {
+                    if (WHOLE_NUMBER.matcher(value).matches()) {
+                        // an int where it fits, so the node equals the one read back from the stored JSON
+                        long number = Long.parseLong(value);
+                        if (number == (int) number) {
+                            fields.put(target.key(), (int) number);
+                        } else {
+                            fields.put(target.key(), number);
+                        }
+                    } else {
+                        fields.put(target.key(), value);
+                    }
+                }
                 case LIST -> {
                     String separator = separators.getOrDefault(target.key(), target.defaultSeparator());
                     List<String> entries = lists.computeIfAbsent(target.key(), k -> new ArrayList<>());

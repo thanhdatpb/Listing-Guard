@@ -90,6 +90,10 @@ public class ConsoleWorkspaceImportController {
     public record IssueRow(int line, String sku, String text) {
     }
 
+    /** A row of the file whose listing was changed in the workspace after its latest import (ADR-062 §8). */
+    public record EditedView(int line, String sku, String kind, String when, boolean overwrite, boolean group, boolean parentOfOthers) {
+    }
+
     private final WorkspaceAccess access;
     private final WorkspaceAccounts accounts;
     private final WorkspaceTemplates templates;
@@ -422,6 +426,18 @@ public class ConsoleWorkspaceImportController {
             Plan plan = imports.plan(actor, p, grid);
             List<IssueRow> issues = new ArrayList<>();
             plan.issues().stream().limit(ISSUES_SHOWN).forEach(i -> issues.add(new IssueRow(i.line(), i.sku(), labels.issue(i.code()))));
+            List<EditedView> edited = new ArrayList<>();
+            java.util.Set<String> parents = new java.util.HashSet<>();
+            plan.edited().forEach(e -> {
+                if (e.parentSku() != null) {
+                    parents.add(e.parentSku());
+                }
+            });
+            plan.edited().forEach(e -> edited.add(new EditedView(e.line(), e.sku(), messages.get("workspace.change." + e.kind().name().toLowerCase(java.util.Locale.ROOT)),
+                    com.thanhdatpb.listingguard.api.console.ConsoleDates.dateTime(messages, e.at()), e.overwrite(), p.overwriteGroups().contains(e.line()),
+                    parents.contains(e.sku()))));
+            model.addAttribute("editedRows", edited);
+            model.addAttribute("canOverwrite", true);
             model.addAttribute("plan", plan);
             model.addAttribute("issues", issues);
             model.addAttribute("moreIssues", Math.max(0, plan.issues().size() - ISSUES_SHOWN));
@@ -455,7 +471,8 @@ public class ConsoleWorkspaceImportController {
             SheetFormat format = SheetReader.detect(stage.bytes(), properties.limits(false));
             Result result = imports.commit(actor, p, grid, new SourceFile(format, stage.fileName(), stage.bytes()), stage.id());
             redirect.addFlashAttribute("notice", messages.get("workspace.import.done", result.counts().created(), result.counts().updated(),
-                    result.counts().unchanged(), result.counts().errors()));
+                    result.counts().unchanged(), result.counts().errors()) + (result.keptEdited() > 0
+                    ? " " + messages.get("workspace.import.kept", result.keptEdited()) : ""));
             if (result.conflicts() > 0) {
                 redirect.addFlashAttribute("error", messages.get("workspace.import.conflicts", result.conflicts()));
             }
@@ -539,8 +556,16 @@ public class ConsoleWorkspaceImportController {
         Params base = base(actor, params);
         Map<Integer, String> chosen = new LinkedHashMap<>();
         Map<String, String> separators = new LinkedHashMap<>();
+        java.util.Set<Integer> overwriteLines = new java.util.HashSet<>();
+        java.util.Set<Integer> overwriteGroups = new java.util.HashSet<>();
         params.forEach((key, value) -> {
-            if (key.startsWith("col.")) {
+            if ((key.startsWith("ow.") || key.startsWith("owg.")) && value != null && !value.isBlank()) {
+                try {
+                    (key.startsWith("owg.") ? overwriteGroups : overwriteLines).add(Integer.parseInt(key.substring(key.indexOf('.') + 1)));
+                } catch (NumberFormatException e) {
+                    throw new WorkspaceException("params.invalid");
+                }
+            } else if (key.startsWith("col.")) {
                 int index;
                 try {
                     index = Integer.parseInt(key.substring(4));
@@ -555,7 +580,7 @@ public class ConsoleWorkspaceImportController {
             }
         });
         return new Params(base.accountId(), base.kind(), base.defaultOwner(), base.newStatus(), base.sheet(), base.fieldRow(), base.firstDataRow(),
-                chosen, separators);
+                chosen, separators, overwriteLines, overwriteGroups);
     }
 
     private static void copy(Map<String, String> from, Map<String, String> to, String... keys) {
@@ -577,7 +602,7 @@ public class ConsoleWorkspaceImportController {
     private static Map<String, String> carryAll(Map<String, String> params) {
         Map<String, String> carry = new LinkedHashMap<>();
         params.forEach((key, value) -> {
-            if (!key.equals("_csrf") && value != null) {
+            if (!key.equals("_csrf") && !key.startsWith("ow.") && !key.startsWith("owg.") && value != null) {
                 carry.put(key, value);
             }
         });

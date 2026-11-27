@@ -16,6 +16,9 @@ listing-guard:
     import-max-bytes: ${LISTING_GUARD_WORKSPACE_IMPORT_MAX_BYTES:20MB}
     import-max-rows: ${LISTING_GUARD_WORKSPACE_IMPORT_MAX_ROWS:10000}
     history-keep: ${LISTING_GUARD_WORKSPACE_HISTORY_KEEP:20}
+    # ADR-062: a listing the background audit calls an error (an ERROR of the rules or a HIGH trademark risk), or has not checked in full, cannot go from
+    # draft to "ready to export" until an ADMIN opens the block with a reason. false: nothing blocks. Only meaningful with the audit on.
+    block-on-error: ${LISTING_GUARD_WORKSPACE_BLOCK_ON_ERROR:true}
     # The background audit of the saved listings, the highlights and the e-mail alerts (ADR-061). Off by default and only meaningful with the
     # workspace and the Console on. While it is off nothing of it exists: no queue, no worker, no page, and the workspace pages are what they were.
     audit:

@@ -75,6 +75,10 @@ class WorkspaceDisabledIntegrationTest {
         assertThat(properties.memberEditScope()).isEqualTo(WorkspaceProperties.EditScope.OWN);
         for (Class<?> type : new Class<?>[] {WorkspaceListings.class, WorkspaceAccounts.class, WorkspaceTemplates.class, ImportStages.class,
                 ListingImportService.class, TemplateService.class, WorkspaceAccess.class, StandardTargets.class, EtsyFields.class,
+                // ADR-062: the editor, the clone, the history, the status and the conflicts of an import
+                ListingContent.class, ListingEditor.class, ListingCloner.class, ListingHistory.class, ListingComparison.class,
+                ListingStatusService.class, WorkspaceOverrides.class,
+                com.thanhdatpb.listingguard.api.console.workspace.ConsoleWorkspaceEditorController.class,
                 com.thanhdatpb.listingguard.api.console.workspace.ConsoleWorkspaceController.class,
                 com.thanhdatpb.listingguard.api.console.workspace.ConsoleWorkspaceImportController.class}) {
             assertThat(context.getBeanNamesForType(type)).as(type.getSimpleName()).isEmpty();
@@ -87,12 +91,15 @@ class WorkspaceDisabledIntegrationTest {
         UUID id = UUID.randomUUID();
         for (String path : new String[] {"/console/workspace", "/console/workspace/accounts", "/console/workspace/import",
                 "/console/workspace/import/sheet", "/console/workspace/import/mapping", "/console/workspace/listings/" + id,
-                "/console/workspace/templates/" + id + "/file"}) {
+                "/console/workspace/templates/" + id + "/file", "/console/workspace/new", "/console/workspace/new?account=" + id,
+                "/console/workspace/listings/" + id + "/edit", "/console/workspace/listings/" + id + "/history"}) {
             mvc.perform(get(path).with(signedIn(user))).andExpect(status().isNotFound());
         }
         for (String path : new String[] {"/console/workspace/accounts", "/console/workspace/import/preview", "/console/workspace/import/commit",
                 "/console/workspace/import/save-template", "/console/workspace/import/cancel", "/console/workspace/listings/" + id + "/owner",
-                "/console/workspace/listings/" + id + "/delete"}) {
+                "/console/workspace/listings/" + id + "/delete", "/console/workspace/new", "/console/workspace/listings/" + id + "/edit",
+                "/console/workspace/clone", "/console/workspace/clone/preview", "/console/workspace/clone/commit", "/console/workspace/status",
+                "/console/workspace/listings/" + id + "/restore", "/console/workspace/listings/" + id + "/draft"}) {
             mvc.perform(post(path).with(signedIn(user)).with(csrf()).param("name", "x")).andExpect(status().isNotFound());
         }
         mvc.perform(multipart("/console/workspace/import/upload").file(new MockMultipartFile("file", "f.xlsx", "application/octet-stream", new byte[] {1}))

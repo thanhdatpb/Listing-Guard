@@ -1,6 +1,7 @@
 package com.thanhdatpb.listingguard.api.console.workspace;
 
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
+import com.thanhdatpb.listingguard.api.workspace.ListingStatusService;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceTypes.ListingRole;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceTypes.ListingStatus;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceTypes.Marketplace;
@@ -68,6 +69,25 @@ final class WorkspaceLabels {
 
     String separator(String key) {
         return messages.get("workspace.separator." + key);
+    }
+
+    /** Why a listing is held back from "ready to export" (ADR-062): ERROR, HIGH, UNCHECKED, INCOMPLETE. */
+    String block(ListingStatusService.Block block) {
+        return messages.get("workspace.block." + lower(block));
+    }
+
+    /** What became of a listing in a change of status. */
+    String result(ListingStatusService.Result result) {
+        return messages.get("workspace.result." + lower(result));
+    }
+
+    /** A problem of one listing of a clone: {@code sku.taken}, {@code sku.empty}... */
+    String cloneProblem(String code) {
+        return messages.get("workspace.clone.problem." + code);
+    }
+
+    String cloneNotice(String code, int count) {
+        return messages.get("workspace.clone.notice." + code, count);
     }
 
     private static String lower(Enum<?> value) {

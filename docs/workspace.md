@@ -1,7 +1,8 @@
 # Kho listing (Listing workspace)
 
 Tài liệu này mô tả kho listing của ADR-059: nơi lưu listing để hệ thống rà và cảnh báo trên dữ liệu đã lưu, thay cho Google Sheet. PR nền này
-làm **kho, template theo tài khoản và nhập dữ liệu**. **Rà nền, tô đỏ và email cảnh báo (W2, ADR-061) có ở [mục 9](#9-rà-nền-tô-đỏ-và-email-adr-061)** và tắt mặc định. Trình soạn, nhân bản (W3) và xuất file `.xlsm`/`.txt` (W4) là các PR sau.
+làm **kho, template theo tài khoản và nhập dữ liệu**. **Rà nền, tô đỏ và email cảnh báo (W2, ADR-061) có ở [mục 9](#9-rà-nền-tô-đỏ-và-email-adr-061)** và tắt mặc định.
+**Trình soạn, tạo mới, nhân bản, lịch sử, trạng thái "Sẵn sàng xuất" và xung đột khi nhập lại (W3, ADR-062) có ở [mục 11](#11-trình-soạn-tạo-mới-nhân-bản-adr-062).** Xuất file `.xlsm`/`.txt` (W4) là PR sau.
 
 > **Chưa xác minh với template Amazon thật.** Repo chưa có template Amazon của HappyC. Mọi fixture là tổng hợp, và danh sách tên cột dùng để
 > *đoán* (`api/src/main/resources/workspace/standard-targets.yaml`) đều ghi `unverified`. Đoán chỉ điền sẵn, người dùng luôn xác nhận.
@@ -17,7 +18,7 @@ làm **kho, template theo tài khoản và nhập dữ liệu**. **Rà nền, t�
 | **Vai trò** | `PARENT` / `CHILD` / `STANDALONE`, suy từ cột parent/child (nếu có) và cột SKU cha. |
 | **Người phụ trách** | Tài khoản Console của client chịu trách nhiệm về listing. |
 | **Trạng thái** | Nháp, Sẵn sàng xuất, Đã xuất, Đang bán. Listing mới nhập lấy trạng thái chọn ở bước 1 (mặc định Nháp); listing đã có giữ trạng thái cũ. |
-| **Nguồn** | Nhập từ file, nhân bản, tạo mới (nhân bản và tạo mới là PR sau). |
+| **Nguồn** | Nhập từ file (`IMPORT`), nhân bản (`CLONE`), tạo mới (`NEW`) ([mục 11](#11-trình-soạn-tạo-mới-nhân-bản-adr-062)). |
 | **Customize** | Dòng của sheet Amazon Custom, nối với listing theo SKU khi đọc. Dòng chưa có listing vẫn được giữ và được báo. |
 | **Lịch sử** | N phiên bản gần nhất của mỗi listing (mặc định 20, `listing-guard.workspace.history-keep`). |
 
@@ -40,7 +41,8 @@ Tắt mặc định. Khi tắt: không có menu "Kho listing", mọi đường d
 ## 3. Quyền
 
 - Thành viên (MEMBER) của client **xem toàn bộ kho** của client.
-- MEMBER **chỉ sửa listing mình phụ trách** (với `own`). Trong PR này "sửa" là nhập dữ liệu ghi đè listing đã có; listing mới nhập bởi MEMBER được giao cho chính họ. Dòng thuộc listing của người khác bị báo lỗi và không ghi.
+- MEMBER **chỉ sửa listing mình phụ trách** (với `own`). "Sửa" là nhập dữ liệu ghi đè listing đã có, **sửa trong trình soạn**, khôi phục một phiên bản và chuyển trạng thái; listing mới nhập, tạo mới hoặc nhân bản bởi MEMBER được giao cho chính họ. Dòng thuộc listing của người khác bị báo lỗi và không ghi. MEMBER **nhân bản được listing của người khác** (bản nhân bản là nháp của chính họ) và mở listing đó ở dạng chỉ đọc.
+- Mở chặn "Sẵn sàng xuất" kèm lý do là việc của ADMIN ([mục 11.6](#116-trạng-thái-sẵn-sàng-xuất)).
 - ADMIN toàn quyền: quản lý tài khoản bán, tải template và đổi ánh xạ cột, nhập cột người phụ trách, đổi người phụ trách, xoá (xoá mềm), tải file template gốc.
 - MEMBER không tạo template và không đổi ánh xạ; khi header của file khác version hiện hành, việc nhập bị chặn với lời nhắc nhờ ADMIN tải template mới.
 - Vai trò đọc từ cơ sở dữ liệu ở mỗi request. Listing của client khác luôn là 404, không phải 403.
@@ -104,7 +106,7 @@ Giới hạn mặc định: 10.000 dòng, 20 MB, 1.500 cột. File có mật kh�
 -->
 
 - **Rà nền** (chỉ khi bật): tiến độ x/y theo tài khoản bán, lịch sử lượt rà, nút Rà lại tài khoản (ADMIN), công tắc email của riêng bạn.
-- **Chi tiết** (chỉ đọc): các trường theo thứ tự template (cột passthrough có nhãn), listing con, dòng Amazon Custom, lịch sử. ADMIN đổi người phụ trách hoặc xoá.
+- **Chi tiết**: các trường theo thứ tự template (cột passthrough có nhãn), listing con, dòng Amazon Custom, lịch sử, và nút **Sửa**, **Nhân bản**, **Lịch sử**. ADMIN đổi người phụ trách hoặc xoá. Cột đầu của danh sách là ô chọn: **Nhân bản đã chọn** và **Chuyển Sẵn sàng xuất**; nút **Tạo listing mới** ở đầu trang.
 - **Tài khoản và template**: danh sách tài khoản, các version template (ADMIN tải được file gốc), form thêm/sửa tài khoản.
 - **Nhập dữ liệu**: bốn bước ở mục 5.
 
@@ -130,6 +132,7 @@ Giới hạn mặc định: 10.000 dòng, 20 MB, 1.500 cột. File có mật kh�
 
 ## 8. Chưa làm, chưa đo
 
+- Chưa chạy bằng Docker/Testcontainers và trình duyệt thật cho W3 (xem [mục 11.8](#118-chưa-làm-chưa-đo)).
 - Chưa đối chiếu với file Excel/template Amazon thật (số sheet, tên sheet, số dòng cài đặt, tên cột `item_sku`...). Cần file thật của HappyC để chuyển các đoán sang `verified`.
 - Chưa đo bộ nhớ và thời gian khi nhập 10.000 dòng thật. Để đo: bật `LISTING_GUARD_WORKSPACE_ENABLED=true` và hai biến multipart `25MB`/`60MB` trong `.env`, chạy `docker compose up --build`, nhập một file 10.000 dòng bằng trang Nhập dữ liệu và ghi `docker stats` của container `api` cùng thời gian từ lúc bấm *Ghi vào kho* đến khi trang trả lời.
 - Test giao diện bằng Playwright dùng Testcontainers và dữ liệu tổng hợp. Xem [cách chụp lại ảnh](#10-chụp-lại-ảnh).
@@ -260,3 +263,67 @@ Bỏ `LG_WORKSPACE_SCREENSHOTS` để chỉ kiểm luồng trên trình duyệt.
 bỏ qua cả test. Ảnh được chụp ở viewport 1280 × 820. Trang dài lấy tối đa 1.800 px theo chiều dọc. Nếu máy có Pillow, script
 tối ưu PNG không mất dữ liệu. Sau khi chụp, kiểm tra đủ 12 ảnh, tooltip, chế độ sáng/tối, bố cục và dữ liệu mẫu trước khi bỏ
 comment các khối `<picture>` trong README và tài liệu này.
+
+## 11. Trình soạn, tạo mới, nhân bản (ADR-062)
+
+Nằm sau cùng cờ `LISTING_GUARD_WORKSPACE_ENABLED`: **tắt thì mọi đường dẫn mới là 404, không bảng nào bị đọc và các trang cũ giữ nguyên**. Không đổi `/api/v1`, SDK, MCP, ruleset hay `analysisVersion`.
+
+| Biến môi trường | Mặc định | Ý nghĩa |
+| --- | --- | --- |
+| `LISTING_GUARD_WORKSPACE_BLOCK_ON_ERROR` | `true` | Listing còn Lỗi, trademark HIGH hoặc chưa rà đủ không chuyển được sang "Sẵn sàng xuất" cho đến khi ADMIN mở chặn. Chỉ có nghĩa khi rà nền bật; `false` tắt hẳn cổng. |
+
+### 11.1 Sửa (`/console/workspace/listings/{id}/edit`)
+
+- Bạn sửa **theo cột của template**. Cột đã gán trường chuẩn được nhóm theo trường (bullet 1–5 cạnh nhau); mỗi ô hiện **tên cột gốc** (đúng chữ trong file) và nhóm hiện nhãn trường chuẩn. Cột chưa gán trường nằm trong phần thu gọn. SKU và người phụ trách hiện nhưng không sửa ở đây.
+- Bộ đếm ký tự lấy giới hạn từ **ruleset đang chạy của sàn** (giống trang Kiểm tra); chỉ là gợi ý nhìn, luật mới là nơi quyết định.
+- **Lưu** ghi một phiên bản mới (khoá lạc quan theo `version`, khoá theo tài khoản như nhập, lịch sử `Sửa`), dựng lại trường chuẩn, tiêu đề và `content_hash` **bằng đúng hàm của phần nhập** từ các cột đã lưu, rồi rà nền chạy ngay trên nội dung vừa lưu (nếu bật). **Lưu mà không sửa gì không ghi gì**: không phiên bản mới, không lịch sử, không rà lại.
+- Trang hiện kết quả rà mới nhất (tô đỏ của [mục 9.5](#95-tô-đỏ-trong-nội-dung)) và **Gợi ý sửa**: các câu gợi ý của quy tắc đi kèm phát hiện (ADR-014). Hệ thống **không tự sửa** và không gọi AI cho nội dung kho.
+- Người khác lưu trước bạn: trang báo (409) và hiện từng cột có khác biệt (lúc bạn mở / bạn đã nhập / đang lưu); chép phần cần giữ rồi bấm **Tải lại**.
+- MEMBER mở listing của người khác: chỉ đọc, có nút **Nhân bản về cho tôi**.
+- Sửa nội dung listing đang "Sẵn sàng xuất" đưa nó về "Nháp".
+
+### 11.2 Tạo mới (`/console/workspace/new`)
+
+Chọn tài khoản bán rồi điền form dựng từ **template mới nhất** của tài khoản (Etsy: các mục chính cố định). SKU bắt buộc và không trùng trong tài khoản. Bạn là người phụ trách, trạng thái Nháp. Tài khoản Amazon chưa có template thì ADMIN tải template trước.
+
+### 11.3 Nhân bản
+
+Từ danh sách (chọn nhiều), trang sửa hoặc trang chi tiết: **một listing**, **cả nhóm** (parent kèm mọi child; `parent_sku` của child đổi theo SKU parent mới) hoặc **nhiều listing đã chọn**. Bản nhân bản là nháp của bạn, ghi `cloned_from`, tối đa 500 listing mỗi lần và cùng một tài khoản nguồn.
+
+1. **Đích**: cùng tài khoản, hoặc tài khoản khác **cùng sàn**.
+2. **Cột** (khi sang tài khoản khác): cột thứ n gán trường X bên nguồn → cột thứ n gán trường X bên đích; cột chưa gán trường ghép theo cùng tên header. Cột nguồn **có giá trị mà không có cột tương ứng** được liệt kê để bạn **bỏ qua** hoặc **chép vào một cột trống của đích** trước khi tạo.
+3. **SKU mới**: gõ tay từng cái hoặc theo mẫu (thay chuỗi, tiền tố, hậu tố, đánh số từ n, đệm số 0). Trang xem trước liệt kê từng SKU và báo SKU **trống, quá dài, trùng trong tài khoản đích, trùng trong lô**; còn lỗi thì không ghi.
+4. **Customize** (Amazon): tuỳ chọn nhân bản dòng Amazon Custom của SKU gốc sang SKU mới.
+5. Cả lô ghi trong **một giao dịch**; rà nền nhận các listing mới như sau một lần nhập.
+
+### 11.4 So với bản gốc
+
+Listing nhân bản mà bản gốc còn tồn tại: cột còn **giống hệt bản gốc** được đánh dấu **Chưa sửa** (hay gặp: quên sửa tiêu đề, sót thông tin bản cũ). Tiêu đề giống hệt bản gốc hoặc listing khác cùng tài khoản hiện **cảnh báo trùng**: đây là kiểm tra nội bộ của kho, **không phải chính sách của sàn**. Tính khi hiển thị, không đổi kết quả rà. Rule bắt thông tin sót (size, số lượng) là việc của W5.
+
+### 11.5 Lịch sử (`…/history`)
+
+Danh sách phiên bản còn giữ (`LISTING_GUARD_WORKSPACE_HISTORY_KEEP`), **khác biệt từng cột** giữa hai phiên bản bất kỳ, và **Khôi phục**: ghi các cột của phiên bản đó thành một phiên bản **mới**, không ghi đè bản nào. SKU và người phụ trách không được khôi phục; cột template hiện tại không còn thì bỏ và được báo.
+
+### 11.6 Trạng thái "Sẵn sàng xuất"
+
+Chọn listing ở danh sách (hoặc nút ở trang sửa) → **Chuyển Sẵn sàng xuất**: trang liệt kê từng listing và vì sao bị chặn, rồi mới chuyển. Chỉ listing Nháp bạn được sửa mới chuyển.
+
+| Chặn vì | Nghĩa |
+| --- | --- |
+| Còn Lỗi / rủi ro HIGH | Kết quả rà của đúng nội dung hiện tại có ERROR của quy tắc hoặc HIGH của trademark. |
+| Chưa kiểm | Chưa có kết quả rà, hoặc kết quả là của nội dung cũ. |
+| Chưa rà đủ | Phần trademark chưa chạy (không có catalog/watchlist, plan không có pack...). |
+
+Cảnh báo (WARNING/MEDIUM) không chặn. **ADMIN mở chặn** bằng cách tick và nhập **lý do bắt buộc**; hệ thống lưu người mở, thời điểm, `content_hash` và trạng thái rà lúc mở. **Lý do hết hiệu lực ngay khi nội dung listing đổi** (listing về Nháp và bị chặn lại). Rà nền tắt thì không có gì chặn.
+
+### 11.7 Xung đột khi nhập lại
+
+Dòng của file mà listing **đã được sửa, tạo mới, nhân bản hoặc khôi phục trong kho sau lần nhập gần nhất của nó** sẽ hiện ở bước xem trước là **Đã sửa trong kho**, không tính vào "cập nhật", và **mặc định bị bỏ qua**. Tick **Ghi đè** từng dòng hoặc **Ghi đè cả nhóm** (parent kèm child) nếu file mới hơn. Dòng không xung đột như cũ.
+
+### 11.8 Chưa làm, chưa đo
+
+- **Chưa xác minh với template Amazon thật**: phép ghép cột khi nhân bản sang tài khoản khác chỉ được thử trên file tổng hợp.
+- **Chưa chạy trên trình duyệt thật**: kịch bản `scripts/test-console-workspace-editor.py` (Playwright) đã viết nhưng chưa chạy; xem cách chạy trong phần đầu của script.
+- Bộ test Testcontainers chưa chạy trong môi trường không có Docker (CI GitHub Actions chạy); các test mới đã chạy trên PostgreSQL 16 cục bộ không có pgvector.
+- Chưa đo thời gian nhân bản 500 listing và bộ nhớ.
+- Xuất file `.xlsm`/`.txt` (W4) chưa có; loại thay đổi lịch sử `EXPORT` đã có sẵn trong CHECK nhưng chưa ai ghi.
