@@ -32,12 +32,12 @@
             <select class="lg-select" id="sheet" name="sheet">
                 <option th:each="s : ${sheets}" th:value="${s}" th:selected="${s == sheet}" th:text="${s}"></option>
             </select>
-            <span th:if="${sheetGuessed}" th:replace="~{console/workspace-fragments :: guessed}"></span>
+            <th:block th:if="${sheetGuessed}"><span th:replace="~{console/workspace-fragments :: guessed}"></span></th:block>
         </div>
         <div class="lg-field lg-field--narrow">
             <label class="lg-field__label" for="fieldRow" th:text="#{workspace.sheet.fieldrow}"></label>
             <input class="lg-input lg-num" type="number" min="1" id="fieldRow" name="fieldRow" th:value="${fieldRow}" aria-describedby="fieldrow-hint">
-            <span th:if="${fieldRowGuessed}" th:replace="~{console/workspace-fragments :: guessed}"></span>
+            <th:block th:if="${fieldRowGuessed}"><span th:replace="~{console/workspace-fragments :: guessed}"></span></th:block>
             <p class="lg-field__hint" id="fieldrow-hint" th:text="${guessConfident or !fieldRowGuessed} ? #{workspace.sheet.fieldrow.hint} : #{workspace.sheet.fieldrow.unsure}"></p>
         </div>
         <div class="lg-field lg-field--narrow">
@@ -51,7 +51,7 @@
                 <option value="" th:selected="${skuCol < 0}" th:text="#{workspace.sheet.sku.none}"></option>
                 <option th:each="c : ${columns}" th:value="${c.index()}" th:selected="${c.index() == skuCol}" th:text="${c.label()}"></option>
             </select>
-            <span th:if="${skuGuessed and skuCol >= 0}" th:replace="~{console/workspace-fragments :: guessed}"></span>
+            <th:block th:if="${skuGuessed and skuCol >= 0}"><span th:replace="~{console/workspace-fragments :: guessed}"></span></th:block>
         </div>
         <div class="lg-actions">
             <button type="submit" class="lg-btn" id="sheet-refresh" th:text="#{workspace.sheet.refresh}"></button>

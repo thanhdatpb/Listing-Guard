@@ -51,7 +51,7 @@
                         </select>
                     </td>
                     <td>
-                        <span th:if="${row.origin() == 'guessed'}" th:replace="~{console/workspace-fragments :: guessed}"></span>
+                        <th:block th:if="${row.origin() == 'guessed'}"><span th:replace="~{console/workspace-fragments :: guessed}"></span></th:block>
                         <span class="lg-text-muted" th:if="${row.origin() != 'guessed'}" th:text="${row.originLabel()}"></span>
                     </td>
                 </tr>

@@ -200,7 +200,13 @@ class ConsoleWorkspaceIntegrationTest {
         assertThat(targets.get(0)[1]).isEqualTo("sku");
         assertThat(targets.get(2)[1]).isEqualTo("title");
         assertThat(targets.get(15)[1]).as("x_custom_flag is not guessed").isEmpty();
-        assertThat(mapping).contains("Guessed");
+        // a guess says so, and only a guess does: 15 columns were guessed, the 16th was not
+        assertThat(mapping.split("lg-chip--flag", -1)).as("one Guessed chip per guessed column").hasSize(1 + 15);
+        // what a person has already confirmed (sheet, rows and SKU column given) is no longer called a guess
+        String confirmed = html(get("/console/workspace/import/sheet").with(signedIn(team.admin())).param("stage", stage).param("mode", "import")
+                .param("account", account.toString()).param("kind", "AMAZON_BULK").param("sheet", "Template").param("fieldRow", "3")
+                .param("firstDataRow", "4").param("skuCol", "0"), 200);
+        assertThat(confirmed).doesNotContain("lg-chip--flag");
 
         // step 4: the preview says what will happen and writes nothing
         String preview = html(withFields(post("/console/workspace/import/preview"), team.admin(), stage, account, "AMAZON_BULK", "Template", mapping), 200);
