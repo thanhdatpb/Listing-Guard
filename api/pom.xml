@@ -54,6 +54,10 @@
             <groupId>com.thanhdatpb.listingguard</groupId>
             <artifactId>listing-input-adapters</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.thanhdatpb.listingguard</groupId>
+            <artifactId>workspace-sheets</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
