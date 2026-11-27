@@ -27,3 +27,7 @@ V54 lưu tên cột đã chọn và metadata vận hành, thêm thống kê theo
 ## Demo workspace
 
 Optional demo workspace (ADR-057, V55) seeds synthetic input through the real Console services, isolates the fictional catalog, and blocks demo API key issuance. See the [demo runbook](../demo.md).
+
+## Role-based home and manager report
+
+Pilot and demo Console can show **Overview** for client administrators and **My work** for members (ADR-058, V56). The existing pilot report has a compact manager view for A4 printing and retains the CSV export.

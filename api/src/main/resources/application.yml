@@ -46,6 +46,8 @@ listing-guard:
       model: ${LISTING_GUARD_ANALYZER_LLM_MODEL:}
       json-mode: ${LISTING_GUARD_ANALYZER_LLM_JSON_MODE:true}
   console:
+    role-home-enabled: ${LISTING_GUARD_CONSOLE_ROLE_HOME_ENABLED:false}
+    catalog-gate-passed-version: ${LISTING_GUARD_CONSOLE_CATALOG_GATE_PASSED_VERSION:}
     pilot: ${LISTING_GUARD_CONSOLE_PILOT:false}
     policy-changes-enabled: ${LISTING_GUARD_CONSOLE_POLICY_CHANGES_ENABLED:true}
     pod-enabled: ${LISTING_GUARD_CONSOLE_POD_ENABLED:true}

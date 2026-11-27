@@ -4,6 +4,7 @@ import com.thanhdatpb.listingguard.api.check.CheckScope;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
 import com.thanhdatpb.listingguard.api.feedback.FeedbackTarget;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * What the result page shows after a bulk run (ADR-029): one {@link Row} per input row, in the input's order, the counts of each
@@ -149,10 +150,15 @@ public record BulkResult(String marketplace, boolean header, List<Row> rows, Cou
      * @param skippedFields  the required fields the row was not checked for (ADR-052), in ruleset order; empty for FULL
      */
     public record Rules(boolean ran, String note, String readiness, String readinessLabel, Integer score, List<Item> items,
-                        CheckScope.Kind scope, List<String> skippedFields) {
+                        CheckScope.Kind scope, List<String> skippedFields, UUID checkId) {
 
         public Rules {
             skippedFields = List.copyOf(skippedFields);
+        }
+
+        public Rules(boolean ran, String note, String readiness, String readinessLabel, Integer score, List<Item> items,
+                     CheckScope.Kind scope, List<String> skippedFields) {
+            this(ran, note, readiness, readinessLabel, score, items, scope, skippedFields, null);
         }
 
         /** A row of the full check. */

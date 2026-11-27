@@ -530,8 +530,12 @@ public class ConsoleBulkController {
         feedback.accountId(user).ifPresent(account -> result.rows().forEach(row -> {
             var detail = row.detail();
             if (detail == null) return;
-            historyTarget(user.clientId(), account, marketplace.code(), row, "listing-rules",
-                    detail.rules().items().stream().map(BulkResult.Item::target).filter(java.util.Objects::nonNull).findFirst().orElse(null));
+            if (pilot.roleHome() && detail.rules().checkId() != null) {
+                history.account(user.clientId(), account, "listing-rules", detail.rules().checkId(), marketplace.code(), 1, row.sku());
+            } else {
+                historyTarget(user.clientId(), account, marketplace.code(), row, "listing-rules", detail.rules().items().stream()
+                        .map(BulkResult.Item::target).filter(java.util.Objects::nonNull).findFirst().orElse(null));
+            }
             historyTarget(user.clientId(), account, marketplace.code(), row, "trademark-risk",
                     detail.trademark().items().stream().map(BulkResult.Item::target).filter(java.util.Objects::nonNull).findFirst().orElse(null));
             historyTarget(user.clientId(), account, marketplace.code(), row, "variation-checks",

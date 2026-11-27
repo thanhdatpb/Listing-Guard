@@ -10,7 +10,7 @@ chức năng đang hoạt động. Tiếng Việt là mặc định. Bạn có t
 1. Trong Sheet, sao chép vùng dữ liệu có hàng tiêu đề. Dùng đúng các cột bạn đang viết: `SKU`, `Title`, `Description`, `Tags`. Bạn **không cần**
    cột `Category`, `Price`, `Quantity`, `Who made` hay `When made`: những trường đó điền trên Etsy khi tạo listing. Nếu bảng có các cột đó,
    Console kiểm chúng, và ô trống trong cột có sẵn vẫn là lỗi.
-   Trên trang chủ, bấm **Dán từ Sheet**. Chọn Etsy hoặc Amazon và dán vào ô nhập.
+   Trên trang **Việc của tôi**, bấm **Kiểm tra hàng loạt**. Chọn Etsy hoặc Amazon và dán vào ô nhập.
 2. Bấm **Tiếp tục: chọn cột**. Xác nhận các cột mà Console tự nhận diện, chỉnh ánh xạ nếu cần. Mục **Phạm vi kiểm tra** mặc định là
    **Kiểm nội dung (chỉ các cột có trong bảng)**: trường bảng không có cột không bị báo thiếu. Rồi bấm **Kiểm tra N dòng**.
 
@@ -59,3 +59,9 @@ Tên cột của Cerebro/Magnet chưa được xác minh với file thật. Có 
 
 Mở **Kiểm keyword** và dán mỗi slogan hoặc cụm chữ trên một dòng. Xem trước rồi chạy kiểm. Mở nguồn của các cảnh báo trước
 khi chọn chữ để in. Giữ nguyên chữ từ nguồn của bạn để kiểm lại khi cần. Chỉ gửi nội dung của seller, tránh đưa thông tin cá nhân của người mua.
+
+## Trang chủ theo vai trò
+
+**Việc của tôi** là trang chủ của seller. Dùng **Kiểm tra hàng loạt** để bắt đầu từ Sheet, **Kiểm keyword** nếu tính năng đã bật, hoặc **Sửa listing** để so sánh trước và sau. Mục **Listing cần sửa** dựa trên lượt gần nhất đã ghi cho tài khoản của bạn. Nút **Ẩn hướng dẫn này** chỉ áp dụng cho tài khoản đang đăng nhập.
+
+Quản lý thấy **Tổng quan**. Chọn 7, 30 hoặc 90 ngày để xem chỉ số, rồi mở **Báo cáo cho quản lý** để in A4 hoặc lưu PDF. CSV vẫn tải từ báo cáo pilot.
