@@ -129,7 +129,7 @@ class WorkspaceDemoDatasetIntegrationTest {
         jdbc.query("""
                 SELECT a.name_key, l.sku, au.state FROM workspace_listing l
                 JOIN workspace_listing_audit au ON au.listing_id = l.id
-                JOIN (SELECT id, CASE name WHEN 'Sample Paper Studio' THEN 'A' WHEN 'Sample Home Goods' THEN 'B' ELSE 'ETSY' END AS name_key
+                JOIN (SELECT id, CASE name WHEN 'Paper Studio' THEN 'A' WHEN 'Pillow Home' THEN 'B' ELSE 'ETSY' END AS name_key
                         FROM workspace_account) a ON a.id = l.account_id
                 WHERE l.client_id = ? AND l.deleted_at IS NULL ORDER BY a.name_key, l.sku""", rs -> {
             states.put(rs.getString(1) + "/" + rs.getString(2), rs.getString(3));

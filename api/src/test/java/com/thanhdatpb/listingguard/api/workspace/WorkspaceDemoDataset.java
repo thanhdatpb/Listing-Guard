@@ -62,7 +62,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 final class WorkspaceDemoDataset {
 
-    static final String ADMIN_EMAIL = "workspace-reviewer@example.test";
     static final String FIRST_WATCH = "Flarbithene";
     static final String RISK_WATCH = "Vellumzoq";
     private static final String CATALOG_ENTRY = "demo-fictional-2026-11";
@@ -311,14 +310,15 @@ final class WorkspaceDemoDataset {
             client = clients.createClient(clientName).getId();
             Map<String, String> emails = new LinkedHashMap<>();
             for (Person person : people()) {
-                console.saveAndFlush(new ConsoleAccount(person.email(), client, person.role()));
-                actors.put(person.key(), access.actor(new ConsoleUser(person.email(), client)).orElseThrow());
-                emails.put(person.key(), person.email());
+                String email = freeEmail(person.email());
+                console.saveAndFlush(new ConsoleAccount(email, client, person.role()));
+                actors.put(person.key(), access.actor(new ConsoleUser(email, client)).orElseThrow());
+                emails.put(person.key(), email);
             }
             Actor admin = actors.get("admin");
-            accountIds.put("A", accounts.create(client, Marketplace.AMAZON, "Sample Paper Studio", "Sample Studio", ExportFormat.XLSM).id());
-            accountIds.put("B", accounts.create(client, Marketplace.AMAZON, "Sample Home Goods", "Sample Home", ExportFormat.TXT).id());
-            accountIds.put("ETSY", accounts.create(client, Marketplace.ETSY, "Sample Etsy Shop", null, ExportFormat.XLSM).id());
+            accountIds.put("A", accounts.create(client, Marketplace.AMAZON, "Paper Studio", "Sample Studio", ExportFormat.XLSM).id());
+            accountIds.put("B", accounts.create(client, Marketplace.AMAZON, "Pillow Home", "Sample Home", ExportFormat.TXT).id());
+            accountIds.put("ETSY", accounts.create(client, Marketplace.ETSY, "Etsy Shop", null, ExportFormat.XLSM).id());
 
             Path demo = Path.of("..", "catalogs", "demo");
             var ruleset = rulesets.ruleset();
@@ -401,6 +401,18 @@ final class WorkspaceDemoDataset {
                 found.put(key + "/" + rs.getString(2), rs.getObject(3, UUID.class));
             }, client);
             return new Seeded(client, Map.copyOf(accountIds), Map.copyOf(found), Map.copyOf(actors), files, expected);
+        }
+
+        /**
+         * An e-mail address is unique in the whole database: the first seeding uses the address of people.csv, a second one in the same database
+         * (two test classes of one run share it) gets a tag in the local part.
+         */
+        private String freeEmail(String email) {
+            if (jdbc.queryForObject("SELECT count(*) FROM account WHERE lower(email) = lower(?)", Integer.class, email) == 0) {
+                return email;
+            }
+            int at = email.indexOf('@');
+            return email.substring(0, at) + "." + UUID.randomUUID().toString().substring(0, 6) + email.substring(at);
         }
 
         /** Serves the DEMO catalog to the client, or stops serving it. */
