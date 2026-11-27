@@ -15,22 +15,28 @@
     <link rel="apple-touch-icon" th:href="@{/brand/icons/icon-180.png(v=${assetVersion})}">
     <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+    <script th:src="@{/brand/theme.js(v=${assetVersion})}"></script>
+    <script defer th:src="@{/brand/console-interactions.js(v=${assetVersion})}"></script>
     <link rel="stylesheet" th:href="@{/brand/tokens.css(v=${assetVersion})}">
     <link rel="stylesheet" th:href="@{/brand/app.css(v=${assetVersion})}">
 </th:block>
 
 <!-- The lockup (symbol and wordmark): the cobalt file, or the reverse file when the system is dark. cssClass sizes it. -->
-<picture th:fragment="logo(cssClass)">
-    <source media="(prefers-color-scheme: dark)" th:srcset="@{/brand/logo/lockup-horizontal-reverse.svg(v=${assetVersion})}">
-    <img th:src="@{/brand/logo/lockup-horizontal.svg(v=${assetVersion})}" th:alt="#{brand.name}" th:class="${cssClass}">
-</picture>
+<span th:fragment="logo(cssClass)" class="lg-lockup">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" th:srcset="@{/brand/logo/lockup-horizontal-reverse.svg(v=${assetVersion})}">
+        <img th:src="@{/brand/logo/lockup-horizontal.svg(v=${assetVersion})}" th:alt="#{brand.name}" th:class="${cssClass}">
+    </picture>
+    <img class="lg-lockup__light" th:classappend="${cssClass}" th:src="@{/brand/logo/lockup-horizontal.svg(v=${assetVersion})}" th:alt="#{brand.name}">
+    <img class="lg-lockup__dark" th:classappend="${cssClass}" th:src="@{/brand/logo/lockup-horizontal-reverse.svg(v=${assetVersion})}" th:alt="#{brand.name}">
+</span>
 
 <!-- The notice of a demonstration catalog, one text for the banner and for the trademark panel of the editor. -->
 <span th:fragment="demoText" th:text="#{demo.banner}"></span>
 
 <!-- Shown on every console page while the configured trademark catalog version starts with "demo-" (ConsoleModelAdvice). -->
 <div th:fragment="demoBanner" th:if="${demoCatalog == true or demoWorkspace == true}" id="demo-banner" role="note" class="lg-banner lg-banner--warning lg-banner--sticky">
-    <th:block th:if="${demoWorkspace}"><svg class="lg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/></svg> <span th:text="#{demo.workspace.banner}"></span></th:block><th:block th:unless="${demoWorkspace}"><span th:replace="~{console/layout :: demoText}"></span></th:block>
+    <th:block th:if="${demoWorkspace}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/></svg> <span th:text="#{demo.workspace.banner}"></span></th:block><th:block th:unless="${demoWorkspace}"><span th:replace="~{console/layout :: demoText}"></span></th:block>
 </div>
 
 <!-- The links that change the language of the page (ConsoleLanguageAdvice): each language is named in itself, on purpose. -->
@@ -69,10 +75,18 @@
         <symbol id="lg-i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
         <symbol id="lg-i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
         <symbol id="lg-i-download" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/></symbol>
+        <symbol id="lg-i-edit" viewBox="0 0 24 24"><path d="M5 19l4-.9 10-10-3.1-3.1-10 10L5 19Zm9-12l3 3M4 21h16"/></symbol>
+        <symbol id="lg-i-phrase" viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8m-8 3h5"/></symbol>
+        <symbol id="lg-i-experiments" viewBox="0 0 24 24"><path d="M9 3h6m-5 0v7l-5 8a2 2 0 002 3h10a2 2 0 002-3l-5-8V3M8 15h8"/></symbol>
+        <symbol id="lg-i-review" viewBox="0 0 24 24"><path d="M5 5h14v14H5V5Zm3 6 3 3 5-5"/></symbol>
+        <symbol id="lg-i-impact" viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h16m-3-8 3 3-3 3"/></symbol>
+        <symbol id="lg-i-pod" viewBox="0 0 24 24"><path d="M12 3l8 4v10l-8 4-8-4V7l8-4Zm0 8v10M4 7l8 4 8-4"/></symbol>
     </svg>
     <a class="app-side__brand" th:href="@{/console}">
         <picture th:replace="~{console/layout :: logo('app-side__logo')}"></picture>
     </a>
+    <div class="app-theme" th:replace="~{console/layout :: themeSwitch}"></div>
+    <p id="console-working" hidden th:text="#{console.working}"></p>
     <input type="checkbox" id="app-menu" class="app-side__toggle">
     <label class="app-side__menu" for="app-menu">
         <svg class="lg-icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#lg-i-menu"/></svg>
@@ -85,8 +99,8 @@
             <a class="app-nav__link" th:href="@{/console/check}" th:aria-current="${active == 'check'} ? 'page'"><th:block th:text="#{nav.check}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
             <a class="app-nav__link" th:href="@{/console/bulk}" th:aria-current="${active == 'bulk'} ? 'page'"><th:block th:text="#{nav.bulk}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg></a>
             <a th:if="${phraseScreeningEnabled == true}" class="app-nav__link" th:href="@{/console/phrase-screening}"
-               th:aria-current="${active == 'phrases'} ? 'page'"><th:block th:text="#{phrase.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg></a>
-            <a class="app-nav__link" th:href="@{/console/check/edit}" th:aria-current="${active == 'edit'} ? 'page'" th:text="#{edit.heading}"></a>
+               th:aria-current="${active == 'phrases'} ? 'page'"><th:block th:text="#{phrase.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-phrase"/></svg></a>
+            <a class="app-nav__link" th:href="@{/console/check/edit}" th:aria-current="${active == 'edit'} ? 'page'"><th:block th:text="#{edit.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-edit"/></svg></a>
             <p class="app-nav__label" th:text="#{nav.group.monitor}"></p>
             <a class="app-nav__link" th:href="@{/console/history}" th:aria-current="${active == 'history'} ? 'page'"><th:block th:text="#{nav.history}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-history"/></svg></a>
             <a class="app-nav__link" th:href="@{/console/reaudit}" th:aria-current="${active == 'reaudit'} ? 'page'"><th:block th:text="#{nav.reaudit}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-reaudit"/></svg></a>
@@ -96,13 +110,15 @@
                 <a class="app-nav__link" th:href="@{/console/stats}" th:aria-current="${active == 'stats'} ? 'page'"><th:block th:text="#{nav.stats}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-stats"/></svg></a>
                 <a th:if="${consoleNavigation != null and consoleNavigation.readiness}" class="app-nav__link" th:href="@{/console/readiness}" th:aria-current="${active == 'readiness'} ? 'page'"><th:block th:text="#{nav.readiness}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
                 <a class="app-nav__link" th:href="@{/console/api-keys}" th:aria-current="${active == 'keys'} ? 'page'"><th:block th:text="#{nav.keys}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-keys"/></svg></a>
+                <a th:if="${consoleNavigation != null and consoleNavigation.pilot}" class="app-nav__link" th:href="@{/console/stats/pilot}"
+                   th:aria-current="${active == 'pilot-report'} ? 'page'"><th:block th:text="#{pilot.report}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-report"/></svg></a>
                 <a th:unless="${consoleNavigation != null and consoleNavigation.pilot}" class="app-nav__link" th:href="@{/console/report}" th:aria-current="${active == 'report'} ? 'page'"><th:block th:text="#{nav.report}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-report"/></svg></a>
             </th:block>
             <th:block th:if="${consoleNavigation != null and (consoleNavigation.pod or consoleNavigation.policyChanges or consoleNavigation.review)}">
-                <p class="app-nav__label" th:text="#{nav.group.experimental}"></p>
-                <a class="app-nav__link" th:if="${consoleNavigation.review}" th:href="@{/console/review-queue}" th:aria-current="${active == 'review'} ? 'page'" th:text="#{review.heading}"></a>
-                <a class="app-nav__link" th:if="${consoleNavigation.policyChanges}" th:href="@{/console/policy-changes}" th:aria-current="${active == 'impact'} ? 'page'" th:text="#{impact.heading}"></a>
-                <a class="app-nav__link" th:if="${consoleNavigation.pod}" th:href="@{/console/pod-readiness}" th:aria-current="${active == 'pod'} ? 'page'" th:text="#{pod.title}"></a>
+                <p class="app-nav__label app-nav__label--icon"><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-experiments"/></svg><span th:text="#{nav.group.experimental}"></span></p>
+                <a class="app-nav__link" th:if="${consoleNavigation.review}" th:href="@{/console/review-queue}" th:aria-current="${active == 'review'} ? 'page'"><th:block th:text="#{review.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-review"/></svg></a>
+                <a class="app-nav__link" th:if="${consoleNavigation.policyChanges}" th:href="@{/console/policy-changes}" th:aria-current="${active == 'impact'} ? 'page'"><th:block th:text="#{impact.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-impact"/></svg></a>
+                <a class="app-nav__link" th:if="${consoleNavigation.pod}" th:href="@{/console/pod-readiness}" th:aria-current="${active == 'pod'} ? 'page'"><th:block th:text="#{pod.title}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-pod"/></svg></a>
             </th:block>
         </nav>
         <div class="app-side__foot">
@@ -122,5 +138,13 @@
         </div>
     </div>
 </header>
+<div th:fragment="themeSwitch" class="app-theme" data-console-theme-controls hidden>
+    <label class="lg-sr-only" for="console-theme" th:text="#{theme.label}"></label>
+    <select class="lg-select" id="console-theme" data-console-theme-switch>
+        <option value="system" th:text="#{theme.system}"></option>
+        <option value="light" th:text="#{theme.light}"></option>
+        <option value="dark" th:text="#{theme.dark}"></option>
+    </select>
+</div>
 </body>
 </html>

@@ -27,6 +27,7 @@
             <button type="submit" class="lg-btn lg-btn--primary lg-btn--block" th:text="#{login.submit}"></button>
         </form>
         <div class="lg-auth__foot">
+            <div th:replace="~{console/layout :: themeSwitch}"></div>
             <div th:replace="~{console/layout :: languageSwitch}"></div>
         </div>
     </div>

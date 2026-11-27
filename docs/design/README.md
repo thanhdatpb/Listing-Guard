@@ -23,3 +23,21 @@ Nguồn thiết kế chính thức cho console và mọi bề mặt của Listin
 - Chữ trên giao diện không lấy từ mockup: mọi câu là key trong `messages*.properties` (ADR-028).
 - Font và logo tự host, không tải từ CDN.
 - Logo: không đổi màu, không kéo giãn, khoảng trống tối thiểu bằng chiều cao chữ "x"; dưới 120px chiều rộng chỉ dùng `symbol`.
+
+## Ảnh màn hình hiện tại
+
+Gallery chụp giao diện thật của client DEMO ở 1440 px, gồm ảnh sáng, tối và bản in báo cáo quản lý. Script từ chối
+trang Console thiếu băng DEMO, che email ở sidebar và chỉ tải tài nguyên từ origin localhost. Kết quả nằm trong
+`screens/current/`. Mở `screens/current/index.html` để trình chiếu.
+
+Trên Windows, chạy stack theo [hướng dẫn demo](../demo.md). Dùng tên email đã seed rồi chạy:
+
+```powershell
+py -m pip install playwright
+py -m playwright install chromium
+py scripts/capture-console-gallery.py --email demo-admin@example.test
+```
+
+Script đăng nhập bằng magic link lấy từ log API dev. Có thể truyền `--storage-state <file>` để dùng phiên ADMIN
+demo đã đăng nhập và `--member-state <file>` để chụp thêm trang Việc của tôi. Giữ file phiên trên máy cục bộ. Nếu đổi
+cổng, truyền `--url http://localhost:<cổng>`. Xem lại ảnh rồi commit các file ảnh và index do script tạo.

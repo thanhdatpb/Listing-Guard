@@ -27,7 +27,7 @@
         </div>
     </div>
 
-    <div class="lg-banner lg-banner--success lg-section" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
+    <div class="lg-banner lg-banner--success lg-toast lg-section" id="notice" role="status" th:if="${notice != null}"><p th:text="${notice}"></p></div>
     <div class="lg-banner lg-banner--error lg-section" id="plan-refused" role="alert" th:if="${planRefused != null}"><p th:text="${planRefused}"></p></div>
     <div class="lg-banner lg-banner--error lg-section" id="errors" role="alert" th:if="${errors != null and !errors.isEmpty()}">
         <div class="lg-banner__body">
@@ -69,7 +69,7 @@
                     </tbody>
                 </table>
             </div>
-            <form id="apply-form" class="lg-actions" method="post" th:action="@{/console/watchlist/import}" th:if="${previewCanApply}">
+            <form id="apply-form" data-console-submit class="lg-actions" method="post" th:action="@{/console/watchlist/import}" th:if="${previewCanApply}">
                 <input type="hidden" name="data" th:value="${previewData}">
                 <input type="hidden" name="delimiter" th:value="${previewDelimiter}">
                 <input type="hidden" name="revision" th:value="${revision}">
@@ -82,7 +82,7 @@
         <!-- the add form and the edit form: the same fields, opened by ?add or ?edit=, or kept open after a refusal -->
         <section class="lg-card lg-section" id="entry-form" tabindex="-1" aria-labelledby="entry-form-heading" th:if="${admin and formOpen}">
             <h2 id="entry-form-heading" class="lg-card__title" th:text="${form.id == null} ? #{watchlist.form.add.heading} : #{watchlist.form.edit.heading}"></h2>
-            <form id="save-form" class="lg-form" method="post" th:action="@{/console/watchlist/entries}">
+            <form id="save-form" data-console-submit class="lg-form" method="post" th:action="@{/console/watchlist/entries}">
                 <input type="hidden" name="revision" th:value="${revision}">
                 <input type="hidden" name="id" th:if="${form.id != null}" th:value="${form.id}">
                 <div class="lg-field">
@@ -124,7 +124,7 @@
         <section class="lg-card lg-section" id="import" tabindex="-1" aria-labelledby="import-heading" th:if="${admin and importOpen and preview == null}">
             <h2 id="import-heading" class="lg-card__title" th:text="#{watchlist.import.heading}"></h2>
             <p class="lg-text-muted" th:text="#{watchlist.import.intro}"></p>
-            <form id="import-form" class="lg-form" method="post" enctype="multipart/form-data" th:action="@{/console/watchlist/import/preview}">
+            <form id="import-form" data-console-submit class="lg-form" method="post" enctype="multipart/form-data" th:action="@{/console/watchlist/import/preview}">
                 <div class="lg-field">
                     <label class="lg-field__label" for="pasted" th:text="#{watchlist.import.paste}"></label>
                     <textarea class="lg-textarea lg-textarea--mono" id="pasted" name="pasted" rows="6" spellcheck="false" aria-describedby="pasted-hint"></textarea>
@@ -202,7 +202,7 @@
                         <td class="lg-nowrap"><code class="lg-code" th:if="${row.serialNumber != null}" th:text="${row.serialNumber}"></code><span class="lg-text-muted" th:if="${row.serialNumber == null}">&mdash;</span></td>
                         <td class="lg-wrap"><span th:if="${row.note != null and !row.note.isEmpty()}" th:text="${row.note}"></span><span class="lg-text-muted" th:if="${row.note == null or row.note.isEmpty()}">&mdash;</span></td>
                         <td>
-                            <form class="lg-inline" method="post" th:if="${admin}" th:action="@{/console/watchlist/entries/{id}/toggle(id=${row.id})}">
+                            <form data-console-submit class="lg-inline" method="post" th:if="${admin}" th:action="@{/console/watchlist/entries/{id}/toggle(id=${row.id})}">
                                 <input type="hidden" name="revision" th:value="${revision}">
                                 <button type="submit" class="lg-switch" role="switch" th:classappend="${row.enabled} ? 'lg-switch--on'"
                                         th:attr="aria-checked=${row.enabled},aria-label=#{watchlist.switch.aria(${row.mark})}"></button>
@@ -213,7 +213,7 @@
                         <td class="lg-nowrap" th:if="${admin}">
                             <a class="lg-btn lg-btn--small" th:href="@{/console/watchlist(edit=${row.id})} + '#entry-form'" th:text="#{watchlist.edit}"
                                th:aria-label="#{watchlist.edit.aria(${row.mark})}"></a>
-                            <form class="lg-inline" method="post" th:action="@{/console/watchlist/entries/{id}/delete(id=${row.id})}">
+                            <form data-console-submit class="lg-inline" method="post" th:action="@{/console/watchlist/entries/{id}/delete(id=${row.id})}">
                                 <input type="hidden" name="revision" th:value="${revision}">
                                 <button type="submit" class="lg-btn lg-btn--small" th:text="#{watchlist.delete}"
                                         th:aria-label="#{watchlist.delete.aria(${row.mark})}"></button>
@@ -224,7 +224,7 @@
                 </table>
             </div>
 
-            <div class="lg-pager">
+            <div class="lg-pager" role="group" th:aria-label="#{console.pagination}">
                 <p class="lg-small lg-text-muted" id="entry-count"
                    th:text="${filters.active()} ? #{watchlist.count.shown(${#strings.toString(rows.size())}, ${#strings.toString(total)})} : #{watchlist.count(${#strings.toString(total)}, ${#strings.toString(enabledCount)}, ${#strings.toString(limits.maxEntries)})}"></p>
                 <a class="lg-btn lg-btn--small" id="export" th:href="@{/console/watchlist/export.csv}">

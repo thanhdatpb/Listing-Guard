@@ -142,6 +142,34 @@ class RoleHomeIntegrationTest {
         }
     }
 
+    @Test
+    void rendersEveryPilotPageInBothLanguagesAndProvidesIconsForEachMenuLink() throws Exception {
+        var client = clients.createClient("console-theme-gallery").getId();
+        var admin = user(client, "theme-manager", "ADMIN");
+        var member = user(client, "theme-member", "MEMBER");
+        var paths = List.of("/console/", "/console/check", "/console/bulk", "/console/check/edit",
+                "/console/phrase-screening", "/console/history", "/console/reaudit", "/console/watchlist", "/console/stats",
+                "/console/readiness", "/console/api-keys", "/console/report", "/console/stats/pilot", "/console/explain");
+        var links = java.util.regex.Pattern.compile("(?s)<a class=\"app-nav__link\"[^>]*>.*?</a>");
+        for (String lang : List.of("vi", "en")) {
+            for (String path : paths) {
+                String page = mvc.perform(get(path).with(signedIn(admin)).param("lang", lang))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+                assertThat(page).as(path + " " + lang).contains("lang=\"" + lang + "\"", "/brand/theme.js", "/brand/tokens.css");
+                assertThat(page.indexOf("/brand/theme.js")).isLessThan(page.indexOf("/brand/tokens.css"));
+                var menu = links.matcher(page);
+                if (!path.equals("/console/stats/pilot")) {
+                    assertThat(page).contains("id=\"console-theme\"");
+                    assertThat(menu.find()).isTrue();
+                    do {
+                        assertThat(menu.group()).contains("<use href=\"#lg-i-");
+                    } while (menu.find());
+                }
+            }
+            assertThat(home(member, lang, "30")).contains("id=\"console-theme\"", "id=\"work-actions\"");
+        }
+    }
+
     private ConsoleUser user(UUID client, String name, String role) {
         String email = name + "@role-home.example.test";
         jdbc.update("INSERT INTO account (id, email, client_id, role) VALUES (?, ?, ?, ?)", UUID.randomUUID(), email, client, role);

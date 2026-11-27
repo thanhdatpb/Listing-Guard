@@ -31,3 +31,8 @@ Optional demo workspace (ADR-057, V55) seeds synthetic input through the real Co
 ## Role-based home and manager report
 
 Pilot and demo Console can show **Overview** for client administrators and **My work** for members (ADR-058, V56). The existing pilot report has a compact manager view for A4 printing and retains the CSV export.
+
+## Console consistency and theme
+
+ADR-059 standardizes pilot Console navigation icons, scrollable table headers, loading and save feedback. The Console
+offers light, dark and system themes; printed reports use the light palette. Added a local DEMO screenshot gallery script.

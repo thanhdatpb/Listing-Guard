@@ -46,6 +46,7 @@
         </div>
     </form>
 
+    <p id="edit-working" class="lg-working" role="status" hidden th:text="#{console.working}"></p>
     <p id="edit-unchecked" data-state="UNCHECKED" role="status" class="lg-small lg-text-muted" th:hidden="${result != null}" th:text="#{edit.unchecked}"></p>
     <p id="edit-request-error" role="alert" class="lg-field__error"></p>
     <div id="edit-output">

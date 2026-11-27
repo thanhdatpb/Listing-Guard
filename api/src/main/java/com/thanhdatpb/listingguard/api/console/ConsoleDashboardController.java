@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
@@ -75,13 +76,15 @@ public class ConsoleDashboardController {
         return "console/dashboard";
     }
     @PostMapping("/console/home/hide-guide")
-    public String hideGuide(@AuthenticationPrincipal ConsoleUser user) {
+    public String hideGuide(@AuthenticationPrincipal ConsoleUser user,
+                            RedirectAttributes redirect) {
         if (!pilot.roleHome()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         var account = roles.account(user).filter(row -> row.getRole() == ConsoleRole.MEMBER)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
         roleHome.hideGuide(user.clientId(), account.getId());
+        redirect.addFlashAttribute("guideSaved", true);
         return "redirect:/console/";
     }
 }
