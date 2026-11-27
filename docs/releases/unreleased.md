@@ -116,3 +116,14 @@ See the [workspace guide](../workspace.md#11-trình-soạn-tạo-mới-nhân-b�
 - Documented the listing workspace import, background audit, inline highlights and e-mail alerts in the README and workspace guide.
 - Added an opt-in Playwright integration test to capture the live synthetic workspace in light and dark themes.
 - Documented the workspace editor, cloning, history, status gate and import conflicts in the workspace guide and ADR-062.
+
+## Workspace screenshots and tests without Docker
+
+No API, schema, ruleset or contract change (no migration, no ADR).
+
+- `TestcontainersConfig` uses an existing PostgreSQL when `LG_TEST_JDBC_URL` is set (with `LG_TEST_JDBC_USER` and `LG_TEST_JDBC_PASSWORD`), as connection details that win over every profile, and starts no container; unset, it behaves as before (CI). `scripts/test-db-local.sh` installs PostgreSQL 16 and pgvector with apt, starts a throwaway cluster and makes a new database for each run. See [testing](../testing.md), which lists the tests that still need Docker.
+- A synthetic workspace dataset (two Amazon accounts with different templates, an Etsy shop, 23 POD listings, five clones, four people), shared by the tests and a later demo seed: `demo/workspace/*.csv` and `WorkspaceDemoDataset`. It is made through the real import, editor, cloner and status services and the real background audit; `WorkspaceDemoDatasetIntegrationTest` reads the final state from the database.
+- `WorkspaceBrowserIntegrationTest` and `scripts/capture-workspace-screens.py` take 12 pages in the light and dark themes (the six existing ones and `workspace-editor`, `-clone`, `-compare`, `-history`, `-status`, `-conflict`) in Chromium; the images are in `docs/images/console` and the README and [workspace guide](../workspace.md#10-chụp-lại-ảnh) show them.
+- `scripts/check-doc-links.py`: the Linux form of `docs/check-doc-links.ps1`.
+- Not changed: the tests that need Docker, and no real Amazon template was read (**not verified against a real file**).
+

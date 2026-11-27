@@ -67,26 +67,20 @@ Từ Google Sheet: **File → Download → Microsoft Excel (.xlsx)** (hoặc `.t
 4. **Xem trước**: số dòng **mới / cập nhật / không đổi / lỗi**, từng lỗi kèm số dòng, và việc sẽ làm với template. Chỉ khi bấm *Ghi vào kho* mới ghi.
 
 
-<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-import-sheet-dark.png">
-  <img src="images/console/workspace-import-sheet-light.png" alt="Xác nhận sheet Template, dòng tên field, dòng dữ liệu đầu và cột SKU trong file Excel tổng hợp.">
+  <img src="images/console/workspace-import-sheet-light.png" alt="Xác nhận sheet Template, dòng tên field, dòng dữ liệu đầu và cột SKU của một file Excel tổng hợp, kèm các dòng đầu của sheet.">
 </picture>
--->
 
-<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-mapping-dark.png">
-  <img src="images/console/workspace-mapping-light.png" alt="Import column mapping with source field names, target selectors and a button to preview the import.">
+  <img src="images/console/workspace-mapping-light.png" alt="Xác nhận từng cột của file: tên field, trường chuẩn được chọn, nguồn của lựa chọn, và nút sang bước xem trước.">
 </picture>
--->
 
-<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-preview-dark.png">
-  <img src="images/console/workspace-preview-light.png" alt="Xem trước nhập dữ liệu với số dòng mới, cập nhật, không đổi và lỗi, cùng bảng giải thích lỗi theo dòng.">
+  <img src="images/console/workspace-preview-light.png" alt="Xem trước nhập lại một file vào tài khoản thứ hai: số dòng mới, cập nhật, không đổi và lỗi, cùng bảng giải thích dòng không có SKU.">
 </picture>
--->
 
 Chưa có template Amazon cho tài khoản: lần nhập đầu (ADMIN) tạo template từ chính file đó.
 
@@ -98,12 +92,10 @@ Giới hạn mặc định: 10.000 dòng, 20 MB, 1.500 cột. File có mật kh�
 
 - **Danh sách listing**: lọc theo tài khoản, sàn, trạng thái, người phụ trách; tìm theo SKU hoặc tiêu đề; listing con nằm dưới listing cha; phân trang 50 dòng. Cột *Kiểm tra* là **Chưa kiểm** khi rà nền tắt; khi bật là **Sạch / Cảnh báo / Lỗi / Rủi ro mới / Chưa rà đủ** (chữ và biểu tượng) kèm bộ lọc theo trạng thái rà ([mục 9](#9-rà-nền-tô-đỏ-và-email-adr-061)).
 
-<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-list-dark.png">
-  <img src="images/console/workspace-list-light.png" alt="Danh sách listing với bộ lọc và cột trạng thái rà, gồm một dòng có rủi ro mới.">
+  <img src="images/console/workspace-list-light.png" alt="Danh sách listing của các tài khoản bán với bộ lọc, listing cha và con, người phụ trách, trạng thái Nháp hoặc Sẵn sàng xuất và cột Kiểm tra gồm Sạch, Cảnh báo, Lỗi, Rủi ro mới và Chưa rà đủ.">
 </picture>
--->
 
 - **Rà nền** (chỉ khi bật): tiến độ x/y theo tài khoản bán, lịch sử lượt rà, nút Rà lại tài khoản (ADMIN), công tắc email của riêng bạn.
 - **Chi tiết**: các trường theo thứ tự template (cột passthrough có nhãn), listing con, dòng Amazon Custom, lịch sử, và nút **Sửa**, **Nhân bản**, **Lịch sử**. ADMIN đổi người phụ trách hoặc xoá. Cột đầu của danh sách là ô chọn: **Nhân bản đã chọn** và **Chuyển Sẵn sàng xuất**; nút **Tạo listing mới** ở đầu trang.
@@ -198,24 +190,20 @@ Mỗi trạng thái có **chữ và biểu tượng**, màu chỉ là phụ. M�
 Trang chi tiết có khối **Nội dung đã rà**: mỗi trường (tiêu đề, bullet, tag, mô tả, search terms, brand) được in đúng như đã lưu, kể cả khoảng trắng thừa; đoạn khớp được bọc trong `<mark>` có **biểu tượng, gạch chân (liền cho Lỗi/rủi ro cao, lượn sóng cho Cảnh báo/trung bình) và tooltip** (nhãn, nguồn, mức, serial, liên kết TSDR khi ruleset có mẫu) mô tả bằng `aria-describedby`; tooltip hiện khi rê chuột và khi focus. Vị trí là offset trong **text gốc của kho** (UTF-16): kết quả trademark nằm trên text chuẩn hoá (NFC, bỏ khoảng trắng hai đầu) và được ánh xạ về text gốc theo cụm ký tự; nếu không chứng minh được vị trí thì để trống và chỉ đánh dấu ở **mức trường**. Ba luật khớp chữ (`banned_words`, `prohibited_content`, `title_promotional_terms`) báo vị trí; luật độ dài, số lượng, ký tự lặp, thiếu trường chưa có vị trí.
 
 
-<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-detail-dark.png">
   <img src="images/console/workspace-detail-light.png" alt="Chi tiết listing có chữ tô đỏ, tooltip đang mở bằng focus và bảng phát hiện.">
 </picture>
--->
 
 ### 9.6 Email
 
 Sau mỗi lượt có rủi ro mới, mỗi người nhận **tối đa một email** một lượt: người phụ trách listing nhận listing của mình; **mọi ADMIN** của client nhận tất cả (kể cả listing chưa có người phụ trách) kèm số listing theo tài khoản bán. Bảng `SKU | Tài khoản | Trường | Nhãn | Mức`, một **đoạn ngắn** quanh chỗ khớp, link mở Console. Không bao giờ gửi cả listing, tiêu đề đầy đủ hay mô tả. Mỗi người **tự tắt** trên trang Rà nền. Vượt trần ngày thì không gửi và phần chưa báo vào email lần sau. Gửi bằng SMTP của đăng nhập magic link (`SPRING_MAIL_HOST`, `LISTING_GUARD_CONSOLE_MAIL_FROM`); ứng dụng không khởi động nếu bật email mà thiếu hai biến này (trừ profile `dev`). **Profile `dev` (demo-local) ghi email ra log** như link đăng nhập, và chỉ nên dùng với dữ liệu tổng hợp. Ngôn ngữ email là `LISTING_GUARD_CONSOLE_DEFAULT_LOCALE` (`en` mặc định).
 
 
-<!-- Chụp bằng ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test sau khi đặt biến ở mục 10.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-audit-dark.png">
   <img src="images/console/workspace-audit-light.png" alt="Trang rà nền với tiến độ theo tài khoản, lịch sử lượt rà và công tắc email cá nhân.">
 </picture>
--->
 
 ### 9.7 Xoá, xuất, đo
 
@@ -233,9 +221,19 @@ Sau mỗi lượt có rủi ro mới, mỗi người nhận **tối đa một em
 
 ## 10. Chụp lại ảnh
 
-Chạy từ thư mục gốc repo với Java 21, Docker Desktop (hoặc Docker trên Linux) và Python. Test tự khởi động PostgreSQL
-Testcontainers và server Spring Boot cổng ngẫu nhiên. Trình duyệt chỉ truy cập server cục bộ. File Excel, tên listing, watchlist
-và email dùng trong test đều là dữ liệu tổng hợp; catalog DEMO chỉ phục vụ client của test. Email dùng profile `dev` để ghi log.
+Ảnh trong README và tài liệu này được chụp từ **bộ dữ liệu tổng hợp** của kho, qua đúng các dịch vụ nhập, sửa, nhân bản, đổi trạng thái và rà nền, không sửa tay dữ liệu.
+
+### 10.1 Bộ dữ liệu tổng hợp
+
+- **Dữ liệu** nằm ở `api/src/main/resources/demo/workspace/`: `people.csv` (bốn người phụ trách, email `@example.test`, một ADMIN) và `listings.csv` (23 listing POD: cốc, túi tote, poster, vỏ gối; có cha/con). Đặt trong tài nguyên của `api` để **cả test lẫn lệnh seed demo (W6) đọc cùng một văn bản**.
+- **Dựng và nạp**: `api/src/test/java/.../workspace/WorkspaceDemoDataset.java`. Hai tài khoản Amazon (template `.xlsm` tổng hợp có dòng cài đặt, dòng nhãn, data validation và cột `occasion`; template `.xlsx` thứ hai với cột khác và cột `fabric_note`) và một shop Etsy. Nạp bằng `ListingImportService`, `ListingEditor`, `ListingCloner` và `ListingStatusService`, rồi chạy rà nền thật. W6 chuyển phần dựng này sang `main` khi cần.
+- **Thứ tự nạp** để mỗi trạng thái có lý do thật: nhập đầu với catalog DEMO được phục vụ; watchlist thêm một từ nên hai listing mang từ đó thành **Rủi ro mới**; nhân bản (một bản giữ tiêu đề gốc, một bản sang tài khoản có template khác, một bản được sửa nên có hai phiên bản) và sửa trong kho; chuyển các nháp sạch sang **Sẵn sàng xuất**; cuối cùng nhập ba listing khi catalog **không** được phục vụ nên chúng là **Chưa rà đủ**.
+- Kết quả: 28 listing (23 nhập, 5 nhân bản): 16 Sạch, 4 Cảnh báo, 3 Lỗi, 2 Rủi ro mới, 3 Chưa rà đủ; 6 Sẵn sàng xuất, 22 Nháp. `WorkspaceDemoDatasetIntegrationTest` kiểm trạng thái cuối trong DB (mọi lượt rà `DONE`, mỗi listing có bản rà, đủ năm trạng thái).
+- Tên là bịa; watchlist và catalog dùng các từ hư cấu của catalog DEMO; không có brand hay tên đội thật trong text listing. **Chưa xác minh với file Amazon thật**: cấu trúc file chỉ giống một flat file.
+
+### 10.2 Chạy
+
+Cần Java 21, Python và Chromium. Test tự khởi động server Spring Boot cổng ngẫu nhiên; trình duyệt chỉ truy cập server cục bộ. Cơ sở dữ liệu: Testcontainers (cần Docker), hoặc PostgreSQL cục bộ theo [docs/testing.md](testing.md) (`eval "$(scripts/test-db-local.sh)"`). Email dùng profile `dev` để ghi log.
 
 Windows (PowerShell):
 
@@ -248,21 +246,35 @@ $env:LG_WORKSPACE_SCREENSHOTS = "docs/images/console"
 ./mvnw.cmd -B -pl api -am "-Dtest=WorkspaceBrowserIntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 ```
 
-Trên Windows, `mvnw.cmd` là bản tương ứng của `./mvnw`. Nếu dùng `python` thay cho `py`, dùng cùng lệnh đó để cài Playwright và đặt `LG_WORKSPACE_PYTHON`.
-
-Linux (bash):
+Linux (bash), có Docker:
 
 ```bash
-python3 -m pip install playwright
+python3 -m pip install playwright pillow
 python3 -m playwright install chromium
 LG_RUN_WORKSPACE_BROWSER=1 LG_WORKSPACE_SCREENSHOTS=docs/images/console \
   ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-Bỏ `LG_WORKSPACE_SCREENSHOTS` để chỉ kiểm luồng trên trình duyệt. Khi `LG_RUN_WORKSPACE_BROWSER` không bằng `1`, JUnit
-bỏ qua cả test. Ảnh được chụp ở viewport 1280 × 820. Trang dài lấy tối đa 1.800 px theo chiều dọc. Nếu máy có Pillow, script
-tối ưu PNG không mất dữ liệu. Sau khi chụp, kiểm tra đủ 12 ảnh, tooltip, chế độ sáng/tối, bố cục và dữ liệu mẫu trước khi bỏ
-comment các khối `<picture>` trong README và tài liệu này.
+Linux không có Docker (phiên cloud): thêm `eval "$(scripts/test-db-local.sh)"` trước lệnh trên; nếu không tải được Chromium của Playwright thì đặt `LG_CHROMIUM_PATH` (ví dụ `/opt/pw-browsers/chromium-*/chrome-linux64/chrome`, hoặc kết quả của `which chromium google-chrome`). Chỉ chạy **`WorkspaceBrowserIntegrationTest`** khi chụp vào `docs/images/console`: `WorkspaceEditorBrowserIntegrationTest` (ADR-062) có script riêng và vài tên ảnh trùng (`workspace-clone`, `workspace-status`, `workspace-history`), nên bỏ `LG_WORKSPACE_SCREENSHOTS` khi chạy cả hai.
+
+Bỏ `LG_WORKSPACE_SCREENSHOTS` để chỉ kiểm luồng trên trình duyệt. Khi `LG_RUN_WORKSPACE_BROWSER` không bằng `1`, JUnit bỏ qua cả test. Mọi trang đều tiếng Anh, ở chế độ sáng và tối, khung 1280 px; cửa sổ cao bằng trang (tối thiểu 820 px, trang dài lấy tối đa 1.800 px, bảng không bị cắt ở 32 rem). Nếu máy có Pillow, script tối ưu PNG không mất dữ liệu. Script không ghi gì vào kho: nhập lại, nhân bản và đổi trạng thái đều dừng ở bước xem trước hoặc trước nút cuối.
+
+### 10.3 Mười hai ảnh
+
+| Ảnh (có `-light` và `-dark`) | Trang | Nằm ở |
+| --- | --- | --- |
+| `workspace-list` | Danh sách, đủ năm trạng thái rà, Nháp và Sẵn sàng xuất | README, mục 6 |
+| `workspace-detail` | Chi tiết, chữ tô đỏ, tooltip mở bằng focus, bảng phát hiện | README, mục 9.5 |
+| `workspace-audit` | Rà nền: tiến độ, lịch sử lượt rà, công tắc email | README, mục 9.6 |
+| `workspace-import-sheet`, `workspace-mapping`, `workspace-preview` | Ba bước đầu của một lần nhập lại vào tài khoản thứ hai | mục 5 |
+| `workspace-editor` | Trình soạn: bộ đếm theo ruleset và chữ tô đỏ (ẩn bớt nhóm cột, xem mục 11.1) | README, mục 11.1 |
+| `workspace-clone` | Xem trước nhân bản sang tài khoản khác: SKU mới, cột chưa có đối ứng | mục 11.3 |
+| `workspace-compare` | Bản nhân bản: cột Chưa sửa và cảnh báo trùng tiêu đề | README, mục 11.4 |
+| `workspace-history` | Hai phiên bản và khác biệt từng cột | mục 11.5 |
+| `workspace-status` | Chuyển Sẵn sàng xuất: dòng bị chặn, ô lý do của ADMIN | README, mục 11.6 |
+| `workspace-conflict` | Xem trước nhập lại có dòng "Đã sửa trong kho" | mục 11.7 |
+
+Sau khi chụp, mở từng ảnh: đúng trang, đúng sáng/tối, bảng không trống, chữ không chồng nhau, không có dữ liệu thật. Bảng danh sách rộng hơn khung nên cột cuối ("Cập nhật") bị cắt: đó là thanh cuộn ngang của bảng thật. Cột "What was found" của bảng phát hiện trademark vẫn bằng tiếng Việt vì câu đó do bộ quét sinh ra, không qua bộ thông điệp của Console.
 
 ## 11. Trình soạn, tạo mới, nhân bản (ADR-062)
 
@@ -282,6 +294,13 @@ Nằm sau cùng cờ `LISTING_GUARD_WORKSPACE_ENABLED`: **tắt thì mọi đư�
 - MEMBER mở listing của người khác: chỉ đọc, có nút **Nhân bản về cho tôi**.
 - Sửa nội dung listing đang "Sẵn sàng xuất" đưa nó về "Nháp".
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-editor-dark.png">
+  <img src="images/console/workspace-editor-light.png" alt="Trình soạn một listing cốc: bộ đếm tiêu đề báo 96 trên 75 ký tự và vượt giới hạn, bullet và search terms với bộ đếm riêng; bên dưới form là nội dung đã rà, từ đầu của tiêu đề được tô đỏ là rủi ro cao.">
+</picture>
+
+Ảnh trên ẩn các nhóm cột không có bộ đếm và phần cột chưa gán trường (trang thật dài khoảng 4.000 px) để bộ đếm và chữ tô đỏ nằm chung một khung 1.800 px; markup của trang không đổi.
+
 ### 11.2 Tạo mới (`/console/workspace/new`)
 
 Chọn tài khoản bán rồi điền form dựng từ **template mới nhất** của tài khoản (Etsy: các mục chính cố định). SKU bắt buộc và không trùng trong tài khoản. Bạn là người phụ trách, trạng thái Nháp. Tài khoản Amazon chưa có template thì ADMIN tải template trước.
@@ -296,13 +315,28 @@ Từ danh sách (chọn nhiều), trang sửa hoặc trang chi tiết: **một l
 4. **Customize** (Amazon): tuỳ chọn nhân bản dòng Amazon Custom của SKU gốc sang SKU mới.
 5. Cả lô ghi trong **một giao dịch**; rà nền nhận các listing mới như sau một lần nhập.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-clone-dark.png">
+  <img src="images/console/workspace-clone-light.png" alt="Trang nhân bản một nhóm cha–con sang tài khoản khác cùng sàn: đích, mẫu SKU thay TOTE bằng BAG, hai cột nguồn chưa có cột tương ứng ở đích, và bảng SKU mới của bốn listing.">
+</picture>
+
 ### 11.4 So với bản gốc
 
 Listing nhân bản mà bản gốc còn tồn tại: cột còn **giống hệt bản gốc** được đánh dấu **Chưa sửa** (hay gặp: quên sửa tiêu đề, sót thông tin bản cũ). Tiêu đề giống hệt bản gốc hoặc listing khác cùng tài khoản hiện **cảnh báo trùng**: đây là kiểm tra nội bộ của kho, **không phải chính sách của sàn**. Tính khi hiển thị, không đổi kết quả rà. Rule bắt thông tin sót (size, số lượng) là việc của W5.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-compare-dark.png">
+  <img src="images/console/workspace-compare-light.png" alt="Trình soạn một bản nhân bản có thông báo về listing gốc, cảnh báo tiêu đề giống hệt bản gốc và nhãn Chưa sửa ở mỗi cột còn giống bản gốc.">
+</picture>
+
 ### 11.5 Lịch sử (`…/history`)
 
 Danh sách phiên bản còn giữ (`LISTING_GUARD_WORKSPACE_HISTORY_KEEP`), **khác biệt từng cột** giữa hai phiên bản bất kỳ, và **Khôi phục**: ghi các cột của phiên bản đó thành một phiên bản **mới**, không ghi đè bản nào. SKU và người phụ trách không được khôi phục; cột template hiện tại không còn thì bỏ và được báo.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-history-dark.png">
+  <img src="images/console/workspace-history-light.png" alt="Lịch sử một bản nhân bản: hai phiên bản (Nhân bản, Sửa), khác biệt từng cột giữa chúng và nút Khôi phục.">
+</picture>
 
 ### 11.6 Trạng thái "Sẵn sàng xuất"
 
@@ -316,14 +350,24 @@ Chọn listing ở danh sách (hoặc nút ở trang sửa) → **Chuyển Sẵn
 
 Cảnh báo (WARNING/MEDIUM) không chặn. **ADMIN mở chặn** bằng cách tick và nhập **lý do bắt buộc**; hệ thống lưu người mở, thời điểm, `content_hash` và trạng thái rà lúc mở. **Lý do hết hiệu lực ngay khi nội dung listing đổi** (listing về Nháp và bị chặn lại). Rà nền tắt thì không có gì chặn.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-status-dark.png">
+  <img src="images/console/workspace-status-light.png" alt="Trang chuyển Sẵn sàng xuất với bốn nháp: một không bị chặn, hai còn Lỗi (một kèm rủi ro HIGH), một chưa rà đủ; có ô mở chặn và ô lý do của ADMIN.">
+</picture>
+
 ### 11.7 Xung đột khi nhập lại
 
 Dòng của file mà listing **đã được sửa, tạo mới, nhân bản hoặc khôi phục trong kho sau lần nhập gần nhất của nó** sẽ hiện ở bước xem trước là **Đã sửa trong kho**, không tính vào "cập nhật", và **mặc định bị bỏ qua**. Tick **Ghi đè** từng dòng hoặc **Ghi đè cả nhóm** (parent kèm child) nếu file mới hơn. Dòng không xung đột như cũ.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-conflict-dark.png">
+  <img src="images/console/workspace-conflict-light.png" alt="Xem trước khi nhập lại file của tài khoản thứ nhất: hai dòng "Đã sửa trong kho" với ô Ghi đè, bị bỏ qua mặc định, và chín dòng không đổi.">
+</picture>
+
 ### 11.8 Chưa làm, chưa đo
 
 - **Chưa xác minh với template Amazon thật**: phép ghép cột khi nhân bản sang tài khoản khác chỉ được thử trên file tổng hợp.
-- **Chưa chạy trên trình duyệt thật**: kịch bản `scripts/test-console-workspace-editor.py` (Playwright) đã viết nhưng chưa chạy; xem cách chạy trong phần đầu của script.
-- Bộ test Testcontainers chưa chạy trong môi trường không có Docker (CI GitHub Actions chạy); các test mới đã chạy trên PostgreSQL 16 cục bộ không có pgvector.
+- Kịch bản `scripts/test-console-workspace-editor.py` (Playwright) đã chạy trên Chromium thật (`WorkspaceEditorBrowserIntegrationTest`) cùng bộ ảnh ở [mục 10](#10-chụp-lại-ảnh); các trang chỉ được thử trên dữ liệu tổng hợp, bằng tiếng Anh.
+- Các test đã chạy trên PostgreSQL 16 cục bộ **có pgvector** ([docs/testing.md](testing.md)); một số test vẫn chỉ chạy được với Docker, danh sách ở đó. CI GitHub Actions chạy bằng Testcontainers.
 - Chưa đo thời gian nhân bản 500 listing và bộ nhớ.
 - Xuất file `.xlsm`/`.txt` (W4) chưa có; loại thay đổi lịch sử `EXPORT` đã có sẵn trong CHECK nhưng chưa ai ghi.

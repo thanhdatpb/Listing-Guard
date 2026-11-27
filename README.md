@@ -65,8 +65,8 @@ State of v0.11.0. "Ready" means it works and its tests pass, within the evidence
 | [Bulk Sheet content scope](docs/bulk-check.md) | Defaults to content in pilot and full elsewhere | Missing Sheet columns are listed as unchecked. Single listing and API checks still use full scope. |
 | [Owner-based catalog](docs/catalog-activation-runbook.md) | Optional catalog rebuild and activation | Parquet schema verified. The threshold, owner-name matching and 47 probes on the real catalog have yet to be measured or validated. |
 | [Periodic re-audit](docs/reaudit.md) | Ready in the console | The first run of a scope has nothing to compare with |
-| [Listing workspace (ADR-059)](docs/workspace.md) | Optional, off by default | Imports and mappings use synthetic workbooks. Real Amazon templates are unverified. Export by account template is pending. |
-| [Workspace editor and cloning (ADR-062)](docs/workspace.md#11-trình-soạn-tạo-mới-nhân-bản-adr-062) | Optional, off by default | Editor, new listing, clone, history, "ready to export" gate and import conflicts, tested on synthetic files and PostgreSQL 16 without pgvector. Not run in a browser; column pairing between two real Amazon templates is unverified. |
+| [Listing workspace (ADR-059)](docs/workspace.md) | Optional, off by default | Has the editor, new listing, clone, history and the ready-to-export gate (ADR-062). Missing: export by account template. Real Amazon templates are unverified; imports and mappings use synthetic workbooks. |
+| [Workspace editor and cloning (ADR-062)](docs/workspace.md#11-trình-soạn-tạo-mới-nhân-bản-adr-062) | Optional, off by default | Editor, new listing, clone, history, "ready to export" gate and import conflicts, tested on synthetic files, on PostgreSQL 16 with pgvector and in Chromium (the screenshots above). Column pairing between two real Amazon templates is unverified. |
 | [Background audit, inline highlights and e-mail alerts (ADR-061)](docs/workspace.md#9-rà-nền-tô-đỏ-và-email-adr-061) | Optional, off by default | No performance measurements on PostgreSQL with the real trademark catalog. E-mail has not been tried with a real SMTP server. |
 | [LLM judge and rewrite suggestions](docs/llm.md) | **Off by default**; free tiers | Not measured on real claims; a verified suggestion is not legal clearance |
 | `hf-convert`, `trademark-import`, `batch-check`, `backtest`, `policy-diff` | Ready as jobs | `hf-convert` ran on one build of the dataset; `backtest` has not been run on a real labelled file |
@@ -125,45 +125,51 @@ design tokens ([ADR-040](docs/adr/ADR-040-console-visual-identity-and-design-sys
 
 ### Listing workspace
 
-The screens use fictional listing and trademark data.
+The screens use fictional listing and trademark data, made by the [synthetic dataset](docs/workspace.md#10-chụp-lại-ảnh) of the workspace tests.
 
-**Listing workspace.** Filter stored listings by seller account, marketplace, owner, listing status or audit status.
+**Listing workspace.** Filter stored listings by seller account, marketplace, owner, listing status or audit status; every row says whether it is a draft or ready to export and how the background audit saw it.
 
-<!-- Generate with ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test after setting the variables in docs/workspace.md.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-list-dark.png">
-  <img src="docs/images/console/workspace-list-light.png" alt="Listing workspace with filters above a table of stored listings, including the audit status and a New risk badge.">
+  <img src="docs/images/console/workspace-list-light.png" alt="Listing workspace with filters above a table of stored listings from seller accounts, with parents and children, owners, Draft and Ready to export statuses, and audit badges Clean, Warning, Error, New risk and Not fully checked.">
 </picture>
--->
-
-**Map the columns.** Confirm which workbook columns hold the SKU, title, description and other listing fields before previewing the import.
-
-<!-- Generate with ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test after setting the variables in docs/workspace.md.
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-mapping-dark.png">
-  <img src="docs/images/console/workspace-mapping-light.png" alt="Import column mapping with source field names, target selectors and a button to preview the import.">
-</picture>
--->
 
 **Open a listing.** The audited content marks the matching words, and the focused tooltip and findings table explain why they were flagged.
 
-<!-- Generate with ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test after setting the variables in docs/workspace.md.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-detail-dark.png">
-  <img src="docs/images/console/workspace-detail-light.png" alt="Listing detail with a highlighted match in the audited title, an open New risk tooltip and a table of findings.">
+  <img src="docs/images/console/workspace-detail-light.png" alt="Listing detail with the watchlist word marked in the audited title, an open New risk tooltip showing level, source and mark, and a table of findings.">
 </picture>
--->
+
+**Edit in the workspace.** Columns are edited as the template has them, with counters taken from the running ruleset (here a title of 96 characters against a limit of 75), and the content as checked below, with the catalog mark underlined in red.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-editor-dark.png">
+  <img src="docs/images/console/workspace-editor-light.png" alt="The editor of a mug listing: a title counter that says 96 of 75 characters and is over the limit, bullet points and search terms with their counters, and below the form the content as checked with the first word of the title marked as a high risk.">
+</picture>
+
+**Compare a clone with its original.** A clone shows which columns are still exactly the original's and warns when its title is the same, a check of the workspace and not a marketplace rule.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-compare-dark.png">
+  <img src="docs/images/console/workspace-compare-light.png" alt="The editor of a clone with a banner naming the original listing, a warning that the title is exactly the same as the original, and a Not edited yet flag on each column that still equals the original.">
+</picture>
+
+**Ready to export.** Only drafts move; the page lists each selected listing with what holds it back, and an administrator can open a block with a written reason.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-status-dark.png">
+  <img src="docs/images/console/workspace-status-light.png" alt="The ready to export page listing four drafts: one with no block, one with an error, one with an error and a high trademark risk, and one not fully checked, with the administrator option to open the block and a reason box.">
+</picture>
 
 **Background audit.** Follow progress by seller account, see why each audit ran and choose whether to receive e-mail alerts.
 
-<!-- Generate with ./mvnw -B -pl api -am -Dtest=WorkspaceBrowserIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test after setting the variables in docs/workspace.md.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/console/workspace-audit-dark.png">
-  <img src="docs/images/console/workspace-audit-light.png" alt="Background audit with account progress, recent audit runs and their reasons, and a personal e-mail alerts checkbox.">
+  <img src="docs/images/console/workspace-audit-light.png" alt="Background audit with counts of listings by state, progress by seller account, the history of audits and their reasons, and a personal e-mail alerts checkbox.">
 </picture>
--->
 
-See the [workspace guide](docs/workspace.md) for the sheet confirmation and import preview.
+See the [workspace guide](docs/workspace.md) for the sheet confirmation, the import preview and conflicts, cloning and history.
 
 History, the watchlist, statistics, the report and API keys are on the same system: [the project guide](docs/overview.md) says what each page does.
 
