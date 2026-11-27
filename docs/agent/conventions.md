@@ -396,3 +396,9 @@ contract tools and release workflow continue to discover exactly one active base
   the refusal of encrypted and binary files, "never run a macro, never recalculate a formula", and never put a cell or a file name in a message or a log. A guessed column is a default the
   person confirms (`standard-targets.yaml` is `unverified`); never write a column name of a marketplace in Java. A template version is the exact field-name row; keep the rows above the data and
   the Excel file byte for byte. Logs carry ids and counts, never a SKU or a title. A new text is a key of both bundles (ADR-028).
+  **Editor and cloning** (ADR-062): `data` (the template's columns) is the only source of a listing; `fields`, `title`, `parent_sku`, `role` and `content_hash` are always built from it again by
+  `ListingContent` (the import's `StandardFields` and hash, never a second copy), and a save that changes no column writes nothing. Every workspace write (save, restore, create, clone) takes
+  `lockAccount`, checks the `version`, writes a history entry of its own kind and says `ListingSaved` / `ListingsImported` inside the transaction; a listener of `AFTER_COMMIT` that reads or
+  writes through JPA must be `REQUIRES_NEW`. Content that changes sends a "ready to export" listing back to a draft, and a reason of an ADMIN for a blocked listing counts only while the
+  listing's `content_hash` is the one stored with it. The standard fields are never sent to an LLM (ADR-059 §1): suggestions are the rules' stored `suggestion`. A new table is `workspace_*`, has
+  the composite key `(listing_id, client_id)` and is in `WorkspaceDataCommands.TABLES`; `ck_workspace_history_kind` equals `WorkspaceTypes.ChangeKind` (`WorkspaceRulesTest`).

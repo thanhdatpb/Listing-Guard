@@ -82,7 +82,37 @@ ADR-061 (V58, off by default, behind `LISTING_GUARD_WORKSPACE_AUDIT_ENABLED`; ne
 - Contract (ADR-022): no `/api/v1` change; `./mvnw -B -pl contract-tools verify` is recorded in the pull request.
 - Not measured: a run on real PostgreSQL with the real catalog (command in `docs/deploy-readiness.md`). Not run: Playwright in a browser, real SMTP, Docker Compose.
 
+## Workspace editor and cloning
+
+ADR-062 (V59; behind the same `LISTING_GUARD_WORKSPACE_ENABLED`, so with the flag off every new path is a 404 and nothing is read or written). The listing workspace gains an
+editor, new listings, clones, a history with restore, a "ready to export" status with a gate, and a warning when an import would overwrite what was changed in the workspace.
+See the [workspace guide](../workspace.md#11-trình-soạn-tạo-mới-nhân-bản-adr-062).
+
+- **Editor** (`/console/workspace/listings/{id}/edit`). Columns of the template grouped by the standard field they were given, with the original column name, counters from the active
+  ruleset (the console `editor.js`), passthrough columns folded away. A save takes the account lock, checks the `version`, writes a history entry and says `ListingSaved`; the audit hears
+  it after the commit. `fields`, `title` and `content_hash` are built again from `data` by the import's own `StandardFields` and hash (`ListingContent`); a save that changes nothing writes
+  nothing. A stale save is refused with a table of the columns that differ. A MEMBER reads another person's listing and can clone it to their own drafts.
+- **New and clone.** A new listing from the newest template of the account (Etsy: the fixed fields), SKU required and unique. Clone one listing, a parent with its children, or a selection, into
+  the same account or another account of the same marketplace (columns paired by standard field, then by header; columns with no partner are listed to leave out or place), SKUs typed or made from
+  a pattern with a preview and a check against the account and the batch, optional Amazon Custom rows, one transaction, then the audit through the import's event.
+- **Compared with the original**, **history** (column differences, restore as a new version) and **status**: a bulk "draft to ready to export" held back by an error, a HIGH trademark risk or an
+  incomplete check (`LISTING_GUARD_WORKSPACE_BLOCK_ON_ERROR`, default true, only with the audit on); an ADMIN opens the block with a required reason that is stored with who, when, the content hash and
+  the audit state and stops counting when the content changes.
+- **Importing again** over a listing that was edited, created, cloned or restored in the workspace after its latest import: the preview says "changed in the workspace", skips the row by default
+  and lets the person overwrite it row by row or by family.
+- **Data (V59).** `ck_workspace_history_kind` also allows `NEW`, `CLONE`, `RESTORE`, `STATUS`, `EXPORT`; new table `workspace_status_override` with a composite foreign key `(listing_id, client_id)`.
+  `workspace purge` and `workspace export` cover it.
+- **Two fixes found by this work.** The audit's `@TransactionalEventListener(AFTER_COMMIT)` methods (`onSaved`, `onImported`) now run in a transaction of their own: inside the finished transaction the
+  check's JPA reads failed with "No active transaction" and the audit failed silently. `quantity` of a workspace listing is stored as a JSON number as `docs/input-schema.md` requires, not as a string
+  (the string made the rules report a missing quantity on every listing that had one).
+- **Console.** New pages: edit, new, clone, history, status; a selection column and bulk buttons in the list; edit/clone/history buttons on the detail page; "changed in the workspace" rows in the import
+  preview. Design tokens only, state words and icons, VI and EN. No AI call: suggestions are the rules' stored `suggestion` sentences.
+- Contract (ADR-022): no `/api/v1` change, so no additive or breaking line; `./mvnw -B -pl contract-tools verify` is recorded in the pull request.
+- Not verified: no real Amazon template (all fixtures are synthetic, the column pairing is untested on two real files). Not run: the Testcontainers suite (no Docker here; run on PostgreSQL 16 without
+  pgvector instead), Playwright (`scripts/test-console-workspace-editor.py`), Docker Compose. Not measured: a 500-listing clone.
+
 ## Documentation
 
 - Documented the listing workspace import, background audit, inline highlights and e-mail alerts in the README and workspace guide.
 - Added an opt-in Playwright integration test to capture the live synthetic workspace in light and dark themes.
+- Documented the workspace editor, cloning, history, status gate and import conflicts in the workspace guide and ADR-062.
