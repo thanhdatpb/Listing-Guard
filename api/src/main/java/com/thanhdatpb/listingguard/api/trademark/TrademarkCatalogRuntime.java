@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -82,6 +83,39 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final TrademarkRulesets rulesets;
+    private com.thanhdatpb.listingguard.api.demo.DemoWorkspaceRegistry demo;
+    private final Map<Long, Snapshot> demoCatalogs = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Autowired(required = false)
+    void demoWorkspaceRegistry(com.thanhdatpb.listingguard.api.demo.DemoWorkspaceRegistry registry) {
+        this.demo = registry;
+    }
+
+    private Optional<Snapshot> demoSnapshot(java.util.UUID client) {
+        if (demo == null || !demo.enabled()) {
+            return Optional.empty();
+        }
+        return demo.catalogId(client).map(id -> demoCatalogs.computeIfAbsent(id, this::loadDemo));
+    }
+
+    private Snapshot loadDemo(long id) {
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                SELECT id, version, file_sha256, pack_id, normalization_version, normalization_hash, format_version
+                FROM trademark_catalog_version WHERE id = ?""", id);
+        if (rows.size() != 1 || !TrademarkProperties.isDemo((String) rows.getFirst().get("version"))) {
+            throw new TrademarkUnavailableException("The demo workspace has no compatible fictional catalog.");
+        }
+        return load(rows.getFirst(), null, "Reset and seed the demo workspace with the active ruleset.");
+    }
+
+    public Optional<Status> demoStatus(java.util.UUID client) {
+        return demoSnapshot(client).map(Snapshot::status);
+    }
+
+    public Optional<Serving> demoServing(java.util.UUID client, String marketplace, Map<String, String> components) {
+        return demoSnapshot(client).map(TrademarkCatalogRuntime::requireReady).map(current -> new Serving(current.scanner(),
+                fingerprint(current, marketplace, components), current.catalogVersionId(), current.catalogVersion()));
+    }
 
     private volatile Snapshot snapshot = new Snapshot(new Status(State.DISABLED, "not evaluated"), null, null);
     private volatile TrademarkScanner withoutCatalog;
@@ -162,6 +196,9 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
                     + "(listing-guard.trademark.catalog-version)"), null, null);
         }
         String version = properties.catalogVersion();
+        if (demo != null && demo.enabled() && TrademarkProperties.isDemo(version)) {
+            return new Snapshot(new Status(State.REFUSED, "A demo workspace must use its own tenant-scoped catalog."), null, null);
+        }
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT id, version, file_sha256, pack_id, normalization_version, normalization_hash, format_version
                 FROM trademark_catalog_version WHERE version = ?""", version);

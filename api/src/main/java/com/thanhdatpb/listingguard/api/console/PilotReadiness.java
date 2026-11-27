@@ -82,7 +82,7 @@ public class PilotReadiness {
 
     public View view(UUID clientId) {
         List<Section> sections = new ArrayList<>();
-        sections.add(new Section(messages.get("readiness.section.trademark"), trademarkItems()));
+        sections.add(new Section(messages.get("readiness.section.trademark"), trademarkItems(clientId)));
         sections.add(new Section(messages.get("readiness.section.people"), peopleItems(clientId)));
         sections.add(new Section(messages.get("readiness.section.settings"), settingsItems()));
         int total = sections.stream().mapToInt(section -> section.items().size()).sum();
@@ -92,10 +92,10 @@ public class PilotReadiness {
 
     // ---- the trademark catalog and ruleset
 
-    private List<Item> trademarkItems() {
-        TrademarkCatalogRuntime.Status status = catalog.status();
+    private List<Item> trademarkItems(UUID clientId) {
+        TrademarkCatalogRuntime.Status status = catalog.demoStatus(clientId).orElseGet(catalog::status);
         boolean ready = status.state() == TrademarkCatalogRuntime.State.READY;
-        boolean demo = trademark.demoCatalog();
+        boolean demo = trademark.demoCatalog() || TrademarkProperties.isDemo(status.detail());
         String version = ready ? status.detail() : null;
         CatalogRow row = version == null ? null : catalogRow(version);
         boolean tier = ready && row != null && row.tier();

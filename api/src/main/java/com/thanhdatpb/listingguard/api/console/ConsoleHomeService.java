@@ -142,7 +142,7 @@ public class ConsoleHomeService {
 
     /** What the checks ran on, from the services that own each part. A part that cannot be read is left out, never guessed. */
     private HomeView.CheckData checkData(UUID clientId, HealthReport report) {
-        TrademarkCatalogRuntime.Status status = catalog.status();
+        TrademarkCatalogRuntime.Status status = catalog.demoStatus(clientId).orElseGet(catalog::status);
         boolean ready = status.state() == TrademarkCatalogRuntime.State.READY;
         String source = null;
         LocalDate date = null;

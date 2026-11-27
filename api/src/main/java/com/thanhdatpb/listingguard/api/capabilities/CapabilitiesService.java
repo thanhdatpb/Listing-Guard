@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
@@ -74,7 +75,16 @@ public class CapabilitiesService {
     }
 
     public Capabilities capabilities() {
-        TrademarkCatalogRuntime.State state = trademarkRuntime.status().state();
+        return capabilities(trademarkRuntime.status().state(), trademarkProperties.demoCatalog());
+    }
+
+    /** The pilot dashboard can describe its isolated fictional catalog without changing the public response. */
+    public Capabilities forConsole(UUID client) {
+        return trademarkRuntime.demoStatus(client).map(status -> capabilities(status.state(), true))
+                .orElseGet(this::capabilities);
+    }
+
+    private Capabilities capabilities(TrademarkCatalogRuntime.State state, boolean demoCatalog) {
 
         List<PackCapability> packs = new ArrayList<>();
         packs.add(new PackCapability(RulesetConfig.DEFAULT_PACK_ID, true, listingRulesVersions()));
@@ -88,7 +98,7 @@ public class CapabilitiesService {
         packs.sort(Comparator.comparing(PackCapability::id));
 
         return new Capabilities(List.copyOf(packs),
-                new TrademarkCatalogCapability(state.name(), trademarkProperties.demoCatalog()),
+                new TrademarkCatalogCapability(state.name(), demoCatalog),
                 new PlansCapability(plans.enabled()),
                 new FixesCapability(fixes.enabled()), phrases.enabled()
                         ? new Capabilities.PhraseScreeningCapability(true, phrases.maxPhrases(), phrases.maxFuzzyPhrases(),

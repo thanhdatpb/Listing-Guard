@@ -214,7 +214,7 @@ public class ReauditService {
 
     /** The reminder for the home page: the scopes of the client last audited with another catalog than the one served now. */
     public Optional<Notice> notice(UUID clientId) {
-        TrademarkCatalogRuntime.Status status = catalog.status();
+        TrademarkCatalogRuntime.Status status = catalog.demoStatus(clientId).orElseGet(catalog::status);
         if (status.state() != TrademarkCatalogRuntime.State.READY) {
             return Optional.empty();
         }

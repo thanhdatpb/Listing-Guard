@@ -42,7 +42,7 @@ public class ConsoleDashboardController {
         model.addAttribute("usage", plans.usage(user.clientId()));
         model.addAttribute("home", home.home(user.clientId()));
         if (pilot.enabled()) {
-            model.addAttribute("pilotCapabilities", capabilities.capabilities());
+            model.addAttribute("pilotCapabilities", capabilities.forConsole(user.clientId()));
         }
         // the catalog changed since a scope was last re-audited (ADR-035)
         model.addAttribute("reauditNotice", reaudit.notice(user.clientId()).orElse(null));

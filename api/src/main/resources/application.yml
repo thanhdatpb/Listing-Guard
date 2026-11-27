@@ -1,4 +1,10 @@
 listing-guard:
+  demo:
+    enabled: ${LISTING_GUARD_DEMO_ENABLED:false}
+    client-name: ${LISTING_GUARD_DEMO_CLIENT_NAME:demo}
+    catalog-dir: ${LISTING_GUARD_DEMO_CATALOG_DIR:catalogs/demo}
+    feedback-percent: ${LISTING_GUARD_DEMO_FEEDBACK_PERCENT:35}
+    false-positive-percent: ${LISTING_GUARD_DEMO_FALSE_POSITIVE_PERCENT:25}
   phrase-screening:
     enabled: ${LISTING_GUARD_PHRASE_SCREENING_ENABLED:false}
     max-phrases: ${LISTING_GUARD_PHRASE_SCREENING_MAX_PHRASES:2000}

@@ -22,4 +22,8 @@ public interface ClientRepository extends JpaRepository<Client, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from Client c where c.id = :id")
     Optional<Client> findByIdForUpdate(@Param("id") UUID id);
+
+    @Query(value =
+            "SELECT EXISTS (SELECT 1 FROM demo_workspace WHERE client_id = :clientId)", nativeQuery = true)
+    boolean isDemoWorkspace(@Param("clientId") UUID clientId);
 }

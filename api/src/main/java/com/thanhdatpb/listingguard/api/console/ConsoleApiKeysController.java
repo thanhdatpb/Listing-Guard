@@ -90,6 +90,10 @@ public class ConsoleApiKeysController {
             IssuedKey issued = provisioning.createKey(user.clientId(), cleaned.isEmpty() ? null : cleaned, properties.maxActiveKeys());
             populate(model, user, "");
             model.addAttribute("issued", issued);
+        } catch (ClientProvisioning.DemoKeyForbiddenException ex) {
+            response.setStatus(HttpStatus.FORBIDDEN.value());
+            populate(model, user, label);
+            model.addAttribute("error", messages.get("demo.workspace.keys"));
         } catch (KeyLimitReachedException ex) {
             response.setStatus(HttpStatus.CONFLICT.value());
             populate(model, user, label);

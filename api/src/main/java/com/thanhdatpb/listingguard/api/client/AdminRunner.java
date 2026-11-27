@@ -3,6 +3,8 @@ package com.thanhdatpb.listingguard.api.client;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountImporter;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRoles;
 import com.thanhdatpb.listingguard.api.trademark.CatalogAdminCommands;
+import com.thanhdatpb.listingguard.api.demo.DemoWorkspaceCommands;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -33,8 +35,19 @@ public class AdminRunner implements ApplicationRunner {
         this.catalog = catalog;
     }
 
+    @Autowired(required = false)
+    private DemoWorkspaceCommands demo;
+
     @Override
     public void run(ApplicationArguments args) {
+        if (args.getNonOptionArgs().stream().findFirst().filter("demo"::equals).isPresent()) {
+            if (demo == null) {
+                throw new IllegalArgumentException("Demo workspace is disabled.");
+            }
+            demo.execute(args);
+            System.out.println("Demo command completed.");
+            return;
+        }
         new AdminCommands(provisioning, catalog, accounts, importer, System.out).execute(args);
     }
 }
