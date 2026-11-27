@@ -10,7 +10,7 @@ chức năng đang hoạt động. Tiếng Việt là mặc định. Bạn có t
 1. Trong Sheet, sao chép vùng dữ liệu có hàng tiêu đề. Dùng đúng các cột bạn đang viết: `SKU`, `Title`, `Description`, `Tags`. Bạn **không cần**
    cột `Category`, `Price`, `Quantity`, `Who made` hay `When made`: những trường đó điền trên Etsy khi tạo listing. Nếu bảng có các cột đó,
    Console kiểm chúng, và ô trống trong cột có sẵn vẫn là lỗi.
-   Trên trang chủ, bấm **Dán từ Sheet**. Chọn Etsy hoặc Amazon và dán vào ô nhập.
+   Trên trang **Việc của tôi**, bấm **Kiểm tra hàng loạt**. Chọn Etsy hoặc Amazon và dán vào ô nhập.
 2. Bấm **Tiếp tục: chọn cột**. Xác nhận các cột mà Console tự nhận diện, chỉnh ánh xạ nếu cần. Mục **Phạm vi kiểm tra** mặc định là
    **Kiểm nội dung (chỉ các cột có trong bảng)**: trường bảng không có cột không bị báo thiếu. Rồi bấm **Kiểm tra N dòng**.
 

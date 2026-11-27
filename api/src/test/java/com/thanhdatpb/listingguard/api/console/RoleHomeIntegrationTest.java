@@ -112,6 +112,19 @@ class RoleHomeIntegrationTest {
         assertThat(home(seller, "vi", "7")).doesNotContain("id=\"work-guide\"");
         assertThat(home(colleague, "vi", "7")).contains("id=\"work-guide\"");
 
+        mvc.perform(post("/console/bulk/run").with(signedIn(seller)).with(csrf())
+                        .param("marketplace", "ETSY").param("header", "yes").param("delimiter", "tab").param("scope", "content")
+                        .param("data", "SKU\tTitle\tDescription\tTags\nOWN-SKU\tBlue ceramic mug\tMade to order\tmug")
+                        .param("col.0", "sku").param("col.1", "title").param("col.2", "description").param("col.3", "tags"))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM check_history_event h JOIN listing_check c ON c.id = h.check_id AND c.client_id = h.client_id
+                WHERE h.client_id = ? AND h.actor_id = ? AND h.sku = 'OWN-SKU' AND c.scope = 'CONTENT'
+                  AND NOT EXISTS (SELECT 1 FROM finding f WHERE f.check_id = c.id AND f.severity = 'ERROR')
+                """, Long.class, client, account(seller).toString())).isOne();
+        assertThat(reports.work(client, account(seller)).needsFix()).anyMatch(
+                item -> item.checkId().equals(sellerCheck) && item.scope().equals("FULL"));
+
         mvc.perform(get("/console/stats/pilot").with(signedIn(seller))).andExpect(status().isForbidden());
         byte[] csv = csv(admin);
         String managerPrint = mvc.perform(get("/console/stats/pilot").with(signedIn(admin)).param("lang", "en"))

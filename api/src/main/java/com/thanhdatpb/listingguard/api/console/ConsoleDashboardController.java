@@ -50,6 +50,7 @@ public class ConsoleDashboardController {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         if (pilot.roleHome()) {
             var account = roles.account(user).orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
+            model.addAttribute("pilotCapabilities", capabilities.forConsole(user.clientId()));
             if (account.getRole() == ConsoleRole.ADMIN) {
                 int period = switch (days == null ? "30" : days) {
                     case "7" -> 7;

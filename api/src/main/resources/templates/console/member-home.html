@@ -13,16 +13,17 @@
 <main class="lg-page lg-role-home" id="main">
     <h1 th:text="#{work.home}"></h1>
     <div class="lg-actions lg-section" id="work-actions">
-        <a class="lg-btn lg-btn--primary" th:href="@{/console/bulk}">
+        <a class="lg-btn lg-btn--primary" id="pilot-start" th:href="@{/console/bulk}">
             <svg class="lg-icon" width="20" height="20" aria-hidden="true"><use href="#lg-i-bulk"/></svg><span th:text="#{nav.bulk}"></span>
         </a>
-        <a class="lg-btn" th:if="${phraseScreeningEnabled == true}" th:href="@{/console/phrase-screening}">
+        <a class="lg-btn" id="home-phrase-screening" th:if="${phraseScreeningEnabled == true}" th:href="@{/console/phrase-screening}">
             <svg class="lg-icon" width="20" height="20" aria-hidden="true"><use href="#lg-i-check"/></svg><span th:text="#{phrase.heading}"></span>
         </a>
         <a class="lg-btn" th:href="@{/console/check/edit}">
             <svg class="lg-icon" width="20" height="20" aria-hidden="true"><use href="#lg-i-report"/></svg><span th:text="#{work.edit}"></span>
         </a>
     </div>
+    <details th:replace="~{console/role-home-fragments :: pilotCapabilities}"></details>
     <section class="lg-card lg-section" id="work-fix">
         <h2 th:text="#{work.fix}"></h2>
         <p th:if="${work.needsFix.isEmpty()}" th:text="#{work.fix.empty}"></p>
@@ -31,7 +32,8 @@
                 <a th:href="@{/console/history/{pack}/{id}(pack=${item.pack},id=${item.checkId})}"
                    th:text="${item.sku != null} ? ${item.sku} : ${item.marketplace}"></a>
                 <span class="lg-small"><span aria-hidden="true" class="lg-manager-marker"></span>
-                    <span th:text="#{work.errors(${item.blocked})}"></span></span>
+                    <span th:text="#{work.errors(${item.blocked})}"></span>
+                    <span th:text="${item.scope == 'CONTENT'} ? #{bulk.scope.content} : #{bulk.scope.full}"></span></span>
             </li>
         </ul>
     </section>

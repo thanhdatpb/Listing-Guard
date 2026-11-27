@@ -39,7 +39,7 @@ public class RoleHomeService {
         }
     }
 
-    public record Activity(String pack, UUID checkId, Instant at, String sku, String marketplace, long rows, long blocked) {}
+    public record Activity(String pack, UUID checkId, Instant at, String sku, String marketplace, long rows, long blocked, String scope) {}
     public record Work(List<Activity> recent, List<Activity> needsFix, boolean guideHidden) {}
 
     private static final String MARKET = "(CAST(:marketplace AS text) IS NULL OR marketplace_code = :marketplace)";
@@ -132,7 +132,7 @@ public class RoleHomeService {
         var params = new MapSqlParameterSource("client", client).addValue("account", account)
                 .addValue("actor", account.toString()).addValue("phrases", phrases.getIfAvailable() != null);
         var recent = jdbc.query("""
-                SELECT pack_id, check_id, checked_at, sku, marketplace_code, row_count, blocked
+                SELECT pack_id, check_id, checked_at, sku, marketplace_code, row_count, blocked, NULL AS scope
                 FROM (
                     SELECT h.pack_id, h.check_id, h.checked_at, h.sku, h.marketplace_code, h.row_count, 0 AS blocked,
                         h.id::text AS order_ref
@@ -152,11 +152,16 @@ public class RoleHomeService {
                 """, params, RoleHomeService::activity);
         var needsFix = jdbc.query("""
                 WITH recent AS (
-                   SELECT DISTINCT ON (c.marketplace_code, COALESCE(NULLIF(h.sku, ''), c.content_hash::text))
-                     h.pack_id, h.check_id, h.checked_at, h.sku, h.marketplace_code, h.row_count
+                   SELECT DISTINCT ON (c.marketplace_code, COALESCE(NULLIF(h.sku, ''), c.content_hash::text),
+                                       c.scope, CASE WHEN c.scope = 'CONTENT' THEN c.analysis_version ELSE '' END)
+                     h.pack_id, h.check_id, h.checked_at, h.sku, h.marketplace_code, h.row_count, c.scope
                    FROM check_history_event h JOIN listing_check c ON c.id = h.check_id AND c.client_id = :client
                    WHERE h.client_id = :client AND h.actor_kind = 'ACCOUNT' AND h.actor_id = :actor AND h.pack_id = 'listing-rules'
-                   ORDER BY c.marketplace_code, COALESCE(NULLIF(h.sku, ''), c.content_hash::text), h.checked_at DESC, h.id DESC
+                     AND c.status = 'COMPLETED'
+                     AND (c.readiness_status IS DISTINCT FROM 'INCOMPLETE' OR EXISTS (
+                           SELECT 1 FROM finding f WHERE f.check_id = c.id AND f.severity = 'ERROR'))
+                   ORDER BY c.marketplace_code, COALESCE(NULLIF(h.sku, ''), c.content_hash::text), c.scope,
+                            CASE WHEN c.scope = 'CONTENT' THEN c.analysis_version ELSE '' END, h.checked_at DESC, h.id DESC
                 )
                 SELECT recent.*, (SELECT count(*) FROM finding f WHERE f.check_id = recent.check_id AND f.severity = 'ERROR') AS blocked
                 FROM recent WHERE EXISTS (SELECT 1 FROM finding f WHERE f.check_id = recent.check_id AND f.severity = 'ERROR')
@@ -178,6 +183,6 @@ public class RoleHomeService {
     private static Activity activity(java.sql.ResultSet row, int index) throws java.sql.SQLException {
         return new Activity(row.getString("pack_id"), row.getObject("check_id", UUID.class),
                 row.getObject("checked_at", OffsetDateTime.class).toInstant(), row.getString("sku"),
-                row.getString("marketplace_code"), row.getLong("row_count"), row.getLong("blocked"));
+                row.getString("marketplace_code"), row.getLong("row_count"), row.getLong("blocked"), row.getString("scope"));
     }
 }

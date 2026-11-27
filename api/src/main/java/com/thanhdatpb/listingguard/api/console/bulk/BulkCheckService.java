@@ -307,7 +307,7 @@ public class BulkCheckService {
             }
             String readiness = readiness(result.readiness());
             return new BulkResult.Rules(true, null, readiness, readinessLabel(readiness), score(result.readiness()),
-                    List.copyOf(items), scoped.scope(), scoped.skippedFields());
+                    List.copyOf(items), scoped.scope(), scoped.skippedFields(), result.checkId());
         } catch (QuotaExceededException e) {
             state.quotaNote = state.quotaNote == null ? BulkText.quota(messages, e) : state.quotaNote;
             return BulkResult.Rules.notRun(BulkText.quota(messages, e));

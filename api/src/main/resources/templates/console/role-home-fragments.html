@@ -105,5 +105,14 @@
         </dl>
     </section>
 </div>
+<details th:fragment="pilotCapabilities" class="lg-section" th:if="${pilotCapabilities != null}">
+    <summary><span id="pilot-heading" th:text="#{pilot.badge}"></span> <span th:text="#{pilot.available}"></span></summary>
+    <ul>
+        <li th:each="pack : ${pilotCapabilities.packs}" th:if="${pack.available}" th:attr="data-pack=${pack.id}"
+            th:text="${@consoleMessages.pilotPack(pack.id)}"></li>
+        <li th:if="${pilotCapabilities.fixes.enabled}" th:text="#{pilot.fixes}"></li>
+        <li th:if="${phraseScreeningEnabled == true}" th:text="#{phrase.heading}"></li>
+    </ul>
+</details>
 </body>
 </html>

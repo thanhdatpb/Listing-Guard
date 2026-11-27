@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.thanhdatpb.listingguard.api.capabilities.Capabilities;
 import com.thanhdatpb.listingguard.api.report.ReportQuery;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -44,7 +45,8 @@ class RoleHomeTemplateTest {
                 "40.0%", "pilot.csv", "&lt;xss&gt;").doesNotContain("<xss>", "id=\"pilot-daily\"");
         String seller = mvc.perform(get("/member").locale(Locale.forLanguageTag("vi")))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
-        assertThat(seller).contains("Việc của tôi", "Kiểm keyword", "Sửa listing", "Ẩn hướng dẫn", "Chưa có lượt kiểm")
+        assertThat(seller).contains("Việc của tôi", "Kiểm keyword", "Sửa listing", "Ẩn hướng dẫn", "Chưa có lượt kiểm",
+                "id=\"pilot-start\"", "id=\"home-phrase-screening\"", "id=\"pilot-heading\">Pilot", "data-pack=\"listing-rules\"")
                 .doesNotContain("manager-report-link");
     }
 
@@ -68,6 +70,10 @@ class RoleHomeTemplateTest {
             return source;
         }
 
+        @Bean ConsoleMessages consoleMessages(MessageSource source) {
+            return new ConsoleMessages(source);
+        }
+
         @Bean ThymeleafViewResolver thymeleaf(WebApplicationContext context, MessageSource messages) {
             var resolver = new SpringResourceTemplateResolver();
             resolver.setApplicationContext(context);
@@ -86,7 +92,9 @@ class RoleHomeTemplateTest {
                     40L, 10L, 5, 0.4, 2, WeeklyChart.of(List.of(new WeeklyChart.Week("2026-W48", "23/11", true, 8, 3))),
                     List.of(), List.of(new RoleHomeService.Mark("<xss>", true, 1)),
                     new HomeView.CheckData("READY", "demo-catalog", "Fixture", date, 1, null, null, List.of()), false);
-            views.setStaticVariables(Map.of("assetVersion", "test", "phraseScreeningEnabled", true,
+            var capabilities = new Capabilities(List.of(new Capabilities.PackCapability("listing-rules", true, Map.of())),
+                    null, null, new Capabilities.FixesCapability(true), null);
+            views.setStaticVariables(Map.of("pilotCapabilities", capabilities, "assetVersion", "test", "phraseScreeningEnabled", true,
                     "overview", overview, "periods", List.of(7, 30, 90),
                     "work", new RoleHomeService.Work(List.of(), List.of(), false)));
             return views;
