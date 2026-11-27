@@ -1,0 +1,109 @@
+# The standard fields a column of a workspace sheet can be given (ADR-059). The keys are the fields of the standard input
+# (docs/input-schema.md) and of the bulk check (ADR-029), so a listing kept in the workspace can be checked later without another mapping.
+#
+# `names` and `prefixes` only fill in a guess for the person to confirm: a header is compared after it is lower-cased and stripped of
+# accents and of everything but letters and digits ("Tiêu đề" and "tieu_de" are the same word; `bullet_point[marketplace_id=X]#1.value`
+# is "bulletpointmarketplaceidx1value"). A guess never decides anything: the page marks it "guessed" and the mapping is what the person
+# confirmed. None of these is a column list that a marketplace published, and no real Amazon template was read to write them.
+status: unverified
+version: standard-targets-1
+separators:
+  newline: "\n"
+  comma: ","
+  semicolon: ";"
+  pipe: "|"
+# The values of a parent/child column, compared after trimming and lower-casing. Anything else leaves the role to the parent SKU column.
+parent_values: [parent]
+child_values: [child]
+targets:
+  - key: sku
+    kind: SKU
+    names: [sku, sellersku, itemsku, masku, mahang, masanpham, id]
+  - key: parent_sku
+    kind: PARENT_SKU
+    names: [parentsku, skucha, macha, parent]
+    prefixes: [parentsku]
+  - key: parent_child
+    kind: PARENT_CHILD
+    marketplaces: [AMAZON]
+    names: [parentage, parentchild, parentagelevel, loaibien]
+    prefixes: [parentage]
+  - key: variation_theme
+    kind: THEME
+    marketplaces: [AMAZON]
+    names: [variationtheme, theme]
+    prefixes: [variationtheme]
+  - key: owner
+    kind: OWNER
+    names: [owner, nguoiphutrach, phutrach, assignee]
+  - key: title
+    kind: TEXT
+    names: [title, tieude, ten, tensanpham, itemname, productname, listingtitle, name]
+    prefixes: [itemname]
+  - key: brand
+    kind: TEXT
+    marketplaces: [AMAZON]
+    names: [brand, thuonghieu, brandname]
+    prefixes: [brandname]
+  - key: bullet_points
+    kind: LIST
+    marketplaces: [AMAZON]
+    default_separator: null
+    names: [bullet, bullets, bulletpoint, bulletpoints, diemnoibat, ychinh]
+    prefixes: [bulletpoint]
+  - key: description
+    kind: TEXT
+    names: [description, mota, motasanpham, desc, noidung, productdescription]
+    prefixes: [productdescription]
+  - key: search_terms
+    kind: TEXT_OR_LIST
+    marketplaces: [AMAZON]
+    names: [searchterms, searchterm, tukhoatimkiem, generickeywords, tukhoa, keywords, keyword]
+    prefixes: [generickeyword]
+  - key: tags
+    kind: LIST
+    marketplaces: [ETSY]
+    default_separator: comma
+    names: [tags, tag, thetag, the, nhan, tukhoa, keywords, keyword]
+    prefixes: [tag]
+  - key: materials
+    kind: LIST
+    marketplaces: [ETSY]
+    default_separator: comma
+    names: [materials, material, chatlieu]
+  - key: personalization
+    kind: TEXT
+    marketplaces: [ETSY]
+    names: [personalization, personalisation, canhancchoa, tuychinh]
+  - key: product_type
+    kind: TEXT
+    marketplaces: [AMAZON]
+    names: [producttype, loaisanpham, feedproducttype]
+    prefixes: [feedproducttype]
+  - key: price
+    kind: PRICE
+    names: [price, gia, dongia, giaban, standardprice]
+    prefixes: [standardprice]
+  - key: quantity
+    kind: INTEGER
+    names: [quantity, qty, soluong, stock, tonkho]
+  - key: category
+    kind: TEXT
+    marketplaces: [ETSY]
+    names: [category, danhmuc]
+  - key: who_made
+    kind: TEXT
+    marketplaces: [ETSY]
+    names: [whomade, ailam]
+  - key: when_made
+    kind: TEXT
+    marketplaces: [ETSY]
+    names: [whenmade, khinaolam]
+  - key: item_highlights
+    kind: TEXT
+    marketplaces: [AMAZON]
+    names: [itemhighlights]
+  - key: attribute
+    kind: ATTRIBUTE
+    names: [color, colour, mau, mausac, size, kichco, kichthuoc, style, kieu]
+    prefixes: [colorname, sizename, stylename]

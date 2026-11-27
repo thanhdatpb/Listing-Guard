@@ -1,0 +1,22 @@
+# The fixed main fields of an Etsy listing in the workspace (template kind ETSY_FIELDS, ADR-059). Etsy listings are posted by hand, so
+# there is no template file to upload: the account's template is this list. A field's `key` is its key in the standard input
+# (docs/input-schema.md), and the order is the order the workspace shows them. The list is a working set chosen for the workspace, not a
+# list that Etsy published: `source.status` stays unverified until the maintainer compares it with the Etsy listing form.
+# A version is immutable: a change is a new file and a new version, like a ruleset.
+version: etsy-fields-1
+source:
+  status: unverified
+  note: Working set of the fixed fields; not read from Etsy documentation.
+fields:
+  - sku
+  - parent_sku
+  - title
+  - description
+  - tags
+  - materials
+  - personalization
+  - price
+  - quantity
+  - category
+  - who_made
+  - when_made
