@@ -23,7 +23,11 @@ import com.thanhdatpb.listingguard.api.workspace.WorkspaceTypes.ExportFormat;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceTypes.ListingStatus;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceTypes.Marketplace;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceTypes.TemplateKind;
+import com.thanhdatpb.listingguard.api.workspace.audit.AuditModels.AuditView;
+import com.thanhdatpb.listingguard.api.workspace.audit.AuditStore;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -61,7 +65,13 @@ public class ConsoleWorkspaceController {
 
     /** A row of the list. */
     public record Row(UUID id, String sku, boolean child, String title, String account, String marketplace, String role, String status,
-                      String statusLabel, String owner, String updated, String parentSku) {
+                      String statusLabel, String owner, String updated, String parentSku, String auditState, String auditLabel) {
+
+        /** A row of the list as it was before the background audit (ADR-061): the state is "not checked". */
+        public Row(UUID id, String sku, boolean child, String title, String account, String marketplace, String role, String status,
+                   String statusLabel, String owner, String updated, String parentSku) {
+            this(id, sku, child, title, account, marketplace, role, status, statusLabel, owner, updated, parentSku, null, null);
+        }
     }
 
     /** A field of a listing in the order of its template. */
@@ -85,6 +95,15 @@ public class ConsoleWorkspaceController {
     private final TemplateService templateService;
     private final ConsoleAccountRoles roles;
     private final ConsoleMessages messages;
+    /** The background audit's parts (ADR-061); empty while the audit is off, and then the pages are what they were. */
+    private ObjectProvider<WorkspaceAuditViews> auditViews;
+    private ObjectProvider<AuditStore> auditStore;
+
+    @Autowired
+    void setAudit(ObjectProvider<WorkspaceAuditViews> views, ObjectProvider<AuditStore> store) {
+        this.auditViews = views;
+        this.auditStore = store;
+    }
 
     public ConsoleWorkspaceController(WorkspaceAccess access, WorkspaceAccounts accounts, WorkspaceTemplates templates,
                                       WorkspaceListings listings, TemplateService templateService, ConsoleAccountRoles roles,
@@ -142,14 +161,20 @@ public class ConsoleWorkspaceController {
         } catch (NumberFormatException ignored) {
             // an unreadable page number is the first page
         }
-        Page<ListingSummary> page = listings.list(actor.clientId(), filter, pageNumber);
+        WorkspaceAuditViews audit = auditViews == null ? null : auditViews.getIfAvailable();
+        String check = audit == null ? null : checkFilter(params.get("check"));
+        Page<ListingSummary> page = check == null ? listings.list(actor.clientId(), filter, pageNumber)
+                : listings.list(actor.clientId(), filter, pageNumber, check);
+        Map<UUID, AuditView> auditOf = audit == null ? Map.of()
+                : auditStore.getObject().views(actor.clientId(), page.items().stream().map(ListingSummary::id).toList());
         Map<UUID, String> emails = roles.emails(actor.clientId());
         List<Row> rows = new ArrayList<>();
         for (ListingSummary s : page.items()) {
             rows.add(new Row(s.id(), s.sku(), s.parentSku() != null, s.title(), s.accountName(), labels.marketplace(s.marketplace()),
                     labels.role(s.role()), s.status().name().toLowerCase(java.util.Locale.ROOT), labels.status(s.status()),
                     s.ownerAccountId() == null ? null : emails.getOrDefault(s.ownerAccountId(), ""), ConsoleDates.dateTime(messages, s.updatedAt()),
-                    s.parentSku()));
+                    s.parentSku(), audit == null ? null : audit.of(auditOf.get(s.id())).code(),
+                    audit == null ? null : audit.of(auditOf.get(s.id())).label()));
         }
         List<SellerAccount> sellerAccounts = accounts.list(actor.clientId());
         List<String[]> statuses = new ArrayList<>();
@@ -167,7 +192,16 @@ public class ConsoleWorkspaceController {
         model.addAttribute("filterOwner", owner);
         model.addAttribute("filterQuery", filter.query());
         model.addAttribute("filtered", !filter.equals(ListingFilter.none()) && (filter.accountId() != null || filter.marketplace() != null
-                || filter.status() != null || filter.owner() != null || filter.noOwner() || !filter.query().isEmpty()));
+                || filter.status() != null || filter.owner() != null || filter.noOwner() || !filter.query().isEmpty()) || check != null);
+        if (audit != null) {
+            List<String[]> checks = new ArrayList<>();
+            for (String code : CHECKS) {
+                checks.add(new String[] {code, messages.get("workspace.audit.state." + code.toLowerCase(java.util.Locale.ROOT))});
+            }
+            model.addAttribute("auditOn", true);
+            model.addAttribute("checks", checks);
+            model.addAttribute("filterCheck", check == null ? "" : check);
+        }
         model.addAttribute("admin", actor.admin());
         model.addAttribute("hasAccounts", !sellerAccounts.isEmpty());
         model.addAttribute("first", page.total() == 0 ? 0 : (long) page.page() * page.pageSize() + 1);
@@ -227,7 +261,24 @@ public class ConsoleWorkspaceController {
         model.addAttribute("customization", listings.customization(actor.clientId(), listing.accountId(), listing.sku()).orElse(null));
         model.addAttribute("admin", actor.admin());
         model.addAttribute("canEdit", access.canEdit(actor, listing.ownerAccountId()));
+        WorkspaceAuditViews audit = auditViews == null ? null : auditViews.getIfAvailable();
+        if (audit != null) {
+            model.addAttribute("auditOn", true);
+            model.addAttribute("audit", audit.detail(actor.clientId(), listing).orElse(null));
+        }
         return "console/workspace-detail";
+    }
+
+    /** The states of the audit's filter, in the order the list offers them; {@code NONE} is a listing that was never audited. */
+    private static final List<String> CHECKS = List.of("NEW_RISK", "ERROR", "WARNING", "CLEAN", "INCOMPLETE", "NONE");
+
+    /** A value of the {@code check} parameter the list knows, upper case, or null: an unknown word is no filter, never an error. */
+    private static String checkFilter(String value) {
+        if (value == null) {
+            return null;
+        }
+        String code = value.strip().toUpperCase(java.util.Locale.ROOT);
+        return CHECKS.contains(code) ? code : null;
     }
 
     private static String targetOf(Template template, String key) {

@@ -46,6 +46,10 @@
             <option value="none" th:selected="${filterOwner == 'none'}" th:text="#{workspace.filter.owner.none}"></option>
             <option th:each="o : ${owners}" th:value="${o.key}" th:selected="${o.key.toString() == filterOwner}" th:text="${o.value}"></option>
         </select>
+        <select class="lg-select" name="check" th:if="${auditOn == true}" th:aria-label="#{workspace.filter.check}">
+            <option value="" th:text="#{workspace.filter.check.any}"></option>
+            <option th:each="c : ${checks}" th:value="${c[0]}" th:selected="${c[0] == filterCheck}" th:text="${c[1]}"></option>
+        </select>
         <input class="lg-input lg-filters__search" type="search" name="q" th:value="${filterQuery}" autocomplete="off"
                th:placeholder="#{workspace.filter.query.placeholder}" th:aria-label="#{workspace.filter.query}">
         <button type="submit" class="lg-btn lg-btn--small" th:text="#{workspace.filter.apply}"></button>
@@ -89,7 +93,7 @@
                 <td th:text="${row.role}"></td>
                 <td><span th:replace="~{console/workspace-fragments :: status(${row.status}, ${row.statusLabel})}"></span></td>
                 <td class="lg-ellip" th:title="${row.owner}"><span th:if="${row.owner != null}" th:text="${row.owner}"></span><span class="lg-text-muted" th:if="${row.owner == null}" th:text="#{workspace.owner.none}"></span></td>
-                <td><span th:replace="~{console/workspace-fragments :: unchecked}"></span></td>
+                <td><th:block th:if="${auditOn != true}"><span th:replace="~{console/workspace-fragments :: unchecked}"></span></th:block><th:block th:if="${auditOn == true}"><span th:replace="~{console/workspace-fragments :: auditState(${row.auditState}, ${row.auditLabel})}"></span></th:block></td>
                 <td class="lg-nowrap lg-text-muted" th:text="${row.updated}"></td>
             </tr>
             </tbody>
@@ -101,11 +105,11 @@
            th:text="#{workspace.shown(${#strings.toString(first)}, ${#strings.toString(last)}, ${#strings.toString(page.total())})}"></p>
         <nav class="lg-actions" th:if="${page.pages() > 1}" th:aria-label="#{workspace.pagination}">
             <a class="lg-btn lg-btn--small" rel="prev" th:if="${page.page() > 0}" th:text="#{workspace.previous}"
-               th:href="@{/console/workspace(account=${filterAccount},marketplace=${filterMarketplace},status=${filterStatus},owner=${filterOwner},q=${filterQuery},page=${page.page() - 1})}"></a>
+               th:href="${auditOn == true} ? @{/console/workspace(account=${filterAccount},marketplace=${filterMarketplace},status=${filterStatus},owner=${filterOwner},check=${filterCheck},q=${filterQuery},page=${page.page() - 1})} : @{/console/workspace(account=${filterAccount},marketplace=${filterMarketplace},status=${filterStatus},owner=${filterOwner},q=${filterQuery},page=${page.page() - 1})}"></a>
             <span class="lg-btn lg-btn--small" aria-disabled="true" th:if="${page.page() == 0}" th:text="#{workspace.previous}"></span>
             <span class="lg-small lg-text-muted" th:text="#{workspace.page(${page.page() + 1}, ${page.pages()})}"></span>
             <a class="lg-btn lg-btn--small" rel="next" th:if="${page.page() + 1 < page.pages()}" th:text="#{workspace.next}"
-               th:href="@{/console/workspace(account=${filterAccount},marketplace=${filterMarketplace},status=${filterStatus},owner=${filterOwner},q=${filterQuery},page=${page.page() + 1})}"></a>
+               th:href="${auditOn == true} ? @{/console/workspace(account=${filterAccount},marketplace=${filterMarketplace},status=${filterStatus},owner=${filterOwner},check=${filterCheck},q=${filterQuery},page=${page.page() + 1})} : @{/console/workspace(account=${filterAccount},marketplace=${filterMarketplace},status=${filterStatus},owner=${filterOwner},q=${filterQuery},page=${page.page() + 1})}"></a>
             <span class="lg-btn lg-btn--small" aria-disabled="true" th:if="${page.page() + 1 >= page.pages()}" th:text="#{workspace.next}"></span>
         </nav>
     </div>

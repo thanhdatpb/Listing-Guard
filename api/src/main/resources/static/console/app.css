@@ -769,3 +769,63 @@ button.lg-switch:focus-visible { outline: 2px solid var(--brand); outline-offset
 /* A table with many columns: the sides of a cell are narrower, so the page does not scroll for ten columns. */
 .lg-table--dense th, .lg-table--dense td { padding-left: var(--space-3); padding-right: var(--space-3); }
 .lg-table--dense td.lg-main { min-width: 12rem; }
+
+/* ---------- the workspace's background audit (ADR-061) ---------- */
+
+/* The state of a listing after the audit: a word and a shape, then a ground. A new risk is the only one with a ring all round (never one side). */
+.lg-chip--audit { border-color: transparent; font-weight: 600; }
+.lg-chip--audit-clean { background: var(--success-subtle); color: var(--success); }
+.lg-chip--audit-warning { background: var(--warning-subtle); color: var(--warning); }
+.lg-chip--audit-error { background: var(--danger-subtle); color: var(--danger); }
+.lg-chip--audit-new_risk { background: var(--danger-subtle); color: var(--danger); box-shadow: 0 0 0 1px var(--danger); font-weight: 700; }
+.lg-chip--audit-incomplete, .lg-chip--audit-none { background: var(--hover); color: var(--ink-soft); font-weight: 400; }
+.lg-state-counts { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.lg-state-counts li { display: flex; align-items: center; gap: var(--space-2); }
+
+/* The text of a listing with the words a finding points at marked. The text keeps the spaces the seller typed. A mark is never only a color:
+   it has an icon (a diamond for an error or a high risk, a triangle for a warning or a medium one), an underline (solid, or wavy) and a
+   tooltip with the words. The tooltip shows on hover and on focus; its content is also a row of the findings table. */
+.lg-hl-fields { margin: 0; }
+.lg-hl-field { padding: var(--space-3) 0; border-top: 1px solid var(--line-soft); }
+.lg-hl-field:first-child { border-top: 0; padding-top: 0; }
+.lg-hl-field__name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-weight: 600; margin-bottom: var(--space-1); }
+.lg-hl-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lg-hl { position: relative; }
+.lg-hl__mark {
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+.lg-hl__icon { vertical-align: -2px; margin-right: 2px; }
+.lg-hl--severe .lg-hl__mark { background: var(--danger-subtle); text-decoration-style: solid; text-decoration-color: var(--danger); }
+.lg-hl--severe .lg-hl__icon { color: var(--danger); }
+.lg-hl--caution .lg-hl__mark { background: var(--warning-subtle); text-decoration-style: wavy; text-decoration-color: var(--warning); }
+.lg-hl--caution .lg-hl__icon { color: var(--warning); }
+.lg-hl__tip {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  top: 100%;
+  min-width: 14rem;
+  max-width: 22rem;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  white-space: normal;
+}
+.lg-hl__tip > * { display: block; }
+.lg-hl:hover .lg-hl__tip, .lg-hl:focus-within .lg-hl__tip { display: block; }
+
+/* The progress of a run: a native bar with x of y beside it. */
+.lg-progress { width: 10rem; max-width: 100%; height: 12px; accent-color: var(--brand); vertical-align: middle; }
+.lg-progress__text { margin-left: var(--space-2); }

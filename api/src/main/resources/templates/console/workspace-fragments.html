@@ -10,6 +10,116 @@
 <!-- The check state of a listing. The background check is a later change (W2): every listing says it has not been checked. -->
 <span th:fragment="unchecked" class="lg-chip lg-chip--neutral"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-unchecked"/></svg><span th:text="#{workspace.check.none}"></span></span>
 
+<!-- The state of a listing after the background audit (ADR-061). code is clean, warning, error, new_risk, incomplete or none; label is its word.
+     A state is a word and a shape: a check for clean, a triangle for a warning, a diamond for an error, a diamond with a dot for a new risk, a
+     dashed circle for what was not fully checked. Colour only helps. -->
+<span th:fragment="auditState(code, label)" th:class="${'lg-chip lg-chip--audit lg-chip--audit-' + code}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use th:href="${code == 'clean' ? '#lg-i-ok' : code == 'warning' ? '#lg-i-warn' : code == 'error' ? '#lg-i-risk-severe' : code == 'new_risk' ? '#lg-i-risk-new' : '#lg-i-unchecked'}"/></svg><span th:text="${label}"></span></span>
+
+<!-- The detail page's audit parts (ADR-061): the content as it was checked, with the words a finding points at marked, and the table of findings.
+     Model: audit (null while the listing has no audit), canEdit, listing. A marked piece is a word, an icon and an underline (a solid one for an
+     error or a high risk, a wavy one for a warning or a medium risk), so colour is not the only sign; its tooltip is described by id and is also a
+     row of the table below. A piece of text sits next to its neighbours with no space between (a space here would be shown), so each field's
+     pieces are on one line. Every value of the listing goes through th:text. -->
+<th:block th:fragment="auditDetail">
+    <section class="lg-card lg-section" id="audit-content" aria-labelledby="audit-content-heading">
+        <h2 id="audit-content-heading" class="lg-card__title" th:text="#{workspace.audit.content}"></h2>
+        <div class="lg-banner lg-banner--info" id="audit-pending" th:if="${audit == null}"><p th:text="#{workspace.audit.pending}"></p></div>
+        <th:block th:if="${audit != null}">
+            <p class="lg-text-muted" th:text="#{workspace.audit.content.intro(${audit.audited})}"></p>
+            <div class="lg-banner lg-banner--warning" id="audit-incomplete" th:unless="${audit.trademarkRan}"><p th:text="#{workspace.audit.incomplete}"></p></div>
+            <dl class="lg-hl-fields" id="audit-fields">
+                <div class="lg-hl-field" th:each="field : ${audit.fields}" th:attr="data-field=${field.path}">
+                    <dt class="lg-hl-field__name"><span th:text="${field.label}"></span><span class="lg-chip lg-chip--audit" th:if="${field.flagged}" th:classappend="${field.flagSeverity == 'severe'} ? 'lg-chip--audit-error' : 'lg-chip--audit-warning'"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use th:href="${field.flagSeverity == 'severe' ? '#lg-i-risk-severe' : '#lg-i-warn'}"/></svg><span th:text="#{workspace.audit.field.flag(${field.flagLevel})}"></span></span></dt>
+                    <dd class="lg-hl-text"><th:block th:each="seg : ${field.segments}"><span th:unless="${seg.marked()}" th:text="${seg.text}"></span><span th:if="${seg.marked()}" th:with="f=${audit.findings[seg.finding]}" class="lg-hl" th:classappend="${'lg-hl--' + seg.severity}"><mark class="lg-hl__mark" tabindex="0" th:attr="aria-describedby=${seg.tip}"><svg class="lg-icon lg-hl__icon" width="14" height="14" aria-hidden="true" focusable="false"><use th:href="${seg.severity == 'severe' ? '#lg-i-risk-severe' : '#lg-i-warn'}"/></svg><span th:text="${seg.text}"></span></mark><span class="lg-hl__tip" role="tooltip" th:id="${seg.tip}"><strong th:text="${f.levelLabel}"></strong><span th:text="${f.source}"></span><span th:if="${f.mark != null}" th:text="#{workspace.audit.tip.mark(${f.mark})}"></span><span th:if="${f.serial != null}" th:text="#{workspace.audit.tip.serial(${f.serial})}"></span><span th:if="${f.fresh}" th:text="#{workspace.audit.state.new_risk}"></span><a th:if="${f.tsdrUrl != null and #strings.startsWith(f.tsdrUrl, 'https://')}" th:href="${f.tsdrUrl}" rel="noopener noreferrer" target="_blank" th:text="#{workspace.audit.tsdr}"></a></span></span></th:block></dd>
+                </div>
+            </dl>
+        </th:block>
+    </section>
+    <section class="lg-card lg-section" id="audit-findings" aria-labelledby="audit-findings-heading" th:if="${audit != null}">
+        <h2 id="audit-findings-heading" class="lg-card__title" th:text="#{workspace.audit.findings}"></h2>
+        <p class="lg-text-muted" th:if="${audit.findings.isEmpty()}" th:text="${audit.trademarkRan} ? #{workspace.audit.findings.none} : #{workspace.audit.findings.none.partial}"></p>
+        <form method="post" id="ack-form" th:if="${audit.hasNew and canEdit}" th:action="@{/console/workspace/audit/listings/{id}/ack(id=${listing.id()})}">
+            <p class="lg-text-muted" th:text="#{workspace.audit.ack.hint}"></p>
+            <div class="lg-actions"><button type="submit" class="lg-btn" th:text="#{workspace.audit.ack}"></button></div>
+        </form>
+        <div class="lg-table-wrap" th:unless="${audit.findings.isEmpty()}">
+            <table class="lg-table lg-table--scroll lg-table--dense" id="audit-table">
+                <caption class="lg-sr-only" th:text="#{workspace.audit.findings}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" class="lg-num" th:text="#{workspace.audit.col.number}"></th>
+                    <th scope="col" th:text="#{workspace.audit.col.level}"></th>
+                    <th scope="col" th:text="#{workspace.audit.col.field}"></th>
+                    <th scope="col" th:text="#{workspace.audit.col.mark}"></th>
+                    <th scope="col" th:text="#{workspace.audit.col.source}"></th>
+                    <th scope="col" th:text="#{workspace.audit.col.serial}"></th>
+                    <th scope="col" th:text="#{workspace.audit.col.message}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="f : ${audit.findings}" th:attr="data-new=${f.fresh},data-positioned=${f.positioned}">
+                    <td class="lg-num" th:text="${f.number}"></td>
+                    <td><span class="lg-chip lg-chip--audit" th:classappend="${f.severity == 'severe'} ? 'lg-chip--audit-error' : 'lg-chip--audit-warning'"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use th:href="${f.severity == 'severe' ? '#lg-i-risk-severe' : '#lg-i-warn'}"/></svg><span th:text="${f.levelLabel}"></span></span> <span class="lg-chip lg-chip--audit lg-chip--audit-new_risk" th:if="${f.fresh}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-risk-new"/></svg><span th:text="#{workspace.audit.state.new_risk}"></span></span></td>
+                    <td th:text="${f.fieldLabel}"></td>
+                    <td class="lg-wrap"><span th:if="${f.mark != null}" th:text="${f.mark}"></span><code class="lg-code" th:if="${f.mark == null}" th:text="${f.rule}"></code></td>
+                    <td th:text="${f.source}"></td>
+                    <td><span th:if="${f.serial != null}" th:text="${f.serial}"></span><a th:if="${f.tsdrUrl != null and #strings.startsWith(f.tsdrUrl, 'https://')}" th:href="${f.tsdrUrl}" rel="noopener noreferrer" target="_blank" th:text="#{workspace.audit.tsdr}"></a><span class="lg-text-muted" th:if="${f.serial == null and f.tsdrUrl == null}">&mdash;</span></td>
+                    <td class="lg-wrap"><span th:text="${f.message}"></span><span class="lg-text-muted" th:if="${!f.positioned}" th:text="${f.knownPlace} ? #{workspace.audit.place.field} : #{workspace.audit.place.other}"></span></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</th:block>
+
+<!-- The progress block: one row for each seller account with its latest run. While a run waits or works the block asks the server again every
+     few seconds and replaces itself; when none does it stops asking. The bar is a native progress element; x of y is written beside it. -->
+<div th:fragment="progress" id="audit-progress" class="lg-audit-progress" th:attr="hx-get=${running} ? @{/console/workspace/audit/progress} : null,hx-trigger=${running} ? 'every 3s' : null,hx-swap=${running} ? 'outerHTML' : null,aria-busy=${running}">
+    <div class="lg-table-wrap">
+        <table class="lg-table lg-table--scroll lg-table--dense" id="audit-progress-table">
+            <caption class="lg-sr-only" th:text="#{workspace.audit.progress}"></caption>
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{workspace.audit.col.account}"></th>
+                <th scope="col" th:text="#{workspace.audit.col.state}"></th>
+                <th scope="col" th:text="#{workspace.audit.col.progress}"></th>
+                <th scope="col" th:text="#{workspace.audit.col.reason}"></th>
+                <th scope="col" class="lg-num" th:text="#{workspace.audit.col.new}"></th>
+                <th scope="col" th:if="${admin}"><span class="lg-sr-only" th:text="#{workspace.audit.col.action}"></span></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="run : ${progress}" th:attr="data-account=${run.accountId()},data-run-status=${run.statusCode()}">
+                <th scope="row" class="lg-wrap"><span th:text="${run.account()}"></span><br><span class="lg-text-muted lg-small" th:text="${run.marketplace()}"></span></th>
+                <td><span th:text="${run.status()}"></span></td>
+                <td>
+                    <progress class="lg-progress" max="100" th:value="${run.percent()}" th:aria-label="${run.account()}" th:if="${run.statusCode() != 'never'}"></progress>
+                    <span class="lg-num lg-progress__text" th:if="${run.statusCode() != 'never'}" th:text="${run.processed() + '/' + run.total()}"></span>
+                    <span class="lg-text-muted" th:if="${run.statusCode() == 'never'}">&mdash;</span>
+                </td>
+                <td th:text="${run.reason()}"></td>
+                <td class="lg-num" th:text="${run.newRiskListings()}"></td>
+                <td th:if="${admin}">
+                    <form method="post" th:action="@{/console/workspace/audit/accounts/{id}(id=${run.accountId()})}"
+                          th:attr="hx-post=@{/console/workspace/audit/accounts/{id}(id=${run.accountId()})},hx-target='#audit-progress',hx-swap='outerHTML',hx-disabled-elt='find button'">
+                        <button type="submit" class="lg-btn lg-btn--small" th:disabled="${run.running()}" th:text="#{workspace.audit.run}"></button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- The card of the home pages (ADR-061): how many listings have a risk nobody has marked as seen. Model: auditHome (null while the audit is off). -->
+<section th:fragment="homeCard" class="lg-card lg-section" id="audit-home-card" aria-labelledby="audit-home-heading">
+    <h2 id="audit-home-heading" class="lg-card__title" th:text="#{workspace.audit.home.title}"></h2>
+    <p class="lg-text-muted" th:if="${auditHome.count() == 0}" id="audit-home-none" th:text="#{workspace.audit.home.none}"></p>
+    <p th:if="${auditHome.count() > 0}"><span th:replace="~{console/workspace-fragments :: auditState('new_risk', #{workspace.audit.state.new_risk})}"></span> <strong class="lg-num" id="audit-home-count" th:text="${auditHome.count()}"></strong></p>
+    <p th:if="${auditHome.count() > 0}" class="lg-text-muted" th:text="${auditHome.mine()} ? #{workspace.audit.home.mine} : #{workspace.audit.home.all}"></p>
+    <p><a class="lg-btn" id="audit-home-link" th:href="${auditHome.mine()} ? @{/console/workspace(check=NEW_RISK,owner=me)} : @{/console/workspace(check=NEW_RISK)}" th:text="#{workspace.audit.home.open}"></a></p>
+</section>
+
 <!-- A value that a guess filled in: it says so, in a word and a shape, until the person confirms it. -->
 <span th:fragment="guessed" class="lg-chip lg-chip--flag"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-guess"/></svg><span th:text="#{workspace.guessed}"></span></span>
 

@@ -22,7 +22,7 @@
         </div>
         <div class="lg-actions">
             <span th:replace="~{console/workspace-fragments :: status(${listing.status().name().toLowerCase()}, ${statusLabel})}"></span>
-            <span th:replace="~{console/workspace-fragments :: unchecked}"></span>
+            <th:block th:if="${auditOn != true}"><span th:replace="~{console/workspace-fragments :: unchecked}"></span></th:block><th:block th:if="${auditOn == true}"><span th:replace="~{console/workspace-fragments :: auditState(${audit == null ? 'none' : audit.state.code}, ${audit == null ? #messages.msg('workspace.check.none') : audit.state.label})}"></span></th:block>
         </div>
     </div>
 
@@ -43,7 +43,7 @@
             <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.detail.created}"></span><span class="lg-kv__value" th:text="${created}"></span></li>
             <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.detail.updated}"></span><span class="lg-kv__value" th:text="${updated}"></span></li>
         </ul>
-    </section>
+    </section><th:block th:if="${auditOn == true}"><th:block th:replace="~{console/workspace-fragments :: auditDetail}"></th:block></th:block>
 
     <section class="lg-card lg-section" aria-labelledby="fields-heading">
         <h2 id="fields-heading" class="lg-card__title" th:text="#{workspace.detail.fields}"></h2>
