@@ -44,6 +44,10 @@ without it.
 docker compose up --build        # postgres + api (override ports: POSTGRES_PORT, API_PORT)
 ```
 
+Without Docker (cloud sessions): `eval "$(scripts/test-db-local.sh)"` starts a local PostgreSQL 16 with pgvector and sets `LG_TEST_JDBC_URL`,
+`LG_TEST_JDBC_USER` and `LG_TEST_JDBC_PASSWORD`; `TestcontainersConfig` then starts no container (unset: Testcontainers as before, as in CI).
+[docs/testing.md](docs/testing.md) lists the tests that still need Docker. `python3 scripts/check-doc-links.py` is the Linux form of `docs/check-doc-links.ps1`.
+
 Do not use `-DforkCount=0` in this repository: it can change the test working-directory context and break `rag-analyzer`'s relative `..\eval\retrieval\queries.yaml` path.
 
 ## Required conventions
@@ -63,6 +67,7 @@ Do not use `-DforkCount=0` in this repository: it can change the test working-di
 - [Operational commands](docs/agent/operations.md) covers policy corpus, catalogs, Compose tasks and job invocations.
 - [Listing workspace](docs/workspace.md) stores listings per seller account, with templates and imports (off by default, ADR-059): the one place that stores listing text.
 - [Phrase screening](docs/phrase-screening.md) checks short seller phrases via API, SDK or MCP (off by default, ADR-055).
+- [Running the tests](docs/testing.md) covers the local PostgreSQL without Docker, the tests that still need Docker and the browser tests.
 - [Detailed engineering conventions](docs/agent/conventions.md) preserves pack, schema, UI, API, evaluation and release rules.
 - [Repository guidelines](CONTRIBUTING.md), [ADRs](docs/adr/), [implementation notes](docs/implementation/),
   [Oracle deployment](docs/deploy-oracle.md) and [operations readiness](docs/deploy-readiness.md).

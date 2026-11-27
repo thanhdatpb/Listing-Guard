@@ -2,10 +2,15 @@ package com.thanhdatpb.listingguard.api;
 
 import com.thanhdatpb.listingguard.api.client.ClientProvisioning;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.core.env.Environment;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -13,14 +18,73 @@ import org.testcontainers.utility.DockerImageName;
 /**
  * One pgvector Postgres for every integration test that imports this. Tests with the same context
  * configuration share the cached Spring context, so the container starts once per test run.
+ *
+ * <p>Opt-in without Docker: when {@code LG_TEST_JDBC_URL} has a value (with {@code LG_TEST_JDBC_USER} and
+ * {@code LG_TEST_JDBC_PASSWORD}) no container starts and every test that imports this configuration uses that
+ * database, whatever its profiles ({@code scripts/test-db-local.sh} makes one; see docs/testing.md). The database
+ * needs the pgvector extension. Without the variable the behaviour is the one above, unchanged (CI).
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfig {
 
+    static final String JDBC_URL = "LG_TEST_JDBC_URL";
+    static final String JDBC_USER = "LG_TEST_JDBC_USER";
+    static final String JDBC_PASSWORD = "LG_TEST_JDBC_PASSWORD";
+
+    /** True when {@code LG_TEST_JDBC_URL} is set to a non-blank value. */
+    static boolean externalDatabase(Environment environment) {
+        String url = environment.getProperty(JDBC_URL);
+        return url != null && !url.isBlank();
+    }
+
+    static final class ExternalDatabase implements Condition {
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            return externalDatabase(context.getEnvironment());
+        }
+    }
+
+    static final class NoExternalDatabase implements Condition {
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            return !externalDatabase(context.getEnvironment());
+        }
+    }
+
     @Bean
     @ServiceConnection
+    @Conditional(NoExternalDatabase.class)
     PostgreSQLContainer postgres() {
         return new PostgreSQLContainer(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
+    }
+
+    /**
+     * The database of {@code LG_TEST_JDBC_URL}, given as connection details like the container's {@code @ServiceConnection}: the data source,
+     * Flyway and JPA take it before any property, whatever the profiles (dev, test, admin...) say. A {@code DynamicPropertyRegistrar} would not do:
+     * in a context with a web server (RANDOM_PORT) Tomcat builds the filters, and so the data source, before that registrar has run.
+     */
+    @Bean
+    @Conditional(ExternalDatabase.class)
+    JdbcConnectionDetails externalDatabaseConnection(Environment environment) {
+        String url = environment.getProperty(JDBC_URL);
+        String user = environment.getProperty(JDBC_USER, "listingguard");
+        String password = environment.getProperty(JDBC_PASSWORD, "listingguard");
+        return new JdbcConnectionDetails() {
+            @Override
+            public String getJdbcUrl() {
+                return url;
+            }
+
+            @Override
+            public String getUsername() {
+                return user;
+            }
+
+            @Override
+            public String getPassword() {
+                return password;
+            }
+        };
     }
 
     /**
