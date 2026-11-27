@@ -24,6 +24,7 @@ import com.thanhdatpb.listingguard.api.workspace.WorkspaceModels.SellerAccount;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceModels.Template;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceModels.WorkspaceException;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceOverrides;
+import com.thanhdatpb.listingguard.api.workspace.WorkspaceProperties;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceTemplates;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceTypes.ListingRole;
 import jakarta.servlet.http.HttpServletResponse;
@@ -98,12 +99,13 @@ public class ConsoleWorkspaceEditorController {
     private final ConsoleMessages messages;
     private final RulesetLimitsService rulesetLimits;
     private final ObjectProvider<WorkspaceAuditViews> auditViews;
+    private final WorkspaceProperties properties;
 
     public ConsoleWorkspaceEditorController(WorkspaceAccess access, WorkspaceAccounts accounts, WorkspaceTemplates templates,
                                             WorkspaceListings listings, ListingEditor editor, ListingCloner cloner, ListingHistory history,
                                             ListingComparison comparison, ListingStatusService statusService, WorkspaceOverrides overrides,
                                             ConsoleAccountRoles roles, ConsoleMessages messages, RulesetLimitsService rulesetLimits,
-                                            ObjectProvider<WorkspaceAuditViews> auditViews) {
+                                            ObjectProvider<WorkspaceAuditViews> auditViews, WorkspaceProperties properties) {
         this.access = access;
         this.accounts = accounts;
         this.templates = templates;
@@ -118,6 +120,7 @@ public class ConsoleWorkspaceEditorController {
         this.messages = messages;
         this.rulesetLimits = rulesetLimits;
         this.auditViews = auditViews;
+        this.properties = properties;
     }
 
     // ------------------------------------------------------------------ helpers
@@ -592,7 +595,7 @@ public class ConsoleWorkspaceEditorController {
         model.addAttribute("unknownVersion", unknown);
         model.addAttribute("changes", changes);
         model.addAttribute("canEdit", canEdit);
-        model.addAttribute("keep", entries.size());
+        model.addAttribute("keep", properties.historyKeep());
         return "console/workspace-history";
     }
 

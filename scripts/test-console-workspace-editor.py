@@ -92,6 +92,9 @@ def editor(page, listing, folder, theme):
 def clone_and_compare(page, listing, folder, theme):
     """Clone from the detail page with a suffix; the clone says which columns are still the original's and warns of the same title."""
     open_page(page, f"{WORKSPACE}/listings/{listing}", "workspace-detail")
+    # the theme chosen in the loop above is remembered by the Console: go back to the light one for the rest
+    page.locator("#console-theme").select_option("light")
+    expect(page.locator("html")).to_have_attribute("data-console-theme", "light")
     page.locator("#detail-clone").click()
     expect(page.locator("main#workspace-clone")).to_be_visible()
     page.locator("#clone-suffix").fill("-CLONE")
