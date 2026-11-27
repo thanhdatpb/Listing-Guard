@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="marketplace(suffix)">
+    <label class="lg-field__label" th:for="'phrase-marketplace-' + ${suffix}" th:text="#{report.form.marketplace}"></label>
+    <select class="lg-select" th:id="'phrase-marketplace-' + ${suffix}" name="marketplace">
+        <option value="ETSY" th:text="#{edit.marketplace.etsy}"></option>
+        <option value="AMAZON" th:text="#{edit.marketplace.amazon}"></option>
+    </select>
+</th:block>
+<div th:fragment="finding(entry)" th:with="finding=${entry.view()}" class="lg-section">
+    <strong th:text="${finding.mark() ?: finding.ruleId()}"></strong>
+    <span th:text="${#messages.msg(entry.sourceMessage())}"></span>
+    <span class="lg-pill" th:classappend="${finding.risk().name() == 'HIGH'} ? 'lg-pill--error' : 'lg-pill--warn'"
+          th:text="${#messages.msg(entry.riskMessage())}"></span>
+    <p th:if="${finding.ownerCountSameMark() != null}" th:text="#{phrase.owners(${finding.ownerCountSameMark()})}"></p>
+    <ul th:unless="${finding.riskAdjustments().isEmpty()}"><li th:each="adjustment : ${finding.riskAdjustments()}"
+        th:text="${adjustment.note()}"></li></ul>
+    <a th:each="link : ${finding.sourceLinks()}" th:href="${link.url()}" target="_blank" rel="noopener noreferrer"
+       th:text="${link.label()}"></a>
+</div>
+</body>
+</html>

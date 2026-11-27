@@ -65,6 +65,20 @@ public class FindingFeedbackService {
     public StoredVerdict record(UUID clientId, Reviewer reviewer, FeedbackTarget target, FeedbackVerdict verdict, String note) {
         String cleaned = cleanNote(note);
         FeedbackFindings.Resolved finding = findings.resolve(clientId, target).orElseThrow(FindingNotFoundException::new);
+        return write(clientId, reviewer, target, verdict, cleaned, finding);
+    }
+
+    /** The console has resolved this transient finding from the authenticated session's result. */
+    public StoredVerdict recordPhrase(UUID clientId, UUID accountId, FeedbackTarget target, FeedbackVerdict verdict,
+                                      FeedbackFindings.Resolved finding) {
+        if (!FeedbackTarget.PHRASE_PACK.equals(target.pack()) || verdict == FeedbackVerdict.NOT_USEFUL) {
+            throw new IllegalArgumentException("Invalid phrase feedback");
+        }
+        return write(clientId, Reviewer.account(accountId), target, verdict, null, finding);
+    }
+
+    private StoredVerdict write(UUID clientId, Reviewer reviewer, FeedbackTarget target, FeedbackVerdict verdict,
+                                String cleaned, FeedbackFindings.Resolved finding) {
         Instant now = clock.instant();
         boolean account = reviewer.kind() == Reviewer.Kind.ACCOUNT;
         String conflict = account

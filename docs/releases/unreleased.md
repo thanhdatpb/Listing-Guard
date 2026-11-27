@@ -18,3 +18,8 @@ ADR-022, additive against v0.10.0
 - `response-property-added` at `schema Capabilities.phraseScreening`
 - `input-definition-added` at `schema PhraseInput`
 - `input-definition-added` at `schema PhraseScreeningRequest`
+
+## Kiểm keyword trong Console
+
+ADR-056 thêm luồng tải CSV/TSV hoặc dán danh sách, xác nhận cột, xem kết quả theo nhóm và xuất từ bộ nhớ của phiên.
+V54 lưu tên cột đã chọn và metadata vận hành, thêm thống kê theo tuần và dùng lại widget feedback cho finding của cụm từ.

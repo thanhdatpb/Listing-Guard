@@ -86,7 +86,7 @@ class ConsoleSellerPilotIntegrationTest {
                         "href=\"/console/check\"", "href=\"/console/bulk\"", "href=\"/console/check/edit\"",
                         "href=\"/console/history\"", "href=\"/console/reaudit\"")
                 .doesNotContain("href=\"/console/watchlist\"", "href=\"/console/stats\"", "href=\"/console/api-keys\"",
-                        "href=\"/console/review-queue\"", "href=\"/console/pod-readiness\"", "href=\"/console/policy-changes\"", "Thử nghiệm");
+                        "href=\"/console/phrase-screening\"", "href=\"/console/review-queue\"", "href=\"/console/pod-readiness\"", "href=\"/console/policy-changes\"", "Thử nghiệm");
         assertThat(lead).contains("lang=\"en\"", "Available in this pilot", "href=\"/console/stats\"",
                 "href=\"/console/watchlist\"", "href=\"/console/api-keys\"").doesNotContain("Experimental");
         for (String page : List.of("/console/check", "/console/bulk", "/console/check/edit", "/console/history", "/console/reaudit")) {
@@ -98,7 +98,7 @@ class ConsoleSellerPilotIntegrationTest {
             mvc.perform(get(page).header(HEADER, ADMIN)).andExpect(status().isOk());
         }
         mvc.perform(post("/console/api-keys").header(HEADER, MEMBER).with(csrf())).andExpect(status().isForbidden());
-        for (String page : List.of("/console/review-queue", "/console/pod-readiness", "/console/policy-changes")) {
+        for (String page : List.of("/console/phrase-screening", "/console/review-queue", "/console/pod-readiness", "/console/policy-changes")) {
             mvc.perform(get(page).header(HEADER, ADMIN)).andExpect(status().isNotFound());
         }
         mvc.perform(post("/console/check/edit/policy-checks").header(HEADER, MEMBER).with(csrf())

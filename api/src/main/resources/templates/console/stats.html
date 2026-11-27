@@ -156,6 +156,9 @@
             </div>
         </section>
     </th:block>
+    <th:block th:if="${phraseWeeks != null}">
+        <section th:replace="~{console/phrase-metrics :: weeks}"></section>
+    </th:block>
 </main>
 </body>
 </html>

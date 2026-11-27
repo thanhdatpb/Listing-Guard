@@ -27,6 +27,9 @@ public class FeedbackFindings {
     }
 
     public Optional<Resolved> resolve(UUID clientId, FeedbackTarget target) {
+        if (!FeedbackTarget.PACKS.contains(target.pack())) {
+            return Optional.empty();
+        }
         List<Resolved> rows;
         if (target.pack().equals(Pack.LISTING_RULES.id())) {
             // The index of GET /api/v1/checks/{id}: the stored rows in id order (FindingRepository.findByCheckIdOrderByIdAsc).

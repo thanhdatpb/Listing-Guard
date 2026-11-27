@@ -89,6 +89,12 @@ public class ApiSecurityConfig {
             uploads.put("/console/bulk/run", bulk.requestLimitBytes());
             uploads.put("/console/reaudit/run", bulk.requestLimitBytes());
         }
+        if (console.enabled() && phrases.enabled()) {
+            uploads.put("/console/phrase-screening/preview",
+                    com.thanhdatpb.listingguard.api.console.phrase.PhraseConsoleController.REQUEST_BYTES);
+            uploads.put("/console/phrase-screening/run",
+                    com.thanhdatpb.listingguard.api.console.phrase.PhraseConsoleController.REQUEST_BYTES);
+        }
         Map<String, Long> jsonLimits = phrases.enabled()
                 ? Map.of("/api/v1/phrase-screenings", PhraseScreeningProperties.MAX_BODY_BYTES) : Map.of();
         return register(new BodyLimitFilter(properties.maxBodyBytes(), mapper, uploads, jsonLimits),

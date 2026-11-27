@@ -41,3 +41,21 @@ kết quả đã giữ. **Rà định kỳ** nhận file xuất hiện tại đ�
 Ngay dưới finding, bấm **Đúng** nếu cảnh báo mô tả đúng vấn đề. Bấm **Báo nhầm** nếu vấn đề được nêu không có trong trường hợp của bạn.
 Bạn có thể đổi phản hồi. Giữ trống ghi chú nếu thông tin liên quan tới người mua hoặc nội dung listing riêng tư. Nếu đăng nhập hoặc kiểm
 tra gặp lỗi, gửi lead tên màn hình và trạng thái hiển thị.
+
+## Kiểm keyword từ Helium 10
+
+1. Trong Cerebro hoặc Magnet, chọn **Export Data** và xuất **CSV**.
+2. Từ trang Console, mở **Kiểm keyword**, tải CSV lên và bấm **Xem trước lô**.
+3. Xác nhận cột cụm từ và cột search volume nếu có. Các cột đoán tự động có nhãn **Đã đoán cột**. Khi chọn cột khác,
+   bấm **Cập nhật xem trước**. Bạn có thể ghi nhớ hai tên cột cho tài khoản của mình.
+4. Xem số dòng trùng, không hợp lệ và vượt trần rồi bấm **Kiểm cụm từ**.
+5. Xem ba nhóm **Chặn**, **Cần xem** và **An toàn**. Bấm **Copy danh sách an toàn** hoặc tải **CSV an toàn** để đưa vào
+   Listing Builder hoặc Google Sheet. Danh sách này chỉ gồm dòng CLEAR đã kiểm đủ. Tải **CSV đầy đủ** để xem các nhóm còn lại và bằng chứng.
+6. Mở các phát hiện để báo **Đúng** hoặc **Báo nhầm**. Nếu phiên xuất đã hết hạn, kiểm lại từ tệp gốc.
+
+Tên cột của Cerebro/Magnet chưa được xác minh với file thật. Có thể thử trước bằng [CSV mẫu với dữ liệu tự đặt](samples/phrase-screening-sample.csv).
+
+## Kiểm chữ in trên design
+
+Mở **Kiểm keyword** và dán mỗi slogan hoặc cụm chữ trên một dòng. Xem trước rồi chạy kiểm. Mở nguồn của các cảnh báo trước
+khi chọn chữ để in. Giữ nguyên chữ từ nguồn của bạn để kiểm lại khi cần. Chỉ gửi nội dung của seller, tránh đưa thông tin cá nhân của người mua.

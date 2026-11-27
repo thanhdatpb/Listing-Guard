@@ -13,9 +13,10 @@
                current=${mine == null ? '' : mine.verdict().name()},
                saved=${feedbackSavedKey != null and feedbackSavedKey == key},
                failed=${feedbackError != null and feedbackErrorKey == key},
-               draft=${failed ? feedbackDraft : (mine == null ? null : mine.note())}"
-      method="post" th:action="@{/console/feedback}" th:id="'fb-' + ${key}"
-      th:attr="hx-post=@{/console/feedback},hx-swap='outerHTML'">
+               draft=${failed ? feedbackDraft : (mine == null ? null : mine.note())},
+               action=${phraseFeedback == true} ? @{/console/phrase-screening/{id}/feedback(id=${target.checkId()})} : @{/console/feedback}"
+      method="post" th:action="${action}" th:id="'fb-' + ${key}"
+      th:attr="hx-post=${action},hx-swap='outerHTML'">
     <input type="hidden" name="pack" th:value="${target.pack()}">
     <input type="hidden" name="checkId" th:value="${target.checkId()}">
     <input type="hidden" name="position" th:value="${target.position()}">
@@ -26,11 +27,11 @@
                     th:text="#{feedback.verdict.correct}"></button>
             <button type="submit" name="verdict" value="FALSE_POSITIVE" class="lg-btn lg-btn--small" th:aria-pressed="${current == 'FALSE_POSITIVE'}"
                     th:text="#{feedback.verdict.false-positive}"></button>
-            <button type="submit" name="verdict" value="NOT_USEFUL" class="lg-btn lg-btn--small" th:aria-pressed="${current == 'NOT_USEFUL'}"
+            <button th:unless="${phraseFeedback == true}" type="submit" name="verdict" value="NOT_USEFUL" class="lg-btn lg-btn--small" th:aria-pressed="${current == 'NOT_USEFUL'}"
                     th:text="#{feedback.verdict.not-useful}"></button>
         </span>
     </div>
-    <details class="lg-feedback__note lg-disclosure" th:open="${draft != null}">
+    <details th:unless="${phraseFeedback == true}" class="lg-feedback__note lg-disclosure" th:open="${draft != null}">
         <summary th:text="#{feedback.note.summary}"></summary>
         <label class="lg-field__label" th:for="'fbn-' + ${key}" th:text="#{feedback.note.label}"></label>
         <textarea class="lg-textarea" name="note" rows="2" th:id="'fbn-' + ${key}" th:attr="maxlength=${feedbackNoteMax}" th:text="${draft}"></textarea>

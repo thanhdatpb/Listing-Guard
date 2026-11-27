@@ -2,8 +2,12 @@ package com.thanhdatpb.listingguard.api.phrase;
 
 import org.springframework.http.HttpStatus;
 
-final class PhraseScreeningException extends RuntimeException {
+public final class PhraseScreeningException extends RuntimeException {
     final HttpStatus status;
+
+    public HttpStatus status() { return status; }
+
+    public String code() { return code; }
     final String code;
 
     PhraseScreeningException(HttpStatus status, String code, String detail) {

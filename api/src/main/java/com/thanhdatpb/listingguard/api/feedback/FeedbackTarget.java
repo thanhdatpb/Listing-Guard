@@ -15,6 +15,8 @@ import java.util.UUID;
  */
 public record FeedbackTarget(String pack, UUID checkId, int position) {
 
+    public static final String PHRASE_PACK = "phrase-screening";
+
     /** The packs whose findings can be answered: they store their findings (V37 {@code ck_finding_verdict_pack}). */
     public static final List<String> PACKS = List.of(Pack.LISTING_RULES.id(), Pack.TRADEMARK_RISK.id(),
             Pack.VARIATION_CHECKS.id());
@@ -22,7 +24,7 @@ public record FeedbackTarget(String pack, UUID checkId, int position) {
     public FeedbackTarget {
         Objects.requireNonNull(pack, "pack");
         Objects.requireNonNull(checkId, "checkId");
-        if (!PACKS.contains(pack)) {
+        if (!PACKS.contains(pack) && !PHRASE_PACK.equals(pack)) {
             throw new IllegalArgumentException("Feedback is not taken for this pack");
         }
         if (position < 0) {

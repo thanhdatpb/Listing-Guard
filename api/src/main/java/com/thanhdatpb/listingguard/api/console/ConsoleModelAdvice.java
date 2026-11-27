@@ -27,9 +27,12 @@ public class ConsoleModelAdvice {
     private final String assetVersion;
 
     private final boolean reviewQueueEnabled;
+    private final boolean phraseScreeningEnabled;
 
     public ConsoleModelAdvice(TrademarkProperties trademark, BrandAssets assets,
-                              @Value("${listing-guard.review-cases.enabled:false}") boolean reviewQueueEnabled) {
+                              @Value("${listing-guard.review-cases.enabled:false}") boolean reviewQueueEnabled,
+                              @Value("${listing-guard.phrase-screening.enabled:false}") boolean phraseScreeningEnabled) {
+        this.phraseScreeningEnabled = phraseScreeningEnabled;
         this.reviewQueueEnabled = reviewQueueEnabled;
         this.demoCatalog = trademark.demoCatalog();
         this.assetVersion = assets.version();
@@ -47,6 +50,11 @@ public class ConsoleModelAdvice {
     @ModelAttribute("reviewQueueEnabled")
     public boolean reviewQueueEnabled() {
         return reviewQueueEnabled;
+    }
+
+    @ModelAttribute("phraseScreeningEnabled")
+    public boolean phraseScreeningEnabled() {
+        return phraseScreeningEnabled;
     }
 
     @ModelAttribute("assetVersion")
