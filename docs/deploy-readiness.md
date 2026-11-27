@@ -167,6 +167,7 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 | TSDR | `TSDR_DOWNLOAD_ENABLED` false, `LISTING_GUARD_TSDR_API_KEY` (secret), `TSDR_MAX_MARKS` 100, `TSDR_UNMATCHED_PER_RUN` 0, `TSDR_RECHECK_INTERVAL` 30d, `TSDR_FINDING_STATUS_ENABLED` false, `TSDR_STATUS_LOG_RETENTION` 30 |
 | Console | `LISTING_GUARD_CONSOLE_ENABLED` false, `LISTING_GUARD_CONSOLE_BASE_URL`, `LISTING_GUARD_CONSOLE_AUTH_MODE` MAGIC_LINK (or CLOUDFLARE_ACCESS, BOTH), `LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN`, `..._ACCESS_AUD`, `..._ACCESS_CERTS_URL`, `..._ACCESS_CERT_CACHE_TTL` 1h, `..._ACCESS_ALLOWED_DOMAINS`, `..._ACCESS_ALLOWED_EMAILS`, `..._ACCESS_AUTO_CREATE` false, `..._ACCESS_DEFAULT_CLIENT_NAME` (the Access settings only for CLOUDFLARE_ACCESS or BOTH), `LISTING_GUARD_CONSOLE_MAIL_FROM`, `LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS` 5, `SPRING_MAIL_HOST` (the mail settings only for MAGIC_LINK or BOTH), `SPRING_MAIL_PORT` 587, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (secret), `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` true, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` true. The cookie is always Secure (`LISTING_GUARD_CONSOLE_COOKIE_SECURE` is fixed to `"true"`) |
 | Features | `LISTING_GUARD_PLANS_ENABLED` false, `LISTING_GUARD_FIXES_ENABLED` false |
+| Listing workspace (ADR-059, `docs/workspace.md`; off) | `LISTING_GUARD_WORKSPACE_ENABLED` false (needs the Console), `LISTING_GUARD_WORKSPACE_MEMBER_EDIT_SCOPE` own (or all), `LISTING_GUARD_WORKSPACE_MAX_TEMPLATE_BYTES` 10MB, `LISTING_GUARD_WORKSPACE_IMPORT_MAX_BYTES` 20MB, `LISTING_GUARD_WORKSPACE_IMPORT_MAX_ROWS` 10000, `LISTING_GUARD_WORKSPACE_HISTORY_KEEP` 20, and the upload limits `LISTING_GUARD_MULTIPART_MAX_FILE_SIZE` (10MB) and `LISTING_GUARD_MULTIPART_MAX_REQUEST_SIZE` (60MB), which must be raised (25MB and 60MB) before the workspace is switched on: the API refuses to start while an import may exceed them |
 | Seller pilot | `LISTING_GUARD_CONSOLE_PILOT` false, `LISTING_GUARD_CONSOLE_BULK_DEFAULT_SCOPE` empty (`content` in pilot, `full` otherwise), `LISTING_GUARD_CONSOLE_DEFAULT_LOCALE` en, `LISTING_GUARD_CONSOLE_POLICY_CHANGES_ENABLED` true, `LISTING_GUARD_CONSOLE_POD_ENABLED` true, `LISTING_GUARD_IMAGE_ENABLED` false. The [pilot sample](../deploy/env.pilot.example) pins image 0.11.0 and ruleset `trademark-risk-2026-12`, enables the pilot and restricts the experiment flags. |
 | Experimental packs | `LISTING_GUARD_REVIEW_CASES_ENABLED`, `LISTING_GUARD_VERIFIED_CASES_ENABLED`, `LISTING_GUARD_ANALYZER_ENABLED` and `LISTING_GUARD_IMAGE_ENABLED` all false. The pilot sample also turns off Console Policy Changes and POD. |
 | HF converter (job options) | `--distinctiveness=distinctiveness-2026-12`, `--wordlist` unset, `--owner-columns` uses the shipped schema. The job resolves no remote sources by default. See the [catalog activation runbook](catalog-activation-runbook.md). |
@@ -578,3 +579,22 @@ từ điển. Các số liệu cũ ở mục đo Hugging Face tiếp tục là m
 ### Owner-based distinctiveness: chưa đo
 
 Schema owner đã đối chiếu ở revision cố định. Phân bố tier, thời gian và mức chiếm đĩa trên catalog thật chưa đo. Xem [runbook kích hoạt catalog](catalog-activation-runbook.md) để chuyển đổi, import và so sánh hai ruleset trên probe trước khi đổi pilot.
+
+## Listing workspace (ADR-059)
+
+The workspace is off by default (`LISTING_GUARD_WORKSPACE_ENABLED=false`): with it off no bean exists, the Console has no menu entry for it,
+every `/console/workspace` path answers 404 and no workspace table is read or written. Switching it on needs the Console, the two multipart
+variables raised to at least the import limit (the start-up check names the variable), and a restart. Details and steps are in
+[the workspace guide](workspace.md).
+
+- **Backup.** The workspace lives in PostgreSQL (`workspace_*`, migration V57), so the existing backup and restore scripts already include it, the original
+  Excel template files (`bytea`) and any uploaded file that is waiting between the steps of an import (kept at most one hour, deleted when the import is written or
+  cancelled, and when the next file is uploaded after it has expired). There is no other store to back up. A client's data can be exported and removed with the
+  `workspace export` and `workspace purge` admin commands (they work with the flag off).
+- **Size, estimated from the structure, not measured.** A listing keeps each non-blank cell once under its column key plus the standard fields, so a flat file of
+  about 300 columns with about 60 filled cells is in the order of 5 to 10 KB of JSON per listing; 10,000 listings are therefore in the order of 50 to 100 MB. Each
+  listing also keeps up to `LISTING_GUARD_WORKSPACE_HISTORY_KEEP` (20) earlier versions, so the worst case, where every listing was changed 20 times, is up to
+  twenty times that. Each template version keeps its Excel file (at most `LISTING_GUARD_WORKSPACE_MAX_TEMPLATE_BYTES`, 10 MB) and a staged upload is at most the
+  import limit (20 MB). **Not measured**: the real size and the time and memory of a 10,000-row import on real files. To measure, follow the steps in the
+  [workspace guide](workspace.md#8-chưa-làm-chưa-đo).
+- **Not verified**: no real Amazon template has been compared with the workspace, and nothing was run on Docker Compose, ARM64, Oracle or Cloudflare for it.

@@ -64,13 +64,18 @@
         <h2 id="preview-heading" class="lg-card__title" th:text="#{workspace.sheet.preview}"></h2>
         <p class="lg-text-muted" th:text="#{workspace.sheet.preview.hint(${fieldRow}, ${firstDataRow})}"></p>
         <div class="lg-table-wrap">
-            <table class="lg-table lg-table--dense" id="sheet-preview">
+            <table class="lg-table lg-table--dense lg-table--scroll" id="sheet-preview">
                 <caption class="lg-sr-only" th:text="#{workspace.sheet.preview}"></caption>
-                <thead><tr><th scope="col" class="lg-num" th:text="#{workspace.sheet.row}"></th><th scope="col" th:text="#{workspace.sheet.cells}"></th></tr></thead>
+                <thead>
+                <tr>
+                    <th scope="col" class="lg-num" th:text="#{workspace.sheet.row}"></th>
+                    <th scope="col" th:each="letter : ${previewLetters}" th:text="${letter}"></th>
+                </tr>
+                </thead>
                 <tbody>
                 <tr th:each="row : ${preview}">
                     <th scope="row" class="lg-num" th:text="${row.number()}"></th>
-                    <td><span class="lg-wrap" th:each="cell, it : ${row.cells()}"><code class="lg-code" th:text="${cell}"></code><span th:unless="${it.last}"> </span></span></td>
+                    <td class="lg-wrap" th:each="i : ${previewColumns}"><code class="lg-code" th:text="${i < row.cells().size() ? row.cells().get(i) : ''}"></code></td>
                 </tr>
                 </tbody>
             </table>

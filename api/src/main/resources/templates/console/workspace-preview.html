@@ -59,7 +59,7 @@
                 <tr th:each="issue : ${issues}">
                     <td class="lg-num" th:text="${issue.line()}"></td>
                     <td class="lg-sku"><code class="lg-code" th:text="${issue.sku()}"></code></td>
-                    <td><svg class="lg-icon" aria-hidden="true" focusable="false"><use href="#lg-i-warn"/></svg> <span th:text="${issue.text()}"></span></td>
+                    <td><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-warn"/></svg> <span th:text="${issue.text()}"></span></td>
                 </tr>
                 </tbody>
             </table>

@@ -31,3 +31,21 @@ Optional demo workspace (ADR-057, V55) seeds synthetic input through the real Co
 ## Role-based home and manager report
 
 Pilot and demo Console can show **Overview** for client administrators and **My work** for members (ADR-058, V56). The existing pilot report has a compact manager view for A4 printing and retains the CSV export.
+
+## Listing workspace (kho listing)
+
+ADR-059, V57. A tenant-scoped store for listings per seller account, with templates kept in versions and an import of `.xlsx`/`.xlsm`/TSV/CSV
+or pasted cells, behind `listing-guard.workspace.enabled` (default false). It is the one place that stores listing text; `/api/v1`, the SDK, the
+MCP server, the rules, the fingerprints and every other page are unchanged, and with the flag off the Console renders as before.
+See the [workspace guide](../workspace.md).
+
+- New module `workspace-sheets` and the one new dependency, Apache POI `poi-ooxml` 5.5.1 (only in that module): bounded reading, zip-bomb limits, no macro run, no
+  formula recalculation, encrypted and binary files refused. The `Dockerfile` copies the module.
+- Console (flag on): "Kho listing" menu group with the list (filters, search, parent/child grouping, pagination), a read-only detail page, "Tài khoản và
+  template" and a four-step import (sheet and rows, SKU column, column mapping remembered per template, preview of new / updated / unchanged / error rows).
+- Permissions: MEMBER reads the whole client and changes only own listings (`LISTING_GUARD_WORKSPACE_MEMBER_EDIT_SCOPE=own`, or `all`); ADMIN everything.
+- Operations: `workspace export` and `workspace purge` admin commands; the PostgreSQL backup already includes the workspace. New settings
+  `LISTING_GUARD_WORKSPACE_*` and `LISTING_GUARD_MULTIPART_MAX_FILE_SIZE` / `..._MAX_REQUEST_SIZE` (raise them to 25MB / 60MB before switching on).
+- Contract (ADR-022): no `/api/v1` change, so no additive or breaking line.
+- Not verified: no real Amazon template; the column-name guesses are `unverified`. Not measured: import time and memory at 10,000 rows. W2 (background
+  check), W3 (editor, cloning) and W4 (export to `.xlsm`/`.txt`) are not done.

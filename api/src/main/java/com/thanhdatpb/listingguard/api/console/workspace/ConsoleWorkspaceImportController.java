@@ -279,6 +279,9 @@ public class ConsoleWorkspaceImportController {
             model.addAttribute("sheets", info.sheets().stream().map(WorkbookInfo.SheetInfo::name).toList());
             model.addAttribute("sheet", sheet);
             model.addAttribute("preview", preview);
+            int previewWidth = preview.stream().mapToInt(r -> r.cells().size()).max().orElse(0);
+            model.addAttribute("previewColumns", java.util.stream.IntStream.range(0, previewWidth).boxed().toList());
+            model.addAttribute("previewLetters", java.util.stream.IntStream.range(0, previewWidth).mapToObj(WorkspaceTemplates::letters).toList());
             model.addAttribute("fieldRow", fieldRow);
             model.addAttribute("firstDataRow", firstDataRow);
             model.addAttribute("fieldRowGuessed", !fieldRowGiven);

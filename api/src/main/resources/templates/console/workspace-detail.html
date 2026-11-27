@@ -17,7 +17,7 @@
     <div class="lg-page__head">
         <div>
             <a class="lg-page__crumb" th:href="@{/console/workspace}" th:text="#{workspace.detail.back}"></a>
-            <h1><code class="lg-code" th:text="${listing.sku()}"></code></h1>
+            <h1 th:text="${listing.sku()}"></h1>
             <p class="lg-page__sub" th:text="${listing.title()}"></p>
         </div>
         <div class="lg-actions">

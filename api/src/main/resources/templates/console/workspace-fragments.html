@@ -5,13 +5,13 @@
      word is the state. No text is written here (ADR-028). -->
 
 <!-- The status of a listing: code is draft, ready_to_export, exported or live; label is its word. -->
-<span th:fragment="status(code, label)" class="lg-chip lg-chip--neutral"><svg class="lg-icon" aria-hidden="true" focusable="false"><use th:href="${'#lg-i-s-' + code}"/></svg><span th:text="${label}"></span></span>
+<span th:fragment="status(code, label)" class="lg-chip lg-chip--neutral"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use th:href="${'#lg-i-s-' + code}"/></svg><span th:text="${label}"></span></span>
 
 <!-- The check state of a listing. The background check is a later change (W2): every listing says it has not been checked. -->
-<span th:fragment="unchecked" class="lg-chip lg-chip--neutral"><svg class="lg-icon" aria-hidden="true" focusable="false"><use href="#lg-i-unchecked"/></svg><span th:text="#{workspace.check.none}"></span></span>
+<span th:fragment="unchecked" class="lg-chip lg-chip--neutral"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-unchecked"/></svg><span th:text="#{workspace.check.none}"></span></span>
 
 <!-- A value that a guess filled in: it says so, in a word and a shape, until the person confirms it. -->
-<span th:fragment="guessed" class="lg-chip lg-chip--flag"><svg class="lg-icon" aria-hidden="true" focusable="false"><use href="#lg-i-guess"/></svg><span th:text="#{workspace.guessed}"></span></span>
+<span th:fragment="guessed" class="lg-chip lg-chip--flag"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-guess"/></svg><span th:text="#{workspace.guessed}"></span></span>
 
 <!-- A message above the page's content: notice (role status) and error (role alert), from the redirect that brought the person here. -->
 <th:block th:fragment="notices">

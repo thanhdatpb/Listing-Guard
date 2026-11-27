@@ -85,7 +85,7 @@
                     <a th:href="@{/console/workspace/listings/{id}(id=${row.id})}"><code class="lg-code" th:text="${row.sku}"></code></a>
                 </td>
                 <td class="lg-ellip" th:title="${row.title}" th:text="${row.title}"></td>
-                <td><span th:text="${row.account}"></span> <span class="lg-text-muted lg-small" th:text="${row.marketplace}"></span></td>
+                <td><span th:text="${row.account}"></span><br><span class="lg-text-muted lg-small" th:text="${row.marketplace}"></span></td>
                 <td th:text="${row.role}"></td>
                 <td><span th:replace="~{console/workspace-fragments :: status(${row.status}, ${row.statusLabel})}"></span></td>
                 <td class="lg-ellip" th:title="${row.owner}"><span th:if="${row.owner != null}" th:text="${row.owner}"></span><span class="lg-text-muted" th:if="${row.owner == null}" th:text="#{workspace.owner.none}"></span></td>

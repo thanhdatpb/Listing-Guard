@@ -387,3 +387,12 @@ contract tools and release workflow continue to discover exactly one active base
   A class named `lg-x--<token>` followed by `:` trips `ConsoleAppCssTest` (it reads a declared variable): name a modifier after the use, not the token.
   A word only a screen reader hears is an absolute box: `lg-table-wrap` is positioned, or it widens the page. `ConsolePageCssTest` scans every
   sheet, page and script for color codes and old color names.
+- **Listing workspace** (ADR-059): `listing-guard.workspace.enabled` defaults to false and is the one exception to "no listing text is stored": the `workspace_*` tables
+  (V57) are the **only** place that stores listing text, and no other feature (`/api/v1`, bulk check, edit mode, re-audit, reports) reads or writes them. While the flag is off no
+  bean of `api.workspace` or `console.workspace` exists, `/console/workspace/**` is a 404 and the shared layout renders byte for byte as before (every workspace addition to
+  `layout.html` is inside a `th:if="${workspaceEnabled == true}"` block written inline, `WorkspaceLayoutTest`). Every statement carries `client_id`, every child table points to its
+  parent through `(id, client_id)`, and another client's row is a 404. Permissions are `WorkspaceAccess` only (MEMBER reads all, changes own listings or all with
+  `member-edit-scope=all`; ADMIN everything; accounts, templates, owner and deletion are ADMIN's). Apache POI lives only in `workspace-sheets` (`SheetReader`); keep its zip-bomb limits,
+  the refusal of encrypted and binary files, "never run a macro, never recalculate a formula", and never put a cell or a file name in a message or a log. A guessed column is a default the
+  person confirms (`standard-targets.yaml` is `unverified`); never write a column name of a marketplace in Java. A template version is the exact field-name row; keep the rows above the data and
+  the Excel file byte for byte. Logs carry ids and counts, never a SKU or a title. A new text is a key of both bundles (ADR-028).
