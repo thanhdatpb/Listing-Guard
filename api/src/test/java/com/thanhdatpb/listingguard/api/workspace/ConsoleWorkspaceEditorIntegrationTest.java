@@ -57,6 +57,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  */
 @SpringBootTest(properties = {
         "listing-guard.workspace.enabled=true",
+        // the gate is switched off here: these tests are about the editor, the clone and the status moves, not about what holds a listing back
+        // (ADR-063 section 1: with the audit off and the gate on, every listing is unchecked and held back; see WorkspaceGateIntegrationTest)
+        "listing-guard.workspace.block-on-error=false",
         "spring.servlet.multipart.max-file-size=25MB",
         "spring.servlet.multipart.max-request-size=60MB",
         "listing-guard.console.enabled=true",

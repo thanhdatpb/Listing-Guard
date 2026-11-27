@@ -5,6 +5,7 @@ import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.Reason;
 import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.RunStatus;
 import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.Source;
 import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.State;
+import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.TrademarkReason;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -73,7 +74,17 @@ public final class AuditModels {
     public record StoredAudit(UUID listingId, UUID clientId, UUID accountId, UUID runId, State state, String inputHash, String analysisVersion,
                               String rulesAnalysis, String trademarkAnalysis, boolean trademarkRan, long listingVersion,
                               String catalogVersion, String watchlistVersion, int errorCount, int warningCount, int newCount,
-                              Instant auditedAt, Instant alertedAt, Instant ackAt) {
+                              Instant auditedAt, Instant alertedAt, Instant ackAt, TrademarkReason trademarkReason) {
+
+        /** An audit that says nothing of why its trademark part did or did not run (one stored before V60). */
+        public StoredAudit(UUID listingId, UUID clientId, UUID accountId, UUID runId, State state, String inputHash, String analysisVersion,
+                           String rulesAnalysis, String trademarkAnalysis, boolean trademarkRan, long listingVersion, String catalogVersion,
+                           String watchlistVersion, int errorCount, int warningCount, int newCount, Instant auditedAt, Instant alertedAt,
+                           Instant ackAt) {
+            this(listingId, clientId, accountId, runId, state, inputHash, analysisVersion, rulesAnalysis, trademarkAnalysis, trademarkRan,
+                    listingVersion, catalogVersion, watchlistVersion, errorCount, warningCount, newCount, auditedAt, alertedAt, ackAt,
+                    trademarkRan ? TrademarkReason.RAN : null);
+        }
     }
 
     /** What the list and the detail page show of a listing's audit. */

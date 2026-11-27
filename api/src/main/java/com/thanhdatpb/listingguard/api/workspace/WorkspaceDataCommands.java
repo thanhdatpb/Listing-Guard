@@ -55,7 +55,7 @@ public class WorkspaceDataCommands {
     /** The workspace tables in delete order (children first). */
     static final List<String> TABLES = List.of("workspace_alert_log", "workspace_alert_pref", "workspace_listing_finding",
             "workspace_listing_audit", "workspace_audit_run", "workspace_status_override", "workspace_listing_history", "workspace_customization", "workspace_listing",
-            "workspace_template", "workspace_import_stage", "workspace_account");
+            "workspace_export_log", "workspace_template", "workspace_import_stage", "workspace_account");
 
     private final JdbcTemplate jdbc;
     private final ClientRepository clients;
@@ -239,6 +239,11 @@ public class WorkspaceDataCommands {
         }
         manifest.put("listing_rows", listingRows);
         manifest.put("customization_rows", customizationRows);
+        // the export log (ADR-063): counts only; a workspace that never exported has no file and no member
+        long exportRows = writeExportLog(clientId, emails, directory);
+        if (exportRows > 0) {
+            manifest.put("export_log_rows", exportRows).put("export_log", "export-log.tsv");
+        }
         Files.writeString(directory.resolve("manifest.json"), mapper.writerWithDefaultPrettyPrinter().writeValueAsString(manifest),
                 StandardCharsets.UTF_8);
         log.info("Workspace export of client {}: {} listing rows, {} customization rows, {} template versions", clientId, listingRows,
@@ -246,6 +251,29 @@ public class WorkspaceDataCommands {
         out.println("Exported " + listingRows + " listings and " + customizationRows + " customization rows in " + templates.size()
                 + " template versions to " + directory);
         return directory;
+    }
+
+    private long writeExportLog(UUID clientId, Map<UUID, String> emails, Path directory) throws IOException {
+        StringBuilder tsv = new StringBuilder();
+        appendRow(tsv, List.of("id", "exported_at", "account", "template_kind", "template_version", "format", "encoding", "listings", "blocked",
+                "opened_by_reason", "unchecked_for_trademark", "value_warnings", "replaced_cells", "exported_by"));
+        long[] count = {0};
+        jdbc.query("SELECT e.id, e.exported_at, a.name AS account, e.template_kind, e.template_version, e.format, e.encoding, e.listing_count, "
+                + "e.blocked_count, e.opened_count, e.untrademarked_count, e.warning_count, e.replaced_cells, e.exported_by "
+                + "FROM workspace_export_log e JOIN workspace_account a ON a.id = e.account_id AND a.client_id = e.client_id "
+                + "WHERE e.client_id = ? ORDER BY e.id", rs -> {
+            UUID by = rs.getObject("exported_by", UUID.class);
+            appendRow(tsv, List.of(rs.getString("id"), String.valueOf(rs.getObject("exported_at", java.time.OffsetDateTime.class)),
+                    rs.getString("account"), rs.getString("template_kind"), String.valueOf(rs.getObject("template_version")), rs.getString("format"),
+                    rs.getString("encoding") == null ? "" : rs.getString("encoding"), rs.getString("listing_count"), rs.getString("blocked_count"),
+                    rs.getString("opened_count"), rs.getString("untrademarked_count"), rs.getString("warning_count"), rs.getString("replaced_cells"),
+                    by == null ? "" : emails.getOrDefault(by, by.toString())));
+            count[0]++;
+        }, clientId);
+        if (count[0] > 0) {
+            Files.writeString(directory.resolve("export-log.tsv"), tsv, StandardCharsets.UTF_8);
+        }
+        return count[0];
     }
 
     private static boolean isFieldRow(List<List<String>> headerRows, List<String> headers) {
@@ -264,7 +292,7 @@ public class WorkspaceDataCommands {
                                 StringBuilder tsv) {
         long[] count = {0};
         jdbc.query("SELECT l.id, l.sku, l.parent_sku, l.role, l.data::text AS data, l.fields::text AS fields, l.owner_account_id, l.status, "
-                + "l.source, l.cloned_from, l.version, l.created_at, l.updated_at, l.deleted_at, a.state AS audit_state, "
+                + "l.source, l.cloned_from, l.version, l.created_at, l.updated_at, l.deleted_at, l.exported_at, a.state AS audit_state, a.trademark_reason AS audit_reason, "
                 + "a.audited_at AS audit_at, a.catalog_version AS audit_catalog, a.watchlist_version AS audit_watchlist, "
                 + "(SELECT COALESCE(json_agg(json_build_object('rule', f.rule_id, 'level', f.level, 'source', f.source, 'field', f.field, "
                 + "'start', f.span_start, 'end', f.span_end, 'mark', f.mark, 'serial', f.serial, 'new', f.is_new) ORDER BY f.position)::text, '[]') "
@@ -289,6 +317,11 @@ public class WorkspaceDataCommands {
             json.put("created_at", String.valueOf(rs.getObject("created_at", java.time.OffsetDateTime.class)))
                     .put("updated_at", String.valueOf(rs.getObject("updated_at", java.time.OffsetDateTime.class)))
                     .put("deleted_at", rs.getObject("deleted_at") == null ? null : String.valueOf(rs.getObject("deleted_at", java.time.OffsetDateTime.class)));
+            // when the listing was last exported or posted (ADR-063); a listing that never was has no member, so an export of a workspace
+            // that never exported is what it was
+            if (rs.getObject("exported_at") != null) {
+                json.put("exported_at", String.valueOf(rs.getObject("exported_at", java.time.OffsetDateTime.class)));
+            }
             json.set("data", data);
             json.set("fields", parse(rs.getString("fields")));
             if (rs.getString("audit_state") != null) {
@@ -297,6 +330,9 @@ public class WorkspaceDataCommands {
                 ObjectNode audit = json.putObject("audit");
                 audit.put("state", rs.getString("audit_state")).put("audited_at", String.valueOf(rs.getObject("audit_at", java.time.OffsetDateTime.class)))
                         .put("catalog_version", rs.getString("audit_catalog")).put("watchlist_version", rs.getString("audit_watchlist"));
+                if (rs.getString("audit_reason") != null) {
+                    audit.put("trademark_reason", rs.getString("audit_reason"));
+                }
                 audit.set("findings", parse(rs.getString("audit_findings")));
             }
             // the reasons an ADMIN gave for letting a blocked listing go (ADR-062); a workspace that never used them exports as before

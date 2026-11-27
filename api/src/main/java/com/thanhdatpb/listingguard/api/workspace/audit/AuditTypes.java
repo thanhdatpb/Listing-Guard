@@ -54,6 +54,45 @@ public final class AuditTypes {
         }
     }
 
+    /**
+     * Why the trademark part of an audit did or did not run (ADR-063, V60 {@code trademark_reason}). The gate reads it: a part that did not run
+     * because the client has no trademark set-up ({@link #NOT_CONFIGURED}, {@link #NO_PLAN}) does not hold a listing back, but the listing is
+     * said to be unchecked for trademark; a part that did not run for a cause that passes or that can be mended ({@link #UNAVAILABLE},
+     * {@link #INCOMPLETE}, {@link #WATCHLIST_ONLY}) does.
+     */
+    public enum TrademarkReason {
+        /** the trademark part ran in full */
+        RAN(false, false),
+        /** no catalog is served and the client has no watchlist entry: nothing was set up */
+        NOT_CONFIGURED(true, false),
+        /** the client's plan has no trademark pack */
+        NO_PLAN(true, false),
+        /** the catalog is not ready (being loaded, or refused) or the check could not be answered: it may pass */
+        UNAVAILABLE(false, true),
+        /** the check ran and a rule of it failed */
+        INCOMPLETE(false, true),
+        /** the client has a watchlist and no catalog is served: only the watchlist was looked at */
+        WATCHLIST_ONLY(false, true);
+
+        private final boolean notSetUp;
+        private final boolean holdsBack;
+
+        TrademarkReason(boolean notSetUp, boolean holdsBack) {
+            this.notSetUp = notSetUp;
+            this.holdsBack = holdsBack;
+        }
+
+        /** True when the client has no trademark set-up at all: the gate lets the listing go and says it was not checked for trademark. */
+        public boolean notSetUp() {
+            return notSetUp;
+        }
+
+        /** True when the missing trademark part holds the listing back at the gate. */
+        public boolean holdsBack() {
+            return holdsBack;
+        }
+    }
+
     /** Where a finding comes from. {@code RULE} is the listing rules; the others are the trademark finding sources. */
     public enum Source {
         RULE, CATALOG, CONTEXT, WATCHLIST

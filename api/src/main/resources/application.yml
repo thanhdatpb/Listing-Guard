@@ -16,9 +16,17 @@ listing-guard:
     import-max-bytes: ${LISTING_GUARD_WORKSPACE_IMPORT_MAX_BYTES:20MB}
     import-max-rows: ${LISTING_GUARD_WORKSPACE_IMPORT_MAX_ROWS:10000}
     history-keep: ${LISTING_GUARD_WORKSPACE_HISTORY_KEEP:20}
-    # ADR-062: a listing the background audit calls an error (an ERROR of the rules or a HIGH trademark risk), or has not checked in full, cannot go from
-    # draft to "ready to export" until an ADMIN opens the block with a reason. false: nothing blocks. Only meaningful with the audit on.
+    # ADR-062, adjusted by ADR-063: a listing the background audit calls an error (an ERROR of the rules or a HIGH trademark risk), has not checked, or whose
+    # trademark part did not run for a cause that may pass (a catalog being loaded, a failed rule) cannot go from draft to "ready to export" nor be exported
+    # until an ADMIN opens the block with a reason. A client with no trademark set-up is not held back and its listings are said to be unchecked for trademark.
+    # With the background audit off every listing is unchecked and held back. false: nothing blocks.
     block-on-error: ${LISTING_GUARD_WORKSPACE_BLOCK_ON_ERROR:true}
+    # ADR-063: the export of a seller account's listings as a copy of its template (.xlsm/.xlsx), a tab-delimited .txt or text to paste.
+    export:
+      # The most listings of one export; a larger selection is refused, not cut.
+      max-listings: ${LISTING_GUARD_WORKSPACE_EXPORT_MAX_LISTINGS:2000}
+      # The encoding of a .txt when the person does not pick one: UTF-8, UTF-8-BOM, UTF-16LE, ISO-8859-1 or windows-1252.
+      text-encoding: ${LISTING_GUARD_WORKSPACE_EXPORT_TEXT_ENCODING:UTF-8}
     # The background audit of the saved listings, the highlights and the e-mail alerts (ADR-061). Off by default and only meaningful with the
     # workspace and the Console on. While it is off nothing of it exists: no queue, no worker, no page, and the workspace pages are what they were.
     audit:

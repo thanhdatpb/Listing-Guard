@@ -80,7 +80,8 @@ public class AuditStore {
             rs.getString("rules_analysis"), rs.getString("trademark_analysis"), rs.getBoolean("trademark_ran"), rs.getLong("listing_version"),
             rs.getString("catalog_version"), rs.getString("watchlist_version"), rs.getInt("error_count"), rs.getInt("warning_count"),
             rs.getInt("new_count"), instant(rs.getObject("audited_at", OffsetDateTime.class)),
-            instant(rs.getObject("alerted_at", OffsetDateTime.class)), instant(rs.getObject("ack_at", OffsetDateTime.class)));
+            instant(rs.getObject("alerted_at", OffsetDateTime.class)), instant(rs.getObject("ack_at", OffsetDateTime.class)),
+            rs.getString("trademark_reason") == null ? null : AuditTypes.TrademarkReason.valueOf(rs.getString("trademark_reason")));
 
     public AuditStore(JdbcTemplate jdbc, TransactionTemplate transactions, Clock clock) {
         this.jdbc = jdbc;
@@ -300,16 +301,18 @@ public class AuditStore {
         return Boolean.TRUE.equals(transactions.execute(status -> {
             int written = jdbc.update("INSERT INTO workspace_listing_audit (listing_id, client_id, account_id, run_id, state, input_hash, analysis_version, "
                     + "rules_analysis, trademark_analysis, trademark_ran, listing_version, catalog_version, watchlist_version, error_count, warning_count, "
-                    + "new_count, audited_at, alerted_at, ack_at) SELECT l.id, l.client_id, l.account_id, ?, ?, ?, ?, ?, ?, ?, l.version, ?, ?, ?, ?, ?, ?, ?, ? "
+                    + "new_count, audited_at, alerted_at, ack_at, trademark_reason) SELECT l.id, l.client_id, l.account_id, ?, ?, ?, ?, ?, ?, ?, l.version, ?, ?, ?, ?, ?, ?, ?, ?, ? "
                     + "FROM workspace_listing l WHERE l.id = ? AND l.client_id = ? AND l.version = ? AND l.deleted_at IS NULL "
                     + "ON CONFLICT (listing_id) DO UPDATE SET run_id = EXCLUDED.run_id, state = EXCLUDED.state, input_hash = EXCLUDED.input_hash, "
                     + "analysis_version = EXCLUDED.analysis_version, rules_analysis = EXCLUDED.rules_analysis, trademark_analysis = EXCLUDED.trademark_analysis, "
                     + "trademark_ran = EXCLUDED.trademark_ran, listing_version = EXCLUDED.listing_version, catalog_version = EXCLUDED.catalog_version, "
                     + "watchlist_version = EXCLUDED.watchlist_version, error_count = EXCLUDED.error_count, warning_count = EXCLUDED.warning_count, "
-                    + "new_count = EXCLUDED.new_count, audited_at = EXCLUDED.audited_at, alerted_at = EXCLUDED.alerted_at, ack_at = EXCLUDED.ack_at",
+                    + "new_count = EXCLUDED.new_count, audited_at = EXCLUDED.audited_at, alerted_at = EXCLUDED.alerted_at, ack_at = EXCLUDED.ack_at, "
+                    + "trademark_reason = EXCLUDED.trademark_reason",
                     audit.runId(), audit.state().name(), audit.inputHash(), audit.analysisVersion(), audit.rulesAnalysis(), audit.trademarkAnalysis(),
                     audit.trademarkRan(), audit.catalogVersion(), audit.watchlistVersion(), audit.errorCount(), audit.warningCount(), audit.newCount(),
-                    ts(audit.auditedAt()), ts(audit.alertedAt()), ts(audit.ackAt()), audit.listingId(), audit.clientId(), audit.listingVersion());
+                    ts(audit.auditedAt()), ts(audit.alertedAt()), ts(audit.ackAt()),
+                    audit.trademarkReason() == null ? null : audit.trademarkReason().name(), audit.listingId(), audit.clientId(), audit.listingVersion());
             if (written == 0) {
                 status.setRollbackOnly();
                 return false;

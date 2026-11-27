@@ -240,22 +240,29 @@ class WorkspaceEditorAuditIntegrationTest extends AuditIntegrationBase {
     }
 
     @Test
-    void aListingThatWasNeverCheckedOrWasNotCheckedInFullIsHeldBackToo() {
+    void aListingThatWasNeverCheckedIsHeldBackButOneOfAClientWithoutTrademarkSetUpIsNotHeldForThat() {
         Team team = team();
         SellerAccount shop = etsyShop(team, "Shop G");
-        // no catalog is served and the client has no watchlist: the trademark part cannot run
+        // no catalog is served and the client has no watchlist: the trademark part cannot run, and nothing was set up (ADR-063 section 1)
         Listing unchecked = insert(team, shop, etsyTemplate(team, shop), "G-1", fields("Plain ceramic mug", "A plain description."), team.memberAccount().getId());
-        Listing incomplete = editor.create(member(team), shop.id(), form("G-2", "Plain ceramic mug two"));
-        assertThat(stateOf(incomplete)).isEqualTo("INCOMPLETE");
+        Listing noSetUp = editor.create(member(team), shop.id(), form("G-2", "Plain ceramic mug two"));
+        assertThat(stateOf(noSetUp)).isEqualTo("INCOMPLETE");
 
-        var verdicts = statusService.verdicts(team.client().getId(), List.of(unchecked.id(), incomplete.id()));
+        var verdicts = statusService.verdicts(team.client().getId(), List.of(unchecked.id(), noSetUp.id()));
 
         assertThat(verdicts.get(unchecked.id()).blocks()).containsExactly(Block.UNCHECKED);
         assertThat(verdicts.get(unchecked.id()).state()).isEqualTo("NONE");
-        assertThat(verdicts.get(incomplete.id()).blocks()).containsExactly(Block.INCOMPLETE);
+        assertThat(verdicts.get(unchecked.id()).trademarkChecked()).isFalse();
+        // the audit says why the trademark part did not run, and the gate lets the listing go while saying it was not checked for trademark
+        assertThat(verdicts.get(noSetUp.id()).blocks()).isEmpty();
+        assertThat(verdicts.get(noSetUp.id()).mayGo()).isTrue();
+        assertThat(verdicts.get(noSetUp.id()).trademarkChecked()).isFalse();
+        assertThat(verdicts.get(noSetUp.id()).trademarkReason()).isEqualTo(AuditTypes.TrademarkReason.NOT_CONFIGURED);
+        assertThat(jdbc.queryForObject("SELECT trademark_reason FROM workspace_listing_audit WHERE listing_id = ?", String.class, noSetUp.id()))
+                .isEqualTo("NOT_CONFIGURED");
         // the text of an audit that is older than the listing is not a check of this listing
-        jdbc.update("UPDATE workspace_listing SET fields = jsonb_set(fields, '{title}', '\"Another title\"') WHERE id = ?", incomplete.id());
-        var stale = statusService.verdicts(team.client().getId(), List.of(incomplete.id())).get(incomplete.id());
+        jdbc.update("UPDATE workspace_listing SET fields = jsonb_set(fields, '{title}', '\"Another title\"') WHERE id = ?", noSetUp.id());
+        var stale = statusService.verdicts(team.client().getId(), List.of(noSetUp.id())).get(noSetUp.id());
         assertThat(stale.state()).isEqualTo("STALE");
         assertThat(stale.blocks()).contains(Block.UNCHECKED);
     }

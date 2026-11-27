@@ -26,6 +26,7 @@ import com.thanhdatpb.listingguard.api.workspace.audit.AuditModels.StoredFinding
 import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.Level;
 import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.Source;
 import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.State;
+import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.TrademarkReason;
 import com.thanhdatpb.listingguard.core.finding.Finding;
 import com.thanhdatpb.listingguard.core.finding.Severity;
 import com.thanhdatpb.listingguard.ruleengine.RuleRun;
@@ -166,7 +167,9 @@ public class ListingAuditor {
         JsonNode fields = listing.fields();
         String inputHash = AuditHasher.input(fields);
         Optional<StoredAudit> prior = store.audit(env.clientId, listing.id());
-        if (prior.isPresent() && prior.get().inputHash().equals(inputHash) && prior.get().analysisVersion().equals(env.analysisVersion)) {
+        // an audit stored before V60 has no trademark reason: it is made again once, so the gate knows why its trademark part did not run
+        if (prior.isPresent() && prior.get().inputHash().equals(inputHash) && prior.get().analysisVersion().equals(env.analysisVersion)
+                && prior.get().trademarkReason() != null) {
             return new Result(Outcome.SKIPPED, prior.get());
         }
         CheckRequest request = new CheckRequest(env.marketplace.name(), fields);
@@ -189,6 +192,7 @@ public class ListingAuditor {
         }
 
         boolean trademarkRan = false;
+        TrademarkReason trademarkReason = unavailableReason(env);
         String trademarkAnalysis = null;
         String catalogVersion = env.context.catalogVersion();
         String watchlistVersion = env.context.watchlistVersion();
@@ -197,6 +201,10 @@ public class ListingAuditor {
                 TrademarkCheckResult result = trademarks.check(env.clientId, request);
                 trademarkAnalysis = result.analysisVersion();
                 trademarkRan = result.completeness() == Completeness.COMPLETE && result.catalogStatus() == TrademarkCheckResult.CatalogStatus.SERVED;
+                trademarkReason = trademarkRan ? TrademarkReason.RAN
+                        : result.catalogStatus() == TrademarkCheckResult.CatalogStatus.SERVED ? TrademarkReason.INCOMPLETE
+                        : env.context.catalogAvailability() == Context.CatalogAvailability.UNAVAILABLE ? TrademarkReason.UNAVAILABLE
+                        : TrademarkReason.WATCHLIST_ONLY;
                 if (result.catalogStatus() == TrademarkCheckResult.CatalogStatus.SERVED) {
                     catalogVersion = result.catalogVersion();
                 }
@@ -206,8 +214,13 @@ public class ListingAuditor {
                 trademarkFindings(result, texts, found);
             } catch (QuotaExceededException e) {
                 return new Result(Outcome.QUOTA, null);
-            } catch (PlanNotAllowedException | TrademarkUnavailableException e) {
+            } catch (PlanNotAllowedException e) {
+                // the plan has no trademark pack: the client has no trademark set-up, so the part did not run and the gate lets it pass (ADR-063)
+                trademarkReason = TrademarkReason.NO_PLAN;
+                log.debug("Audit of listing {}: no trademark part ({})", listing.id(), e.getClass().getSimpleName());
+            } catch (TrademarkUnavailableException e) {
                 // this part did not run; the listing is not called clean for it
+                trademarkReason = TrademarkReason.UNAVAILABLE;
                 log.debug("Audit of listing {}: no trademark part ({})", listing.id(), e.getClass().getSimpleName());
             } catch (RuntimeException e) {
                 log.warn("Audit of listing {}: the trademark check failed ({})", listing.id(), e.getClass().getSimpleName());
@@ -225,10 +238,20 @@ public class ListingAuditor {
         StoredAudit audit = new StoredAudit(listing.id(), env.clientId, env.accountId, runId, state, inputHash, env.analysisVersion, rulesAnalysis,
                 trademarkAnalysis, trademarkRan, listing.version(), catalogVersion, watchlistVersion, errors, warnings, fresh, now,
                 nothingNewlyNew ? prior.map(StoredAudit::alertedAt).orElse(null) : null,
-                fresh == 0 || nothingNewlyNew ? prior.map(StoredAudit::ackAt).orElse(null) : null);
+                fresh == 0 || nothingNewlyNew ? prior.map(StoredAudit::ackAt).orElse(null) : null, trademarkReason);
         List<NewFinding> kept = findings.stream().sorted(Comparator.comparingInt((NewFinding f) -> -f.level().weight())).limit(properties.maxFindings()).toList();
         boolean saved = store.save(audit, kept);
         return new Result(saved ? Outcome.AUDITED : Outcome.STALE, saved ? audit : null);
+    }
+
+    /**
+     * Why the trademark part did not run when no check is made at all: {@code trademarks.available} is false, which means no catalog is served
+     * and the client has no watchlist entry. A catalog that is being loaded or was refused may pass, so it holds the listing back; one that
+     * nobody set up does not (ADR-063).
+     */
+    private static TrademarkReason unavailableReason(Env env) {
+        return env.context.catalogAvailability() == Context.CatalogAvailability.UNAVAILABLE ? TrademarkReason.UNAVAILABLE
+                : TrademarkReason.NOT_CONFIGURED;
     }
 
     // ------------------------------------------------------------------ the rules

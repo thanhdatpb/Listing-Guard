@@ -17,6 +17,11 @@ public final class WorkspaceTypes {
         XLSM, TXT
     }
 
+    /** What an export made, as the export log records it (ADR-063). Each equals a value of {@code ck_workspace_export_format} (V60). */
+    public enum OutputFormat {
+        XLSM, XLSX, TXT, CLIPBOARD, ETSY_POSTED
+    }
+
     public enum TemplateKind {
         AMAZON_BULK(Marketplace.AMAZON), AMAZON_CUSTOM(Marketplace.AMAZON), ETSY_FIELDS(Marketplace.ETSY);
 
@@ -44,7 +49,7 @@ public final class WorkspaceTypes {
         IMPORT, CLONE, NEW
     }
 
-    /** The kinds of change a history row records. Each equals a value of {@code ck_workspace_history_kind} (V59); EXPORT is written by a later change. */
+    /** The kinds of change a history row records. Each equals a value of {@code ck_workspace_history_kind} (V59); EXPORT is written by the export (ADR-063). */
     public enum ChangeKind {
         IMPORT, EDIT, OWNER, DELETE, NEW, CLONE, RESTORE, STATUS, EXPORT
     }
