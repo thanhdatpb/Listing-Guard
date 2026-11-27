@@ -30,6 +30,7 @@ class ConsoleTextInTemplatesTest {
     private static final Path TEMPLATES = Path.of("src/main/resources/templates/console");
     private static final Path SCRIPTS = Path.of("src/main/resources/static/console");
     private static final Path CONSOLE_JAVA = Path.of("src/main/java/com/thanhdatpb/listingguard/api/console");
+    private static final Path AUDIT_JAVA = Path.of("src/main/java/com/thanhdatpb/listingguard/api/workspace/audit");
 
     /**
      * Text that may stand in a template because it is not a sentence of ours: the identifiers the API itself uses, and a header and
@@ -177,13 +178,16 @@ class ConsoleTextInTemplatesTest {
             used.add(inTemplates.group(1));
         }
         Pattern literal = Pattern.compile("\"([a-z][a-z0-9]*(?:\\.[a-z0-9]+)+\\.?)\"");
-        try (Stream<Path> paths = Files.walk(CONSOLE_JAVA)) {
-            for (Path source : paths.filter(path -> path.toString().endsWith(".java")).toList()) {
-                Matcher matcher = literal.matcher(read(source));
-                while (matcher.find()) {
-                    String text = matcher.group(1);
-                    if (prefixes.contains(text.substring(0, text.indexOf('.')))) {
-                        (text.endsWith(".") ? families : used).add(text);
+        // the e-mail of the workspace audit (ADR-061) is written by a class outside the console package, in the same two bundles
+        for (Path root : List.of(CONSOLE_JAVA, AUDIT_JAVA)) {
+            try (Stream<Path> paths = Files.walk(root)) {
+                for (Path source : paths.filter(path -> path.toString().endsWith(".java")).toList()) {
+                    Matcher matcher = literal.matcher(read(source));
+                    while (matcher.find()) {
+                        String text = matcher.group(1);
+                        if (prefixes.contains(text.substring(0, text.indexOf('.')))) {
+                            (text.endsWith(".") ? families : used).add(text);
+                        }
                     }
                 }
             }
