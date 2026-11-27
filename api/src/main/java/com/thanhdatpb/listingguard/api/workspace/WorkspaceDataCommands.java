@@ -53,7 +53,8 @@ public class WorkspaceDataCommands {
             """;
 
     /** The workspace tables in delete order (children first). */
-    static final List<String> TABLES = List.of("workspace_listing_history", "workspace_customization", "workspace_listing",
+    static final List<String> TABLES = List.of("workspace_alert_log", "workspace_alert_pref", "workspace_listing_finding",
+            "workspace_listing_audit", "workspace_audit_run", "workspace_listing_history", "workspace_customization", "workspace_listing",
             "workspace_template", "workspace_import_stage", "workspace_account");
 
     private final JdbcTemplate jdbc;
@@ -262,9 +263,15 @@ public class WorkspaceDataCommands {
     private long rowsOfListings(UUID clientId, UUID templateId, List<String> keys, Map<UUID, String> emails, boolean includeDeleted,
                                 StringBuilder tsv) {
         long[] count = {0};
-        jdbc.query("SELECT id, sku, parent_sku, role, data::text AS data, fields::text AS fields, owner_account_id, status, source, "
-                + "cloned_from, version, created_at, updated_at, deleted_at FROM workspace_listing WHERE client_id = ? AND template_id = ? "
-                + (includeDeleted ? "" : "AND deleted_at IS NULL ") + "ORDER BY sku, id", rs -> {
+        jdbc.query("SELECT l.id, l.sku, l.parent_sku, l.role, l.data::text AS data, l.fields::text AS fields, l.owner_account_id, l.status, "
+                + "l.source, l.cloned_from, l.version, l.created_at, l.updated_at, l.deleted_at, a.state AS audit_state, "
+                + "a.audited_at AS audit_at, a.catalog_version AS audit_catalog, a.watchlist_version AS audit_watchlist, "
+                + "(SELECT COALESCE(json_agg(json_build_object('rule', f.rule_id, 'level', f.level, 'source', f.source, 'field', f.field, "
+                + "'start', f.span_start, 'end', f.span_end, 'mark', f.mark, 'serial', f.serial, 'new', f.is_new) ORDER BY f.position)::text, '[]') "
+                + "FROM workspace_listing_finding f WHERE f.listing_id = l.id AND f.client_id = l.client_id) AS audit_findings "
+                + "FROM workspace_listing l LEFT JOIN workspace_listing_audit a ON a.listing_id = l.id AND a.client_id = l.client_id "
+                + "WHERE l.client_id = ? AND l.template_id = ? "
+                + (includeDeleted ? "" : "AND l.deleted_at IS NULL ") + "ORDER BY l.sku, l.id", rs -> {
             var data = parse(rs.getString("data"));
             List<String> row = new ArrayList<>();
             for (String key : keys) {
@@ -281,6 +288,14 @@ public class WorkspaceDataCommands {
                     .put("deleted_at", rs.getObject("deleted_at") == null ? null : String.valueOf(rs.getObject("deleted_at", java.time.OffsetDateTime.class)));
             json.set("data", data);
             json.set("fields", parse(rs.getString("fields")));
+            if (rs.getString("audit_state") != null) {
+                // the latest background audit (ADR-061); a listing that was never audited has no member, so an export of a workspace
+                // that never turned the audit on is what it was
+                ObjectNode audit = json.putObject("audit");
+                audit.put("state", rs.getString("audit_state")).put("audited_at", String.valueOf(rs.getObject("audit_at", java.time.OffsetDateTime.class)))
+                        .put("catalog_version", rs.getString("audit_catalog")).put("watchlist_version", rs.getString("audit_watchlist"));
+                audit.set("findings", parse(rs.getString("audit_findings")));
+            }
             row.add(json.toString());
             appendRow(tsv, row);
             count[0]++;

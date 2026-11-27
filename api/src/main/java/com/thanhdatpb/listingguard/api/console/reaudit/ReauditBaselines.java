@@ -58,10 +58,10 @@ public class ReauditBaselines {
      * @param first                 there is no previous run: everything is known, because nothing can be compared
      * @param catalogVersionMissing the previous run's catalog version no longer exists, so its marks cannot be read
      */
-    record Baseline(boolean first, boolean catalogVersionMissing, Predicate<String> catalogMarkKnown,
+    public record Baseline(boolean first, boolean catalogVersionMissing, Predicate<String> catalogMarkKnown,
                     Predicate<UUID> watchlistEntryKnown) {
 
-        static Baseline noPreviousRun() {
+        public static Baseline noPreviousRun() {
             return new Baseline(true, false, mark -> true, entry -> true);
         }
     }
@@ -117,5 +117,28 @@ public class ReauditBaselines {
             };
         }
         return new Baseline(false, missing, catalogKnown, watchlistKnown);
+    }
+
+    /**
+     * The same rules for one listing of the workspace (ADR-061): what that listing's own previous audit knew. {@code previousAt} is when
+     * that audit ran; a null {@code previousCatalogVersion} and {@code previousWatchlistVersion} with a non-null {@code previousAt} mean the
+     * audit ran with no catalog and no watchlist. {@code entryTimes} is {@link #entryTimes(UUID)}, read once by a caller that asks many times.
+     *
+     * @param previousAt null when the listing was never audited: there is nothing to compare with
+     */
+    public Baseline since(UUID clientId, Instant previousAt, String previousCatalogVersion, String previousWatchlistVersion,
+                          String catalogVersion, String watchlistVersion, Collection<String> catalogMarks,
+                          Map<UUID, Instant> entryTimes) {
+        if (previousAt == null) {
+            return Baseline.noPreviousRun();
+        }
+        return new ReauditBaselines(this.catalogMarks, id -> entryTimes).build(clientId,
+                new Run(null, clientId, null, null, null, null, previousAt, previousCatalogVersion, null, previousWatchlistVersion, 0, 0,
+                        0, 0, null), catalogVersion, watchlistVersion, catalogMarks);
+    }
+
+    /** When each watchlist entry of the client was added or changed. */
+    public Map<UUID, Instant> entryTimes(UUID clientId) {
+        return entryTimes.updatedAt(clientId);
     }
 }

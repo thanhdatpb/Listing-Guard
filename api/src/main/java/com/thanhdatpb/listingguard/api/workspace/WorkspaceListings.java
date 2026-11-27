@@ -273,6 +273,14 @@ public class WorkspaceListings {
      * then the SKU. {@code query} matches a part of the SKU or the title, ignoring case.
      */
     public Page<ListingSummary> list(UUID clientId, ListingFilter filter, int page) {
+        return list(clientId, filter, page, null);
+    }
+
+    /**
+     * The same, filtered by the state of the latest background audit (ADR-061): {@code CLEAN}, {@code WARNING}, {@code ERROR}, {@code NEW_RISK},
+     * {@code INCOMPLETE} or {@code NONE} (never audited); null for no filter, which is the statement of before the audit existed.
+     */
+    public Page<ListingSummary> list(UUID clientId, ListingFilter filter, int page, String check) {
         StringBuilder where = new StringBuilder("l.client_id = ? AND l.deleted_at IS NULL");
         List<Object> args = new ArrayList<>();
         args.add(clientId);
@@ -301,7 +309,18 @@ public class WorkspaceListings {
             args.add(like);
             args.add(like);
         }
-        String from = " FROM workspace_listing l JOIN workspace_account a ON a.id = l.account_id AND a.client_id = l.client_id WHERE " + where;
+        String join = "";
+        if (check != null) {
+            join = " LEFT JOIN workspace_listing_audit au ON au.listing_id = l.id AND au.client_id = l.client_id";
+            if ("NONE".equals(check)) {
+                where.append(" AND au.listing_id IS NULL");
+            } else {
+                where.append(" AND au.state = ?");
+                args.add(check);
+            }
+        }
+        String from = " FROM workspace_listing l JOIN workspace_account a ON a.id = l.account_id AND a.client_id = l.client_id" + join
+                + " WHERE " + where;
         long total = jdbc.queryForObject("SELECT COUNT(*)" + from, Long.class, args.toArray());
         int safePage = Math.max(0, page);
         List<Object> pageArgs = new ArrayList<>(args);
