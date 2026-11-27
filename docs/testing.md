@@ -40,7 +40,7 @@ The Spring contexts are cached as before. The database needs pgvector. Decision:
 
 ## Without Docker: what still needs it
 
-From a full run of `./mvnw -B -pl api -am verify` against a local PostgreSQL with pgvector (2026-11-27, 1,840 tests):
+From a full run of `./mvnw -B -pl api -am verify` against a local PostgreSQL with pgvector (2026-11-27, 1,838 tests in `api`: 1 failure and 22 errors, all listed here):
 everything passes except the tests below, which **were not changed**. Run them in CI or on a machine with Docker.
 
 - **Tests that start their own container** (`new PostgreSQLContainer(...)` in the test, not `TestcontainersConfig`): `Migration*Test`
