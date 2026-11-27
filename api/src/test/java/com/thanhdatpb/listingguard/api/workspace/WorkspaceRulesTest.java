@@ -164,7 +164,9 @@ class WorkspaceRulesTest {
 
     @Test
     void everyTableOfTheMigrationIsAdditiveAndEveryChildPointsToItsParentThroughTheClient() throws IOException {
-        String sql = Files.readString(Path.of("src/main/resources/db/migration/V57__listing_workspace.sql"), StandardCharsets.UTF_8);
+        // V57 is the workspace, V58 the background audit (ADR-061); both are additive and both belong to the purge and the export
+        String sql = Files.readString(Path.of("src/main/resources/db/migration/V57__listing_workspace.sql"), StandardCharsets.UTF_8) + "\n"
+                + Files.readString(Path.of("src/main/resources/db/migration/V58__workspace_background_audit.sql"), StandardCharsets.UTF_8);
 
         assertThat(sql).doesNotContainIgnoringCase("ALTER TABLE").doesNotContainIgnoringCase("DROP ");
         Matcher tables = Pattern.compile("CREATE TABLE (workspace_\\w+)").matcher(sql);
