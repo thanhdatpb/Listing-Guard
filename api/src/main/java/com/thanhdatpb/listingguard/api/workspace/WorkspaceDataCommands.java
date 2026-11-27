@@ -62,6 +62,7 @@ public class WorkspaceDataCommands {
     private final TransactionTemplate transaction;
     private final PrintStream out;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public WorkspaceDataCommands(JdbcTemplate jdbc, ClientRepository clients, ObjectMapper mapper, TransactionTemplate transaction) {
         this(jdbc, clients, mapper, transaction, System.out);
     }

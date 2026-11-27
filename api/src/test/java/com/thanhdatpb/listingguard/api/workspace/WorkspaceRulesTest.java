@@ -25,6 +25,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.util.unit.DataSize;
 
@@ -223,6 +224,28 @@ class WorkspaceRulesTest {
         assertThat(WorkspaceDataCommands.TABLES.indexOf("workspace_listing_history")).isLessThan(WorkspaceDataCommands.TABLES.indexOf("workspace_listing"));
         assertThat(WorkspaceDataCommands.TABLES.indexOf("workspace_listing")).isLessThan(WorkspaceDataCommands.TABLES.indexOf("workspace_template"));
         assertThat(WorkspaceDataCommands.TABLES.indexOf("workspace_template")).isLessThan(WorkspaceDataCommands.TABLES.indexOf("workspace_account"));
+    }
+
+    @Test
+    void theAdminJobCanBuildTheCommandsBean() {
+        // two constructors (one for the tests): Spring must know which one to use, or every admin command stops working
+        try (var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+            context.getEnvironment().setActiveProfiles("admin");
+            register(context, JdbcTemplate.class, Mockito.mock(JdbcTemplate.class));
+            register(context, com.thanhdatpb.listingguard.api.client.ClientRepository.class,
+                    Mockito.mock(com.thanhdatpb.listingguard.api.client.ClientRepository.class));
+            register(context, com.fasterxml.jackson.databind.ObjectMapper.class, new com.fasterxml.jackson.databind.ObjectMapper());
+            register(context, org.springframework.transaction.support.TransactionTemplate.class,
+                    Mockito.mock(org.springframework.transaction.support.TransactionTemplate.class));
+            context.register(WorkspaceDataCommands.class);
+            context.refresh();
+
+            assertThat(context.getBean(WorkspaceDataCommands.class)).isNotNull();
+        }
+    }
+
+    private static <T> void register(org.springframework.context.support.GenericApplicationContext context, Class<T> type, T instance) {
+        context.registerBean(type, (java.util.function.Supplier<T>) () -> instance);
     }
 
     // ---------------------------------------------------------------- the account columns and keys
