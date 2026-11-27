@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRoles;
 import com.thanhdatpb.listingguard.api.workspace.ImportModels.Counts;
+import com.thanhdatpb.listingguard.api.workspace.ImportModels.EditedRow;
 import com.thanhdatpb.listingguard.api.workspace.ImportModels.MappingColumn;
 import com.thanhdatpb.listingguard.api.workspace.ImportModels.MappingView;
 import com.thanhdatpb.listingguard.api.workspace.ImportModels.Params;
@@ -160,7 +161,19 @@ public class ListingImportService {
 
     /** One data row that can be written, before the template of the write is known. */
     record Draft(int line, String sku, String parentSku, ListingRole role, String title, Map<String, String> data,
-                         ObjectNode fields, UUID owner, boolean ownerExplicit, Existing existing, boolean unchanged) {
+                         ObjectNode fields, UUID owner, boolean ownerExplicit, Existing existing, boolean unchanged, boolean edited,
+                         boolean overwrite) {
+
+        /** A row nobody changed in the workspace. */
+        Draft(int line, String sku, String parentSku, ListingRole role, String title, Map<String, String> data, ObjectNode fields,
+              UUID owner, boolean ownerExplicit, Existing existing, boolean unchanged) {
+            this(line, sku, parentSku, role, title, data, fields, owner, ownerExplicit, existing, unchanged, false, false);
+        }
+
+        /** Whether the commit writes this row: every row but one changed in the workspace that the person did not choose to overwrite. */
+        boolean written() {
+            return !unchanged && (!edited || overwrite);
+        }
     }
 
     static final class Prepared {
@@ -367,6 +380,19 @@ public class ListingImportService {
         missingFromFile.removeAll(fileSkus);
         parentsKnown.addAll(listings.existingSkus(actor.clientId(), p.accountId(), missingFromFile));
         Set<String> referencedByExisting = listings.parentsReferenced(actor.clientId(), p.accountId(), fileSkus);
+        // listings that were edited, created, cloned or restored in the workspace after their latest import (ADR-062 §8)
+        Map<UUID, WorkspaceListings.Edited> editedInWorkspace = listings.editedSinceImport(actor.clientId(),
+                existing.values().stream().map(Existing::id).toList());
+        Map<Integer, String> skuOfLine = new HashMap<>();
+        rows.forEach(row -> skuOfLine.put(row.line(), row.built().sku()));
+        Set<String> overwriteFamilies = new HashSet<>();
+        p.overwriteGroups().forEach(line -> {
+            String sku = skuOfLine.get(line);
+            if (sku != null) {
+                overwriteFamilies.add(sku);
+            }
+        });
+        List<EditedRow> edited = new ArrayList<>();
 
         List<RowIssue> issues = new ArrayList<>();
         List<Draft> drafts = new ArrayList<>();
@@ -425,23 +451,31 @@ public class ListingImportService {
             String hash = hash(row.data(), role);
             boolean same = old != null && old.contentHash().equals(hash) && templateId != null && templateId.equals(old.templateId())
                     && (!explicit || java.util.Objects.equals(owner, old.ownerAccountId()));
+            WorkspaceListings.Edited inWorkspace = old != null && !same ? editedInWorkspace.get(old.id()) : null;
+            boolean overwrite = inWorkspace != null && (p.overwriteLines().contains(row.line()) || overwriteFamilies.contains(built.sku())
+                    || !built.parentSku().isEmpty() && overwriteFamilies.contains(built.parentSku()));
             if (old == null) {
                 created++;
             } else if (same) {
                 unchanged++;
+            } else if (inWorkspace != null) {
+                // not counted as an update: it is written only if the person chooses to overwrite it
+                edited.add(new EditedRow(row.line(), built.sku(), built.parentSku().isEmpty() ? null : built.parentSku(), inWorkspace.kind(),
+                        inWorkspace.at(), overwrite));
             } else {
                 updated++;
             }
             drafts.add(new Draft(row.line(), built.sku(), built.parentSku().isEmpty() ? null : built.parentSku(), role, built.title(),
-                    row.data(), built.fields(), owner, explicit, old, same));
+                    row.data(), built.fields(), owner, explicit, old, same, inWorkspace != null, overwrite));
         }
         prep.drafts = drafts;
         prep.plan = new Plan(new Counts(rows.size(), created, updated, unchanged, errors), issues, prep.action, blocking, ignored, 0, 0,
-                added, removed);
+                added, removed, edited);
     }
 
+    /** The content hash of a row: {@link ListingContent#hash}, shared with the editor and the clone (ADR-062 §1). */
     static String hash(Map<String, String> data, ListingRole role) {
-        return WorkspaceJson.contentHash(new TreeMap<>(data), role.name());
+        return ListingContent.hash(data, role);
     }
 
     private void readCustomRows(Actor actor, Params p, SheetGrid grid, Prepared prep, List<ColumnUse> uses, int width, String blocking,
@@ -534,12 +568,15 @@ public class ListingImportService {
         if (prep.plan.blocking() != null) {
             throw new WorkspaceException(prep.plan.blocking());
         }
-        if (prep.plan.counts().created() + prep.plan.counts().updated() == 0 && prep.action == TemplateAction.USE_EXISTING
-                || prep.plan.counts().created() + prep.plan.counts().updated() == 0 && prep.action == TemplateAction.BUILTIN) {
+        int overwritten = (int) prep.drafts.stream().filter(d -> d.edited() && d.overwrite() && !d.unchanged()).count();
+        int keptEdited = prep.plan.edited().size() - overwritten;
+        if (prep.plan.counts().created() + prep.plan.counts().updated() + overwritten == 0 && prep.action == TemplateAction.USE_EXISTING
+                || prep.plan.counts().created() + prep.plan.counts().updated() + overwritten == 0 && prep.action == TemplateAction.BUILTIN) {
             if (stageId != null) {
                 stages.delete(actor.clientId(), stageId);
             }
-            return new Result(prep.plan.counts(), 0, false, prep.current == null ? 0 : prep.current.version(), prep.plan.customizationsUnlinked());
+            return new Result(prep.plan.counts(), 0, false, prep.current == null ? 0 : prep.current.version(), prep.plan.customizationsUnlinked(),
+                    0, keptEdited);
         }
         Template template;
         boolean created = false;
@@ -573,14 +610,16 @@ public class ListingImportService {
         log.info("Workspace import into account {} of client {}: {} rows, {} new, {} updated, {} unchanged, {} errors, {} conflicts",
                 p.accountId(), actor.clientId(), prep.plan.counts().rows(), prep.plan.counts().created(), prep.plan.counts().updated(),
                 prep.plan.counts().unchanged(), prep.plan.counts().errors(), conflicts);
-        return new Result(prep.plan.counts(), conflicts, created, template.version(), prep.plan.customizationsUnlinked());
+        Counts counts = prep.plan.counts();
+        return new Result(new Counts(counts.rows(), counts.created(), counts.updated() + overwritten, counts.unchanged(), counts.errors()),
+                conflicts, created, template.version(), prep.plan.customizationsUnlinked(), overwritten, keptEdited);
     }
 
     private int writeListings(Actor actor, Params p, Prepared prep, Template template) {
         List<Write> inserts = new ArrayList<>();
         List<Write> updates = new ArrayList<>();
         for (Draft d : prep.drafts) {
-            if (d.unchanged()) {
+            if (!d.written()) {
                 continue;
             }
             boolean isNew = d.existing() == null;

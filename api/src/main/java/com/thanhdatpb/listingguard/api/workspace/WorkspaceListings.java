@@ -261,7 +261,7 @@ public class WorkspaceListings {
         return changed == 1;
     }
 
-    private void snapshot(UUID clientId, UUID listingId, ChangeKind kind, UUID changedBy) {
+    void snapshot(UUID clientId, UUID listingId, ChangeKind kind, UUID changedBy) {
         jdbc.update("INSERT INTO workspace_listing_history (client_id, listing_id, version, change_kind, data, fields, status, owner_account_id, "
                 + "changed_by, changed_at) SELECT client_id, id, version, ?, data, fields, status, owner_account_id, ?, ? FROM workspace_listing "
                 + "WHERE id = ? AND client_id = ?", kind.name(), changedBy, Timestamp.from(clock.instant()), listingId, clientId);
@@ -352,6 +352,121 @@ public class WorkspaceListings {
     public long count(UUID clientId, UUID accountId) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM workspace_listing WHERE client_id = ? AND account_id = ? AND deleted_at IS NULL",
                 Long.class, clientId, accountId);
+    }
+
+
+    // ---------------------------------------------------------------- the editor, the restore and the status (ADR-062)
+
+    /**
+     * Writes the new content of one listing (an edit or a restore), guarded by the version the caller read, with its status (a content that
+     * changed is no longer "ready"), and records the history entry. Returns false, and writes nothing, when the listing was changed or
+     * deleted meanwhile. The caller holds the account's lock and a transaction. The SKU, the account, the template, the owner and the source
+     * of a listing never change here.
+     */
+    public boolean updateContent(UUID clientId, Write write) {
+        Listing l = write.state();
+        int changed = jdbc.update("UPDATE workspace_listing SET parent_sku = ?, role = ?, title = ?, data = ?::jsonb, fields = ?::jsonb, "
+                + "content_hash = ?, status = ?, version = version + 1, updated_at = ? WHERE id = ? AND client_id = ? AND version = ? "
+                + "AND deleted_at IS NULL", l.parentSku(), l.role().name(), l.title(), json.write(l.data()), json.write(l.fields()),
+                l.contentHash(), l.status().name(), Timestamp.from(clock.instant()), write.id(), clientId, write.expectedVersion());
+        if (changed == 1) {
+            snapshot(clientId, write.id(), write.kind(), write.changedBy());
+        }
+        return changed == 1;
+    }
+
+    /** Changes the status of a listing, guarded by the version, and records a STATUS entry. False when the listing changed or is gone. */
+    public boolean changeStatus(UUID clientId, UUID listingId, ListingStatus status, long expectedVersion, UUID changedBy) {
+        int changed = jdbc.update("UPDATE workspace_listing SET status = ?, version = version + 1, updated_at = ? WHERE id = ? "
+                + "AND client_id = ? AND version = ? AND deleted_at IS NULL", status.name(), Timestamp.from(clock.instant()), listingId, clientId,
+                expectedVersion);
+        if (changed == 1) {
+            snapshot(clientId, listingId, ChangeKind.STATUS, changedBy);
+        }
+        return changed == 1;
+    }
+
+    /** The live listings of the client with these ids, by id. A listing of another client is simply absent. */
+    public Map<UUID, Listing> findMany(UUID clientId, Collection<UUID> ids) {
+        Map<UUID, Listing> found = new HashMap<>();
+        List<UUID> all = new ArrayList<>(ids);
+        for (int from = 0; from < all.size(); from += 1000) {
+            UUID[] chunk = all.subList(from, Math.min(all.size(), from + 1000)).toArray(UUID[]::new);
+            jdbc.query("SELECT " + COLUMNS + " FROM workspace_listing WHERE client_id = ? AND id = ANY (?) AND deleted_at IS NULL",
+                    (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
+                        Listing listing = mapper.mapRow(rs, 0);
+                        found.put(listing.id(), listing);
+                    }, clientId, chunk);
+        }
+        return found;
+    }
+
+    /** The live children of a parent SKU of an account, whole, by SKU. */
+    public List<Listing> childrenWhole(UUID clientId, UUID accountId, String parentSku) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM workspace_listing WHERE client_id = ? AND account_id = ? AND parent_sku = ? "
+                + "AND deleted_at IS NULL ORDER BY sku", mapper, clientId, accountId, parentSku);
+    }
+
+    /** One kept version of a listing, whole. */
+    public record HistorySnapshot(long version, ChangeKind kind, Map<String, String> data, com.fasterxml.jackson.databind.JsonNode fields,
+                                  ListingStatus status, UUID ownerAccountId, UUID changedBy, Instant changedAt) {
+    }
+
+    public Optional<HistorySnapshot> historyEntry(UUID clientId, UUID listingId, long version) {
+        return jdbc.query("SELECT version, change_kind, data::text AS data, fields::text AS fields, status, owner_account_id, changed_by, "
+                + "changed_at FROM workspace_listing_history WHERE client_id = ? AND listing_id = ? AND version = ? ORDER BY id DESC LIMIT 1",
+                (rs, n) -> new HistorySnapshot(rs.getLong("version"), ChangeKind.valueOf(rs.getString("change_kind")),
+                        json.stringMap(rs.getString("data")), json.tree(rs.getString("fields")), ListingStatus.valueOf(rs.getString("status")),
+                        rs.getObject("owner_account_id", UUID.class), rs.getObject("changed_by", UUID.class),
+                        rs.getObject("changed_at", OffsetDateTime.class).toInstant()), clientId, listingId, version).stream().findFirst();
+    }
+
+    /** The kinds of change that put content into a listing from inside the workspace rather than from a sheet. */
+    static final List<String> WORKSPACE_KINDS = List.of("EDIT", "NEW", "CLONE", "RESTORE");
+
+    /** What the last change made inside the workspace to a listing was, and when. */
+    public record Edited(ChangeKind kind, Instant at) {
+    }
+
+    /**
+     * Of these listings, those that were edited, created, cloned or restored in the workspace after their latest import (ADR-062 §8): their
+     * latest history entry of such a kind is newer than their latest IMPORT entry, or they have no IMPORT entry at all. A listing whose only
+     * later changes are of the responsible person or the status is not in the answer.
+     */
+    public Map<UUID, Edited> editedSinceImport(UUID clientId, Collection<UUID> listingIds) {
+        Map<UUID, Edited> found = new HashMap<>();
+        List<UUID> all = new ArrayList<>(listingIds);
+        for (int from = 0; from < all.size(); from += 1000) {
+            UUID[] chunk = all.subList(from, Math.min(all.size(), from + 1000)).toArray(UUID[]::new);
+            jdbc.query("SELECT DISTINCT ON (h.listing_id) h.listing_id, h.change_kind, h.changed_at FROM workspace_listing_history h "
+                    + "WHERE h.client_id = ? AND h.listing_id = ANY (?) AND h.change_kind = ANY (?) AND h.id > COALESCE((SELECT MAX(i.id) "
+                    + "FROM workspace_listing_history i WHERE i.listing_id = h.listing_id AND i.client_id = h.client_id AND i.change_kind = 'IMPORT'), 0) "
+                    + "ORDER BY h.listing_id, h.id DESC", (org.springframework.jdbc.core.RowCallbackHandler) rs -> found.put(
+                    rs.getObject("listing_id", UUID.class), new Edited(ChangeKind.valueOf(rs.getString("change_kind")),
+                            rs.getObject("changed_at", OffsetDateTime.class).toInstant())), clientId, chunk, WORKSPACE_KINDS.toArray(String[]::new));
+        }
+        return found;
+    }
+
+    /** A listing of the account whose title is this one, apart from one listing (the one being looked at). */
+    public record TitleMatch(UUID id, String sku) {
+    }
+
+    /** The other live listings of the account whose title equals {@code title} ignoring case and the blanks at both ends; at most 5. */
+    public List<TitleMatch> sameTitle(UUID clientId, UUID accountId, UUID except, String title) {
+        String clean = title == null ? "" : title.strip();
+        if (clean.isEmpty()) {
+            return List.of();
+        }
+        String like = clean.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        return jdbc.query("SELECT id, sku FROM workspace_listing WHERE client_id = ? AND account_id = ? AND deleted_at IS NULL AND id <> ? "
+                + "AND btrim(title) ILIKE ? ESCAPE '\\' ORDER BY sku LIMIT 5", (rs, n) -> new TitleMatch(rs.getObject("id", UUID.class),
+                rs.getString("sku")), clientId, accountId, except, like);
+    }
+
+    /** How many live listings the client has with these ids, so a selection can say how many it lost. */
+    public int countLive(UUID clientId, Collection<UUID> ids) {
+        return findMany(clientId, ids).size();
     }
 
     // ---------------------------------------------------------------- Amazon Custom rows
