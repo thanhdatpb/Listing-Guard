@@ -10,6 +10,7 @@
             <p class="lg-small" th:if="${overview.period.marketplace != null}" th:text="${overview.period.marketplace}"></p>
         </div>
         <div class="lg-actions pilot-screen">
+            <div th:replace="~{console/layout :: themeSwitch}"></div>
             <a class="lg-btn" th:href="@{/console/stats(from=${overview.period.from},to=${overview.period.to},marketplace=${overview.period.marketplace})}"
                th:text="#{stats.title}"></a>
             <a class="lg-btn" th:href="@{/console/stats/pilot.csv(from=${overview.period.from},to=${overview.period.to},marketplace=${overview.period.marketplace})}"

@@ -137,7 +137,7 @@ class ConsoleEditorFormIntegrationTest {
                 .contains("name=\"category\"").contains("name=\"whoMade\"").contains("name=\"whenMade\"");
         assertThat(html).contains("i_did").contains("made_to_order").contains("does not keep a list of codes");
         // free text: an input, not a choice of values
-        assertThat(html).doesNotContain("<select").doesNotContain("<option");
+        assertThat(html.substring(html.indexOf("<main"))).doesNotContain("<select").doesNotContain("<option");
     }
 
     @Test

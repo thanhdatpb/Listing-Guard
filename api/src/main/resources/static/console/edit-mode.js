@@ -6,6 +6,7 @@
   const unchecked = document.getElementById('edit-unchecked');
   const error = document.getElementById('edit-request-error');
   const submit = form.querySelector('button[type=submit]');
+  const working = document.getElementById('edit-working');
   const draft = form.elements.after;
   let revision = 0;
   let pending = false;
@@ -145,6 +146,8 @@
     const body = new URLSearchParams(new FormData(form));
     pending = true;
     submit.disabled = true;
+    form.setAttribute('aria-busy', 'true');
+    if (working) working.hidden = false;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000);
     try {
@@ -165,6 +168,8 @@
       clearTimeout(timer);
       pending = false;
       submit.disabled = false;
+      form.removeAttribute('aria-busy');
+      if (working) working.hidden = true;
     }
   });
 

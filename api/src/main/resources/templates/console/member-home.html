@@ -11,7 +11,8 @@
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('dashboard')}"></header>
 <main class="lg-page lg-role-home" id="main">
-    <h1 th:text="#{work.home}"></h1>
+    <div class="lg-page__head"><div><h1 th:text="#{work.home}"></h1><p class="lg-page__sub" th:text="#{work.intro}"></p></div></div>
+    <p class="lg-banner lg-banner--success lg-toast lg-section" role="status" th:if="${guideSaved == true}" th:text="#{console.guide.saved}"></p>
     <div class="lg-actions lg-section" id="work-actions">
         <a class="lg-btn lg-btn--primary" id="pilot-start" th:href="@{/console/bulk}">
             <svg class="lg-icon" width="20" height="20" aria-hidden="true"><use href="#lg-i-bulk"/></svg><span th:text="#{nav.bulk}"></span>
@@ -55,7 +56,7 @@
     <section class="lg-card lg-section" id="work-guide" th:unless="${work.guideHidden}">
         <h2 th:text="#{work.guide}"></h2>
         <ol><li th:text="#{work.step.one}"></li><li th:text="#{work.step.two}"></li><li th:text="#{work.step.three}"></li></ol>
-        <form method="post" th:action="@{/console/home/hide-guide}">
+        <form data-console-submit method="post" th:action="@{/console/home/hide-guide}">
             <button type="submit" class="lg-btn" th:text="#{work.guide.hide}"></button>
         </form>
     </section>

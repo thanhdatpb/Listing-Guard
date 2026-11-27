@@ -1,7 +1,6 @@
 package com.thanhdatpb.listingguard.api.workspace;
 
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.signedIn;
-import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.withoutShell;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -454,7 +453,7 @@ class ConsoleWorkspaceIntegrationTest {
         for (String language : new String[] {null, "vi"}) {
             for (String path : paths) {
                 String page = html(in(get(path).with(signedIn(team.admin())), language), 200);
-                String body = withoutShell(page);
+                String body = page.substring(page.indexOf("<main"));
                 assertThat(page).as(path + " " + language).contains("<html lang=\"" + (language == null ? "en" : "vi") + "\"").doesNotContain("??")
                         .contains("<h1").contains("id=\"main\"");
                 assertThat(body).as(path).doesNotContain(" style=").doesNotContain("<script");

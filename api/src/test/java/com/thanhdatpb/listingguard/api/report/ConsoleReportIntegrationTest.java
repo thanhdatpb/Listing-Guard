@@ -3,7 +3,6 @@ package com.thanhdatpb.listingguard.api.report;
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.section;
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.signedIn;
 import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.userOf;
-import static com.thanhdatpb.listingguard.api.console.ConsoleTestSupport.withoutShell;
 import static com.thanhdatpb.listingguard.api.plan.PlanTestSupport.newClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -181,7 +180,7 @@ class ConsoleReportIntegrationTest {
     }
 
     @Test
-    void everyValueIsEscapedAndThePageHasNoScript() throws Exception {
+    void everyValueIsEscapedAndTheReportBodyHasNoScript() throws Exception {
         TestClient c = client();
         UUID listing = data.listing(c.id(), "ETSY", CREATED);
         data.finding(listing, "ERROR", "<script>alert(1)</script>");
@@ -191,7 +190,7 @@ class ConsoleReportIntegrationTest {
         String html = page(userOf(c), "from", "2026-11-02", "to", "2026-11-08");
 
         assertThat(html).contains("&lt;script&gt;alert(1)&lt;/script&gt;").contains("&lt;img src=x onerror=alert(1)&gt;");
-        assertThat(withoutShell(html)).doesNotContain("<script").doesNotContain("<img").doesNotContain("<iframe");
+        assertThat(html.substring(html.indexOf("<main"))).doesNotContain("<script").doesNotContain("<img").doesNotContain("<iframe");
     }
 
     @Test
