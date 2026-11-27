@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.detail.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- One listing of the workspace, read only (ADR-059): its facts, its fields in the order of its template (a column no standard field was given
+     is shown as passthrough), its family, its Amazon Custom row and its history. An ADMIN changes the responsible person and deletes; the
+     editor is a later change. Every value goes through th:text. No text is written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace')}"></header>
+<main class="lg-page" id="workspace-detail">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <a class="lg-page__crumb" th:href="@{/console/workspace}" th:text="#{workspace.detail.back}"></a>
+            <h1 th:text="${listing.sku()}"></h1>
+            <p class="lg-page__sub" th:text="${listing.title()}"></p>
+        </div>
+        <div class="lg-actions">
+            <span th:replace="~{console/workspace-fragments :: status(${listing.status().name().toLowerCase()}, ${statusLabel})}"></span>
+            <span th:replace="~{console/workspace-fragments :: unchecked}"></span>
+        </div>
+    </div>
+
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <div class="lg-banner lg-banner--info lg-section" id="detail-readonly" th:unless="${canEdit}"><p th:text="#{workspace.detail.readonly}"></p></div>
+    <div class="lg-banner lg-banner--info lg-section" id="detail-editor-later" th:if="${canEdit}"><p th:text="#{workspace.detail.editor.later}"></p></div>
+
+    <section class="lg-card lg-section" aria-labelledby="facts-heading">
+        <h2 id="facts-heading" class="lg-card__title" th:text="#{workspace.detail.facts}"></h2>
+        <ul class="lg-kv">
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.detail.account}"></span><span class="lg-kv__value"><span th:text="${account.name()}"></span> <span class="lg-text-muted" th:text="${marketplaceLabel}"></span></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.detail.template}"></span><span class="lg-kv__value" th:text="#{workspace.detail.template.value(${kindLabel}, ${#strings.toString(template.version())})}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.detail.role}"></span><span class="lg-kv__value" th:text="${roleLabel}"></span></li>
+            <li class="lg-kv__item" th:if="${listing.parentSku() != null}"><span class="lg-kv__label" th:text="#{workspace.detail.parent}"></span><span class="lg-kv__value"><a th:if="${parent != null}" th:href="@{/console/workspace/listings/{id}(id=${parent.id()})}"><code class="lg-code" th:text="${listing.parentSku()}"></code></a><code class="lg-code" th:if="${parent == null}" th:text="${listing.parentSku()}"></code></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.detail.owner}"></span><span class="lg-kv__value"><span th:if="${ownerEmail != null}" th:text="${ownerEmail}"></span><span class="lg-text-muted" th:if="${ownerEmail == null}" th:text="#{workspace.owner.none}"></span></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.detail.source}"></span><span class="lg-kv__value"><span th:text="${sourceLabel}"></span> <a th:if="${clonedFrom != null}" th:href="@{/console/workspace/listings/{id}(id=${clonedFrom.id()})}"><code class="lg-code" th:text="${clonedFrom.sku()}"></code></a></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.detail.version}"></span><span class="lg-kv__value lg-num" th:text="${listing.version()}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.detail.created}"></span><span class="lg-kv__value" th:text="${created}"></span></li>
+            <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.detail.updated}"></span><span class="lg-kv__value" th:text="${updated}"></span></li>
+        </ul>
+    </section>
+
+    <section class="lg-card lg-section" aria-labelledby="fields-heading">
+        <h2 id="fields-heading" class="lg-card__title" th:text="#{workspace.detail.fields}"></h2>
+        <p class="lg-text-muted" th:text="#{workspace.detail.fields.intro}"></p>
+        <div class="lg-table-wrap">
+            <table class="lg-table lg-table--dense" id="detail-fields">
+                <caption class="lg-sr-only" th:text="#{workspace.detail.fields}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{workspace.detail.field}"></th>
+                    <th scope="col" th:text="#{workspace.detail.value}"></th>
+                    <th scope="col" th:text="#{workspace.detail.meaning}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="field : ${fields}">
+                    <th scope="row" class="lg-wrap"><code class="lg-code" th:text="${field.header()}"></code></th>
+                    <td class="lg-wrap" th:text="${field.value()}"></td>
+                    <td><span th:if="${!field.passthrough()}" th:text="${field.target()}"></span><span class="lg-text-muted" th:if="${field.passthrough()}" th:text="#{workspace.detail.passthrough}"></span></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="lg-card lg-section" aria-labelledby="family-heading" th:if="${!children.isEmpty()}">
+        <h2 id="family-heading" class="lg-card__title" th:text="#{workspace.detail.children}"></h2>
+        <ul class="lg-plain">
+            <li th:each="child : ${children}"><a th:href="@{/console/workspace/listings/{id}(id=${child.id()})}"><code class="lg-code" th:text="${child.sku()}"></code></a> <span th:text="${child.title()}"></span></li>
+        </ul>
+    </section>
+
+    <section class="lg-card lg-section" aria-labelledby="custom-heading" th:if="${customization != null}">
+        <h2 id="custom-heading" class="lg-card__title" th:text="#{workspace.detail.customization}"></h2>
+        <div class="lg-table-wrap">
+            <table class="lg-table lg-table--dense" id="detail-customization">
+                <caption class="lg-sr-only" th:text="#{workspace.detail.customization}"></caption>
+                <thead><tr><th scope="col" th:text="#{workspace.detail.field}"></th><th scope="col" th:text="#{workspace.detail.value}"></th></tr></thead>
+                <tbody>
+                <tr th:each="entry : ${customization.data()}"><th scope="row" class="lg-wrap"><code class="lg-code" th:text="${entry.key}"></code></th><td class="lg-wrap" th:text="${entry.value}"></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="lg-card lg-section" aria-labelledby="history-heading">
+        <h2 id="history-heading" class="lg-card__title" th:text="#{workspace.detail.history}"></h2>
+        <div class="lg-table-wrap">
+            <table class="lg-table lg-table--dense" id="detail-history">
+                <caption class="lg-sr-only" th:text="#{workspace.detail.history}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" class="lg-num" th:text="#{workspace.detail.version}"></th>
+                    <th scope="col" th:text="#{workspace.history.kind}"></th>
+                    <th scope="col" th:text="#{workspace.col.status}"></th>
+                    <th scope="col" th:text="#{workspace.col.owner}"></th>
+                    <th scope="col" th:text="#{workspace.history.by}"></th>
+                    <th scope="col" th:text="#{workspace.history.when}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="h : ${history}">
+                    <td class="lg-num" th:text="${h.version()}"></td>
+                    <td th:text="${h.kind()}"></td>
+                    <td th:text="${h.status()}"></td>
+                    <td th:text="${h.owner()}"></td>
+                    <td th:text="${h.changedBy()}"></td>
+                    <td class="lg-nowrap" th:text="${h.when()}"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="lg-card lg-section" aria-labelledby="manage-heading" th:if="${admin}">
+        <h2 id="manage-heading" class="lg-card__title" th:text="#{workspace.detail.manage}"></h2>
+        <form class="lg-form" id="owner-form" method="post" th:action="@{/console/workspace/listings/{id}/owner(id=${listing.id()})}">
+            <input type="hidden" name="version" th:value="${listing.version()}">
+            <div class="lg-field">
+                <label class="lg-field__label" for="owner" th:text="#{workspace.detail.owner}"></label>
+                <select class="lg-select" id="owner" name="owner">
+                    <option value="" th:selected="${listing.ownerAccountId() == null}" th:text="#{workspace.owner.none}"></option>
+                    <option th:each="o : ${owners}" th:value="${o.key}" th:selected="${o.key == listing.ownerAccountId()}" th:text="${o.value}"></option>
+                </select>
+            </div>
+            <div class="lg-actions"><button type="submit" class="lg-btn" th:text="#{workspace.detail.owner.save}"></button></div>
+        </form>
+        <form class="lg-form" id="delete-form" method="post" th:action="@{/console/workspace/listings/{id}/delete(id=${listing.id()})}">
+            <input type="hidden" name="version" th:value="${listing.version()}">
+            <p class="lg-text-muted" th:text="#{workspace.detail.delete.hint}"></p>
+            <div class="lg-actions"><button type="submit" class="lg-btn lg-btn--destructive" th:text="#{workspace.detail.delete}"></button></div>
+        </form>
+    </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${mode == 'template'} ? #{workspace.template.title} : #{workspace.import.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- Step 1 of the import, and of the template upload (ADR-059): which account, which kind of sheet, who is responsible, and the file or the
+     pasted cells. The file is kept on the server until the last step (it can be 20 MB); nothing is written to the workspace yet. No text is
+     written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav(${mode == 'template'} ? 'workspace-accounts' : 'workspace-import')}"></header>
+<main class="lg-page" id="workspace-import">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="${mode == 'template'} ? #{workspace.template.heading} : #{workspace.import.heading}"></h1>
+            <p class="lg-page__sub" th:text="${mode == 'template'} ? #{workspace.template.intro} : #{workspace.import.intro}"></p>
+        </div>
+    </div>
+
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <ol class="lg-empty__steps" th:aria-label="#{workspace.steps.aria}">
+        <li><strong th:text="#{workspace.step.choose}"></strong></li>
+        <li th:text="#{workspace.step.sheet}"></li>
+        <li th:text="#{workspace.step.columns}"></li>
+        <li th:text="${mode == 'template'} ? #{workspace.step.save} : #{workspace.step.preview}"></li>
+    </ol>
+
+    <div class="lg-empty" id="import-no-accounts" th:if="${sellerAccounts.isEmpty()}">
+        <h2 class="lg-empty__title" th:text="#{workspace.import.noaccounts.title}"></h2>
+        <p class="lg-empty__text" th:text="#{workspace.import.noaccounts.text}"></p>
+        <p><a class="lg-btn lg-btn--primary" th:href="@{/console/workspace/accounts}" th:text="#{workspace.nav.accounts}"></a></p>
+    </div>
+
+    <form class="lg-card lg-form lg-section" id="import-form" method="post" enctype="multipart/form-data" th:unless="${sellerAccounts.isEmpty()}"
+          th:action="@{/console/workspace/import/upload}">
+        <input type="hidden" name="mode" th:value="${mode}">
+        <div class="lg-field">
+            <label class="lg-field__label" for="account" th:text="#{workspace.import.account}"></label>
+            <select class="lg-select" id="account" name="account" required>
+                <option th:each="a : ${sellerAccounts}" th:value="${a.id()}" th:selected="${a.id().toString() == selectedAccount}" th:text="${a.name()}"></option>
+            </select>
+        </div>
+        <div class="lg-field">
+            <label class="lg-field__label" for="kind" th:text="#{workspace.import.kind}"></label>
+            <select class="lg-select" id="kind" name="kind" required>
+                <option th:each="k : ${kinds}" th:value="${k[0]}" th:selected="${k[0] == selectedKind}" th:text="${k[1]}"></option>
+            </select>
+            <p class="lg-field__hint" th:text="#{workspace.import.kind.hint}"></p>
+        </div>
+        <div class="lg-field" th:if="${mode == 'import' and admin}">
+            <label class="lg-field__label" for="owner" th:text="#{workspace.import.owner}"></label>
+            <select class="lg-select" id="owner" name="owner">
+                <option value="" th:text="#{workspace.owner.none}"></option>
+                <option th:each="o : ${owners}" th:value="${o.key}" th:selected="${o.key == me}" th:text="${o.value}"></option>
+            </select>
+            <p class="lg-field__hint" th:text="#{workspace.import.owner.hint}"></p>
+        </div>
+        <p class="lg-text-muted" th:if="${mode == 'import' and !admin}" th:text="#{workspace.import.owner.self}"></p>
+        <div class="lg-field" th:if="${mode == 'import'}">
+            <label class="lg-field__label" for="status" th:text="#{workspace.import.status}"></label>
+            <select class="lg-select" id="status" name="status">
+                <option th:each="s : ${statuses}" th:value="${s[0]}" th:text="${s[1]}"></option>
+            </select>
+            <p class="lg-field__hint" th:text="#{workspace.import.status.hint}"></p>
+        </div>
+        <div class="lg-field">
+            <label class="lg-drop" for="file">
+                <span class="lg-drop__title" th:text="#{workspace.import.file}"></span>
+                <span class="lg-drop__hint" id="file-hint" th:text="#{workspace.import.file.hint(${maxMegabytes}, ${maxRows})}"></span>
+                <input type="file" id="file" name="file" aria-describedby="file-hint" accept=".xlsx,.xlsm,.tsv,.csv,.txt">
+            </label>
+        </div>
+        <div class="lg-field" th:if="${mode == 'import'}">
+            <label class="lg-field__label" for="text" th:text="#{workspace.import.paste}"></label>
+            <textarea class="lg-textarea lg-textarea--mono" id="text" name="text" rows="6" th:placeholder="#{workspace.import.paste.placeholder}"></textarea>
+            <p class="lg-field__hint" th:text="#{workspace.import.paste.hint}"></p>
+        </div>
+        <div class="lg-actions">
+            <button type="submit" class="lg-btn lg-btn--primary" th:text="#{workspace.import.next}"></button>
+            <a class="lg-btn" th:href="${mode == 'template'} ? @{/console/workspace/accounts} : @{/console/workspace}" th:text="#{workspace.cancel}"></a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

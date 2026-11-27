@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- The listing workspace (ADR-059): every listing of the client, with filters that work without a script (a plain GET form), children under
+     their parent, and the pager. Every account of the client reads this page; the check state is "not checked" until the background check
+     (a later change) exists. No text is written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace')}"></header>
+<main class="lg-page" id="workspace-page">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{workspace.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{workspace.intro}"></p>
+        </div>
+        <div class="lg-actions">
+            <a class="lg-btn lg-btn--primary" id="workspace-import-open" th:href="@{/console/workspace/import}" th:text="#{workspace.import.open}"></a>
+        </div>
+    </div>
+
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+
+    <form class="lg-filters" id="workspace-filters" method="get" role="search" th:action="@{/console/workspace}" th:aria-label="#{workspace.filters.aria}">
+        <select class="lg-select" name="account" th:aria-label="#{workspace.filter.account}">
+            <option value="" th:text="#{workspace.filter.account.any}"></option>
+            <option th:each="a : ${sellerAccounts}" th:value="${a.id()}" th:selected="${a.id().toString() == filterAccount}" th:text="${a.name()}"></option>
+        </select>
+        <select class="lg-select" name="marketplace" th:aria-label="#{workspace.filter.marketplace}">
+            <option value="" th:text="#{workspace.filter.marketplace.any}"></option>
+            <option value="AMAZON" th:selected="${filterMarketplace == 'AMAZON'}" th:text="#{workspace.marketplace.amazon}"></option>
+            <option value="ETSY" th:selected="${filterMarketplace == 'ETSY'}" th:text="#{workspace.marketplace.etsy}"></option>
+        </select>
+        <select class="lg-select" name="status" th:aria-label="#{workspace.filter.status}">
+            <option value="" th:text="#{workspace.filter.status.any}"></option>
+            <option th:each="s : ${statuses}" th:value="${s[0]}" th:selected="${s[0] == filterStatus}" th:text="${s[1]}"></option>
+        </select>
+        <select class="lg-select" name="owner" th:aria-label="#{workspace.filter.owner}">
+            <option value="" th:text="#{workspace.filter.owner.any}"></option>
+            <option value="me" th:selected="${filterOwner == 'me'}" th:text="#{workspace.filter.owner.me}"></option>
+            <option value="none" th:selected="${filterOwner == 'none'}" th:text="#{workspace.filter.owner.none}"></option>
+            <option th:each="o : ${owners}" th:value="${o.key}" th:selected="${o.key.toString() == filterOwner}" th:text="${o.value}"></option>
+        </select>
+        <input class="lg-input lg-filters__search" type="search" name="q" th:value="${filterQuery}" autocomplete="off"
+               th:placeholder="#{workspace.filter.query.placeholder}" th:aria-label="#{workspace.filter.query}">
+        <button type="submit" class="lg-btn lg-btn--small" th:text="#{workspace.filter.apply}"></button>
+        <a class="lg-btn lg-btn--link" id="workspace-reset" th:if="${filtered}" th:href="@{/console/workspace}" th:text="#{workspace.filter.reset}"></a>
+    </form>
+
+    <div class="lg-empty" id="workspace-empty-accounts" th:if="${!hasAccounts}">
+        <h2 class="lg-empty__title" th:text="#{workspace.empty.accounts.title}"></h2>
+        <p class="lg-empty__text" th:text="#{workspace.empty.accounts.text}"></p>
+        <p><a class="lg-btn lg-btn--primary" th:href="@{/console/workspace/accounts}" th:text="#{workspace.nav.accounts}"></a></p>
+    </div>
+    <div class="lg-empty" id="workspace-empty" th:if="${hasAccounts and rows.isEmpty()}">
+        <h2 class="lg-empty__title" th:text="${filtered} ? #{workspace.empty.filtered.title} : #{workspace.empty.none.title}"></h2>
+        <p class="lg-empty__text" th:text="${filtered} ? #{workspace.empty.filtered.text} : #{workspace.empty.none.text}"></p>
+        <p th:unless="${filtered}"><a class="lg-btn lg-btn--primary" th:href="@{/console/workspace/import}" th:text="#{workspace.import.open}"></a></p>
+    </div>
+
+    <div class="lg-table-wrap" th:unless="${rows.isEmpty()}">
+        <table class="lg-table lg-table--scroll lg-table--dense" id="workspace-table">
+            <caption class="lg-sr-only" th:text="#{workspace.table.caption}"></caption>
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{workspace.col.sku}"></th>
+                <th scope="col" th:text="#{workspace.col.title}"></th>
+                <th scope="col" th:text="#{workspace.col.account}"></th>
+                <th scope="col" th:text="#{workspace.col.role}"></th>
+                <th scope="col" th:text="#{workspace.col.status}"></th>
+                <th scope="col" th:text="#{workspace.col.owner}"></th>
+                <th scope="col" th:text="#{workspace.col.check}"></th>
+                <th scope="col" th:text="#{workspace.col.updated}"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="row : ${rows}" th:attr="data-child=${row.child}">
+                <td class="lg-sku">
+                    <span class="lg-text-muted" aria-hidden="true" th:if="${row.child}">&rarr;</span>
+                    <a th:href="@{/console/workspace/listings/{id}(id=${row.id})}"><code class="lg-code" th:text="${row.sku}"></code></a>
+                </td>
+                <td class="lg-ellip" th:title="${row.title}" th:text="${row.title}"></td>
+                <td><span th:text="${row.account}"></span><br><span class="lg-text-muted lg-small" th:text="${row.marketplace}"></span></td>
+                <td th:text="${row.role}"></td>
+                <td><span th:replace="~{console/workspace-fragments :: status(${row.status}, ${row.statusLabel})}"></span></td>
+                <td class="lg-ellip" th:title="${row.owner}"><span th:if="${row.owner != null}" th:text="${row.owner}"></span><span class="lg-text-muted" th:if="${row.owner == null}" th:text="#{workspace.owner.none}"></span></td>
+                <td><span th:replace="~{console/workspace-fragments :: unchecked}"></span></td>
+                <td class="lg-nowrap lg-text-muted" th:text="${row.updated}"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="lg-pager" th:unless="${rows.isEmpty()}">
+        <p class="lg-small lg-text-muted" id="workspace-shown"
+           th:text="#{workspace.shown(${#strings.toString(first)}, ${#strings.toString(last)}, ${#strings.toString(page.total())})}"></p>
+        <nav class="lg-actions" th:if="${page.pages() > 1}" th:aria-label="#{workspace.pagination}">
+            <a class="lg-btn lg-btn--small" rel="prev" th:if="${page.page() > 0}" th:text="#{workspace.previous}"
+               th:href="@{/console/workspace(account=${filterAccount},marketplace=${filterMarketplace},status=${filterStatus},owner=${filterOwner},q=${filterQuery},page=${page.page() - 1})}"></a>
+            <span class="lg-btn lg-btn--small" aria-disabled="true" th:if="${page.page() == 0}" th:text="#{workspace.previous}"></span>
+            <span class="lg-small lg-text-muted" th:text="#{workspace.page(${page.page() + 1}, ${page.pages()})}"></span>
+            <a class="lg-btn lg-btn--small" rel="next" th:if="${page.page() + 1 < page.pages()}" th:text="#{workspace.next}"
+               th:href="@{/console/workspace(account=${filterAccount},marketplace=${filterMarketplace},status=${filterStatus},owner=${filterOwner},q=${filterQuery},page=${page.page() + 1})}"></a>
+            <span class="lg-btn lg-btn--small" aria-disabled="true" th:if="${page.page() + 1 >= page.pages()}" th:text="#{workspace.next}"></span>
+        </nav>
+    </div>
+</main>
+</body>
+</html>

@@ -38,6 +38,9 @@ public class AdminRunner implements ApplicationRunner {
     @Autowired(required = false)
     private DemoWorkspaceCommands demo;
 
+    @Autowired(required = false)
+    private com.thanhdatpb.listingguard.api.workspace.WorkspaceDataCommands workspace;
+
     @Override
     public void run(ApplicationArguments args) {
         if (args.getNonOptionArgs().stream().findFirst().filter("demo"::equals).isPresent()) {
@@ -46,6 +49,13 @@ public class AdminRunner implements ApplicationRunner {
             }
             demo.execute(args);
             System.out.println("Demo command completed.");
+            return;
+        }
+        if (args.getNonOptionArgs().stream().findFirst().filter("workspace"::equals).isPresent()) {
+            if (workspace == null) {
+                throw new IllegalArgumentException("The workspace commands are not available.");
+            }
+            workspace.execute(args);
             return;
         }
         new AdminCommands(provisioning, catalog, accounts, importer, System.out).execute(args);

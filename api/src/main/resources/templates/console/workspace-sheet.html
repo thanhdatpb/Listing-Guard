@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.sheet.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- Step 2 (ADR-059): which sheet, which row holds the field names, where the data starts, which column is the SKU. What a guess filled in says so;
+     the refresh button reads the form again and shows the chosen sheet. Everything a cell holds goes through th:text. No text is written here
+     (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav(${mode == 'template'} ? 'workspace-accounts' : 'workspace-import')}"></header>
+<main class="lg-page" id="workspace-sheet">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{workspace.sheet.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{workspace.sheet.intro}"></p>
+        </div>
+    </div>
+
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <div class="lg-banner lg-banner--warning lg-section" id="macro-note" role="note" th:if="${macro}"><p th:text="#{workspace.sheet.macro}"></p></div>
+    <p class="lg-text-muted" id="file-facts" th:text="#{workspace.sheet.facts(${format}, ${fileName == null ? '' : fileName})}"></p>
+
+    <form class="lg-card lg-form lg-section" id="sheet-form" method="get" th:action="@{/console/workspace/import/sheet}">
+        <th:block th:replace="~{console/workspace-fragments :: carry(${carry})}"></th:block>
+        <div class="lg-field">
+            <label class="lg-field__label" for="sheet" th:text="#{workspace.sheet.sheet}"></label>
+            <select class="lg-select" id="sheet" name="sheet">
+                <option th:each="s : ${sheets}" th:value="${s}" th:selected="${s == sheet}" th:text="${s}"></option>
+            </select>
+            <th:block th:if="${sheetGuessed}"><span th:replace="~{console/workspace-fragments :: guessed}"></span></th:block>
+        </div>
+        <div class="lg-field lg-field--narrow">
+            <label class="lg-field__label" for="fieldRow" th:text="#{workspace.sheet.fieldrow}"></label>
+            <input class="lg-input lg-num" type="number" min="1" id="fieldRow" name="fieldRow" th:value="${fieldRow}" aria-describedby="fieldrow-hint">
+            <th:block th:if="${fieldRowGuessed}"><span th:replace="~{console/workspace-fragments :: guessed}"></span></th:block>
+            <p class="lg-field__hint" id="fieldrow-hint" th:text="${guessConfident or !fieldRowGuessed} ? #{workspace.sheet.fieldrow.hint} : #{workspace.sheet.fieldrow.unsure}"></p>
+        </div>
+        <div class="lg-field lg-field--narrow">
+            <label class="lg-field__label" for="firstDataRow" th:text="#{workspace.sheet.firstdata}"></label>
+            <input class="lg-input lg-num" type="number" min="2" id="firstDataRow" name="firstDataRow" th:value="${firstDataRow}">
+            <p class="lg-field__hint" th:text="#{workspace.sheet.firstdata.hint}"></p>
+        </div>
+        <div class="lg-field">
+            <label class="lg-field__label" for="skuCol" th:text="#{workspace.sheet.sku}"></label>
+            <select class="lg-select" id="skuCol" name="skuCol">
+                <option value="" th:selected="${skuCol < 0}" th:text="#{workspace.sheet.sku.none}"></option>
+                <option th:each="c : ${columns}" th:value="${c.index()}" th:selected="${c.index() == skuCol}" th:text="${c.label()}"></option>
+            </select>
+            <th:block th:if="${skuGuessed and skuCol >= 0}"><span th:replace="~{console/workspace-fragments :: guessed}"></span></th:block>
+        </div>
+        <div class="lg-actions">
+            <button type="submit" class="lg-btn" id="sheet-refresh" th:text="#{workspace.sheet.refresh}"></button>
+            <button type="submit" class="lg-btn lg-btn--primary" id="sheet-next" th:formaction="@{/console/workspace/import/mapping}"
+                    th:disabled="${skuCol < 0}" th:text="#{workspace.sheet.next}"></button>
+        </div>
+    </form>
+
+    <section class="lg-card lg-section" aria-labelledby="preview-heading">
+        <h2 id="preview-heading" class="lg-card__title" th:text="#{workspace.sheet.preview}"></h2>
+        <p class="lg-text-muted" th:text="#{workspace.sheet.preview.hint(${fieldRow}, ${firstDataRow})}"></p>
+        <div class="lg-table-wrap">
+            <table class="lg-table lg-table--dense lg-table--scroll" id="sheet-preview">
+                <caption class="lg-sr-only" th:text="#{workspace.sheet.preview}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" class="lg-num" th:text="#{workspace.sheet.row}"></th>
+                    <th scope="col" th:each="letter : ${previewLetters}" th:text="${letter}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${preview}">
+                    <th scope="row" class="lg-num" th:text="${row.number()}"></th>
+                    <td class="lg-wrap" th:each="i : ${previewColumns}"><code class="lg-code" th:text="${i < row.cells().size() ? row.cells().get(i) : ''}"></code></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <form method="post" th:action="@{/console/workspace/import/cancel}" class="lg-actions">
+        <input type="hidden" name="stage" th:value="${#strings.isEmpty(carry.get('stage')) ? '' : carry.get('stage')}">
+        <button type="submit" class="lg-btn lg-btn--link" th:text="#{workspace.cancel}"></button>
+    </form>
+</main>
+</body>
+</html>

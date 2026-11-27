@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.thanhdatpb.listingguard</groupId>
+        <artifactId>listing-guard</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>workspace-sheets</artifactId>
+    <name>Listing Guard :: Workspace Sheets</name>
+    <description>Bounded, read-only reading of .xlsx/.xlsm/TSV/CSV files for the listing workspace (ADR-059). The only module that
+        depends on Apache POI. No Spring, no database, no network; a macro is never run and a formula is never recalculated.</description>
+
+    <properties>
+        <!-- Apache POI 5.5.1 (ADR-059). The 5.4.1 release fixed the OOXML duplicate-entry issue (CVE-2025-31672); 6.0.0 exists but
+             is a new major line, not used until the maintainer reviews it. Only this module depends on it. -->
+        <poi.version>5.5.1</poi.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

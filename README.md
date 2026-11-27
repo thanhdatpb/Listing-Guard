@@ -31,6 +31,7 @@ The optional console keeps magic-link sign-in by default and can use verified Cl
 Listing Guard suggests and reports. It never edits or publishes a listing and does no SEO.
 
 Optional [phrase screening](docs/phrase-screening.md) batches up to 2,000 seller keywords or print-text phrases with catalog and watchlist evidence.
+Optional [listing workspace](docs/workspace.md) (off by default, ADR-059) keeps listings per seller account, with templates in versions and imports from Excel, Google Sheets, TSV or pasted cells.
 
 The pilot console includes a keyword CSV and print-text screening workflow with session-scoped exports ([guide](docs/pilot-seller-guide.md)).
 

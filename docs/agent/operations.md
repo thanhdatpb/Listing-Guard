@@ -59,3 +59,13 @@ docker compose --profile prod --profile policy-diff run --rm policy-diff [--dry-
 ```
 
 On Windows use `mvnw.cmd`, with `JAVA_HOME` pointing at a JDK 21.
+
+## Listing workspace data (ADR-059)
+
+Both commands run in the one-shot `admin` job, need no HTTP endpoint and work with the workspace flag off. They filter every statement by the client and
+log ids and counts only. See [the workspace guide](../workspace.md#7-sao-lưu-xuất-xoá-dữ-liệu).
+
+```bash
+docker compose run --rm admin workspace export --client=<id|name> [--out=<dir>] [--include-deleted]
+docker compose run --rm admin workspace purge  --client=<id|name> [--confirm=<code>]
+```

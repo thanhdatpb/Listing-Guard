@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.mapping.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- Step 3 (ADR-059): what each column is. The starting value is what the template remembers, else a guess from the header; a guess says so.
+     A column left as "keep as is" stays in the listing unchanged (passthrough). A MEMBER sees the saved mapping and cannot change it: the
+     template belongs to the account. No text is written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav(${mode == 'template'} ? 'workspace-accounts' : 'workspace-import')}"></header>
+<main class="lg-page" id="workspace-mapping">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <h1 th:text="#{workspace.mapping.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{workspace.mapping.intro(${kindLabel})}"></p>
+        </div>
+    </div>
+
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <div class="lg-banner lg-banner--info lg-section" id="mapping-readonly" th:if="${readOnly}"><p th:text="#{workspace.mapping.readonly}"></p></div>
+    <div class="lg-banner lg-banner--info lg-section" id="mapping-first" th:if="${!hasTemplate and !readOnly and mode == 'import'}"><p th:text="#{workspace.mapping.first}"></p></div>
+
+    <form class="lg-form" id="mapping-form" method="post"
+          th:action="${mode == 'template'} ? @{/console/workspace/import/save-template} : @{/console/workspace/import/preview}">
+        <th:block th:replace="~{console/workspace-fragments :: carry(${carry})}"></th:block>
+        <div class="lg-table-wrap lg-section">
+            <table class="lg-table lg-table--scroll lg-table--dense" id="mapping-table">
+                <caption class="lg-sr-only" th:text="#{workspace.mapping.caption}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{workspace.mapping.column}"></th>
+                    <th scope="col" th:text="#{workspace.mapping.header}"></th>
+                    <th scope="col" th:text="#{workspace.mapping.target}"></th>
+                    <th scope="col" th:text="#{workspace.mapping.origin}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${rows}">
+                    <th scope="row"><code class="lg-code" th:text="${row.letters()}"></code></th>
+                    <td class="lg-wrap" th:text="${row.header()}"></td>
+                    <td>
+                        <label class="lg-sr-only" th:for="${'col-' + row.index()}" th:text="#{workspace.mapping.target.for(${row.letters()})}"></label>
+                        <select class="lg-select" th:id="${'col-' + row.index()}" th:name="${'col.' + row.index()}" th:disabled="${readOnly}">
+                            <option value="" th:selected="${row.target().isEmpty()}" th:text="#{workspace.target.skip}"></option>
+                            <option th:each="o : ${options}" th:value="${o[0]}" th:selected="${o[0] == row.target()}" th:text="${o[1]}"></option>
+                        </select>
+                    </td>
+                    <td>
+                        <th:block th:if="${row.origin() == 'guessed'}"><span th:replace="~{console/workspace-fragments :: guessed}"></span></th:block>
+                        <span class="lg-text-muted" th:if="${row.origin() != 'guessed'}" th:text="${row.originLabel()}"></span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <section class="lg-card lg-section" id="mapping-separators" aria-labelledby="separators-heading" th:if="${!separators.isEmpty() and !readOnly}">
+            <h2 id="separators-heading" class="lg-card__title" th:text="#{workspace.mapping.separators}"></h2>
+            <p class="lg-text-muted" th:text="#{workspace.mapping.separators.hint}"></p>
+            <div class="lg-field" th:each="s : ${separators}">
+                <label class="lg-field__label" th:for="${'sep-' + s[0]}" th:text="${s[1]}"></label>
+                <select class="lg-select" th:id="${'sep-' + s[0]}" th:name="${'sep.' + s[0]}">
+                    <option th:each="o : ${separatorOptions}" th:value="${o[0]}" th:selected="${o[0] == s[2]}" th:text="${o[1]}"></option>
+                </select>
+            </div>
+        </section>
+
+        <div class="lg-actions">
+            <button type="submit" class="lg-btn lg-btn--primary" id="mapping-next"
+                    th:text="${mode == 'template'} ? #{workspace.mapping.save} : #{workspace.mapping.next}"></button>
+            <a class="lg-btn" th:href="@{/console/workspace/import/sheet(stage=${carry.get('stage')},mode=${mode},account=${carry.get('account')},kind=${carry.get('kind')},owner=${carry.get('owner')},status=${carry.get('status')},sheet=${carry.get('sheet')},fieldRow=${carry.get('fieldRow')},firstDataRow=${carry.get('firstDataRow')},skuCol=${carry.get('skuCol')})}" th:text="#{workspace.back}"></a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

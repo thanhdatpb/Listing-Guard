@@ -9,6 +9,7 @@ for service boundaries and [the release notes](docs/releases/v0.11.0.md) for dep
 | Module | Responsibility |
 | --- | --- |
 | `core`, `listing-input-adapters` | Domain and input normalization from local exports and standard listing input. |
+| `workspace-sheets` | Bounded, read-only reading of `.xlsx`/`.xlsm`/TSV/CSV for the listing workspace (ADR-059); the only module that uses Apache POI. |
 | `rule-engine` | Deterministic validation, immutable YAML rulesets, fixes and readiness. |
 | `trademark-scanner` | Catalog and trademark risk analysis. |
 | `variation-checks`, `personalization-screening`, `image-checker` | Independent checks with their own rulesets and fingerprints. |
@@ -35,7 +36,7 @@ without it.
 
 ```bash
 ./mvnw -B verify                 # build + all tests (needs Docker for Testcontainers)
-./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening,image-checker,client,mcp-server,contract-tools,hf-convert verify   # fast: no Docker needed
+./mvnw -B -pl core,rule-engine,rag-analyzer,trademark-scanner,variation-checks,personalization-screening,image-checker,workspace-sheets,client,mcp-server,contract-tools,hf-convert verify   # fast: no Docker needed
 ./mvnw -B -pl hf-convert -am package # -> hf-convert/target/listing-guard-hf-convert.jar (ADR-030; DuckDB only here)
 ./mvnw -B -pl contract-tools verify # API compatibility check against the latest release (ADR-022); report in contract-tools/target/contract/
 ./mvnw -B -pl mcp-server -am package # -> mcp-server/target/listing-guard-mcp.jar (the MCP server, with the SDK; see docs/mcp.md)
@@ -60,6 +61,7 @@ Do not use `-DforkCount=0` in this repository: it can change the test working-di
 
 - [Feature status, history and roadmap](docs/agent/status.md) is the detailed record formerly under Context and Planned work.
 - [Operational commands](docs/agent/operations.md) covers policy corpus, catalogs, Compose tasks and job invocations.
+- [Listing workspace](docs/workspace.md) stores listings per seller account, with templates and imports (off by default, ADR-059): the one place that stores listing text.
 - [Phrase screening](docs/phrase-screening.md) checks short seller phrases via API, SDK or MCP (off by default, ADR-055).
 - [Detailed engineering conventions](docs/agent/conventions.md) preserves pack, schema, UI, API, evaluation and release rules.
 - [Repository guidelines](CONTRIBUTING.md), [ADRs](docs/adr/), [implementation notes](docs/implementation/),
