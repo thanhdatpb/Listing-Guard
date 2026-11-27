@@ -50,7 +50,7 @@
     <!-- The catalog changed since a scope was last re-audited (ADR-035): said as a warning, with the way to the page. -->
     <th:block th:if="${reauditNotice != null}">
         <div th:replace="~{console/reaudit-fragments :: due(${reauditNotice}, @{/console/reaudit})}"></div>
-    </th:block>
+    </th:block><th:block th:if="${auditHome != null}"><th:block th:replace="~{console/workspace-fragments :: homeCard}"></th:block></th:block>
 
     <!-- No result and no verdict in eight weeks: how to start, not a page of zeros. -->
     <section class="lg-empty lg-section" id="home-empty" th:if="${!pilotHome and home.empty}" aria-labelledby="empty-heading">

@@ -14,9 +14,18 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 public class ConsoleWorkspaceAdvice {
 
     private final boolean workspaceEnabled;
+    private final boolean auditEnabled;
 
-    public ConsoleWorkspaceAdvice(@Value("${listing-guard.workspace.enabled:false}") boolean workspaceEnabled) {
+    public ConsoleWorkspaceAdvice(@Value("${listing-guard.workspace.enabled:false}") boolean workspaceEnabled,
+                                  @Value("${listing-guard.workspace.audit.enabled:false}") boolean auditEnabled) {
         this.workspaceEnabled = workspaceEnabled;
+        this.auditEnabled = auditEnabled;
+    }
+
+    /** Whether the workspace's background audit is on (ADR-061): the sidebar shows its page only then. */
+    @ModelAttribute("workspaceAuditEnabled")
+    public boolean workspaceAuditEnabled() {
+        return workspaceEnabled && auditEnabled;
     }
 
     @ModelAttribute("workspaceEnabled")

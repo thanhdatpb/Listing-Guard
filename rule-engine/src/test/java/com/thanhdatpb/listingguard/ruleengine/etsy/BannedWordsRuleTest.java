@@ -34,6 +34,16 @@ class BannedWordsRuleTest {
     }
 
     @Test
+    void theFindingSaysWhereTheWordIsInTheFieldText() {
+        String title = "  Premium " + word.toUpperCase() + "!! bag";
+        Finding finding = rule.evaluate(listing(title, List.of()), CONFIG).get(0);
+
+        assertThat(finding.matchStart()).isEqualTo(title.indexOf(word.toUpperCase()));
+        assertThat(title.substring(finding.matchStart(), finding.matchEnd())).isEqualTo(word.toUpperCase());
+        assertThat(finding.value()).isEqualTo(word.toUpperCase());
+    }
+
+    @Test
     void wordInTheDescriptionIsFlagged() {
         List<Finding> findings = rule.evaluate(withDescription("This is a " + word + "."), CONFIG);
 

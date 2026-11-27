@@ -47,7 +47,7 @@ public final class BannedWordsRule implements Rule {
         if (matcher != null && matcher.find()) {
             findings.add(finding(config, field, matcher.group(),
                     "Từ '" + word + "' nằm trong danh sách từ cần xem lại và xuất hiện ở " + field + ".",
-                    "Xem lại chính sách của sàn và cân nhắc bỏ hoặc thay từ '" + word + "'."));
+                    "Xem lại chính sách của sàn và cân nhắc bỏ hoặc thay từ '" + word + "'.").withSpan(matcher.start(), matcher.end()));
         }
     }
 

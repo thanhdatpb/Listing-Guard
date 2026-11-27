@@ -591,7 +591,27 @@ public class ListingImportService {
             (isNew ? inserts : updates).add(write);
         }
         listings.insertAll(actor.clientId(), inserts);
-        return listings.updateAll(actor.clientId(), updates).size();
+        List<Write> conflicts = listings.updateAll(actor.clientId(), updates);
+        if (events != null) {
+            // the rows this import really wrote: the new ones and the updated ones that nobody else changed first (ADR-061)
+            java.util.Set<UUID> notWritten = new java.util.HashSet<>();
+            conflicts.forEach(w -> notWritten.add(w.id()));
+            List<UUID> written = new ArrayList<>();
+            inserts.forEach(w -> written.add(w.id()));
+            updates.stream().filter(w -> !notWritten.contains(w.id())).forEach(w -> written.add(w.id()));
+            if (!written.isEmpty()) {
+                events.publishEvent(new WorkspaceEvents.ListingsImported(actor.clientId(), p.accountId(), written, actor.accountId()));
+            }
+        }
+        return conflicts.size();
+    }
+
+    /** Where the import says what it wrote (ADR-061); null where nothing listens, as in a test that builds the service by hand. */
+    private org.springframework.context.ApplicationEventPublisher events;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setEvents(org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
     }
 
     private void writeCustom(Actor actor, Params p, Prepared prep, Template template) {

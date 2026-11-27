@@ -51,7 +51,7 @@ public final class TitlePromotionalTermsRule implements Rule {
                 findings.add(finding(config, "title", found,
                         "Tiêu đề có cụm từ về giá, vận chuyển hoặc khuyến mãi: " + Texts.quote(found) + ".",
                         "Cân nhắc bỏ cụm từ này khỏi tiêu đề: theo hướng dẫn của Etsy, Etsy tự gắn nhãn về giá, vận chuyển và "
-                                + "khuyến mãi cho sản phẩm trong kết quả tìm kiếm."));
+                                + "khuyến mãi cho sản phẩm trong kết quả tìm kiếm.").withSpan(matcher.start(), matcher.end()));
             }
         }
         return findings;

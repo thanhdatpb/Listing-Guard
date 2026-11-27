@@ -24,7 +24,7 @@
             <svg class="lg-icon" width="20" height="20" aria-hidden="true"><use href="#lg-i-report"/></svg><span th:text="#{work.edit}"></span>
         </a>
     </div>
-    <details th:replace="~{console/role-home-fragments :: pilotCapabilities}"></details>
+    <details th:replace="~{console/role-home-fragments :: pilotCapabilities}"></details><th:block th:if="${auditHome != null}"><th:block th:replace="~{console/workspace-fragments :: homeCard}"></th:block></th:block>
     <section class="lg-card lg-section" id="work-fix">
         <h2 th:text="#{work.fix}"></h2>
         <p th:if="${work.needsFix.isEmpty()}" th:text="#{work.fix.empty}"></p>

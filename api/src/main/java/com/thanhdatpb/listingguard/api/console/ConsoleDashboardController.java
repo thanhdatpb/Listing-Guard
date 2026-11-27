@@ -32,6 +32,13 @@ public class ConsoleDashboardController {
     private final ConsolePilot pilot;
     private final ConsoleAccountRoles roles;
     private final RoleHomeService roleHome;
+    /** The card of the background audit (ADR-061); nothing is injected while the audit is off. */
+    private org.springframework.beans.factory.ObjectProvider<com.thanhdatpb.listingguard.api.console.workspace.AuditHomeCard> auditCard;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setAuditCard(org.springframework.beans.factory.ObjectProvider<com.thanhdatpb.listingguard.api.console.workspace.AuditHomeCard> card) {
+        this.auditCard = card;
+    }
 
     public ConsoleDashboardController(PlanService plans, ConsoleHomeService home, ReauditService reaudit,
                                       CapabilitiesService capabilities, ConsolePilot pilot, ConsoleAccountRoles roles,
@@ -49,6 +56,10 @@ public class ConsoleDashboardController {
     public String dashboard(@AuthenticationPrincipal ConsoleUser user, @RequestParam(name = "days", required = false) String days,
                             Model model, HttpServletResponse response) {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        var card = auditCard == null ? null : auditCard.getIfAvailable();
+        if (card != null) {
+            model.addAttribute("auditHome", card.of(user).orElse(null));
+        }
         if (pilot.roleHome()) {
             var account = roles.account(user).orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
             model.addAttribute("pilotCapabilities", capabilities.forConsole(user.clientId()));

@@ -168,6 +168,7 @@ variable is missing (`:?`). Defaults below are the ones in `docker-compose.prod.
 | Console | `LISTING_GUARD_CONSOLE_ENABLED` false, `LISTING_GUARD_CONSOLE_BASE_URL`, `LISTING_GUARD_CONSOLE_AUTH_MODE` MAGIC_LINK (or CLOUDFLARE_ACCESS, BOTH), `LISTING_GUARD_CONSOLE_ACCESS_TEAM_DOMAIN`, `..._ACCESS_AUD`, `..._ACCESS_CERTS_URL`, `..._ACCESS_CERT_CACHE_TTL` 1h, `..._ACCESS_ALLOWED_DOMAINS`, `..._ACCESS_ALLOWED_EMAILS`, `..._ACCESS_AUTO_CREATE` false, `..._ACCESS_DEFAULT_CLIENT_NAME` (the Access settings only for CLOUDFLARE_ACCESS or BOTH), `LISTING_GUARD_CONSOLE_MAIL_FROM`, `LISTING_GUARD_CONSOLE_MAX_ACTIVE_KEYS` 5, `SPRING_MAIL_HOST` (the mail settings only for MAGIC_LINK or BOTH), `SPRING_MAIL_PORT` 587, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (secret), `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` true, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` true. The cookie is always Secure (`LISTING_GUARD_CONSOLE_COOKIE_SECURE` is fixed to `"true"`) |
 | Features | `LISTING_GUARD_PLANS_ENABLED` false, `LISTING_GUARD_FIXES_ENABLED` false |
 | Listing workspace (ADR-059, `docs/workspace.md`; off) | `LISTING_GUARD_WORKSPACE_ENABLED` false (needs the Console), `LISTING_GUARD_WORKSPACE_MEMBER_EDIT_SCOPE` own (or all), `LISTING_GUARD_WORKSPACE_MAX_TEMPLATE_BYTES` 10MB, `LISTING_GUARD_WORKSPACE_IMPORT_MAX_BYTES` 20MB, `LISTING_GUARD_WORKSPACE_IMPORT_MAX_ROWS` 10000, `LISTING_GUARD_WORKSPACE_HISTORY_KEEP` 20, and the upload limits `LISTING_GUARD_MULTIPART_MAX_FILE_SIZE` (10MB) and `LISTING_GUARD_MULTIPART_MAX_REQUEST_SIZE` (60MB), which must be raised (25MB and 60MB) before the workspace is switched on: the API refuses to start while an import may exceed them |
+| Workspace background audit and e-mail alerts (ADR-061; off) | `LISTING_GUARD_WORKSPACE_AUDIT_ENABLED` false (needs the workspace and the Console), `_CONCURRENCY` 2, `_SCHEDULE_CRON` empty, `_KEEP_RUNS` 30, `LISTING_GUARD_WORKSPACE_ALERTS_EMAIL_ENABLED` false (needs SMTP settings), `_DAILY_CAP` 3 |
 | Seller pilot | `LISTING_GUARD_CONSOLE_PILOT` false, `LISTING_GUARD_CONSOLE_BULK_DEFAULT_SCOPE` empty (`content` in pilot, `full` otherwise), `LISTING_GUARD_CONSOLE_DEFAULT_LOCALE` en, `LISTING_GUARD_CONSOLE_POLICY_CHANGES_ENABLED` true, `LISTING_GUARD_CONSOLE_POD_ENABLED` true, `LISTING_GUARD_IMAGE_ENABLED` false. The [pilot sample](../deploy/env.pilot.example) pins image 0.11.0 and ruleset `trademark-risk-2026-12`, enables the pilot and restricts the experiment flags. |
 | Experimental packs | `LISTING_GUARD_REVIEW_CASES_ENABLED`, `LISTING_GUARD_VERIFIED_CASES_ENABLED`, `LISTING_GUARD_ANALYZER_ENABLED` and `LISTING_GUARD_IMAGE_ENABLED` all false. The pilot sample also turns off Console Policy Changes and POD. |
 | HF converter (job options) | `--distinctiveness=distinctiveness-2026-12`, `--wordlist` unset, `--owner-columns` uses the shipped schema. The job resolves no remote sources by default. See the [catalog activation runbook](catalog-activation-runbook.md). |
@@ -598,3 +599,53 @@ variables raised to at least the import limit (the start-up check names the vari
   import limit (20 MB). **Not measured**: the real size and the time and memory of a 10,000-row import on real files. To measure, follow the steps in the
   [workspace guide](workspace.md#8-chưa-làm-chưa-đo).
 - **Not verified**: no real Amazon template has been compared with the workspace, and nothing was run on Docker Compose, ARM64, Oracle or Cloudflare for it.
+
+## Workspace background audit (ADR-061)
+
+Off by default (`LISTING_GUARD_WORKSPACE_AUDIT_ENABLED=false`; needs the workspace and the Console). With it off no bean exists, nothing is queued or read, the workspace pages
+are what ADR-059 made them and the audit's paths answer 404. Settings: `LISTING_GUARD_WORKSPACE_AUDIT_ENABLED`, `_CONCURRENCY` (2, at most 8), `_SCHEDULE_CRON` (empty: no periodic audit),
+`_KEEP_RUNS` (30), `_POLL_INTERVAL`, `_LEASE`, `_DRIFT_INTERVAL`, `_MAX_FINDINGS`; and for the e-mail `LISTING_GUARD_WORKSPACE_ALERTS_EMAIL_ENABLED` (false), `_DAILY_CAP` (3),
+`_EXCERPT_CHARS`, `_MAX_ROWS`. The e-mail needs `SPRING_MAIL_HOST` and `LISTING_GUARD_CONSOLE_MAIL_FROM` (the API refuses to start otherwise, except in the `dev` profile, which logs the e-mail).
+Run one API instance: the queue is the PostgreSQL table `workspace_audit_run`, there is no broker. Details: [the workspace guide](workspace.md#9-rà-nền-tô-đỏ-và-email-adr-061).
+
+- **Backup.** Migration V58 adds `workspace_audit_run`, `workspace_listing_audit`, `workspace_listing_finding`, `workspace_alert_pref` and `workspace_alert_log`, all in PostgreSQL and in the
+  existing backup. `workspace purge` deletes them with the rest of the client's workspace data and `workspace export` adds the latest audit to each listing.
+- **Quota.** An audit uses the client's monthly quota like any check. After a new catalog every audited listing needs one new trademark analysis (the catalog version is part of the
+  cache identity), so a client with 5,000 listings uses up to 5,000 units of the trademark pack for each new catalog version and each watchlist change that alters the fingerprint. The
+  run stops with the note "quota" when the month's units are used up.
+- **Size, estimated from the structure, not measured.** Each listing keeps one audit row (about 400 bytes) and at most `..._MAX_FINDINGS` (100) findings of about 0.5 to 1 KB, usually
+  a few; 5,000 listings are in the order of a few MB.
+
+### Measured: the compute part, without a database (synthetic)
+
+`WorkspaceAuditMeasureTest` (off unless `-Dworkspace.audit.measure=true`) audits 5,000 synthetic Etsy listings (a title, 13 tags, a description; one in twenty carries a mark of the
+catalog with its own case, punctuation and extra spaces) against a synthetic catalog of 500,000 invented marks held in memory with a trigram index (the way `pg_trgm` answers; the plain
+`InMemoryTrademarkCatalog` compares each form with every mark and cannot serve this size). Per listing it does what an audit does outside PostgreSQL: the input hash, the rules with their
+positions, the trademark scan, the mapping of every span to the stored text, the marked pieces of the detail page, and the alert summary.
+
+| What | Measured |
+| --- | --- |
+| Listings / catalog marks | 5,000 / 500,000 |
+| Catalog build | 2.4 s |
+| Heap with the catalog | 110 MB (the catalog itself about 95 MB) |
+| Audit of all listings, one thread | 119 s, about 42 listings per second |
+| Per listing, median / p95 / max | 23.2 / 31.2 / 139 ms |
+| Peak heap during the audit | 344 MB (sum of the heap pool peaks) |
+| Trademark findings, high or medium | 18,710, every one mapped to a span in the stored text |
+| Alert summary of 3,347 rows | 80 ms, 4,101 characters (40 rows shown, the rest counted) |
+
+Environment: OpenJDK 21.0.13.1, 4 processors, 3.4 GB heap, a cloud development container (not the Oracle ARM64 server). The listings and marks are invented and fuzzy matches are frequent in
+them, so the number of findings says nothing about real listings. Command:
+
+```bash
+./mvnw -B -pl api test -Dtest=WorkspaceAuditMeasureTest -Dworkspace.audit.measure=true \
+    -Dworkspace.audit.measure.listings=5000 -Dworkspace.audit.measure.marks=500000   # api/target/workspace-audit-measure.md
+```
+
+### Not measured
+
+- **A run on PostgreSQL**: queue claims, reads and writes of 5,000 listings, the `pg_trgm` lookups of the real catalog, and the time and memory of the whole run on the server. To measure on the
+  PC or the server: import 5,000 listings (workspace guide, section 5), set `LISTING_GUARD_WORKSPACE_AUDIT_ENABLED=true`, start with `docker compose up --build`, open **Rà nền**, press
+  **Rà lại tài khoản** and read the start and finish times of the run in the history table (or `SELECT started_at, finished_at, total, done FROM workspace_audit_run ORDER BY created_at DESC`);
+  read the peak memory with `docker stats` while it runs.
+- **The real USPTO catalog and real listings**, the **ARM64 server**, **real SMTP** and a **browser** (no Playwright run for the new pages).

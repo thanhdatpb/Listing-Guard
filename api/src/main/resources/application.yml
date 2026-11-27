@@ -16,6 +16,28 @@ listing-guard:
     import-max-bytes: ${LISTING_GUARD_WORKSPACE_IMPORT_MAX_BYTES:20MB}
     import-max-rows: ${LISTING_GUARD_WORKSPACE_IMPORT_MAX_ROWS:10000}
     history-keep: ${LISTING_GUARD_WORKSPACE_HISTORY_KEEP:20}
+    # The background audit of the saved listings, the highlights and the e-mail alerts (ADR-061). Off by default and only meaningful with the
+    # workspace and the Console on. While it is off nothing of it exists: no queue, no worker, no page, and the workspace pages are what they were.
+    audit:
+      enabled: ${LISTING_GUARD_WORKSPACE_AUDIT_ENABLED:false}
+      # How many runs are worked at once (1 to 8).
+      concurrency: ${LISTING_GUARD_WORKSPACE_AUDIT_CONCURRENCY:2}
+      poll-interval: ${LISTING_GUARD_WORKSPACE_AUDIT_POLL_INTERVAL:5s}
+      # A run nobody renews for this long is taken again (a crash or a restart).
+      lease: ${LISTING_GUARD_WORKSPACE_AUDIT_LEASE:2m}
+      # How often the worker compares the analysis context (catalog, watchlist, rulesets) with the one of each account's last audit.
+      drift-interval: ${LISTING_GUARD_WORKSPACE_AUDIT_DRIFT_INTERVAL:30s}
+      # A Spring cron expression (UTC) for a periodic audit of every account, for example "0 0 3 * * *". Empty: no periodic audit.
+      schedule-cron: ${LISTING_GUARD_WORKSPACE_AUDIT_SCHEDULE_CRON:}
+      keep-runs: ${LISTING_GUARD_WORKSPACE_AUDIT_KEEP_RUNS:30}
+      max-findings: ${LISTING_GUARD_WORKSPACE_AUDIT_MAX_FINDINGS:100}
+    alerts:
+      email:
+        enabled: ${LISTING_GUARD_WORKSPACE_ALERTS_EMAIL_ENABLED:false}
+        # The most e-mails one person gets in a day (UTC); what was not sent stays untold and goes in the next summary.
+        daily-cap: ${LISTING_GUARD_WORKSPACE_ALERTS_EMAIL_DAILY_CAP:3}
+        excerpt-chars: ${LISTING_GUARD_WORKSPACE_ALERTS_EMAIL_EXCERPT_CHARS:40}
+        max-rows: ${LISTING_GUARD_WORKSPACE_ALERTS_EMAIL_MAX_ROWS:40}
   phrase-screening:
     enabled: ${LISTING_GUARD_PHRASE_SCREENING_ENABLED:false}
     max-phrases: ${LISTING_GUARD_PHRASE_SCREENING_MAX_PHRASES:2000}
