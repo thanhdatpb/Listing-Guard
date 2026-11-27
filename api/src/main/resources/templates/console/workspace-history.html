@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.history.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- The versions of a listing that are kept (ADR-062 §6), what changed column by column between two of them, and the restore of one. A restore
+     writes the old columns as a new version; it never overwrites. No text is written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace')}"></header>
+<main class="lg-page" id="workspace-history">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <a class="lg-page__crumb" th:href="@{/console/workspace/listings/{id}/edit(id=${listing.id()})}" th:text="#{workspace.edit.back}"></a>
+            <h1 th:text="#{workspace.history.heading(${listing.sku()})}"></h1>
+            <p class="lg-page__sub" th:text="#{workspace.history.sub(${#strings.toString(keep)})}"></p>
+        </div>
+    </div>
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+
+    <div class="lg-empty" th:if="${versions.isEmpty()}">
+        <h2 class="lg-empty__title" th:text="#{workspace.history.empty.title}"></h2>
+        <p class="lg-empty__text" th:text="#{workspace.history.empty.text}"></p>
+    </div>
+
+    <form method="get" id="history-form" th:action="@{/console/workspace/listings/{id}/history(id=${listing.id()})}" th:unless="${versions.isEmpty()}">
+        <div class="lg-filters">
+            <label for="history-from" th:text="#{workspace.history.from}"></label>
+            <select class="lg-select" id="history-from" name="from"><option th:each="v : ${versions}" th:value="${v.version()}" th:selected="${v.version() == from}" th:text="${v.version()}"></option></select>
+            <label for="history-to" th:text="#{workspace.history.to}"></label>
+            <select class="lg-select" id="history-to" name="to"><option th:each="v : ${versions}" th:value="${v.version()}" th:selected="${v.version() == to}" th:text="${v.version()}"></option></select>
+            <button type="submit" class="lg-btn lg-btn--small" id="history-compare" th:text="#{workspace.history.compare}"></button>
+        </div>
+    </form>
+
+    <div class="lg-banner lg-banner--warning lg-section" th:if="${unknownVersion}"><p th:text="#{workspace.history.unknown}"></p></div>
+
+    <section class="lg-card lg-section" id="history-changes" aria-labelledby="history-changes-heading" th:if="${compare}">
+        <h2 id="history-changes-heading" class="lg-card__title" th:text="#{workspace.history.changes(${#strings.toString(from)}, ${#strings.toString(to)})}"></h2>
+        <p class="lg-text-muted" th:if="${changes.isEmpty()}" th:text="#{workspace.history.nochange}"></p>
+        <div class="lg-table-wrap" th:unless="${changes.isEmpty()}">
+            <table class="lg-table lg-table--dense" id="history-changes-table">
+                <caption class="lg-sr-only" th:text="#{workspace.history.changes(${#strings.toString(from)}, ${#strings.toString(to)})}"></caption>
+                <thead><tr><th scope="col" th:text="#{workspace.detail.field}"></th><th scope="col" th:text="#{workspace.detail.meaning}"></th><th scope="col" th:text="#{workspace.history.before}"></th><th scope="col" th:text="#{workspace.history.after}"></th></tr></thead>
+                <tbody>
+                <tr th:each="c : ${changes}">
+                    <th scope="row" class="lg-wrap"><code class="lg-code" th:text="${c.header()}"></code></th>
+                    <td th:text="${c.target()}"></td>
+                    <td class="lg-wrap"><span th:if="${c.before() != null}" th:text="${c.before()}"></span><span class="lg-text-muted" th:if="${c.before() == null}" th:text="#{workspace.history.empty.value}"></span></td>
+                    <td class="lg-wrap"><span th:if="${c.after() != null}" th:text="${c.after()}"></span><span class="lg-text-muted" th:if="${c.after() == null}" th:text="#{workspace.history.empty.value}"></span></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="lg-card lg-section" id="history-versions" aria-labelledby="history-versions-heading" th:unless="${versions.isEmpty()}">
+        <h2 id="history-versions-heading" class="lg-card__title" th:text="#{workspace.detail.history}"></h2>
+        <div class="lg-table-wrap">
+            <table class="lg-table lg-table--dense" id="history-table">
+                <caption class="lg-sr-only" th:text="#{workspace.detail.history}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" class="lg-num" th:text="#{workspace.detail.version}"></th>
+                    <th scope="col" th:text="#{workspace.history.kind}"></th>
+                    <th scope="col" th:text="#{workspace.col.status}"></th>
+                    <th scope="col" th:text="#{workspace.history.by}"></th>
+                    <th scope="col" th:text="#{workspace.history.when}"></th>
+                    <th scope="col"><span class="lg-sr-only" th:text="#{workspace.audit.col.action}"></span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="v : ${versions}" th:attr="data-version=${v.version()}">
+                    <td class="lg-num"><span th:text="${v.version()}"></span> <span class="lg-chip lg-chip--neutral" th:if="${v.current()}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-ok"/></svg><span th:text="#{workspace.history.current}"></span></span></td>
+                    <td th:text="${v.kind()}"></td>
+                    <td th:text="${v.status()}"></td>
+                    <td th:text="${v.by()}"></td>
+                    <td class="lg-nowrap" th:text="${v.when()}"></td>
+                    <td>
+                        <form method="post" th:if="${v.restorable()}" th:action="@{/console/workspace/listings/{id}/restore(id=${listing.id()})}">
+                            <input type="hidden" name="version" th:value="${listing.version()}">
+                            <input type="hidden" name="restore" th:value="${v.version()}">
+                            <button type="submit" class="lg-btn lg-btn--small" th:text="#{workspace.history.restore}"></button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="lg-text-muted lg-small" th:text="#{workspace.history.restore.hint}"></p>
+    </section>
+</main>
+</body>
+</html>

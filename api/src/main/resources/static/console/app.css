@@ -871,3 +871,13 @@ button.lg-switch:focus-visible { outline: 2px solid var(--brand); outline-offset
 /* The progress of a run: a native bar with x of y beside it. */
 .lg-progress { width: 10rem; max-width: 100%; height: 12px; accent-color: var(--brand); vertical-align: middle; }
 .lg-progress__text { margin-left: var(--space-2); }
+
+/* The editor of the workspace (ADR-062): the columns that are one standard field sit together (the bullets side by side), each with the name of its own
+   column; the columns no field was given are folded away. A group is a fieldset, so a reader of a screen hears which field a column belongs to. */
+.lg-edit-group { margin: 0 0 var(--space-4); padding: var(--space-4); border: 1px solid var(--line-soft); border-radius: var(--radius-md); min-width: 0; }
+.lg-edit-group > legend { padding: 0 var(--space-2); font-weight: 600; }
+.lg-edit-group__hint { margin: 0 0 var(--space-3); color: var(--ink-muted); font-size: 13px; line-height: 18px; }
+.lg-edit-group__fields { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.lg-edit-group__fields > .lg-field { margin: 0; min-width: 0; }
+.lg-edit-source { color: var(--ink-muted); font-weight: 400; }
+.lg-check { display: inline-flex; align-items: center; gap: var(--space-2); margin: 0 var(--space-4) var(--space-2) 0; }

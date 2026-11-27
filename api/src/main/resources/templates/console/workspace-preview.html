@@ -30,6 +30,7 @@
         <div class="lg-card"><p class="lg-stat__label" th:text="#{workspace.preview.created}"></p><p class="lg-stat__value lg-num" id="count-created" th:text="${plan.counts().created()}"></p></div>
         <div class="lg-card"><p class="lg-stat__label" th:text="#{workspace.preview.updated}"></p><p class="lg-stat__value lg-num" id="count-updated" th:text="${plan.counts().updated()}"></p></div>
         <div class="lg-card"><p class="lg-stat__label" th:text="#{workspace.preview.unchanged}"></p><p class="lg-stat__value lg-num" id="count-unchanged" th:text="${plan.counts().unchanged()}"></p></div>
+        <div class="lg-card" th:if="${!plan.edited().isEmpty()}"><p class="lg-stat__label" th:text="#{workspace.preview.edited}"></p><p class="lg-stat__value lg-num" id="count-edited" th:text="${plan.edited().size()}"></p></div>
         <div class="lg-card"><p class="lg-stat__label" th:text="#{workspace.preview.errors}"></p><p class="lg-stat__value lg-num" id="count-errors" th:text="${plan.counts().errors()}"></p></div>
     </div>
 
@@ -69,6 +70,35 @@
 
     <form class="lg-actions" id="commit-form" method="post" th:action="@{/console/workspace/import/commit}">
         <th:block th:replace="~{console/workspace-fragments :: carry(${carry})}"></th:block>
+        <section class="lg-card lg-section" id="preview-edited" aria-labelledby="edited-heading" th:if="${!editedRows.isEmpty()}">
+            <h2 id="edited-heading" class="lg-card__title" th:text="#{workspace.preview.edited.title(${#strings.toString(editedRows.size())})}"></h2>
+            <p class="lg-text-muted" th:text="#{workspace.preview.edited.text}"></p>
+            <div class="lg-table-wrap">
+                <table class="lg-table lg-table--dense" id="preview-edited-table">
+                    <caption class="lg-sr-only" th:text="#{workspace.preview.edited}"></caption>
+                    <thead>
+                    <tr>
+                        <th scope="col"><span class="lg-sr-only" th:text="#{workspace.preview.edited.overwrite}"></span></th>
+                        <th scope="col" class="lg-num" th:text="#{workspace.preview.line}"></th>
+                        <th scope="col" th:text="#{workspace.col.sku}"></th>
+                        <th scope="col" th:text="#{workspace.preview.edited.how}"></th>
+                        <th scope="col" th:text="#{workspace.history.when}"></th>
+                        <th scope="col" th:if="${canOverwrite}"><span class="lg-sr-only" th:text="#{workspace.preview.edited.group}"></span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="e : ${editedRows}" th:attr="data-line=${e.line()}">
+                        <td><input type="checkbox" th:name="${'ow.' + e.line()}" value="1" th:checked="${e.overwrite()}" th:disabled="${!canOverwrite}" th:aria-label="#{workspace.preview.edited.overwrite.row(${e.sku()})}"></td>
+                        <td class="lg-num" th:text="${e.line()}"></td>
+                        <td class="lg-sku"><code class="lg-code" th:text="${e.sku()}"></code></td>
+                        <td><span class="lg-chip lg-chip--flag"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-guess"/></svg><span th:text="#{workspace.preview.edited.chip}"></span></span> <span class="lg-text-muted lg-small" th:text="${e.kind()}"></span></td>
+                        <td class="lg-nowrap" th:text="${e.when()}"></td>
+                        <td th:if="${canOverwrite}"><label class="lg-check" th:if="${e.parentOfOthers()}"><input type="checkbox" th:name="${'owg.' + e.line()}" value="1" th:checked="${e.group()}"> <span th:text="#{workspace.preview.edited.group}"></span></label></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
         <button type="submit" class="lg-btn lg-btn--primary" id="commit-button" th:disabled="${!plan.canWrite()}" th:text="#{workspace.preview.commit}"></button>
         <a class="lg-btn" th:href="@{/console/workspace/import/mapping(stage=${carry.get('stage')},mode='import',account=${carry.get('account')},kind=${carry.get('kind')},owner=${carry.get('owner')},status=${carry.get('status')},sheet=${carry.get('sheet')},fieldRow=${carry.get('fieldRow')},firstDataRow=${carry.get('firstDataRow')},skuCol=${carry.get('skuCol')})}" th:text="#{workspace.back}"></a>
     </form>

@@ -9,7 +9,7 @@
 <body>
 <!-- One listing of the workspace, read only (ADR-059): its facts, its fields in the order of its template (a column no standard field was given
      is shown as passthrough), its family, its Amazon Custom row and its history. An ADMIN changes the responsible person and deletes; the
-     editor is a later change. Every value goes through th:text. No text is written here (ADR-028). -->
+     editor is the page "edit". Every value goes through th:text. No text is written here (ADR-028). -->
 <div th:replace="~{console/layout :: demoBanner}"></div>
 <header th:replace="~{console/layout :: nav('workspace')}"></header>
 <main class="lg-page" id="workspace-detail">
@@ -28,7 +28,11 @@
 
     <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
     <div class="lg-banner lg-banner--info lg-section" id="detail-readonly" th:unless="${canEdit}"><p th:text="#{workspace.detail.readonly}"></p></div>
-    <div class="lg-banner lg-banner--info lg-section" id="detail-editor-later" th:if="${canEdit}"><p th:text="#{workspace.detail.editor.later}"></p></div>
+    <div class="lg-actions lg-section" id="detail-actions">
+        <a class="lg-btn lg-btn--primary" id="detail-edit" th:href="@{/console/workspace/listings/{id}/edit(id=${listing.id()})}" th:text="${canEdit} ? #{workspace.detail.edit} : #{workspace.detail.open}"></a>
+        <form method="post" th:action="@{/console/workspace/clone}"><input type="hidden" name="listing" th:value="${listing.id()}"><button type="submit" class="lg-btn" id="detail-clone" th:text="#{workspace.edit.clone}"></button></form>
+        <a class="lg-btn" id="detail-history" th:href="@{/console/workspace/listings/{id}/history(id=${listing.id()})}" th:text="#{workspace.edit.history}"></a>
+    </div>
 
     <section class="lg-card lg-section" aria-labelledby="facts-heading">
         <h2 id="facts-heading" class="lg-card__title" th:text="#{workspace.detail.facts}"></h2>

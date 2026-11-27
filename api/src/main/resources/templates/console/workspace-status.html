@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.status.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- "Draft to ready to export" for a selection (ADR-062 §7): what the check says of each listing, then the move. A listing with an error or a HIGH risk, or
+     one that was not checked in full, stays a draft; an ADMIN can open the block with a reason. No text is written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace')}"></header>
+<main class="lg-page" id="workspace-status">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <a class="lg-page__crumb" th:href="@{/console/workspace}" th:text="#{workspace.detail.back}"></a>
+            <h1 th:text="#{workspace.status.heading}"></h1>
+            <p class="lg-page__sub" th:text="${applied} ? #{workspace.status.sub.done} : #{workspace.status.sub}"></p>
+        </div>
+    </div>
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <div class="lg-banner lg-banner--info lg-section" id="status-gate-off" th:unless="${gate}"><p th:text="#{workspace.status.gate.off}"></p></div>
+    <div class="lg-banner lg-banner--warning lg-section" id="status-blocked" th:if="${gate and anyBlocked and !applied}"><p th:text="#{workspace.status.blocked}"></p></div>
+
+    <div class="lg-empty" th:if="${rows.isEmpty()}">
+        <h2 class="lg-empty__title" th:text="#{workspace.status.none}"></h2>
+    </div>
+
+    <div class="lg-table-wrap lg-section" th:unless="${rows.isEmpty()}">
+        <table class="lg-table lg-table--dense" id="status-table">
+            <caption class="lg-sr-only" th:text="#{workspace.status.heading}"></caption>
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{workspace.col.sku}"></th>
+                <th scope="col" th:text="#{workspace.col.title}"></th>
+                <th scope="col" th:text="#{workspace.col.status}"></th>
+                <th scope="col" th:text="#{workspace.status.check}"></th>
+                <th scope="col" th:text="#{workspace.status.result}"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${rows}" th:attr="data-ok=${r.mayGo()}">
+                <td class="lg-sku"><a th:href="@{/console/workspace/listings/{id}/edit(id=${r.id()})}"><code class="lg-code" th:text="${r.sku()}"></code></a></td>
+                <td class="lg-ellip" th:title="${r.title()}" th:text="${r.title()}"></td>
+                <td th:text="${r.status()}"></td>
+                <td>
+                    <span class="lg-chip lg-chip--audit lg-chip--audit-clean" th:if="${r.blocks().isEmpty()}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-ok"/></svg><span th:text="#{workspace.status.check.ok}"></span></span>
+                    <span class="lg-chip lg-chip--audit lg-chip--audit-error" th:each="b : ${r.blocks()}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-risk-severe"/></svg><span th:text="${b}"></span></span>
+                    <span class="lg-text-muted lg-small" th:if="${r.openedReason() != null}"><br><span th:text="#{workspace.status.opened(${r.openedBy() == null ? '' : r.openedBy()}, ${r.openedReason()})}"></span></span>
+                </td>
+                <td><span th:if="${r.result() != null}" th:text="${r.result()}"></span></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <form class="lg-section" id="status-form" method="post" th:action="@{/console/workspace/status}" th:if="${!applied and !rows.isEmpty()}">
+        <input type="hidden" name="step" value="apply">
+        <input type="hidden" name="listing" th:each="id : ${ids}" th:value="${id}">
+        <section class="lg-card lg-section" id="status-open" aria-labelledby="status-open-heading" th:if="${admin and gate and anyBlocked}">
+            <h2 id="status-open-heading" class="lg-card__title" th:text="#{workspace.status.open}"></h2>
+            <p class="lg-text-muted" th:text="#{workspace.status.open.hint}"></p>
+            <label class="lg-check"><input type="checkbox" name="open" value="1"> <span th:text="#{workspace.status.open.check}"></span></label>
+            <div class="lg-field">
+                <label class="lg-field__label" for="status-reason" th:text="#{workspace.status.open.reason}"></label>
+                <textarea class="lg-textarea" id="status-reason" name="reason" rows="3" th:maxlength="${reasonMax}"></textarea>
+                <p class="lg-field__hint" th:text="#{workspace.status.open.reason.hint(${#strings.toString(reasonMax)})}"></p>
+            </div>
+        </section>
+        <div class="lg-actions">
+            <button type="submit" class="lg-btn lg-btn--primary" id="status-apply" th:text="#{workspace.status.apply}"></button>
+            <a class="lg-btn" th:href="@{/console/workspace}" th:text="#{workspace.edit.cancel}"></a>
+        </div>
+    </form>
+    <p th:if="${applied}"><a class="lg-btn lg-btn--primary" th:href="@{/console/workspace}" th:text="#{workspace.status.back}"></a></p>
+</main>
+</body>
+</html>

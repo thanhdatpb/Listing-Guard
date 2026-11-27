@@ -20,6 +20,7 @@
             <p class="lg-page__sub" th:text="#{workspace.intro}"></p>
         </div>
         <div class="lg-actions">
+            <a class="lg-btn" id="workspace-new-open" th:href="@{/console/workspace/new}" th:text="#{workspace.new.open}"></a>
             <a class="lg-btn lg-btn--primary" id="workspace-import-open" th:href="@{/console/workspace/import}" th:text="#{workspace.import.open}"></a>
         </div>
     </div>
@@ -67,11 +68,18 @@
         <p th:unless="${filtered}"><a class="lg-btn lg-btn--primary" th:href="@{/console/workspace/import}" th:text="#{workspace.import.open}"></a></p>
     </div>
 
-    <div class="lg-table-wrap" th:unless="${rows.isEmpty()}">
+    <form id="workspace-select-form" method="post" th:action="@{/console/workspace/clone}" th:unless="${rows.isEmpty()}">
+    <div class="lg-actions lg-section" id="workspace-bulk" role="group" th:aria-label="#{workspace.bulk.aria}">
+        <button type="submit" class="lg-btn lg-btn--small" id="bulk-clone" th:text="#{workspace.bulk.clone}"></button>
+        <button type="submit" class="lg-btn lg-btn--small" id="bulk-ready" th:formaction="@{/console/workspace/status}" th:text="#{workspace.bulk.ready}"></button>
+        <span class="lg-small lg-text-muted" th:text="#{workspace.bulk.hint}"></span>
+    </div>
+    <div class="lg-table-wrap">
         <table class="lg-table lg-table--scroll lg-table--dense" id="workspace-table">
             <caption class="lg-sr-only" th:text="#{workspace.table.caption}"></caption>
             <thead>
             <tr>
+                <th scope="col"><span class="lg-sr-only" th:text="#{workspace.bulk.select}"></span></th>
                 <th scope="col" th:text="#{workspace.col.sku}"></th>
                 <th scope="col" th:text="#{workspace.col.title}"></th>
                 <th scope="col" th:text="#{workspace.col.account}"></th>
@@ -84,6 +92,7 @@
             </thead>
             <tbody>
             <tr th:each="row : ${rows}" th:attr="data-child=${row.child}">
+                <td><input type="checkbox" name="listing" th:value="${row.id}" th:aria-label="${row.sku}"></td>
                 <td class="lg-sku">
                     <span class="lg-text-muted" aria-hidden="true" th:if="${row.child}">&rarr;</span>
                     <a th:href="@{/console/workspace/listings/{id}(id=${row.id})}"><code class="lg-code" th:text="${row.sku}"></code></a>
@@ -99,6 +108,7 @@
             </tbody>
         </table>
     </div>
+    </form>
 
     <div class="lg-pager" th:unless="${rows.isEmpty()}">
         <p class="lg-small lg-text-muted" id="workspace-shown"

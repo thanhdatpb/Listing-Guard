@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.clone.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+</head>
+<body>
+<!-- Clone (ADR-062 §4): one page that shows what would be written and writes it only from its last button. The target account, the way the SKUs are
+     made, the columns that have no partner in another account's template, and the Amazon Custom rows are chosen here; the list of SKUs says before
+     anything is written which one is taken or repeated. No text is written here (ADR-028). -->
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace')}"></header>
+<main class="lg-page" id="workspace-clone">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <a class="lg-page__crumb" th:href="@{/console/workspace}" th:text="#{workspace.detail.back}"></a>
+            <h1 th:text="#{workspace.clone.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{workspace.clone.sub(${#strings.toString(items.size())})}"></p>
+        </div>
+    </div>
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <div class="lg-banner lg-banner--info lg-section" id="clone-owner"><p th:text="#{workspace.clone.owner}"></p></div>
+    <div class="lg-banner lg-banner--warning lg-section" th:each="n : ${notices}" th:attr="data-notice=${n}"><p th:text="${n}"></p></div>
+    <div class="lg-banner lg-banner--error lg-section" id="clone-problems" role="alert" th:if="${!problems.isEmpty()}"><ul><li th:each="p : ${problems}" th:text="${p}"></li></ul></div>
+
+    <form class="lg-section" id="clone-form" method="post" th:action="@{/console/workspace/clone/preview}">
+        <input type="hidden" name="listing" th:each="id : ${ids}" th:value="${id}">
+
+        <section class="lg-card lg-section" aria-labelledby="clone-target-heading">
+            <h2 id="clone-target-heading" class="lg-card__title" th:text="#{workspace.clone.target}"></h2>
+            <div class="lg-field">
+                <label class="lg-field__label" for="clone-target" th:text="#{workspace.clone.target.label}"></label>
+                <select class="lg-select" id="clone-target" name="target">
+                    <option th:each="a : ${targets}" th:value="${a.id()}" th:selected="${a.id() == targetId}" th:text="${a.name()}"></option>
+                </select>
+                <p class="lg-field__hint" th:text="#{workspace.clone.target.hint}"></p>
+            </div>
+            <label class="lg-check"><input type="checkbox" name="family" value="1" th:checked="${family}"> <span th:text="#{workspace.clone.family}"></span></label>
+            <label class="lg-check" th:if="${amazon}"><input type="checkbox" name="custom" value="1" th:checked="${custom}"> <span th:text="#{workspace.clone.custom}"></span></label>
+            <p class="lg-text-muted lg-small" th:if="${amazon and preview.customizations() > 0}" th:text="#{workspace.clone.custom.count(${#strings.toString(preview.customizations())})}"></p>
+        </section>
+
+        <section class="lg-card lg-section" aria-labelledby="clone-sku-heading">
+            <h2 id="clone-sku-heading" class="lg-card__title" th:text="#{workspace.clone.sku}"></h2>
+            <fieldset class="lg-edit-group">
+                <legend th:text="#{workspace.clone.sku.mode}"></legend>
+                <label class="lg-check"><input type="radio" name="skuMode" value="pattern" th:checked="${!manual}"> <span th:text="#{workspace.clone.sku.pattern}"></span></label>
+                <label class="lg-check"><input type="radio" name="skuMode" value="manual" th:checked="${manual}"> <span th:text="#{workspace.clone.sku.manual}"></span></label>
+            </fieldset>
+            <div class="lg-edit-group__fields" id="clone-pattern">
+                <div class="lg-field"><label class="lg-field__label" for="clone-find" th:text="#{workspace.clone.sku.find}"></label><input class="lg-input" type="text" id="clone-find" name="find" autocomplete="off" th:value="${plan.find()}"></div>
+                <div class="lg-field"><label class="lg-field__label" for="clone-replace" th:text="#{workspace.clone.sku.replace}"></label><input class="lg-input" type="text" id="clone-replace" name="replace" autocomplete="off" th:value="${plan.replace()}"></div>
+                <div class="lg-field"><label class="lg-field__label" for="clone-prefix" th:text="#{workspace.clone.sku.prefix}"></label><input class="lg-input" type="text" id="clone-prefix" name="prefix" autocomplete="off" th:value="${plan.prefix()}"></div>
+                <div class="lg-field"><label class="lg-field__label" for="clone-suffix" th:text="#{workspace.clone.sku.suffix}"></label><input class="lg-input" type="text" id="clone-suffix" name="suffix" autocomplete="off" th:value="${plan.suffix()}"></div>
+                <div class="lg-field"><label class="lg-field__label" for="clone-number" th:text="#{workspace.clone.sku.number}"></label><input class="lg-input" type="number" min="0" id="clone-number" name="numberFrom" th:value="${numberFrom}"></div>
+                <div class="lg-field"><label class="lg-field__label" for="clone-width" th:text="#{workspace.clone.sku.width}"></label><input class="lg-input" type="number" min="0" max="12" id="clone-width" name="numberWidth" th:value="${plan.numberWidth()}"></div>
+            </div>
+            <p class="lg-field__hint" th:text="#{workspace.clone.sku.hint}"></p>
+        </section>
+
+        <section class="lg-card lg-section" id="clone-columns" aria-labelledby="clone-columns-heading" th:if="${!sameAccount and !preview.unmapped().isEmpty()}">
+            <h2 id="clone-columns-heading" class="lg-card__title" th:text="#{workspace.clone.columns}"></h2>
+            <p class="lg-text-muted" th:text="#{workspace.clone.columns.intro}"></p>
+            <div class="lg-table-wrap">
+                <table class="lg-table lg-table--dense" id="clone-unmapped">
+                    <caption class="lg-sr-only" th:text="#{workspace.clone.columns}"></caption>
+                    <thead><tr><th scope="col" th:text="#{workspace.clone.columns.source}"></th><th scope="col" class="lg-num" th:text="#{workspace.clone.columns.filled}"></th><th scope="col" th:text="#{workspace.clone.columns.goes}"></th></tr></thead>
+                    <tbody>
+                    <tr th:each="u : ${preview.unmapped()}">
+                        <th scope="row" class="lg-wrap"><code class="lg-code" th:text="${u.sourceHeader()}"></code></th>
+                        <td class="lg-num" th:text="${u.filled()}"></td>
+                        <td>
+                            <select class="lg-select" th:name="${'map.' + u.sourceKey()}" th:aria-label="${u.sourceHeader()}">
+                                <option value="" th:selected="${u.chosen().isEmpty()}" th:text="#{workspace.clone.columns.skip}"></option>
+                                <option th:each="c : ${preview.free()}" th:value="${c.key()}" th:selected="${c.key() == u.chosen()}" th:text="${c.header()}"></option>
+                            </select>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <details class="lg-disclosure lg-section" id="clone-pairs" th:if="${!sameAccount and !preview.pairs().isEmpty()}">
+            <summary th:text="#{workspace.clone.pairs(${#strings.toString(preview.pairs().size())})}"></summary>
+            <div class="lg-table-wrap">
+                <table class="lg-table lg-table--dense">
+                    <caption class="lg-sr-only" th:text="#{workspace.clone.pairs.caption}"></caption>
+                    <thead><tr><th scope="col" th:text="#{workspace.clone.columns.source}"></th><th scope="col" th:text="#{workspace.clone.columns.goes}"></th></tr></thead>
+                    <tbody><tr th:each="p : ${preview.pairs()}"><th scope="row" class="lg-wrap"><code class="lg-code" th:text="${p.sourceHeader()}"></code></th><td class="lg-wrap"><code class="lg-code" th:text="${p.targetHeader()}"></code></td></tr></tbody>
+                </table>
+            </div>
+        </details>
+
+        <section class="lg-card lg-section" aria-labelledby="clone-items-heading">
+            <h2 id="clone-items-heading" class="lg-card__title" th:text="#{workspace.clone.items}"></h2>
+            <p class="lg-text-muted" th:text="#{workspace.clone.items.max(${#strings.toString(max)})}"></p>
+            <div class="lg-table-wrap">
+                <table class="lg-table lg-table--dense" id="clone-items">
+                    <caption class="lg-sr-only" th:text="#{workspace.clone.items}"></caption>
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{workspace.clone.old}"></th>
+                        <th scope="col" th:text="#{workspace.clone.new}"></th>
+                        <th scope="col" th:text="#{workspace.col.title}"></th>
+                        <th scope="col" th:text="#{workspace.col.role}"></th>
+                        <th scope="col" th:text="#{workspace.clone.problem}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="i : ${items}" th:attr="data-ok=${i.problems().isEmpty()}">
+                        <td class="lg-sku"><code class="lg-code" th:text="${i.sku()}"></code></td>
+                        <td class="lg-sku">
+                            <input class="lg-input" type="text" autocomplete="off" th:if="${manual}" th:name="${'sku.' + i.id()}" th:value="${i.newSku()}" th:aria-label="${i.sku()}">
+                            <code class="lg-code" th:unless="${manual}" th:text="${i.newSku()}"></code>
+                        </td>
+                        <td class="lg-ellip" th:title="${i.title()}" th:text="${i.title()}"></td>
+                        <td><span th:text="${i.role()}"></span><span class="lg-text-muted lg-small" th:if="${i.parent() != null}"> &rarr; <code class="lg-code" th:text="${i.parent()}"></code></span></td>
+                        <td>
+                            <span class="lg-chip lg-chip--audit lg-chip--audit-clean" th:if="${i.problems().isEmpty()}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-ok"/></svg><span th:text="#{workspace.clone.ok}"></span></span>
+                            <span class="lg-chip lg-chip--audit lg-chip--audit-error" th:each="p : ${i.problems()}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-risk-severe"/></svg><span th:text="${p}"></span></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="lg-actions">
+            <button type="submit" class="lg-btn" id="clone-refresh" th:text="#{workspace.clone.refresh}"></button>
+            <button type="submit" class="lg-btn lg-btn--primary" id="clone-commit" th:formaction="@{/console/workspace/clone/commit}" th:disabled="${!canWrite}" th:text="#{workspace.clone.commit}"></button>
+            <a class="lg-btn" th:href="@{/console/workspace}" th:text="#{workspace.edit.cancel}"></a>
+        </div>
+        <p class="lg-text-muted" th:unless="${canWrite}" th:text="#{workspace.clone.blocked}"></p>
+    </form>
+</main>
+</body>
+</html>
