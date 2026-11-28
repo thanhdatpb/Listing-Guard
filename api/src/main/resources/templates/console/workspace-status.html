@@ -21,6 +21,8 @@
         </div>
     </div>
     <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <div class="lg-banner lg-banner--info lg-section" id="status-audit-off" th:if="${gate and auditOff}"><p th:text="#{workspace.status.audit.off}"></p></div>
+    <div class="lg-banner lg-banner--info lg-section" id="status-unchecked" th:if="${anyUnchecked and !auditOff}"><p th:text="#{workspace.status.unchecked.note}"></p></div>
     <div class="lg-banner lg-banner--info lg-section" id="status-gate-off" th:unless="${gate}"><p th:text="#{workspace.status.gate.off}"></p></div>
     <div class="lg-banner lg-banner--warning lg-section" id="status-blocked" th:if="${gate and anyBlocked and !applied}"><p th:text="#{workspace.status.blocked}"></p></div>
 
@@ -48,6 +50,8 @@
                 <td>
                     <span class="lg-chip lg-chip--audit lg-chip--audit-clean" th:if="${r.blocks().isEmpty()}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-ok"/></svg><span th:text="#{workspace.status.check.ok}"></span></span>
                     <span class="lg-chip lg-chip--audit lg-chip--audit-error" th:each="b : ${r.blocks()}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-risk-severe"/></svg><span th:text="${b}"></span></span>
+                    <span class="lg-chip lg-chip--neutral" th:if="${r.trademarkUnchecked()}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-unchecked"/></svg><span th:text="#{workspace.status.trademark.unchecked}"></span></span>
+                    <span class="lg-text-muted lg-small" th:if="${r.trademarkUnchecked()}"><br><span th:text="${r.trademarkWhy()}"></span></span>
                     <span class="lg-text-muted lg-small" th:if="${r.openedReason() != null}"><br><span th:text="#{workspace.status.opened(${r.openedBy() == null ? '' : r.openedBy()}, ${r.openedReason()})}"></span></span>
                 </td>
                 <td><span th:if="${r.result() != null}" th:text="${r.result()}"></span></td>

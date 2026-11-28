@@ -57,6 +57,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  */
 @SpringBootTest(properties = {
         "listing-guard.workspace.enabled=true",
+        // the gate is switched off here: these tests are about the editor, the clone and the status moves, not about what holds a listing back
+        // (ADR-063 section 1: with the audit off and the gate on, every listing is unchecked and held back; see WorkspaceGateIntegrationTest)
+        "listing-guard.workspace.block-on-error=false",
         "spring.servlet.multipart.max-file-size=25MB",
         "spring.servlet.multipart.max-request-size=60MB",
         "listing-guard.console.enabled=true",
@@ -459,5 +462,102 @@ class ConsoleWorkspaceEditorIntegrationTest {
         MvcResult kept = perform(commit, 302);
         assertThat(kept.getFlashMap().get("notice").toString()).contains("1 listings changed in the workspace were kept as they are.");
         assertThat(listing(team, account, "E-S2").title()).isEqualTo("Changed in the workspace");
+    }
+
+    // ------------------------------------------------------------------ the export (ADR-063)
+
+    private List<UUID> readyIds(Team team, SellerAccount account) {
+        List<UUID> ids = jdbc.queryForList("SELECT id FROM workspace_listing WHERE client_id = ? AND account_id = ? AND deleted_at IS NULL ORDER BY sku",
+                UUID.class, team.client().getId(), account.id());
+        statusService.markReady(actor(team.admin()), ids, false, null);
+        return ids;
+    }
+
+    @Autowired
+    ListingStatusService statusService;
+
+    @Test
+    void theExportPageConfirmsWithTheCountsAndThenDownloadsTheFileAndMovesTheListings() throws Exception {
+        Team team = team();
+        SellerAccount account = account(team, "X-");
+        List<UUID> ids = readyIds(team, account);
+
+        String form = page(get("/console/workspace/export").param("account", account.id().toString()).with(signedIn(team.admin())), 200);
+        assertThat(form).contains("id=\"export-filter\"").contains("id=\"export-preview-open\"");
+
+        var request = post("/console/workspace/export").with(signedIn(team.admin())).with(csrf());
+        ids.forEach(id -> request.param("listing", id.toString()));
+        String confirm = page(request, 200);
+        assertThat(confirm).contains("id=\"export-summary\"").contains("id=\"export-groups\"").contains("id=\"export-go\"").contains("id=\"export-gate-off\"")
+                .contains("id=\"export-audit-off\"");
+
+        var go = post("/console/workspace/export").with(signedIn(team.admin())).with(csrf()).param("step", "export").param("medium", "EXCEL")
+                .param("confirm", Integer.toString(ids.size()));
+        ids.forEach(id -> go.param("listing", id.toString()));
+        MvcResult file = perform(go, 200);
+        assertThat(file.getResponse().getHeader("Content-Disposition")).contains("attachment").contains(".xlsx");
+        assertThat(file.getResponse().getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(file.getResponse().getContentAsByteArray()).startsWith((byte) 'P', (byte) 'K');
+        assertThat(listing(team, account, "X-S2").status()).isEqualTo(ListingStatus.EXPORTED);
+
+        // a wrong count stops: nothing more is exported and the confirmation is shown with the reason
+        var stale = post("/console/workspace/export").with(signedIn(team.admin())).with(csrf()).param("step", "export").param("confirm", "99");
+        ids.forEach(id -> stale.param("listing", id.toString()));
+        assertThat(page(stale, 422)).contains("id=\"export-error\"");
+        // another client cannot name the account
+        Team stranger = team();
+        perform(get("/console/workspace/export").param("account", account.id().toString()).with(signedIn(stranger.admin())), 404);
+        perform(post("/console/workspace/export").with(signedIn(stranger.admin())).with(csrf()).param("account", account.id().toString()), 404);
+    }
+
+    @Test
+    void theTextToPasteIsAPageWithACopyButtonInBothLanguages() throws Exception {
+        Team team = team();
+        SellerAccount account = account(team, "Y-");
+        List<UUID> ids = readyIds(team, account);
+        for (String language : new String[] {"en", "vi"}) {
+            var go = in(post("/console/workspace/export"), language).with(signedIn(team.admin())).with(csrf()).param("step", "export")
+                    .param("medium", "CLIPBOARD").param("withHeader", "1").param("confirm", Integer.toString(ids.size()));
+            ids.forEach(id -> go.param("listing", id.toString()));
+            String html = page(go, 200);
+            assertThat(html).contains("id=\"paste-text\"").contains("data-copy-from=\"paste-text\"").contains("/console/copy.js").contains("Y-P1");
+            if ("en".equals(language)) {
+                assertThat(html).contains("Copy the text");
+                assertThat(listing(team, account, "Y-S2").status()).isEqualTo(ListingStatus.EXPORTED);
+                ids.forEach(id -> jdbc.update("UPDATE workspace_listing SET status = 'READY_TO_EXPORT' WHERE id = ?", id));
+            } else {
+                assertThat(html).contains("Sao chép text");
+            }
+        }
+    }
+
+    @Test
+    void anEtsyListingShowsTheCopyPanelInTheOrderOfTheFieldsAndPostedMovesItLive() throws Exception {
+        Team team = team();
+        SellerAccount shop = accounts.create(team.client().getId(), Marketplace.ETSY, "Etsy panel", null, ExportFormat.XLSM);
+        Map<String, String> form = new LinkedHashMap<>();
+        form.put("sku", "ET-1");
+        form.put("title", "Plain ceramic mug");
+        form.put("description", "A plain description.");
+        form.put("tags", "mug, ceramic, gift");
+        form.put("price", "19.99");
+        form.put("quantity", "5");
+        form.put("category", "Mugs");
+        form.put("who_made", "i_did");
+        form.put("when_made", "made_to_order");
+        Listing mug = editor.create(actor(team.member()), shop.id(), form);
+
+        String html = page(get("/console/workspace/listings/" + mug.id()).with(signedIn(team.member())), 200);
+        assertThat(html).contains("id=\"etsy-copy-table\"").contains("id=\"copy-title\"").contains("id=\"copy-tags\"").contains("mug, ceramic, gift")
+                .contains("/console/copy.js").doesNotContain("id=\"release-posted\"");
+        assertThat(html.indexOf("copy-title")).isLessThan(html.indexOf("copy-description")).isLessThan(html.indexOf("copy-tags"));
+        assertThat(html.indexOf("copy-tags")).isLessThan(html.indexOf("copy-price"));
+        assertThat(page(get(edit(mug.id())).with(signedIn(team.member())), 200)).contains("id=\"etsy-copy-table\"");
+
+        statusService.markReady(actor(team.member()), List.of(mug.id()), false, null);
+        assertThat(page(get("/console/workspace/listings/" + mug.id()).with(signedIn(team.member())), 200)).contains("id=\"release-posted\"");
+        perform(post("/console/workspace/listings/" + mug.id() + "/posted").with(signedIn(team.other())).with(csrf()), 403);
+        perform(post("/console/workspace/listings/" + mug.id() + "/posted").with(signedIn(team.member())).with(csrf()), 302);
+        assertThat(listings.find(team.client().getId(), mug.id()).orElseThrow().status()).isEqualTo(ListingStatus.LIVE);
     }
 }

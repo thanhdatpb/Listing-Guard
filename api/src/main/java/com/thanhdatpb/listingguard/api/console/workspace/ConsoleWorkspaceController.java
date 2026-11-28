@@ -99,6 +99,14 @@ public class ConsoleWorkspaceController {
     private ObjectProvider<WorkspaceAuditViews> auditViews;
     private ObjectProvider<AuditStore> auditStore;
 
+    /** What the pages show of the release of a listing (ADR-063): the time it was exported, the buttons after an export, the Etsy copy panel. */
+    private WorkspaceReleaseViews releaseViews;
+
+    @Autowired
+    void setRelease(WorkspaceReleaseViews views) {
+        this.releaseViews = views;
+    }
+
     @Autowired
     void setAudit(ObjectProvider<WorkspaceAuditViews> views, ObjectProvider<AuditStore> store) {
         this.auditViews = views;
@@ -261,6 +269,7 @@ public class ConsoleWorkspaceController {
         model.addAttribute("customization", listings.customization(actor.clientId(), listing.accountId(), listing.sku()).orElse(null));
         model.addAttribute("admin", actor.admin());
         model.addAttribute("canEdit", access.canEdit(actor, listing.ownerAccountId()));
+        releaseViews.fill(model, actor, listing, account);
         WorkspaceAuditViews audit = auditViews == null ? null : auditViews.getIfAvailable();
         if (audit != null) {
             model.addAttribute("auditOn", true);

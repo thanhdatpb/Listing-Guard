@@ -48,6 +48,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  */
 @SpringBootTest(properties = {
         "listing-guard.workspace.enabled=true",
+        // the gate is switched off here: these tests are about the editor, the clone and the status moves, not about what holds a listing back
+        // (ADR-063 section 1: with the audit off and the gate on, every listing is unchecked and held back; see WorkspaceGateIntegrationTest)
+        "listing-guard.workspace.block-on-error=false",
         "spring.servlet.multipart.max-file-size=25MB",
         "spring.servlet.multipart.max-request-size=60MB",
         "listing-guard.console.enabled=true",
@@ -647,10 +650,42 @@ class WorkspaceEditorIntegrationTest {
         assertThatThrownBy(() -> history.restore(team.admin(), v2.id(), v0.version(), v2.version())).isInstanceOf(ListingEditor.VersionConflict.class);
     }
 
-    // ------------------------------------------------------------------ 6. status (the check is off here)
+    // ------------------------------------------------------------------ 6. status (the gate is switched off here)
+
+    @Autowired
+    org.springframework.beans.factory.ObjectProvider<com.thanhdatpb.listingguard.api.workspace.audit.AuditStore> auditStores;
+    @Autowired
+    WorkspaceOverrides overrides;
 
     @Test
-    void withTheAuditOffNothingHoldsADraftBackAndAReadyListingGoesBackToDraftWhenItsContentChanges() throws IOException {
+    void withTheAuditOffAndTheGateOnEveryDraftIsUncheckedAndAnAdministratorOpensTheBlockWithAReason() throws IOException {
+        Team team = team();
+        SellerAccount account = amazonWithFamily(team, "Shop One", "G-");
+        Listing mine = listing(team, account, "G-S2");
+        ListingStatusService strict = new ListingStatusService(access, listings, overrides, auditStores, true);
+
+        assertThat(strict.gateActive()).isTrue();
+        assertThat(strict.auditActive()).isFalse();
+        var verdict = strict.verdicts(team.client().getId(), List.of(mine.id())).get(mine.id());
+        assertThat(verdict.blocks()).containsExactly(ListingStatusService.Block.UNCHECKED);
+        assertThat(verdict.state()).isEqualTo("NONE");
+        assertThat(verdict.mayGo()).isFalse();
+        assertThat(strict.markReady(team.member(), List.of(mine.id()), false, null)).singleElement()
+                .satisfies(o -> assertThat(o.result()).isEqualTo(ListingStatusService.Result.BLOCKED));
+        assertThat(listing(team, account, "G-S2").status()).isEqualTo(ListingStatus.DRAFT);
+
+        // an ADMIN opens it with a reason, which is stored with the state NONE and the block it opened
+        assertThat(strict.markReady(team.admin(), List.of(mine.id()), true, "The audit is off for this client")).singleElement()
+                .satisfies(o -> assertThat(o.result()).isEqualTo(ListingStatusService.Result.MOVED_OPENED));
+        assertThat(listing(team, account, "G-S2").status()).isEqualTo(ListingStatus.READY_TO_EXPORT);
+        var row = overrides.latest(team.client().getId(), List.of(mine.id())).get(mine.id());
+        assertThat(row.auditState()).isEqualTo("NONE");
+        assertThat(row.blockReasons()).isEqualTo("UNCHECKED");
+        assertThat(strict.verdicts(team.client().getId(), List.of(mine.id())).get(mine.id()).mayGo()).isTrue();
+    }
+
+    @Test
+    void withTheGateSwitchedOffNothingHoldsADraftBackAndAReadyListingGoesBackToDraftWhenItsContentChanges() throws IOException {
         Team team = team();
         SellerAccount account = amazonWithFamily(team, "Shop One", "E-");
         Listing mine = listing(team, account, "E-S2");

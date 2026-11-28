@@ -290,7 +290,7 @@ public class ListingCloner {
         return -1;
     }
 
-    private Map<String, List<TemplateColumn>> byTarget(Template template) {
+    private static Map<String, List<TemplateColumn>> byTarget(Template template) {
         Map<String, List<TemplateColumn>> by = new LinkedHashMap<>();
         for (TemplateColumn column : template.columns()) {
             String target = template.mapping().targets().get(column.key());
@@ -305,7 +305,7 @@ public class ListingCloner {
      * Pairs the columns of two Amazon templates by the standard field they were given (the n-th with the n-th), then the columns no field
      * was given by header (ignoring case and the blanks at both ends).
      */
-    List<Pair> pairs(Template source, Template target) {
+    public static List<Pair> pairs(Template source, Template target) {
         List<Pair> pairs = new ArrayList<>();
         Set<String> targetDone = new HashSet<>();
         Map<String, List<TemplateColumn>> from = byTarget(source);

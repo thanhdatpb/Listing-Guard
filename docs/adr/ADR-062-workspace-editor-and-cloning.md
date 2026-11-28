@@ -1,6 +1,6 @@
 # ADR-062 — Workspace editor and cloning
 
-- Trạng thái: Proposed
+- Trạng thái: Proposed (§7 và các câu hỏi mở (3), (4) được điều chỉnh bởi [ADR-063](ADR-063-workspace-export-by-account-template.md))
 - Liên quan: ADR-014, ADR-022, ADR-028, ADR-033, ADR-035, ADR-040–042, ADR-050, ADR-052, ADR-059, ADR-060, ADR-061.
 - Phạm vi: PR W3 của kho listing. Xuất file `.xlsm`/`.txt` (W4) và các rule bắt thông tin sót như size hay số lượng (W5, ADR-039) không nằm trong PR này.
 - Số ADR và migration: 038 để dành, 039 dành cho W5, 059 là kho listing, 060 console consistency, 061 rà nền (W2); 062 và V59 là số trống tiếp theo trên
@@ -134,3 +134,13 @@ khác là 404 (trang) hoặc "không tìm thấy" (dịch vụ). Log chỉ có i
 - Câu hỏi mở: (1) có muốn AI-2 trong trình soạn không (cần ADR riêng vì gửi text kho ra ngoài); (2) sửa listing "Sẵn sàng" đưa về "Nháp" có đúng ý không; (3) cổng chặn cả "Chưa kiểm/Chưa rà đủ" làm client không có trademark pack bị chặn hết: có nên
   chỉ chặn Lỗi/HIGH khi plan không có pack; (4) khi rà nền tắt cổng không chặn gì; (5) cho phép nhân bản nhiều tài khoản nguồn trong một lần; (6) dấu phân cách danh sách của Etsy chỉ được nhớ khi ánh xạ đổi
   (W1), nên danh sách tag dựng lại có thể khác nếu người nhập từng chọn dấu phân cách khác mặc định mà ánh xạ không đổi; (7) MEMBER có được ghi đè dòng "Đã sửa trong kho" của listing do chính họ phụ trách (hiện: có).
+
+## Bổ sung bởi ADR-063
+
+[ADR-063](ADR-063-workspace-export-by-account-template.md) §1 trả lời các câu hỏi mở (3) và (4) và **thay** phần cổng của §7 như sau (phần còn lại của §7, gồm lý do mở của ADMIN gắn với `content_hash`, giữ nguyên):
+
+- Cổng vẫn là `ListingStatusService.verdicts`, nay dùng chung cho "Chuyển Sẵn sàng xuất" và cho xuất file. Luôn chặn: Lỗi (ERROR), HIGH của trademark và "Chưa kiểm".
+- "Chưa rà đủ" chỉ chặn khi nguyên nhân là tạm thời hoặc sửa được (catalog đang nạp hoặc bị từ chối, check không trả lời, một rule lỗi, chỉ có watchlist mà không có catalog). Client **chưa cấu hình trademark** (không có catalog READY và không có mục watchlist lúc rà, hoặc gói không có pack) **không bị chặn**; trang trạng thái, màn hình xác nhận xuất và nhật ký xuất ghi "chưa kiểm trademark". Nguyên nhân là cột `workspace_listing_audit.trademark_reason` (V60).
+- Rà nền tắt: cổng coi mọi listing là "Chưa kiểm" và chặn (ADMIN vẫn mở được kèm lý do); trang ghi "Rà nền đang tắt". `block-on-error=false` vẫn tắt hẳn cổng.
+- Giữ: AI-2 không chạy trong kho; sửa listing Sẵn sàng thì về Nháp.
+- Hậu quả cho chuỗi test của W3: các test chạy với rà nền tắt mà chỉ nhằm kiểm trình soạn, nhân bản và chuyển trạng thái nay đặt `block-on-error=false`; một test mới giữ hành vi "rà nền tắt, cổng bật".

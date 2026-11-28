@@ -13,7 +13,7 @@ import org.springframework.util.unit.DataSize;
  * exists only while {@code listing-guard.workspace.enabled} is true.
  */
 @Configuration
-@EnableConfigurationProperties(WorkspaceProperties.class)
+@EnableConfigurationProperties({WorkspaceProperties.class, WorkspaceExportProperties.class})
 public class WorkspaceConfig {
 
     @Bean

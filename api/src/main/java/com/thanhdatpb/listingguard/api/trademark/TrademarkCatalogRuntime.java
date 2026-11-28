@@ -117,7 +117,10 @@ public class TrademarkCatalogRuntime implements SmartInitializingSingleton {
                 fingerprint(current, marketplace, components), current.catalogVersionId(), current.catalogVersion()));
     }
 
-    private volatile Snapshot snapshot = new Snapshot(new Status(State.DISABLED, "not evaluated"), null, null);
+    /** The detail of the status before the first evaluation: the catalog is not "off", it is not known yet (ADR-063). */
+    public static final String NOT_EVALUATED = "not evaluated";
+
+    private volatile Snapshot snapshot = new Snapshot(new Status(State.DISABLED, NOT_EVALUATED), null, null);
     private volatile TrademarkScanner withoutCatalog;
 
     /** Serves the configured version; does not follow the activation log. */

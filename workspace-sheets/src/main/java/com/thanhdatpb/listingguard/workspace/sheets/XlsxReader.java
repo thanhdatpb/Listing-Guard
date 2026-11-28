@@ -41,7 +41,8 @@ import org.xml.sax.XMLReader;
  */
 final class XlsxReader {
 
-    private static final Object LOCK = new Object();
+    /** The lock of POI's process-wide zip-bomb settings; {@link SheetWriter} and {@link SheetValidations} take it too. */
+    static final Object LOCK = new Object();
     private static final String VBA_PROJECT = "application/vnd.ms-office.vbaProject";
     private static final long IN_MEMORY_BYTES = 1L << 20;
 
@@ -98,15 +99,20 @@ final class XlsxReader {
         });
     }
 
+    /** Sets POI's zip-bomb guard from the limits. The caller holds {@link #LOCK}. */
+    static void configure(SheetLimits limits) {
+        ZipSecureFile.setMinInflateRatio(limits.minInflateRatio());
+        ZipSecureFile.setMaxEntrySize(limits.maxEntrySize());
+        ZipSecureFile.setMaxTextSize(limits.maxTextSize());
+    }
+
     private interface PackageWork<T> {
         T run(OPCPackage pkg, SheetFormat format) throws Exception;
     }
 
     private static <T> T withPackage(byte[] bytes, SheetLimits limits, PackageWork<T> work) {
         synchronized (LOCK) {
-            ZipSecureFile.setMinInflateRatio(limits.minInflateRatio());
-            ZipSecureFile.setMaxEntrySize(limits.maxEntrySize());
-            ZipSecureFile.setMaxTextSize(limits.maxTextSize());
+            configure(limits);
             Path temp = null;
             try {
                 OPCPackage pkg;

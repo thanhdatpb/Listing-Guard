@@ -10,6 +10,7 @@ import com.thanhdatpb.listingguard.api.workspace.audit.AuditModels.StoredAudit;
 import com.thanhdatpb.listingguard.api.workspace.audit.AuditModels.StoredFinding;
 import com.thanhdatpb.listingguard.api.workspace.audit.AuditStore;
 import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.Level;
+import com.thanhdatpb.listingguard.api.workspace.audit.AuditTypes.TrademarkReason;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -29,11 +30,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * "Draft to ready to export", for a selection (ADR-062 §7). With the background audit on and {@code block-on-error} true (the default), a
- * listing cannot go while its latest audit of the text it has now says an ERROR or a HIGH trademark risk, or while it was not checked at
- * all or not checked in full (no result, a result of older text, or a part that did not run: a listing is never "ready" on a guess). An
- * ADMIN can open the block with a reason; the reason is stored with who, when, the content hash and the audit's state, and counts only
- * while the listing's content is that one. With the audit off there is no result to hold a listing back, so nothing blocks.
+ * "Draft to ready to export", for a selection (ADR-062 §7, adjusted by ADR-063 §1), and the one gate that the export also asks. With
+ * {@code block-on-error} true (the default), a listing cannot go while its latest audit of the text it has now says an ERROR or a HIGH
+ * trademark risk, while it was not checked (no result, or a result of older text), or while its trademark part did not run for a cause that
+ * can pass or be mended (a catalog being loaded, a rule that failed). A trademark part that did not run because the client has no trademark
+ * set-up (no catalog served and no watchlist, or a plan without the pack) does not hold the listing back, and the listing is said to be
+ * unchecked for trademark wherever it is shown. With the background audit off no listing has a result, so every listing is unchecked and
+ * held back; {@code block-on-error=false} switches the gate off. An ADMIN can open the block with a reason; the reason is stored with who,
+ * when, the content hash and the audit's state, and counts only while the listing's content is that one.
  */
 @Service
 @ConditionalOnProperty(prefix = "listing-guard.workspace", name = "enabled", havingValue = "true")
@@ -63,8 +67,13 @@ public class ListingStatusService {
         UNKNOWN
     }
 
-    /** What the gate says of a listing now. {@code opened} is a valid reason of an ADMIN; {@code state} is the audit's state, NONE or STALE. */
-    public record Verdict(UUID id, String sku, Set<Block> blocks, String state, Override opened) {
+    /**
+     * What the gate says of a listing now. {@code opened} is a valid reason of an ADMIN; {@code state} is the audit's state, NONE or STALE.
+     * {@code trademarkChecked} is true when the audit of this very content ran its trademark part in full, whether or not the gate is on;
+     * {@code trademarkReason} is why it did not, when there is an audit of this content (null otherwise).
+     */
+    public record Verdict(UUID id, String sku, Set<Block> blocks, String state, Override opened, boolean trademarkChecked,
+                          TrademarkReason trademarkReason) {
 
         /** True when the listing may go now: nothing blocks it, or a reason of an ADMIN is valid for this very content. */
         public boolean mayGo() {
@@ -90,9 +99,14 @@ public class ListingStatusService {
         this.blockOnError = blockOnError;
     }
 
-    /** Whether the gate can hold anything back: the audit is on and the setting is not switched off. */
+    /** Whether the gate can hold anything back: {@code block-on-error} is not switched off. */
     public boolean gateActive() {
-        return blockOnError && audits.getIfAvailable() != null;
+        return blockOnError;
+    }
+
+    /** Whether the background audit is on, so a listing can have a result at all; with it off the gate holds every listing back as unchecked. */
+    public boolean auditActive() {
+        return audits.getIfAvailable() != null;
     }
 
     /** What the gate says of each of these listings of the client, by id; a listing that is not the client's is absent. */
@@ -110,29 +124,30 @@ public class ListingStatusService {
         Map<UUID, Override> opened = overrides.latest(clientId, found.stream().map(Listing::id).toList());
         for (Listing l : found) {
             Set<Block> blocks = EnumSet.noneOf(Block.class);
-            String state = "NONE";
+            StoredAudit audit = stored.get(l.id());
+            boolean current = audit != null && audit.inputHash().equals(AuditHasher.input(l.fields()));
+            String state = audit == null ? "NONE" : current ? audit.state().name() : "STALE";
             if (gateActive()) {
-                StoredAudit audit = stored.get(l.id());
-                if (audit == null) {
-                    blocks.add(Block.UNCHECKED);
-                } else if (!audit.inputHash().equals(AuditHasher.input(l.fields()))) {
-                    state = "STALE";
+                if (!current) {
+                    // no result, a result of older text, or no audit at all: a listing is never "ready" on a guess (ADR-061 §4)
                     blocks.add(Block.UNCHECKED);
                 } else {
-                    state = audit.state().name();
                     if (audit.errorCount() > 0) {
                         blocks.add(Block.ERROR);
                         if (store.findings(clientId, l.id()).stream().map(StoredFinding::level).anyMatch(level -> level == Level.HIGH)) {
                             blocks.add(Block.HIGH);
                         }
                     }
-                    if (!audit.trademarkRan()) {
+                    // a result stored before V60 has no reason: it holds back until the audit is made again (ADR-063 §1)
+                    if (audit.trademarkReason() == null || audit.trademarkReason().holdsBack()) {
                         blocks.add(Block.INCOMPLETE);
                     }
                 }
             }
             Override reason = opened.get(l.id());
-            verdicts.put(l.id(), new Verdict(l.id(), l.sku(), blocks, state, reason != null && reason.contentHash().equals(l.contentHash()) ? reason : null));
+            verdicts.put(l.id(), new Verdict(l.id(), l.sku(), blocks, state,
+                    reason != null && reason.contentHash().equals(l.contentHash()) ? reason : null,
+                    current && audit.trademarkRan(), current ? audit.trademarkReason() : null));
         }
         return verdicts;
     }
@@ -189,13 +204,16 @@ public class ListingStatusService {
         return outcomes;
     }
 
-    /** Sends a ready listing back to a draft (a person's choice, never a gate). Only a listing the actor may change. */
+    /**
+     * Sends a listing that is ready, exported or live back to a draft (a person's choice, never a gate): the way to export a listing again or
+     * to change one that is live (ADR-063 §7). Only a listing the actor may change; the change is a STATUS entry of its history.
+     */
     @Transactional
     public boolean markDraft(Actor actor, UUID id) {
         Listing l = listings.find(actor.clientId(), id).orElseThrow(() -> new WorkspaceException("listing.unknown"));
         if (!access.canEdit(actor, l.ownerAccountId())) {
             throw new WorkspaceException("forbidden");
         }
-        return l.status() == ListingStatus.READY_TO_EXPORT && listings.changeStatus(actor.clientId(), id, ListingStatus.DRAFT, l.version(), actor.accountId());
+        return l.status() != ListingStatus.DRAFT && listings.changeStatus(actor.clientId(), id, ListingStatus.DRAFT, l.version(), actor.accountId());
     }
 }

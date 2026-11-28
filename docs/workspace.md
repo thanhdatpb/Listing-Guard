@@ -2,7 +2,7 @@
 
 Tài liệu này mô tả kho listing của ADR-059: nơi lưu listing để hệ thống rà và cảnh báo trên dữ liệu đã lưu, thay cho Google Sheet. PR nền này
 làm **kho, template theo tài khoản và nhập dữ liệu**. **Rà nền, tô đỏ và email cảnh báo (W2, ADR-061) có ở [mục 9](#9-rà-nền-tô-đỏ-và-email-adr-061)** và tắt mặc định.
-**Trình soạn, tạo mới, nhân bản, lịch sử, trạng thái "Sẵn sàng xuất" và xung đột khi nhập lại (W3, ADR-062) có ở [mục 11](#11-trình-soạn-tạo-mới-nhân-bản-adr-062).** Xuất file `.xlsm`/`.txt` (W4) là PR sau.
+**Trình soạn, tạo mới, nhân bản, lịch sử, trạng thái "Sẵn sàng xuất" và xung đột khi nhập lại (W3, ADR-062) có ở [mục 11](#11-trình-soạn-tạo-mới-nhân-bản-adr-062).** **Xuất file theo template của tài khoản, xuất Amazon Custom, copy từng mục Etsy và cổng điều chỉnh (W4, ADR-063) có ở [mục 12](#12-xuất-theo-template-của-tài-khoản-adr-063).**
 
 > **Chưa xác minh với template Amazon thật.** Repo chưa có template Amazon của HappyC. Mọi fixture là tổng hợp, và danh sách tên cột dùng để
 > *đoán* (`api/src/main/resources/workspace/standard-targets.yaml`) đều ghi `unverified`. Đoán chỉ điền sẵn, người dùng luôn xác nhận.
@@ -340,15 +340,16 @@ Danh sách phiên bản còn giữ (`LISTING_GUARD_WORKSPACE_HISTORY_KEEP`), **k
 
 ### 11.6 Trạng thái "Sẵn sàng xuất"
 
-Chọn listing ở danh sách (hoặc nút ở trang sửa) → **Chuyển Sẵn sàng xuất**: trang liệt kê từng listing và vì sao bị chặn, rồi mới chuyển. Chỉ listing Nháp bạn được sửa mới chuyển.
+Chọn listing ở danh sách (hoặc nút ở trang sửa) → **Chuyển Sẵn sàng xuất**: trang liệt kê từng listing và vì sao bị chặn, rồi mới chuyển. Chỉ listing Nháp bạn được sửa mới chuyển. Cổng này là **một**: xuất file ([mục 12](#12-xuất-theo-template-của-tài-khoản-adr-063)) và nút "Đã đăng" của Etsy hỏi đúng nó. Từ ADR-063 cổng chặn **theo nguyên nhân**:
 
 | Chặn vì | Nghĩa |
 | --- | --- |
-| Còn Lỗi / rủi ro HIGH | Kết quả rà của đúng nội dung hiện tại có ERROR của quy tắc hoặc HIGH của trademark. |
-| Chưa kiểm | Chưa có kết quả rà, hoặc kết quả là của nội dung cũ. |
-| Chưa rà đủ | Phần trademark chưa chạy (không có catalog/watchlist, plan không có pack...). |
+| Còn Lỗi / rủi ro HIGH | Kết quả rà của đúng nội dung hiện tại có ERROR của quy tắc hoặc HIGH của trademark. Luôn chặn. |
+| Chưa kiểm | Chưa có kết quả rà, kết quả là của nội dung cũ, hoặc **rà nền đang tắt** (khi đó mọi listing là "Chưa kiểm"). Luôn chặn. |
+| Phần trademark chưa chạy (tạm thời) | Catalog đang nạp hoặc bị từ chối, check không trả lời, một rule lỗi, chỉ có watchlist mà chưa có catalog, hoặc kết quả cũ chưa ghi nguyên nhân (được rà lại một lần). Chặn. |
+| Client chưa cấu hình trademark | Không có catalog READY và không có mục watchlist lúc rà, hoặc gói không có pack trademark. **Không chặn**; trang trạng thái, màn hình xác nhận xuất và nhật ký xuất ghi **"chưa kiểm trademark"**. |
 
-Cảnh báo (WARNING/MEDIUM) không chặn. **ADMIN mở chặn** bằng cách tick và nhập **lý do bắt buộc**; hệ thống lưu người mở, thời điểm, `content_hash` và trạng thái rà lúc mở. **Lý do hết hiệu lực ngay khi nội dung listing đổi** (listing về Nháp và bị chặn lại). Rà nền tắt thì không có gì chặn.
+`LISTING_GUARD_WORKSPACE_BLOCK_ON_ERROR=false` tắt hẳn cổng (kể cả khi rà nền tắt). Cảnh báo (WARNING/MEDIUM) không chặn. **ADMIN mở chặn** bằng cách tick và nhập **lý do bắt buộc**; hệ thống lưu người mở, thời điểm, `content_hash` và trạng thái rà lúc mở. **Lý do hết hiệu lực ngay khi nội dung listing đổi** (listing về Nháp và bị chặn lại), và có hiệu lực lại nếu khôi phục đúng nội dung đó.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-status-dark.png">
@@ -370,4 +371,60 @@ Dòng của file mà listing **đã được sửa, tạo mới, nhân bản ho�
 - Kịch bản `scripts/test-console-workspace-editor.py` (Playwright) đã chạy trên Chromium thật (`WorkspaceEditorBrowserIntegrationTest`) cùng bộ ảnh ở [mục 10](#10-chụp-lại-ảnh); các trang chỉ được thử trên dữ liệu tổng hợp, bằng tiếng Anh.
 - Các test đã chạy trên PostgreSQL 16 cục bộ **có pgvector** ([docs/testing.md](testing.md)); một số test vẫn chỉ chạy được với Docker, danh sách ở đó. CI GitHub Actions chạy bằng Testcontainers.
 - Chưa đo thời gian nhân bản 500 listing và bộ nhớ.
-- Xuất file `.xlsm`/`.txt` (W4) chưa có; loại thay đổi lịch sử `EXPORT` đã có sẵn trong CHECK nhưng chưa ai ghi.
+
+## 12. Xuất theo template của tài khoản (ADR-063)
+
+> **Chưa xác minh với file Amazon thật.** Mọi thử nghiệm dùng file tổng hợp. Bạn kiểm trên máy của mình bằng [bài kiểm round-trip](#124-bài-kiểm-round-trip-và---clone-to-với-file-thật).
+
+### 12.1 Cách xuất
+
+**Kho listing → Xuất file** (hoặc chọn listing ở danh sách → *Xuất các listing đã chọn*), chọn **một** tài khoản Amazon. Mặc định lọc **Sẵn sàng xuất**; tối đa `LISTING_GUARD_WORKSPACE_EXPORT_MAX_LISTINGS` (2000) listing mỗi lần. Màn hình xác nhận (chưa ghi gì) nói: số listing xuất, **số bị chặn kèm lý do**, **số chưa kiểm trademark**, số đi qua nhờ lý do mở của ADMIN, child không có parent trong lô, listing của version khác, cảnh báo giá trị hợp lệ và số ô `.txt` sẽ bị thay. Nút cuối cùng tính lại dưới khoá tài khoản; nếu số listing đã đổi so với lúc xác nhận thì dừng và hiện lại.
+
+Chỉ listing **Sẵn sàng xuất** mà bạn **được sửa** và cổng cho đi mới được xuất; còn lại được liệt kê kèm lý do.
+
+| Dạng | Làm gì |
+| --- | --- |
+| **Bản sao workbook** (`.xlsm`/`.xlsx`) | Mở bản sao file template gốc của đúng version listing đang dùng, xoá các dòng từ dòng dữ liệu đầu, ghi dữ liệu theo thứ tự cột. Giữ nguyên dòng phía trên, sheet khác, data validation, tên đã đặt, định dạng ô và part `vbaProject` (đúng từng byte). Template tạo từ TSV/CSV không có file gốc nên không chọn được dạng này (giao diện nói lý do và dùng `.txt`). |
+| **`.txt` tab-delimited** | Các dòng header của template nguyên văn rồi dòng dữ liệu, CR LF. Bảng mã chọn được: UTF-8 (mặc định, `LISTING_GUARD_WORKSPACE_EXPORT_TEXT_ENCODING`), UTF-8 có BOM, UTF-16LE, ISO-8859-1, Windows-1252; ký tự không ghi được thì từ chối cả file. **Tab hoặc xuống dòng trong ô được thay bằng một dấu cách** và số ô bị thay được báo. |
+| **Text để dán vào Sheet** | TSV của các dòng dữ liệu (tuỳ chọn kèm header) hiện trong ô chỉ đọc kèm nút **Sao chép**. Ô có tab/xuống dòng/dấu nháy được bọc `"…"` nên không bị thay. Dán: bấm vào ô đầu của Sheet rồi dán. |
+
+Số: ô thuộc cột bạn gán **giá** hoặc **số nguyên** mà giá trị là số thật được ghi **ô kiểu số** (và dạng chuẩn `19.5`, `5`, không `.0`, không số mũ trong `.txt`); mọi ô khác là chữ (mã như `007` giữ nguyên; chữ `=…` không bao giờ thành công thức). Listing thuộc nhiều version template: mỗi version một file (gói `.zip`), hoặc chọn một version; text để dán chỉ nhận một version. **Parent đứng trước child.** Cột passthrough giữ nguyên.
+
+Sau khi xuất, listing sang **Đã xuất** kèm thời điểm và một mục lịch sử `EXPORT`; **Đánh dấu đang bán** (Đang bán) hiện ở trang listing; **Đưa về Nháp** dùng được cho listing Sẵn sàng, Đã xuất và Đang bán (để xuất lại nếu tải file hỏng). File không được lưu. **Nhật ký xuất** chỉ lưu số đếm (tài khoản, version template, dạng, số listing, số bị chặn, số chưa kiểm trademark, người xuất, thời điểm), hiện ở trang xuất, và được `workspace export` (tệp `export-log.tsv`) và `workspace purge` xử lý.
+
+**Kiểm giá trị hợp lệ (tuỳ chọn):** đọc data validation dạng danh sách của sheet template (danh sách trực tiếp, hoặc vùng ở sheet khác, kể cả qua tên đã đặt) và cảnh báo giá trị listing không nằm trong danh sách (phân biệt hoa thường). Chỉ là **cảnh báo nội bộ, chưa xác minh với Amazon**, không chặn xuất. Công thức (`INDIRECT`, `OFFSET`), tên không phải vùng, danh sách quá 5.000 giá trị và luật nằm ở phần mở rộng của sheet được đếm là "chưa đọc được", không đoán; template không có luật nào đọc được thì bỏ qua và ghi rõ.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-export-dark.png">
+  <img src="images/console/workspace-export-light.png" alt="Màn hình xác nhận xuất: số listing xuất và không xuất, bảng listing bị giữ lại kèm lý do (chưa Sẵn sàng xuất, có Lỗi, rủi ro HIGH), các lựa chọn dạng xuất.">
+</picture>
+
+### 12.2 Amazon Custom
+
+Chọn **Loại sheet: Amazon Custom**: xuất dòng customize của các SKU đã chọn theo template `AMAZON_CUSTOM` của tài khoản, cùng ba dạng trên và cùng cổng (SKU của listing Sẵn sàng xuất). **Không đổi trạng thái listing**, nên xuất Custom **trước**, rồi mới xuất bulk.
+
+### 12.3 Etsy
+
+Etsy đăng tay. Trang listing và trang soạn của listing Etsy có panel **Copy từng mục** theo đúng thứ tự `etsy-fields.yaml`, mỗi mục một nút **Copy** (tags nối bằng dấu phẩy), kèm số tag và số ký tự theo ruleset đang chạy. Khi đã đăng, bấm **Đã đăng**: listing Sẵn sàng xuất chuyển sang **Đang bán** qua cùng cổng như xuất, kèm thời điểm, mục lịch sử `EXPORT` và một dòng nhật ký (`ETSY_POSTED`).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-etsy-copy-dark.png">
+  <img src="images/console/workspace-etsy-copy-light.png" alt="Panel Copy từng mục của một listing Etsy: từng mục theo thứ tự form Etsy, số ký tự và số tag, cảnh báo vượt giới hạn tiêu đề, nút Copy.">
+</picture>
+
+### 12.4 Bài kiểm round-trip và `--clone-to` với file thật
+
+Lệnh admin này **không ghi gì vào DB và không gọi mạng**; chạy trên máy của bạn với template thật (jar của `api`, profile `admin`):
+
+```bash
+java -jar api/target/listing-guard-api.jar --spring.profiles.active=admin workspace roundtrip \
+  --file=<template> [--sheet=<tên sheet>] [--field-row=<n>] [--clone-to=<template 2>]
+```
+
+Lệnh đọc file, đoán cột như lúc nhập, xuất lại `.xlsm`/`.xlsx` và `.txt` vào một thư mục tạm (in đường dẫn), đọc lại và in **khác biệt từng ô** (kể cả "cùng số, ghi khác chữ", ví dụ `19.50` và `19.5`) và **các part của gói bị đổi** (sheet, shared strings, styles đổi theo thiết kế; macro phải "kept byte for byte"; data validation và sheet phụ phải còn). Với `--clone-to`, in **bảng ghép cột** giữa hai template theo đúng phép ghép của lúc nhân bản: cột ghép được, cột của template đầu **không có chỗ**, cột của template sau **còn trống**. Việc cần bạn làm: chạy lệnh với file `.xlsm`/`.txt` thật của từng tài khoản, tải thử file `roundtrip.*` lên Amazon (tài khoản thử), và ghi kết quả vào ADR-063 (mục chưa xác minh).
+
+### 12.5 Chưa làm, chưa đo
+
+- Chưa xác minh với template Amazon thật: kiểu ô số, ô có xuống dòng, dòng header của `.txt`, vị trí data validation (`dataValidation` hay `extLst`).
+- Xuất Excel dựng workbook trong bộ nhớ (khác phần đọc dùng SAX); chưa đo bộ nhớ với 2000 listing × template thật.
+- Hai ảnh trên chụp bằng cùng kịch bản của [mục 10](#10-chụp-lại-ảnh) (`export_screen`, `etsy_copy_screen`), trên dữ liệu tổng hợp, tiếng Anh.

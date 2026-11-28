@@ -25,9 +25,15 @@ public class AuditContexts {
      * @param catalogVersion   the catalog the client's checks are served from, null when none is served
      * @param watchlistVersion the hash of the client's enabled watchlist entries, null when it has none
      * @param watchlistRevision the revision of the list (0 when it has none)
+     * @param catalogAvailability why the catalog is or is not served (ADR-063); it is not part of {@link #key()}
      */
     public record Context(String marketplace, String rulesVersion, String trademarkRuleset, String catalogVersion, String watchlistVersion,
-                          long watchlistRevision) {
+                          long watchlistRevision, CatalogAvailability catalogAvailability) {
+
+        /** The catalog the client's checks are served from: ready, not set up (nothing is configured or activated), or not ready now. */
+        public enum CatalogAvailability {
+            READY, NOT_CONFIGURED, UNAVAILABLE
+        }
 
         /** What a finished run records as the versions it used, in one cell. */
         public String rulesetVersions() {
@@ -66,6 +72,14 @@ public class AuditContexts {
         String catalogVersion = status.state() == TrademarkCatalogRuntime.State.READY ? status.detail() : null;
         WatchlistService.Active watchlist = watchlists.active(clientId);
         String watchlistVersion = watchlist.watchlist().isEmpty() ? null : watchlist.watchlist().contentHash();
-        return new Context(code, rules, trademarkRulesets.ruleset().version(), catalogVersion, watchlistVersion, watchlist.revision());
+        Context.CatalogAvailability availability = switch (status.state()) {
+            case READY -> Context.CatalogAvailability.READY;
+            // REFUSED is a catalog that is set up and cannot be served; "not evaluated" is a catalog not known yet: both may pass
+            case REFUSED -> Context.CatalogAvailability.UNAVAILABLE;
+            case DISABLED -> TrademarkCatalogRuntime.NOT_EVALUATED.equals(status.detail()) ? Context.CatalogAvailability.UNAVAILABLE
+                    : Context.CatalogAvailability.NOT_CONFIGURED;
+        };
+        return new Context(code, rules, trademarkRulesets.ruleset().version(), catalogVersion, watchlistVersion, watchlist.revision(),
+                availability);
     }
 }

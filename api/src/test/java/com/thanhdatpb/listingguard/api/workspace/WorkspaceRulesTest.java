@@ -178,7 +178,9 @@ class WorkspaceRulesTest {
                 .hasSize(2).first().isEqualTo("ALTER TABLE workspace_listing_history DROP CONSTRAINT ck_workspace_history_kind;");
         assertThat(editor).contains("ALTER TABLE workspace_listing_history ADD CONSTRAINT ck_workspace_history_kind CHECK (change_kind IN (");
         assertThat(editor).containsOnlyOnce("DROP ").doesNotContainIgnoringCase("TRUNCATE").doesNotContainIgnoringCase("DELETE FROM");
-        String all = sql + "\n" + editor;
+        // V60 (ADR-063) creates the export log and adds two nullable columns; its shape is held by ExportSchemaTest
+        String export = Files.readString(Path.of("src/main/resources/db/migration/V60__workspace_export.sql"), StandardCharsets.UTF_8);
+        String all = sql + "\n" + editor + "\n" + export;
         Matcher tables = Pattern.compile("CREATE TABLE (workspace_\\w+)").matcher(all);
         List<String> created = new ArrayList<>();
         while (tables.find()) {

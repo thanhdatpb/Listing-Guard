@@ -59,6 +59,15 @@ public record WorkspaceProperties(
                 minInflateRatio, maxEntrySize.toBytes(), maxTextSize.toBytes());
     }
 
+    /**
+     * The limits of a written file (ADR-063): the rows and columns of an import, and the larger of the two file limits, because the template that
+     * is copied was accepted under {@code maxTemplateBytes} and the file that comes out may hold up to {@code importMaxRows} rows.
+     */
+    public SheetLimits exportLimits() {
+        return new SheetLimits(Math.max(importMaxBytes.toBytes(), maxTemplateBytes.toBytes()), importMaxRows + HEADER_ALLOWANCE, maxColumns,
+                minInflateRatio, maxEntrySize.toBytes(), maxTextSize.toBytes());
+    }
+
     /** The largest request of the upload paths: the bigger file limit plus the multipart envelope. */
     public long requestLimitBytes() {
         return Math.max(importMaxBytes.toBytes(), maxTemplateBytes.toBytes()) + FORM_OVERHEAD_BYTES;

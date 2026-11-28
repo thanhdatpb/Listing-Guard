@@ -268,19 +268,11 @@ public class WorkspaceListings {
         trimHistory(clientId, List.of(listingId));
     }
 
-    /**
-     * One page of the list. Children follow their parent: the order is the family (the parent SKU, else the SKU), the parent row first,
-     * then the SKU. {@code query} matches a part of the SKU or the title, ignoring case.
-     */
-    public Page<ListingSummary> list(UUID clientId, ListingFilter filter, int page) {
-        return list(clientId, filter, page, null);
+    /** The FROM and WHERE of a list and its arguments: the one place the filters of the list are turned into SQL. */
+    private record Filtered(String from, List<Object> args) {
     }
 
-    /**
-     * The same, filtered by the state of the latest background audit (ADR-061): {@code CLEAN}, {@code WARNING}, {@code ERROR}, {@code NEW_RISK},
-     * {@code INCOMPLETE} or {@code NONE} (never audited); null for no filter, which is the statement of before the audit existed.
-     */
-    public Page<ListingSummary> list(UUID clientId, ListingFilter filter, int page, String check) {
+    private Filtered filtered(UUID clientId, ListingFilter filter, String check) {
         StringBuilder where = new StringBuilder("l.client_id = ? AND l.deleted_at IS NULL");
         List<Object> args = new ArrayList<>();
         args.add(clientId);
@@ -321,6 +313,25 @@ public class WorkspaceListings {
         }
         String from = " FROM workspace_listing l JOIN workspace_account a ON a.id = l.account_id AND a.client_id = l.client_id" + join
                 + " WHERE " + where;
+        return new Filtered(from, args);
+    }
+
+    /**
+     * One page of the list. Children follow their parent: the order is the family (the parent SKU, else the SKU), the parent row first,
+     * then the SKU. {@code query} matches a part of the SKU or the title, ignoring case.
+     */
+    public Page<ListingSummary> list(UUID clientId, ListingFilter filter, int page) {
+        return list(clientId, filter, page, null);
+    }
+
+    /**
+     * The same, filtered by the state of the latest background audit (ADR-061): {@code CLEAN}, {@code WARNING}, {@code ERROR}, {@code NEW_RISK},
+     * {@code INCOMPLETE} or {@code NONE} (never audited); null for no filter, which is the statement of before the audit existed.
+     */
+    public Page<ListingSummary> list(UUID clientId, ListingFilter filter, int page, String check) {
+        Filtered filtered = filtered(clientId, filter, check);
+        String from = filtered.from();
+        List<Object> args = filtered.args();
         long total = jdbc.queryForObject("SELECT COUNT(*)" + from, Long.class, args.toArray());
         int safePage = Math.max(0, page);
         List<Object> pageArgs = new ArrayList<>(args);
@@ -384,6 +395,78 @@ public class WorkspaceListings {
             snapshot(clientId, listingId, ChangeKind.STATUS, changedBy);
         }
         return changed == 1;
+    }
+
+    /**
+     * The ids of the listings a filter matches, in the order of the list, at most {@code max}; one more than {@code max} is never read, so a
+     * caller can tell that the filter holds more (it asks for {@code max + 1} and compares).
+     */
+    public List<UUID> ids(UUID clientId, ListingFilter filter, int max) {
+        Filtered filtered = filtered(clientId, filter, null);
+        List<Object> args = new ArrayList<>(filtered.args());
+        args.add(max);
+        return jdbc.query("SELECT l.id" + filtered.from() + " ORDER BY a.marketplace, lower(a.name), a.id, COALESCE(l.parent_sku, l.sku), "
+                + "(l.parent_sku IS NOT NULL), l.sku LIMIT ?", (rs, n) -> rs.getObject("id", UUID.class), args.toArray());
+    }
+
+    /**
+     * Moves a listing that is ready to export out of the workspace: to EXPORTED (a file or a text was made of it) or to LIVE (an Etsy listing a
+     * person posted by hand), stamps {@code exported_at}, bumps the version and records an EXPORT entry in its history (ADR-063 §7). Guarded
+     * by the version and by the listing being ready; false when it is neither, or was changed meanwhile. The caller holds a transaction.
+     */
+    public boolean release(UUID clientId, UUID listingId, ListingStatus to, long expectedVersion, UUID changedBy) {
+        Timestamp now = Timestamp.from(clock.instant());
+        int changed = jdbc.update("UPDATE workspace_listing SET status = ?, exported_at = ?, version = version + 1, updated_at = ? WHERE id = ? "
+                + "AND client_id = ? AND version = ? AND status = 'READY_TO_EXPORT' AND deleted_at IS NULL", to.name(), now, now, listingId,
+                clientId, expectedVersion);
+        if (changed == 1) {
+            snapshot(clientId, listingId, ChangeKind.EXPORT, changedBy);
+        }
+        return changed == 1;
+    }
+
+    /** When each of these listings was last exported or posted; a listing that never was is absent. */
+    public Map<UUID, Instant> exportedAt(UUID clientId, Collection<UUID> ids) {
+        Map<UUID, Instant> found = new HashMap<>();
+        List<UUID> all = new ArrayList<>(ids);
+        for (int from = 0; from < all.size(); from += 1000) {
+            jdbc.query("SELECT id, exported_at FROM workspace_listing WHERE client_id = ? AND id = ANY (?) AND exported_at IS NOT NULL",
+                    (org.springframework.jdbc.core.RowCallbackHandler) rs -> found.put(rs.getObject("id", UUID.class),
+                            rs.getObject("exported_at", OffsetDateTime.class).toInstant()), clientId,
+                    all.subList(from, Math.min(all.size(), from + 1000)).toArray(UUID[]::new));
+        }
+        return found;
+    }
+
+    /**
+     * Moves a listing that was exported to LIVE (a person says it is on sale), guarded by the version and by the status. Records a STATUS
+     * entry. False when the listing is not exported or changed meanwhile.
+     */
+    public boolean markLive(UUID clientId, UUID listingId, long expectedVersion, UUID changedBy) {
+        int changed = jdbc.update("UPDATE workspace_listing SET status = 'LIVE', version = version + 1, updated_at = ? WHERE id = ? "
+                + "AND client_id = ? AND version = ? AND status = 'EXPORTED' AND deleted_at IS NULL", Timestamp.from(clock.instant()),
+                listingId, clientId, expectedVersion);
+        if (changed == 1) {
+            snapshot(clientId, listingId, ChangeKind.STATUS, changedBy);
+        }
+        return changed == 1;
+    }
+
+    /** The Amazon Custom rows of an account for these SKUs, by SKU. A SKU without a row is absent. */
+    public Map<String, CustomizationRow> customizationRows(UUID clientId, UUID accountId, Collection<String> skus) {
+        Map<String, CustomizationRow> found = new HashMap<>();
+        List<String> all = new ArrayList<>(skus);
+        for (int from = 0; from < all.size(); from += 1000) {
+            jdbc.query("SELECT sku, template_id, data::text AS data FROM workspace_customization WHERE client_id = ? AND account_id = ? "
+                    + "AND sku = ANY (?)", (org.springframework.jdbc.core.RowCallbackHandler) rs -> found.put(rs.getString("sku"),
+                    new CustomizationRow(rs.getString("sku"), rs.getObject("template_id", UUID.class), json.stringMap(rs.getString("data")))),
+                    clientId, accountId, all.subList(from, Math.min(all.size(), from + 1000)).toArray(String[]::new));
+        }
+        return found;
+    }
+
+    /** One Amazon Custom row: its SKU, the template version it was read with and its cells by column key. */
+    public record CustomizationRow(String sku, UUID templateId, Map<String, String> data) {
     }
 
     /** The live listings of the client with these ids, by id. A listing of another client is simply absent. */

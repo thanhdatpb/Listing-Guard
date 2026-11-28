@@ -68,4 +68,5 @@ log ids and counts only. See [the workspace guide](../workspace.md#7-sao-lưu-xu
 ```bash
 docker compose run --rm admin workspace export --client=<id|name> [--out=<dir>] [--include-deleted]
 docker compose run --rm admin workspace purge  --client=<id|name> [--confirm=<code>]
+docker compose run --rm admin workspace roundtrip --file=<template> [--sheet=<name>] [--field-row=<n>] [--clone-to=<template 2>]   # ADR-063: no database; the file must be inside the container
 ```
