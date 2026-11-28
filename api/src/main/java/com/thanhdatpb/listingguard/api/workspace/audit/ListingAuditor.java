@@ -14,6 +14,7 @@ import com.thanhdatpb.listingguard.api.trademark.TrademarkCheckService;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkRulesets;
 import com.thanhdatpb.listingguard.api.trademark.TrademarkUnavailableException;
 import com.thanhdatpb.listingguard.api.workspace.EtsyFields;
+import com.thanhdatpb.listingguard.api.workspace.ListingComparison;
 import com.thanhdatpb.listingguard.api.workspace.StandardTargets;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceModels.Listing;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceModels.Template;
@@ -92,9 +93,12 @@ public class ListingAuditor {
         final Set<String> scopeFields;
         final Context context;
         final String analysisVersion;
+        final Template template;
         private final Supplier<Map<UUID, Instant>> entryTimes;
 
-        Env(UUID clientId, UUID accountId, Marketplace marketplace, Set<String> scopeFields, Context context, Supplier<Map<UUID, Instant>> entryTimes) {
+        Env(UUID clientId, UUID accountId, Marketplace marketplace, Template template, Set<String> scopeFields, Context context,
+            Supplier<Map<UUID, Instant>> entryTimes) {
+            this.template = template;
             this.clientId = clientId;
             this.accountId = accountId;
             this.marketplace = marketplace;
@@ -118,9 +122,14 @@ public class ListingAuditor {
     private final AuditProperties properties;
     private final TextNormalizer normalizer;
     private final Clock clock;
+    private final ListingComparison comparison;
+    private final CloneLeftoverFinder cloneLeftovers;
 
     public ListingAuditor(CheckService checks, TrademarkCheckService trademarks, AuditStore store, ReauditBaselines baselines,
-                          StandardTargets targets, EtsyFields etsyFields, AuditProperties properties, TrademarkRulesets rulesets, Clock clock) {
+                          StandardTargets targets, EtsyFields etsyFields, AuditProperties properties, TrademarkRulesets rulesets, Clock clock,
+                          ListingComparison comparison, CloneLeftoverPack clonePack) {
+        this.comparison = comparison;
+        this.cloneLeftovers = new CloneLeftoverFinder(clonePack, targets);
         this.checks = checks;
         this.trademarks = trademarks;
         this.store = store;
@@ -156,7 +165,7 @@ public class ListingAuditor {
 
     public Env env(UUID clientId, UUID accountId, Marketplace marketplace, Template template, Context context,
                    Supplier<Map<UUID, Instant>> entryTimes) {
-        return new Env(clientId, accountId, marketplace, scopeFields(marketplace, template), context, entryTimes);
+        return new Env(clientId, accountId, marketplace, template, scopeFields(marketplace, template), context, entryTimes);
     }
 
     /** Audits {@code listing} (a live listing of {@code env}'s client and account) and stores the result, unless it is already up to date. */
@@ -166,9 +175,17 @@ public class ListingAuditor {
         }
         JsonNode fields = listing.fields();
         String inputHash = AuditHasher.input(fields);
+        // a clone is also compared with its original while the pack clone-leftover is on (ADR-039 §4); its analysis version then holds the pack and what
+        // of the original decides the result, so it is audited again once when the switch is turned on and when its original changes. With the switch off,
+        // or for a listing that is no clone, the analysis version is the one every listing had
+        Optional<ListingComparison.Alignment> alignment = env.context.cloneLeftover() != null && listing.clonedFrom() != null
+                ? comparison.aligned(env.clientId, listing, env.template) : Optional.empty();
+        String analysisVersion = env.context.cloneLeftover() != null && listing.clonedFrom() != null
+                ? env.context.cloneAnalysisVersion(env.scopeFields, alignment.map(a -> a.original().templateId() + ":" + a.original().contentHash()).orElse("none"))
+                : env.analysisVersion;
         Optional<StoredAudit> prior = store.audit(env.clientId, listing.id());
         // an audit stored before V60 has no trademark reason: it is made again once, so the gate knows why its trademark part did not run
-        if (prior.isPresent() && prior.get().inputHash().equals(inputHash) && prior.get().analysisVersion().equals(env.analysisVersion)
+        if (prior.isPresent() && prior.get().inputHash().equals(inputHash) && prior.get().analysisVersion().equals(analysisVersion)
                 && prior.get().trademarkReason() != null) {
             return new Result(Outcome.SKIPPED, prior.get());
         }
@@ -181,6 +198,7 @@ public class ListingAuditor {
             CheckResult result = scoped.result();
             rulesAnalysis = result.analysisVersion();
             ruleFindings(env, request, result, texts, found);
+            alignment.ifPresent(a -> cloneFindings(env, a, listing, texts, found));
         } catch (QuotaExceededException e) {
             return new Result(Outcome.QUOTA, null);
         } catch (PlanNotAllowedException e) {
@@ -235,7 +253,7 @@ public class ListingAuditor {
         int fresh = (int) findings.stream().filter(NewFinding::isNew).count();
         State state = fresh > 0 ? State.NEW_RISK : errors > 0 ? State.ERROR : warnings > 0 ? State.WARNING : !trademarkRan ? State.INCOMPLETE : State.CLEAN;
         boolean nothingNewlyNew = fresh == 0 || stillTheSameNewRisks(prior.orElse(null), inputHash, findings);
-        StoredAudit audit = new StoredAudit(listing.id(), env.clientId, env.accountId, runId, state, inputHash, env.analysisVersion, rulesAnalysis,
+        StoredAudit audit = new StoredAudit(listing.id(), env.clientId, env.accountId, runId, state, inputHash, analysisVersion, rulesAnalysis,
                 trademarkAnalysis, trademarkRan, listing.version(), catalogVersion, watchlistVersion, errors, warnings, fresh, now,
                 nothingNewlyNew ? prior.map(StoredAudit::alertedAt).orElse(null) : null,
                 fresh == 0 || nothingNewlyNew ? prior.map(StoredAudit::ackAt).orElse(null) : null, trademarkReason);
@@ -286,6 +304,19 @@ public class ListingAuditor {
             }
             found.add(new NewFinding(RULES_PACK, problem.ruleId(), problem.severity() == Severity.ERROR ? Level.ERROR : Level.WARNING, Source.RULE,
                     problem.field(), start, end, null, null, null, null, null, problem.message(), problem.suggestion(), false));
+        }
+    }
+
+    // ------------------------------------------------------------------ the comparison with the original (ADR-039 §4)
+
+    /**
+     * The values of the original that a clone still states, from the pack {@code clone-leftover}: a WARNING each, with the span of the old value in the
+     * stored text of its field. It adds findings and changes none: the rule findings above are exactly what the check API gives.
+     */
+    private void cloneFindings(Env env, ListingComparison.Alignment alignment, Listing listing, Map<String, String> texts, List<NewFinding> found) {
+        for (CloneLeftoverFinder.Leftover leftover : cloneLeftovers.find(env.marketplace, alignment, listing, texts)) {
+            found.add(new NewFinding(CloneLeftoverPack.PACK, CloneLeftoverPack.RULE_ID, Level.WARNING, Source.RULE, leftover.field(), leftover.start(),
+                    leftover.end(), null, null, null, null, null, leftover.message(), leftover.suggestion(), false));
         }
     }
 

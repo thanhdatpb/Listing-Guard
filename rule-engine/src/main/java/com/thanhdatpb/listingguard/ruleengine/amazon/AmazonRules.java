@@ -1,6 +1,8 @@
 package com.thanhdatpb.listingguard.ruleengine.amazon;
 
 import com.thanhdatpb.listingguard.ruleengine.Rule;
+import com.thanhdatpb.listingguard.ruleengine.hygiene.ContentRules;
+import java.util.ArrayList;
 import java.util.List;
 
 /** The Amazon rule set, in the order findings are reported. */
@@ -12,7 +14,7 @@ public final class AmazonRules {
     }
 
     public static List<Rule> all() {
-        return List.of(
+        List<Rule> rules = new ArrayList<>(List.of(
                 new RequiredFieldsRule(),
                 new TitleLengthRule(),
                 new TitleRepeatedWordsRule(),
@@ -28,6 +30,8 @@ public final class AmazonRules {
                 new CustomizationImageInputCountRule(),
                 new CustomizationTextInputMaxCharsRule(),
                 new CustomizationFreeTextSensitiveRule(),
-                new CategoryNotCoveredRule());
+                new CategoryNotCoveredRule()));
+        rules.addAll(ContentRules.all());
+        return List.copyOf(rules);
     }
 }

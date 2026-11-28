@@ -1,0 +1,15 @@
+# Synthetic sample case (ADR-032): self-written, not taken from a real listing; the DEMO marks are invented.
+id: amazon-11-content-lookalikes
+marketplace: AMAZON
+note: 'Texts that look like leftovers and are not: a count and a size, mom and dad, a weight, a short brand in capitals.'
+listing:
+  title: "Northfield BMW Style Stoneware Mug, 2 Pack of 11 oz for Mom and Dad"
+  brand: Northfield Pottery
+  bullet_points: ["Each 11oz mug is dishwasher safe", "The mug weighs 9 oz empty", "Gift for mom and dad"]
+  description: "A 2 pack of stoneware mugs finished with a blue glaze (hand wash if you like) :)"
+  search_terms: "ceramic mug stoneware cup"
+  product_type: DRINKING_CUP
+  price: 28.00
+  quantity: 4
+expected: []
+trademark_risk: LOW

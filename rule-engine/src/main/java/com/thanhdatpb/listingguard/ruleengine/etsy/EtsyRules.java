@@ -1,6 +1,8 @@
 package com.thanhdatpb.listingguard.ruleengine.etsy;
 
 import com.thanhdatpb.listingguard.ruleengine.Rule;
+import com.thanhdatpb.listingguard.ruleengine.hygiene.ContentRules;
+import java.util.ArrayList;
 import java.util.List;
 
 /** The Etsy rule set, in the order findings are reported. */
@@ -12,7 +14,7 @@ public final class EtsyRules {
     }
 
     public static List<Rule> all() {
-        return List.of(
+        List<Rule> rules = new ArrayList<>(List.of(
                 new RequiredFieldsRule(),
                 new PriceQuantityPositiveRule(),
                 new TitleLengthRule(),
@@ -31,6 +33,8 @@ public final class EtsyRules {
                 new PersonalizationDropdownOptionsRule(),
                 new PersonalizationUploadFilesRule(),
                 new PersonalizationInstructionsLengthRule(),
-                new PersonalizationFreeTextSensitiveRule());
+                new PersonalizationFreeTextSensitiveRule()));
+        rules.addAll(ContentRules.all());
+        return List.copyOf(rules);
     }
 }

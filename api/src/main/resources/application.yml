@@ -42,6 +42,8 @@ listing-guard:
       schedule-cron: ${LISTING_GUARD_WORKSPACE_AUDIT_SCHEDULE_CRON:}
       keep-runs: ${LISTING_GUARD_WORKSPACE_AUDIT_KEEP_RUNS:30}
       max-findings: ${LISTING_GUARD_WORKSPACE_AUDIT_MAX_FINDINGS:100}
+      # Also compare a clone with its original (ADR-039, pack clone-leftover). Off: nothing changes, and no clone is audited again.
+      clone-leftover: ${LISTING_GUARD_WORKSPACE_AUDIT_CLONE_LEFTOVER:false}
     alerts:
       email:
         enabled: ${LISTING_GUARD_WORKSPACE_ALERTS_EMAIL_ENABLED:false}

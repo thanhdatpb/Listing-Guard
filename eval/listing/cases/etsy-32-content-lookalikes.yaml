@@ -1,0 +1,15 @@
+# Synthetic sample case (ADR-032): self-written, not taken from a real listing; the DEMO marks are invented.
+id: etsy-32-content-lookalikes
+marketplace: ETSY
+note: 'Texts that look like leftovers and are not: Mom and Dad, 2 pack of 11oz, a short brand in capitals, a smiley and numbered lines.'
+listing:
+  title: 'Mom and Dad Gift 2 Pack of 11oz Mugs BMW Style'
+  description: 'A 2 pack of 11oz mugs. Each 11oz mug is dishwasher safe (hand wash if you like) :) 1) glazed 2) fired. A perfect gift for mom and dad. Available in 11oz and 15oz.'
+  tags: [mom dad gift, 2 pack mugs, ceramic mug, blue glaze, kitchen gift]
+  price: 28.00
+  quantity: 4
+  who_made: i_did
+  when_made: made_to_order
+  category: Home & Living > Kitchen & Dining > Drinkware > Mugs
+expected: []
+trademark_risk: LOW

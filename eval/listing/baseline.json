@@ -1,14 +1,46 @@
 {
   "format" : "listing-guard/eval-listing-baseline/v1",
   "rulesetVersions" : {
-    "AMAZON" : "amazon-2026-12c",
-    "ETSY" : "etsy-2026-12"
+    "AMAZON" : "amazon-2026-12d",
+    "ETSY" : "etsy-2026-12b"
   },
   "trademarkRulesetVersion" : "trademark-risk-2026-11b",
-  "cases" : 27,
+  "cases" : 43,
   "rules" : [ {
+    "key" : "AMAZON/mojibake",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "AMAZON/placeholder_leftover",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "AMAZON/product_noun_conflict",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
     "key" : "AMAZON/prohibited_content",
     "sourceStatus" : "SECONDARY",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "AMAZON/quantity_conflict",
+    "sourceStatus" : "UNVERIFIED",
     "truePositives" : 1,
     "falsePositives" : 0,
     "falseNegatives" : 0,
@@ -39,7 +71,23 @@
     "precision" : 1.0,
     "recall" : 1.0
   }, {
+    "key" : "ETSY/all_caps_ratio",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
     "key" : "ETSY/duplicate_tags",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/mojibake",
     "sourceStatus" : "UNVERIFIED",
     "truePositives" : 1,
     "falsePositives" : 0,
@@ -87,6 +135,14 @@
     "precision" : 1.0,
     "recall" : 1.0
   }, {
+    "key" : "ETSY/placeholder_leftover",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
     "key" : "ETSY/price_quantity_positive",
     "sourceStatus" : "VERIFIED",
     "truePositives" : 2,
@@ -95,9 +151,49 @@
     "precision" : 1.0,
     "recall" : 1.0
   }, {
+    "key" : "ETSY/product_noun_conflict",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/quantity_conflict",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/recipient_conflict",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/repeated_word",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
     "key" : "ETSY/required_fields",
     "sourceStatus" : "VERIFIED",
     "truePositives" : 2,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/size_unit_conflict",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
     "falsePositives" : 0,
     "falseNegatives" : 0,
     "precision" : 1.0,
@@ -153,7 +249,7 @@
   }, {
     "key" : "ETSY/title_repeated_words",
     "sourceStatus" : "SECONDARY",
-    "truePositives" : 1,
+    "truePositives" : 2,
     "falsePositives" : 0,
     "falseNegatives" : 0,
     "precision" : 1.0,
@@ -161,6 +257,22 @@
   }, {
     "key" : "ETSY/title_word_count",
     "sourceStatus" : "SECONDARY",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/unbalanced_brackets",
+    "sourceStatus" : "UNVERIFIED",
+    "truePositives" : 1,
+    "falsePositives" : 0,
+    "falseNegatives" : 0,
+    "precision" : 1.0,
+    "recall" : 1.0
+  }, {
+    "key" : "ETSY/whitespace",
+    "sourceStatus" : "UNVERIFIED",
     "truePositives" : 1,
     "falsePositives" : 0,
     "falseNegatives" : 0,

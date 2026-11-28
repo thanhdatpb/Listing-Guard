@@ -34,7 +34,7 @@ See `queries.yaml` for the format.
 
 Do the listing rules and the trademark scan report what a correct checker reports? (ADR-032)
 
-- `cases/<id>.yaml`: 27 self-written, synthetic listings (21 Etsy, 6 Amazon), each with **every** finding a correct checker reports
+- `cases/<id>.yaml`: 43 self-written, synthetic listings (32 Etsy, 11 Amazon), each with **every** finding a correct checker reports
   (`rule`, optional `field`, optional `mark` for a trademark rule) and optionally the overall trademark level. None is a real
   listing; the trademark part is scanned with the DEMO catalog of `catalogs/demo/` (invented marks), never with a served catalog.
   The format is in `ListingEvalCase`; the loader refuses an unknown key, an id that is not the file name and a rule the active
@@ -45,6 +45,9 @@ Do the listing rules and the trademark scan report what a correct checker report
 How a result is scored: a reported finding is its rule, its field and (trademark) the normalized catalog mark, repeats counted once.
 Each expected entry is one true positive or one false negative of its rule; each reported finding that no entry matches is one false
 positive of its rule. Listing rules are keyed per marketplace (`ETSY/title_length`), trademark rules `trademark/<rule>`.
+
+The cases are scored with the ruleset versions that have the content rules of ADR-039 (`etsy-2026-12b`, `amazon-2026-12d`), named in `application-eval-listing.yml`: the job and the CI gate
+read that one list. Their rules are `unverified`, so the gate reports them and does not fail on them.
 
 **The gate**: CI fails when the precision of a rule whose source is `verified` falls below `baseline.json`, or when a case cannot be
 analysed completely (`ListingEvalGateTest`, part of `./mvnw verify`, no Docker; its report goes to the job summary). Recall and the

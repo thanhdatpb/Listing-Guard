@@ -26,9 +26,18 @@ public class AuditContexts {
      * @param watchlistVersion the hash of the client's enabled watchlist entries, null when it has none
      * @param watchlistRevision the revision of the list (0 when it has none)
      * @param catalogAvailability why the catalog is or is not served (ADR-063); it is not part of {@link #key()}
+     * @param cloneLeftover   the version and hash of the pack {@code clone-leftover} (ADR-039) when the comparison of a clone with its original is on, otherwise
+     *                        null. It changes {@link #key()} (so a run is queued when the switch is turned on) but not {@link #analysisVersion}: only a clone's own
+     *                        analysis version holds it ({@link #cloneAnalysisVersion})
      */
     public record Context(String marketplace, String rulesVersion, String trademarkRuleset, String catalogVersion, String watchlistVersion,
-                          long watchlistRevision, CatalogAvailability catalogAvailability) {
+                          long watchlistRevision, CatalogAvailability catalogAvailability, String cloneLeftover) {
+
+        /** A context without the comparison of clones: what every context was before ADR-039. */
+        public Context(String marketplace, String rulesVersion, String trademarkRuleset, String catalogVersion, String watchlistVersion,
+                       long watchlistRevision, CatalogAvailability catalogAvailability) {
+            this(marketplace, rulesVersion, trademarkRuleset, catalogVersion, watchlistVersion, watchlistRevision, catalogAvailability, null);
+        }
 
         /** The catalog the client's checks are served from: ready, not set up (nothing is configured or activated), or not ready now. */
         public enum CatalogAvailability {
@@ -40,15 +49,29 @@ public class AuditContexts {
             return "rules=" + rulesVersion + ";trademark=" + trademarkRuleset;
         }
 
-        /** The key of the whole context: one value to compare with the one a run stored. */
+        /** The key of the whole context: one value to compare with the one a run stored. Without the clone comparison it is what it always was. */
         public String key() {
+            String base = baseKey();
+            return cloneLeftover == null ? base : AuditHasher.analysis(List.of("ctx2", base, cloneLeftover));
+        }
+
+        private String baseKey() {
             return AuditHasher.analysis(List.of("ctx1", marketplace, rulesVersion, trademarkRuleset, String.valueOf(catalogVersion),
                     String.valueOf(watchlistVersion)));
         }
 
-        /** The analysis version of a listing audited under this context and this scope (the fields its template has). */
+        /** The analysis version of a listing audited under this context and this scope (the fields its template has). It ignores the clone comparison. */
         public String analysisVersion(Set<String> scopeFields) {
-            return AuditHasher.analysis(List.of("analysis1", key(), String.join(",", new TreeSet<>(scopeFields))));
+            return AuditHasher.analysis(List.of("analysis1", baseKey(), String.join(",", new TreeSet<>(scopeFields))));
+        }
+
+        /**
+         * The analysis version of a clone while the comparison with its original is on: the version of its listing and scope, the pack, and what of the
+         * original decides the result ({@code originalKey}: its template and content hash, or {@code none} when the original is gone). A clone is audited
+         * again when the pack, its original or the original's template changes, and a listing that is no clone never carries this.
+         */
+        public String cloneAnalysisVersion(Set<String> scopeFields, String originalKey) {
+            return AuditHasher.analysis(List.of("analysis1+clone", analysisVersion(scopeFields), String.valueOf(cloneLeftover), originalKey));
         }
     }
 
@@ -56,9 +79,13 @@ public class AuditContexts {
     private final TrademarkRulesets trademarkRulesets;
     private final TrademarkCatalogRuntime catalog;
     private final WatchlistService watchlists;
+    private final AuditProperties properties;
+    private final CloneLeftoverPack clonePack;
 
     public AuditContexts(ActiveRulesets rulesets, TrademarkRulesets trademarkRulesets, TrademarkCatalogRuntime catalog,
-                         WatchlistService watchlists) {
+                         WatchlistService watchlists, AuditProperties properties, CloneLeftoverPack clonePack) {
+        this.properties = properties;
+        this.clonePack = clonePack;
         this.rulesets = rulesets;
         this.trademarkRulesets = trademarkRulesets;
         this.catalog = catalog;
@@ -80,6 +107,6 @@ public class AuditContexts {
                     : Context.CatalogAvailability.NOT_CONFIGURED;
         };
         return new Context(code, rules, trademarkRulesets.ruleset().version(), catalogVersion, watchlistVersion, watchlist.revision(),
-                availability);
+                availability, properties.cloneLeftover() ? clonePack.identity() : null);
     }
 }

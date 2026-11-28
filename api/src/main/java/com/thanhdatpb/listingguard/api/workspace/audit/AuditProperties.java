@@ -16,6 +16,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param scheduleCron  a Spring cron expression for the periodic audit of every account; empty (the default) means no periodic audit
  * @param keepRuns      how many finished runs of one seller account are kept
  * @param maxFindings   the most findings kept for one listing
+ * @param cloneLeftover whether a clone is also compared with its original (ADR-039, pack {@code clone-leftover}); off by default, and with it off an
+ *                      audit is exactly what it was: the same findings, the same analysis versions, no clone is audited again
  */
 @ConfigurationProperties(prefix = "listing-guard.workspace.audit")
 public record AuditProperties(
@@ -27,7 +29,8 @@ public record AuditProperties(
         @DefaultValue("30s") Duration driftInterval,
         @DefaultValue("") String scheduleCron,
         @DefaultValue("30") int keepRuns,
-        @DefaultValue("100") int maxFindings) {
+        @DefaultValue("100") int maxFindings,
+        @DefaultValue("false") boolean cloneLeftover) {
 
     public AuditProperties {
         if (concurrency < 1 || concurrency > 8) {

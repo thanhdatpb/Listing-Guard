@@ -1,0 +1,17 @@
+# Synthetic sample case (ADR-032): self-written, not taken from a real listing; the DEMO marks are invented.
+id: etsy-23-placeholder-leftover
+marketplace: ETSY
+note: 'The description still has the placeholder the seller meant to replace.'
+listing:
+  title: 'Handmade Ceramic Coffee Mug with Blue Glaze'
+  description: 'A stoneware mug made for [NAME] and finished with a blue glaze. Holds about 350 ml.'
+  tags: [ceramic mug, coffee mug, blue glaze, stoneware, kitchen gift]
+  price: 28.00
+  quantity: 4
+  who_made: i_did
+  when_made: made_to_order
+  category: Home & Living > Kitchen & Dining > Drinkware > Mugs
+expected:
+  - rule: placeholder_leftover
+    field: description
+trademark_risk: LOW

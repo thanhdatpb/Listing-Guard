@@ -47,7 +47,7 @@ public class ListingEvalGateTest {
         boolean update = Boolean.getBoolean("eval.listing.update");
 
         ListingEvalRunner.Outcome outcome = ListingEvalRunner.evaluate(LISTING_DIR, DEMO_DIR, normalizers(),
-                new RuleEngine(RuleRegistry.withDefaults()), activeRulesets(), trademarkRuleset(), REPORT_DIR, update);
+                new RuleEngine(RuleRegistry.withDefaults()), evalRulesets(), trademarkRuleset(), REPORT_DIR, update);
 
         assertThat(outcome.result().cases()).as("the sample set has at least 20 cases").isGreaterThanOrEqualTo(20);
         assertThat(outcome.result().problems()).as("cases whose analysis was not complete").isEmpty();
@@ -70,8 +70,22 @@ public class ListingEvalGateTest {
 
     /** The listing-rules rulesets {@code listing-guard.rulesets.locations} names, by marketplace. */
     public static java.util.function.Function<String, RulesetConfig> activeRulesets() throws IOException {
+        return rulesets(application());
+    }
+
+    /**
+     * The rulesets the labelled sample set is scored with: the list of {@code application-eval-listing.yml}, which the one-shot job uses too, so the gate
+     * and the job cannot differ. It names the versions that have the content rules of ADR-039; the default list of {@code application.yml} is the older one.
+     */
+    public static java.util.function.Function<String, RulesetConfig> evalRulesets() throws IOException {
+        JsonNode profile = new ObjectMapper(new YAMLFactory()).readTree(Files.readString(
+                Path.of("src", "main", "resources", "application-eval-listing.yml"), StandardCharsets.UTF_8));
+        return rulesets(profile);
+    }
+
+    private static java.util.function.Function<String, RulesetConfig> rulesets(JsonNode root) {
         Map<String, RulesetConfig> byMarketplace = new HashMap<>();
-        for (JsonNode location : application().path("listing-guard").path("rulesets").path("locations")) {
+        for (JsonNode location : root.path("listing-guard").path("rulesets").path("locations")) {
             RulesetConfig config = RulesetLoader.loadClasspath(classpath(location.asText()));
             byMarketplace.put(config.marketplace().toUpperCase(Locale.ROOT), config);
         }

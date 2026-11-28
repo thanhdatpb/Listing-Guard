@@ -1,0 +1,17 @@
+# Synthetic sample case (ADR-032): self-written, not taken from a real listing; the DEMO marks are invented.
+id: amazon-10-clone-quantity-leftover
+marketplace: AMAZON
+note: 'A copied listing: the title says pack of 2 and a bullet point says 4 pieces.'
+listing:
+  title: "Northfield Pottery Stoneware Coffee Mug, Pack of 2, 12 oz"
+  brand: Northfield Pottery
+  bullet_points: ["Stoneware mug thrown on the wheel", "Includes 4 pieces", "Dishwasher safe"]
+  description: "A stoneware mug finished with a blue glaze."
+  search_terms: "ceramic mug stoneware cup"
+  product_type: DRINKING_CUP
+  price: 28.00
+  quantity: 4
+expected:
+  - rule: quantity_conflict
+    field: bullet_points[1]
+trademark_risk: LOW
