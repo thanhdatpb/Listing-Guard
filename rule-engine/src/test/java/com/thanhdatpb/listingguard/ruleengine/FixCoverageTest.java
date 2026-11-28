@@ -94,7 +94,7 @@ class FixCoverageTest {
 
         List<Finding> findings = ENGINE.runDetailed(listing, config).findings();
 
-        Set<String> enabledRules = RuleRegistry.withDefaults().rulesFor("ETSY").stream().map(Rule::id)
+        Set<String> enabledRules = RuleRegistry.withDefaults().rulesFor("ETSY").stream().filter(rule -> !rule.optional()).map(Rule::id)
                 .filter(id -> config.rule(id).enabled()).collect(Collectors.toCollection(TreeSet::new));
         assertThat(enabledRules).as("banned_words is switched off in this ruleset").doesNotContain("banned_words");
         assertThat(findings.stream().map(Finding::ruleId).collect(Collectors.toSet()))

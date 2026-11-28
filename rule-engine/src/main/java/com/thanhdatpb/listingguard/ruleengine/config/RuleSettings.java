@@ -101,6 +101,23 @@ public record RuleSettings(String ruleId, Severity severity, Source source, Map<
         throw invalid(name, "a non-empty mapping of names to non-empty strings", value);
     }
 
+    /** A mapping from names to lists of strings, in the order of the YAML file; an empty mapping is refused. */
+    public Map<String, List<String>> stringListMapParam(String name) {
+        Object value = require(name);
+        if (value instanceof Map<?, ?> map && !map.isEmpty()) {
+            Map<String, List<String>> copy = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!(entry.getKey() instanceof String key) || !(entry.getValue() instanceof List<?> list)
+                        || !list.stream().allMatch(item -> item instanceof String)) {
+                    throw invalid(name, "a mapping of names to lists of strings", value);
+                }
+                copy.put(key, list.stream().map(String.class::cast).toList());
+            }
+            return copy;
+        }
+        throw invalid(name, "a non-empty mapping of names to lists of strings", value);
+    }
+
     private Object require(String name) {
         Object value = params.get(name);
         if (value == null) {

@@ -140,4 +140,44 @@ class FrozenRulesetsTest {
             assertThat(current.rule(id)).as("rule %s is unchanged", id).isEqualTo(old.rule(id));
         }
     }
+
+    @Test
+    void etsy202612bIsUnchanged() {
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/etsy-2026-12b.yaml");
+
+        assertThat(config.version()).isEqualTo("etsy-2026-12b");
+        assertThat(config.contentHash()).isEqualTo("dc7c23f6dda0bfc20d596dd5664d3b538e1e161c01b5115cda7c6d7b5637fe8d");
+    }
+
+    @Test
+    void amazon202612dIsUnchanged() {
+        RulesetConfig config = RulesetLoader.loadClasspath("rulesets/amazon-2026-12d.yaml");
+
+        assertThat(config.version()).isEqualTo("amazon-2026-12d");
+        assertThat(config.contentHash()).isEqualTo("9929350ce9176b1d2827976689103f4e4de29f476c93acafa5b0b9b1b1611184");
+    }
+
+    @Test
+    void etsy202612bAddsTheTenContentRulesAndChangesNothingElse() {
+        RulesetConfig old = RulesetLoader.loadClasspath("rulesets/etsy-2026-12.yaml");
+        RulesetConfig current = RulesetLoader.loadClasspath("rulesets/etsy-2026-12b.yaml");
+
+        assertThat(current.contentHash()).isNotEqualTo(old.contentHash());
+        assertThat(current.rules().keySet()).containsAll(old.rules().keySet()).hasSize(old.rules().size() + 10);
+        for (String id : old.rules().keySet()) {
+            assertThat(current.rule(id)).as("rule %s is unchanged", id).isEqualTo(old.rule(id));
+        }
+    }
+
+    @Test
+    void amazon202612dAddsTheTenContentRulesAndChangesNothingElse() {
+        RulesetConfig old = RulesetLoader.loadClasspath("rulesets/amazon-2026-12c.yaml");
+        RulesetConfig current = RulesetLoader.loadClasspath("rulesets/amazon-2026-12d.yaml");
+
+        assertThat(current.contentHash()).isNotEqualTo(old.contentHash());
+        assertThat(current.rules().keySet()).containsAll(old.rules().keySet()).hasSize(old.rules().size() + 10);
+        for (String id : old.rules().keySet()) {
+            assertThat(current.rule(id)).as("rule %s is unchanged", id).isEqualTo(old.rule(id));
+        }
+    }
 }

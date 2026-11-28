@@ -19,6 +19,15 @@ public interface Rule {
 
     List<Finding> evaluate(Listing listing, RulesetConfig config);
 
+    /**
+     * True for a rule that a ruleset may leave out (ADR-039). {@link RuleEngine} runs, validates and lists the limits of an optional rule
+     * only for a ruleset that configures it, so a ruleset published before the rule existed keeps its exact results and still starts.
+     * Every other rule must be configured by every ruleset of its marketplace, as before.
+     */
+    default boolean optional() {
+        return false;
+    }
+
     /** Severity configured for this rule in the given ruleset. */
     default Severity severity(RulesetConfig config) {
         return config.rule(id()).severity();

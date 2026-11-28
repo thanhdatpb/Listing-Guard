@@ -99,7 +99,7 @@ public final class RuleEngine {
         if (checkedFields == null) {
             return skips;
         }
-        for (Rule rule : registry.rulesFor(config.packId(), config.marketplace())) {
+        for (Rule rule : rules(config)) {
             if (rule instanceof FieldScopedRule scoped && config.rule(rule.id(), listing.productType()).enabled()) {
                 Set<String> skipped = new LinkedHashSet<>(scoped.scopedFields(listing, config));
                 skipped.removeIf(checkedFields::contains);
@@ -123,7 +123,7 @@ public final class RuleEngine {
      */
     public List<RuleLimit> limits(RulesetConfig config, String category) {
         List<RuleLimit> limits = new ArrayList<>();
-        for (Rule rule : registry.rulesFor(config.packId(), config.marketplace())) {
+        for (Rule rule : rules(config)) {
             RuleSettings settings = config.rule(rule.id(), category);
             for (Limit limit : rule.limits(settings)) {
                 limits.add(new RuleLimit(limit.field(), rule.id(), limit.kind(), limit.value(), limit.unit(),
@@ -133,12 +133,18 @@ public final class RuleEngine {
         return List.copyOf(limits);
     }
 
+    /** The rules that apply to the ruleset: every registered rule, but an optional one only when the ruleset configures it (ADR-039). */
+    private List<Rule> rules(RulesetConfig config) {
+        return registry.rulesFor(config.packId(), config.marketplace()).stream()
+                .filter(rule -> !rule.optional() || config.rules().containsKey(rule.id())).toList();
+    }
+
     private Evaluation evaluate(Listing listing, RulesetConfig config, Set<String> checkedFields) {
         List<Finding> findings = new ArrayList<>();
         List<String> failed = new ArrayList<>();
         Set<String> skippedRules = new LinkedHashSet<>();
         Set<String> skippedFields = new LinkedHashSet<>();
-        for (Rule rule : registry.rulesFor(config.packId(), config.marketplace())) {
+        for (Rule rule : rules(config)) {
             try {
                 if (!config.rule(rule.id(), listing.productType()).enabled()) {
                     continue;
@@ -220,7 +226,9 @@ public final class RuleEngine {
         Set<String> known = new HashSet<>();
         for (Rule rule : rules) {
             known.add(rule.id());
-            rule.validate(config);
+            if (!rule.optional() || config.rules().containsKey(rule.id())) {
+                rule.validate(config);
+            }
         }
         for (String configured : config.rules().keySet()) {
             if (!known.contains(configured)) {

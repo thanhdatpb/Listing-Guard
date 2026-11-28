@@ -39,7 +39,7 @@ class AmazonRulesetTest {
     @Test
     void everyRegisteredAmazonRuleHasConfigurationAndTheRulesetHasNoUnknownRule() {
         engine.validate(CONFIG);
-        assertThat(AmazonRules.all()).extracting(Rule::id).containsExactlyInAnyOrderElementsOf(CONFIG.rules().keySet());
+        assertThat(AmazonRules.all().stream().filter(rule -> !rule.optional()).toList()).extracting(Rule::id).containsExactlyInAnyOrderElementsOf(CONFIG.rules().keySet());
     }
 
     @Test

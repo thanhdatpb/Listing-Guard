@@ -1,0 +1,502 @@
+# Amazon ruleset. Thresholds, word lists and severities live here; rule logic lives in Java (ADR-001).
+# Settings can be overridden per product type under `categories` (ADR-006). None are overridden yet: the
+# product type limits are published only in Amazon's per-product-type schemas and in Seller Central help
+# pages, which need a seller login; a later version will add them.
+#
+# Successor of amazon-2026-11, which is kept unchanged as history. Changes: the title limit is 75 characters
+# (Seller Forums announcement of June 10, 2026, effective July 27, 2026), the new rule item_highlights_length, and
+# prohibited_content also scans item_highlights.
+#
+# Successor of amazon-2026-12, which is kept unchanged as history (a test pins its hash). A change inside the same month
+# gets a letter after the month: 2026-12b, then 2026-12c. Changes: the optional `customization` input block (Amazon Custom
+# products) and its rules customization_text_input_count, customization_dropdown_options, customization_image_input_count,
+# customization_text_input_max_chars and customization_free_text_sensitive. Every other rule is copied as it was.
+#
+# Successor of amazon-2026-12b, which is kept unchanged as history (a test pins its hash). Change: the new rule
+# description_length (WARNING, source unverified: no official page could be read and no Amazon text names the number). Every
+# other rule is copied as it was.
+#
+# Successor of amazon-2026-12c, which is kept unchanged as history (a test pins its hash). Change (ADR-039): the same ten rules of content hygiene and
+# of facts a copied listing tells two ways as etsy-2026-12b (mojibake, placeholder_leftover, whitespace, unbalanced_brackets, repeated_word,
+# all_caps_ratio, size_unit_conflict, quantity_conflict, recipient_conflict, product_noun_conflict), over the Amazon texts (title, brand, bullet
+# points, description, item highlights, search terms). Internal quality rules, not Amazon policy: every source is unverified and every severity
+# WARNING. Every earlier rule is copied as it was. This version is opt-in: the default of application.yml stays amazon-2026-12c;
+# LISTING_GUARD_AMAZON_RULESET selects this one (deploy/env.pilot.example).#
+# Any change to this file changes its content hash. Bump `version` for every change: the API refuses to
+# start when a registered version has a different hash (ADR-002).
+#
+# Severity policy for Amazon (differs from Etsy, see ADR-006): ERROR only when the value is verified;
+# secondary and unverified values are WARNING.
+#
+# source.status:
+#   verified   - confirmed against an official Amazon document that could be read
+#   secondary  - official page not readable by automation (Seller Central help needs a login), value taken
+#                from an Amazon announcement or from Amazon staff in the Seller Forums
+#   unverified - no usable source found, or sources disagree
+#
+# The rules target the US store (en_US): the word rules (repeated words, exempt words) are English.
+marketplace: AMAZON
+version: amazon-2026-12d
+checked_at: 2026-11-28
+
+rules:
+  required_fields:
+    severity: ERROR
+    # Listing fields. Only product_type is listed because it is the only field with an official source:
+    # the other required attributes depend on the product type and appear only in its schema.
+    fields:
+      - product_type
+    source:
+      status: verified
+      urls:
+        - https://github.com/amzn/selling-partner-api-models/blob/main/models/listings-items-api-model/listingsItems_2021-08-01.json
+      note: Listings Items API v2021-08-01, ListingsItemPutRequest - required fields are productType and attributes. Which attributes are required depends on the product type (Product Type Definitions API).
+
+  title_length:
+    severity: WARNING
+    max_length: 75
+    source:
+      status: secondary
+      urls:
+        - https://ppc.land/amazon-cuts-product-title-limit-to-75-characters-on-july-27/
+      note: 'Amazon announcement in the Seller Forums, dated June 10, 2026, effective July 27, 2026 (read in an article on ppc.land of June 13, 2026): in all product categories except media a title may be at most 75 characters, including spaces, and a listing that stays above the limit is rewritten automatically by Amazon AI systems. This replaces the 200 characters of amazon-2026-11 (announcement of January 21, 2025). The media exception is not applied here: a media product type would need a category override (none yet). The official help page needs a Seller Central login and was not read.'
+
+  title_repeated_words:
+    severity: WARNING
+    # A word (ignoring case) may appear at most this many times in the title.
+    max_occurrences: 2
+    # Prepositions, articles and conjunctions do not count. Amazon publishes no list: this one is ours.
+    exempt_words:
+      - a
+      - an
+      - the
+      - and
+      - or
+      - but
+      - nor
+      - for
+      - so
+      - yet
+      - about
+      - above
+      - across
+      - after
+      - against
+      - along
+      - among
+      - around
+      - at
+      - before
+      - behind
+      - below
+      - beside
+      - between
+      - by
+      - down
+      - during
+      - from
+      - in
+      - inside
+      - into
+      - near
+      - of
+      - "off"
+      - "on"
+      - onto
+      - out
+      - outside
+      - over
+      - past
+      - through
+      - to
+      - toward
+      - under
+      - until
+      - up
+      - upon
+      - with
+      - within
+      - without
+    source:
+      status: secondary
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/b2b15728-0d43-453e-974f-59eb63f73059
+      note: 'Same announcement - "Titles may not contain the same word more than twice", with prepositions, articles and conjunctions excepted. The exempt word list is not published by Amazon and is unverified.'
+
+  title_forbidden_chars:
+    severity: WARNING
+    # Not allowed in a title unless they are part of the brand name (the brand field is checked).
+    chars: ["!", "$", "?", "_", "{", "}", "^", "¬", "¦"]
+    source:
+      status: secondary
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/b2b15728-0d43-453e-974f-59eb63f73059
+      note: 'Same announcement - the special characters !, $, ?, _, {, }, ^, ¬ and ¦ are not allowed, unless they are part of the brand name.'
+
+  bullet_count:
+    severity: WARNING
+    max_count: 5
+    source:
+      status: unverified
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/5de5712a-24e0-4071-8cae-7302864a6d04
+      note: 'Old Seller Central help text ("up to five Feature Bullets") as quoted by a seller in the Seller Forums; the current help page needs a login. Not confirmed by an Amazon document.'
+
+  bullet_length:
+    severity: WARNING
+    # Switched off: sources disagree (256, 100, 500 characters per bullet, or 1000 in total) and the limit
+    # depends on the product type. Enable it, with a verified value, when the product type schemas are available.
+    enabled: false
+    max_length: 256
+    source:
+      status: unverified
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/5de5712a-24e0-4071-8cae-7302864a6d04
+      note: 'Quoted old help text says 256 characters per bullet, "can vary by product category"; other Seller Forums posts report 100, 500, or 1000 characters for all bullets together. The unit (characters or bytes) is not confirmed either.'
+
+  item_highlights_length:
+    severity: WARNING
+    # Characters (code points), like title_length. The source does not say how Amazon counts them.
+    max_length: 125
+    source:
+      status: secondary
+      urls:
+        - https://ppc.land/amazon-cuts-product-title-limit-to-75-characters-on-july-27/
+      note: 'Same announcement (Seller Forums, June 10, 2026, effective July 27, 2026; read in the ppc.land article) - the new Item Highlights field accepts up to 125 characters; its content is searchable and shown with the title in search results and on product detail pages. The official help page needs a Seller Central login and was not read.'
+
+  description_length:
+    severity: WARNING
+    # Characters (code points), like title_length. Nothing read says whether Amazon counts characters or UTF-8 bytes, or whether
+    # HTML tags count; characters is the more lenient reading for text that is not ASCII, which is why it was chosen.
+    max_length: 2000
+    source:
+      status: unverified
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/801b73cbbeea235a4359dae958bf120a
+        - https://sellercentral-europe.amazon.com/seller-forums/discussions/t/b457e4b9f062319261aa2232fcf37289
+      note: 'Not confirmed by any Amazon document. Two Seller Forums threads read on 2026-11-11 state 2000 for the description, both written by ordinary sellers (no Amazon staff reply), dated only as "7 years ago" and "6 years ago", neither linking an Amazon page: "when it is limited to 2000 characters" and "Maximum Length: 2000 (assume this is characters but it isn''t defined)". The unit is therefore unknown. The official help pages (Seller Central, "Product detail page rules") returned no rule text without a seller login, and the Product Type Definitions API, which carries the real limit per product type as maxUtf8ByteLength, needs seller credentials: it was not read. The article of June 13, 2026 on ppc.land (the June 10, 2026 announcement) used for title_length does not mention the description. Commercial listing tools quote the same number; they are not used as a source. The limit may differ by product type: a later version should read it from the product type schemas.'
+
+  search_terms_length:
+    severity: WARNING
+    # UTF-8 bytes, not characters.
+    max_bytes: 249
+    source:
+      status: secondary
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/d73f6ef2-6a10-4ae5-b2bf-140066b8b299
+      note: 'Amazon staff in the Seller Forums - "the length limit for generic keywords is 249 Bytes, as shown in the Keyword attributes explained page" (a help page that needs a login). Other posts report 250 or 500; the product type schema measures strings in UTF-8 bytes (maxUtf8ByteLength).'
+
+  prohibited_content:
+    severity: WARNING
+    # Fields scanned: title, description, bullet_points (each bullet), item_highlights.
+    fields:
+      - title
+      - description
+      - bullet_points
+      - item_highlights
+    # Name -> regex. The first match in a field is reported. Phone numbers and addresses are not checked: they
+    # cannot be told apart reliably with a regex.
+    patterns:
+      url: '(?i)\b(?:https?://|www\.)\S+'
+      email: '[\p{L}\p{Nd}._%+-]+@[\p{L}\p{Nd}-]+(?:\.[\p{L}\p{Nd}-]+)+'
+    source:
+      status: secondary
+      urls:
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/476c3ca7-35c7-4ca5-912a-e854487579c2
+        - https://sellercentral.amazon.com/seller-forums/discussions/t/2f1eb3e8-bc07-45b1-a74a-0820342fde5e
+      note: 'Seller Forums posts quote the Product detail page rules - phone numbers, addresses, email addresses and website URLs are not allowed in listing content. Read through search result summaries; the official help page needs a seller login. item_highlights is scanned too because it is listing content shown on the product detail page; no Amazon text read for this ruleset names that field in the ban, so for it the rule is our extension of the same ban.'
+
+  # Amazon Custom products (the optional `customization` block of the input). The three numbers below come from two secondary
+  # articles that report Amazon's Custom rules; the Seller Central help page needs a seller login and was not read, so none of
+  # them is verified and every rule is a WARNING (ADR-006).
+  customization_text_input_count:
+    severity: WARNING
+    # Text inputs of all the print surfaces of the product together.
+    max_count: 10
+    source:
+      status: secondary
+      urls:
+        - https://www.ecomcrew.com/amazon-custom-products
+        - https://sellersnap.io/amazon-custom-products-policy-update/
+      note: 'Two articles that report the Amazon Custom rules: a product may have at most 10 text inputs. The Seller Central help page needs a login and was not read.'
+
+  customization_dropdown_options:
+    severity: WARNING
+    # Dropdown options of one print surface, all its dropdowns together.
+    max_count: 100
+    # Whether "Red" and "red" are the same label. No source says, so only exact repeats are reported.
+    case_insensitive: false
+    source:
+      status: secondary
+      urls:
+        - https://www.ecomcrew.com/amazon-custom-products
+        - https://sellersnap.io/amazon-custom-products-policy-update/
+      note: 'Two articles that report the Amazon Custom rules: at most 100 dropdown options per print surface. The Seller Central help page needs a login and was not read. A label that repeats inside one dropdown is reported too: that is our own check, no source names it, and only exact repeats (after trimming) count, because no source says whether case matters.'
+
+  customization_image_input_count:
+    severity: WARNING
+    # Image inputs (customer uploads) of one print surface.
+    max_count: 10
+    source:
+      status: secondary
+      urls:
+        - https://www.ecomcrew.com/amazon-custom-products
+        - https://sellersnap.io/amazon-custom-products-policy-update/
+      note: 'Two articles that report the Amazon Custom rules: at most 10 customer-uploaded images per print surface. The Seller Central help page needs a login and was not read.'
+
+  customization_text_input_max_chars:
+    severity: WARNING
+    source:
+      status: unverified
+      urls:
+        - https://www.ecomcrew.com/amazon-custom-products
+      note: 'Our own check, not an Amazon rule. The same articles say the seller sets the number of characters and the kinds of characters of a text input; a text input that sets no number lets a buyer type a text that can overflow the print area (a custom product is not returnable since 15 February 2023, so the seller bears that cost). The rule has no number of its own: the right length depends on the product.'
+
+  customization_free_text_sensitive:
+    # Never above INFO: the rule refuses to start otherwise.
+    severity: INFO
+    # A text input whose label has one of these words (whole word, ignoring case) gets a reminder.
+    keywords:
+      - name
+      - number
+      - team
+      - player
+    source:
+      status: unverified
+      note: 'Our own hint, not an Amazon rule and not a trademark verdict: a buyer who can type any text can type a team or a player that is a trademark, so a dropdown whose choices the seller sets, or a limit on the kinds of characters, keeps that out. The word list is ours, the same as the Etsy rule personalization_free_text_sensitive. The trademark check (POST /api/v1/trademark-checks) is separate and does not read the customization block.'
+
+  category_not_covered:
+    severity: INFO
+    source:
+      status: unverified
+      note: Behavior of Listing Guard, not an Amazon rule. When the ruleset has at least one category override, tells the caller that the listing's product type has none, so only the default settings were applied. A ruleset without any override never reports it.
+
+  # ---- Content hygiene and clone leftovers (ADR-039) ---------------------------------------------------------------------
+  # Internal quality rules, not marketplace policy: every source is unverified and every severity WARNING. A rule is optional in the engine, so
+  # the ruleset that does not list it (every version before this one) is unchanged. `fields` is what the rule reads; a word list or a number is
+  # read from here, none is in Java. A finding of a rule that matches text carries the span of the match, so the workspace can mark it.
+
+  mojibake:
+    severity: WARNING
+    fields: [title, brand, bullet_points, description, item_highlights, search_terms]
+    # Case-sensitive. The damage is in the exact characters: a UTF-8 text read as Windows-1252 or Latin-1, and the replacement character.
+    patterns:
+      - '[ÃÂ][\u0080-\u00BF]'
+      - 'â€'
+      - 'ï¿½'
+      - '\uFFFD'
+      - 'á»'
+      - 'áº'
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: không có trang chính thức nào nêu nó, nên nguồn là unverified và mức mặc định là WARNING. Mẫu lấy từ các lỗi mã hoá thường gặp khi mở file UTF-8 bằng Windows-1252; danh sách là của chúng tôi.'
+
+  placeholder_leftover:
+    severity: WARNING
+    fields: [title, brand, bullet_points, description, item_highlights, search_terms]
+    report_at_most: 3
+    # Ignoring case.
+    patterns:
+      - '\[(?:name|your[ _-]?[a-z ]{1,20}|insert[a-z ]{0,20}|enter[a-z ]{0,20}|text|date|size|colou?r|brand|item|product|title|keywords?|sku|price|placeholder|description|recipient|occasion|city|state|number|year|initials?|xx+|tbd)\]'
+      - '\{\{\s*[a-z_][a-z0-9_ ]{0,30}\}\}'
+      - '\{(?:name|[a-z]+_name|text|date|size|colou?r|title|sku|price|item|product|keyword|recipient|occasion|initials?)\}'
+      - '<(?:name|your[a-z _-]{0,20}|insert[a-z _-]{0,20}|text|date|size|colou?r)>'
+      - 'lorem\s+ipsum'
+      - 'dolor\s+sit\s+amet'
+      - '(?<![\p{L}\p{N}])(?:your|insert|enter|add)\s+(?:text|title|description|keywords?|name)\s+here(?![\p{L}\p{N}])'
+      - '(?<![\p{L}\p{N}])\?{3,}'
+    # Case-sensitive: a run of capital X or an upper-case TBD is a placeholder, "XXXL" is a size and "tbd" can be a word.
+    case_sensitive_patterns:
+      - '(?<![\p{L}\p{N}])X{3,}(?![\p{L}\p{N}])'
+      - '(?<![\p{L}\p{N}])(?:TBD|TBA|TODO|FIXME)(?![\p{L}\p{N}])'
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: không có trang chính thức nào nêu nó, nên nguồn là unverified và mức mặc định là WARNING. Danh sách mẫu là của chúng tôi; XXX có thể là ký hiệu nụ hôn trong văn bản vui, nên rule chỉ là cảnh báo.'
+
+  whitespace:
+    severity: WARNING
+    fields: [title, brand, bullet_points, description, item_highlights]
+    # More spaces than this in a row between two words are reported.
+    spaces_allowed: 1
+    # Characters turned into a space by the fix, and characters with no width that the fix removes.
+    invisible_chars: ["\t", "\u00A0", "\u2007", "\u202F"]
+    zero_width_chars: ["\u200B", "\u200C", "\u200D", "\u2060", "\uFEFF"]
+    # A blank before one of these marks is reported.
+    space_before: [",", ";"]
+    # The one rule that proposes a fix (a title and a tag are cleaned as text); the other fields get a sentence of advice.
+    fix_fields: [title, tags]
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: không có trang chính thức nào nêu nó, nên nguồn là unverified và mức mặc định là WARNING. Chỉ chỗ trắng thừa; dấu xuống dòng của mô tả không bị báo, và khoảng trắng hai đầu đã bị bộ chuẩn hoá cắt từ trước.'
+
+  unbalanced_brackets:
+    severity: WARNING
+    fields: [title, bullet_points, description, item_highlights]
+    pairs: ["()", "[]", "{}"]
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: không có trang chính thức nào nêu nó, nên nguồn là unverified và mức mặc định là WARNING. Mặt cười như :) và số thứ tự đầu dòng như 1) không bị tính là dấu ngoặc.'
+
+  repeated_word:
+    severity: WARNING
+    fields: [title, bullet_points, description, item_highlights]
+    # Words of at least this many letters, the same twice in a row on one line, ignoring case.
+    min_length: 2
+    # Repeated on purpose: names people are called, interjections, and the few English words that can follow themselves.
+    exempt_words: [mom, mum, nana, nan, gigi, pop, papa, mimi, bye, "no", ha, la, so, very, yum, go, boo, choo, wow, tick, tock, ding, dong, ho, blah, bla, hip, hooray, had, that, bora, pom, zig, zag, cha, na, yay]
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: không có trang chính thức nào nêu nó, nên nguồn là unverified và mức mặc định là WARNING. Khác title_repeated_words (đếm một từ ở bất kỳ đâu trong tiêu đề): rule này chỉ báo hai từ giống nhau đứng liền nhau. Danh sách từ được lặp có chủ ý là của chúng tôi.'
+
+  all_caps_ratio:
+    severity: WARNING
+    fields: [title, bullet_points, description, item_highlights]
+    # Only words of at least this many letters that have case are counted, and nothing is reported with fewer than min_words of them, so a short brand in capitals next to ordinary words is never a finding.
+    min_word_letters: 3
+    min_words: 3
+    # The share of counted words written entirely in capitals at which a text is reported.
+    caps_share_from: 0.75
+    exempt_words: [usa, led, diy, pvc, bpa, gps, usb, uv, pod, rgb, pdf, svg, png, pla, abs, tpu, upc, nfl, nba, mlb, nhl, ufc, wwe, bmw, nyc, dna, fda, ipad, iphone, ps5, xbox]
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: không có trang chính thức nào nêu nó, nên nguồn là unverified và mức mặc định là WARNING. Ngưỡng và danh sách chữ viết tắt là của chúng tôi.'
+
+  size_unit_conflict:
+    severity: WARNING
+    # The text that says what the listing is (the title) is compared with each text of `against`.
+    anchor: title
+    against: [bullet_points, description, item_highlights]
+    # A value in a sentence that lists options ("available in 11oz or 15oz") says nothing about which one this listing is.
+    ambiguity_markers: [available, choose, select, option, options, variation, variations, pick, also, comes in, come in, sizes, offered, optional]
+    ambiguity_before: 40
+    ambiguity_after: 20
+    # A size is a number with one of these units; the family of a size is its unit, so 11 oz is compared with other ounces, never with inches.
+    units:
+      oz: [oz, ounce, ounces, fl oz, fl. oz]
+      ml: [ml, milliliter, milliliters, millilitre, millilitres]
+      l: [liter, liters, litre, litres]
+      gal: [gal, gallon, gallons]
+      in: [inch, inches, in., '"', "\u201D"]
+      cm: [cm, centimeter, centimeters, centimetre, centimetres]
+      mm: [mm, millimeter, millimeters]
+      ft: [ft, ft., foot, feet]
+      lb: [lb, lbs, pound, pounds]
+      kg: [kg, kilogram, kilograms]
+      g: [gram, grams]
+    # Units that can carry a second dimension (12 x 16 inch); "2 x 11oz" is a count and a size.
+    dimension_units: [in, cm, mm, ft]
+    # A number near one of these words measures a part or a weight of the product, not its size.
+    ignore_words: [weigh, weighs, weighing, weight, thick, thickness, deep, depth, handle, diameter, height, tall, base, rim, opening, strap, cord, chain, length, wide, width]
+    ignore_before: 25
+    ignore_after: 12
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: không có trang chính thức nào nêu nó, nên nguồn là unverified và mức mặc định là WARNING. Nhận kích cỡ có đơn vị (11oz, 12 x 16 inch); kích cỡ không có đơn vị (S, M, ''size 11'') không được đọc.'
+
+  quantity_conflict:
+    severity: WARNING
+    # The text that says what the listing is (the title) is compared with each text of `against`.
+    anchor: title
+    against: [bullet_points, description, item_highlights]
+    # A value in a sentence that lists options ("available in 11oz or 15oz") says nothing about which one this listing is.
+    ambiguity_markers: [available, choose, select, option, options, variation, variations, pick, also, comes in, come in, sizes, offered, optional]
+    ambiguity_before: 40
+    ambiguity_after: 20
+    # Each expression has the number (or a number word) as its first group. A number tied to no count word is not read.
+    patterns:
+      - '(?<![\p{L}\p{N}])(?:pack|set|bundle|lot|box|case|pair|kit)s?\s+of\s+(\d{1,4}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|dozen)(?![\p{L}\p{N}])(?!\s?(?:oz|ml|cm|mm|inch|inches|ft|lbs?|kg|gal|fl)(?![\p{L}]))'
+      - '(?<![\p{L}\p{N}.,/-])(\d{1,4})[\s-]?(?:pack|pk|pcs?|pieces?|count|ct|pairs?)(?![\p{L}\p{N}])'
+      - '(?<![\p{L}\p{N}])(?:qty|quantity)\s*[:=x]?\s*(\d{1,4})(?![\p{L}\p{N}])'
+    number_words: {one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10", eleven: "11", twelve: "12", dozen: "12"}
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: không có trang chính thức nào nêu nó, nên nguồn là unverified và mức mặc định là WARNING. Chỉ đọc số đi kèm từ chỉ số lượng (pack of 2, 4 pieces); số không gắn với từ đó không được đọc.'
+
+  recipient_conflict:
+    severity: WARNING
+    # The text that says what the listing is (the title) is compared with each text of `against`.
+    anchor: title
+    against: [bullet_points, description, item_highlights]
+    # A value in a sentence that lists options ("available in 11oz or 15oz") says nothing about which one this listing is.
+    ambiguity_markers: [available, choose, select, option, options, variation, variations, pick, also, comes in, come in, sizes, offered, optional]
+    ambiguity_before: 40
+    ambiguity_after: 20
+    # Axes: on one axis the recipients exclude each other. A text that names two values of an axis agrees with a text that names either.
+    axes:
+      parent:
+        mom: [mom, mommy, mama, mother, mum, mummy]
+        dad: [dad, daddy, father]
+      grandparent:
+        grandma: [grandma, grandmother, granny, nana, nonna, gigi]
+        grandpa: [grandpa, grandfather, pawpaw]
+      spouse:
+        wife: [wife, wifey]
+        husband: [husband, hubby]
+      partner:
+        girlfriend: [girlfriend]
+        boyfriend: [boyfriend]
+      sibling:
+        sister: [sister]
+        brother: [brother]
+      child:
+        daughter: [daughter]
+        son: [son]
+      kid:
+        girl: [girl, girls]
+        boy: [boy, boys]
+      gender:
+        her: [for her, for women, for woman, for ladies, women's, womens, ladies]
+        him: [for him, for men, for man, men's, mens]
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: không có trang chính thức nào nêu nó, nên nguồn là unverified và mức mặc định là WARNING. Danh sách người nhận là của chúng tôi; đại từ đứng một mình (her, him) không tính, chỉ tính cụm như ''for her''.'
+
+  product_noun_conflict:
+    severity: WARNING
+    anchor: title
+    # The product type is read from this field: product_type (Amazon) or category (Etsy; the last part of a path).
+    type_field: product_type
+    # A noun group and every way a seller writes it.
+    groups:
+      mug: [mug, mugs, coffee cup]
+      tumbler: [tumbler, tumblers, water bottle]
+      shirt: [shirt, shirts, tee, tees, t-shirt, t-shirts, t shirt, tshirt, tank top]
+      sweatshirt: [sweatshirt, hoodie, crewneck, pullover, sweater]
+      wall_art: [poster, posters, canvas, wall art, art print, framed print]
+      sticker: [sticker, stickers, decal, decals]
+      pillow: [pillow, pillowcase, pillow cover, throw pillow, cushion cover]
+      blanket: [blanket, throw blanket]
+      ornament: [ornament, ornaments]
+      phone_case: [phone case, phone cases, iphone case, samsung case]
+      bag: [tote bag, tote, backpack, handbag]
+      hat: [hat, beanie, baseball cap]
+      jewelry: [necklace, bracelet, earrings, pendant]
+      candle: [candle, candles]
+      keychain: [keychain, key chain, keyring, key ring]
+    # A product type and the groups it may be called. A type that is not listed is not judged.
+    product_types:
+      MUG: [mug]
+      COFFEE_MUG: [mug]
+      DRINKING_CUP: [mug, tumbler]
+      TUMBLER: [tumbler]
+      SHIRT: [shirt, sweatshirt]
+      T_SHIRT: [shirt, sweatshirt]
+      SWEATSHIRT: [sweatshirt, shirt]
+      HAT: [hat]
+      BAG: [bag]
+      TOTE_BAG: [bag]
+      WALL_ART: [wall_art]
+      POSTER: [wall_art]
+      STICKER: [sticker]
+      PILLOW: [pillow]
+      BLANKET: [blanket]
+      ORNAMENT: [ornament]
+      PHONE_CASE: [phone_case]
+      NECKLACE: [jewelry]
+      BRACELET: [jewelry]
+      EARRINGS: [jewelry]
+      CANDLE: [candle]
+      KEYCHAIN: [keychain]
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: không có trang chính thức nào nêu nó, nên nguồn là unverified và mức mặc định là WARNING. Bảng loại sản phẩm chưa đối chiếu với danh sách loại của sàn; loại không có trong bảng thì rule bỏ qua.'
