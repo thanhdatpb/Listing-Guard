@@ -11,6 +11,9 @@ contract tools and release workflow continue to discover exactly one active base
 - When adding an API endpoint, check pack or MCP tool, update the architecture diagrams in `docs/images/` and the product overview in `README.md`.
 - **No marketplace limits in Java.** Thresholds, word lists, field lists and severities go in the ruleset
   YAML, logic in Java (ADR-001). A rule class reads its severity via `Rule.severity(config)`.
+- **A rule that older ruleset versions do not have is `optional()`** (ADR-039). `RuleEngine` runs, validates and lists the limits of an optional rule only for a ruleset that
+  configures it, so the older version still starts and gives the results it gave. A rule that every ruleset of its marketplace must configure stays non-optional. An internal quality
+  rule (not marketplace policy) is `unverified`, its note says "Quy tắc chất lượng nội bộ ... không phải chính sách của sàn", and its default severity is WARNING.
 - **A ruleset version is immutable** (ADR-002). Never edit a published `rulesets/*.yaml`: copy it to a new
   file with a new `version` and change that one. Old files stay (a test pins `etsy-2026-10`'s hash). The API
   fails at startup if a registered version has a different content hash. Every YAML key a rule needs must be
