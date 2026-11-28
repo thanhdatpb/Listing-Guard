@@ -39,19 +39,19 @@ class AuditStartupCheckTest {
     @Test
     void theSettingsRefuseNonsenseAndTheCronMustParse() {
         assertThatThrownBy(() -> new AuditProperties(true, true, 0, java.time.Duration.ofSeconds(5), java.time.Duration.ofMinutes(2),
-                java.time.Duration.ofSeconds(30), "", 30, 100)).isInstanceOf(IllegalArgumentException.class);
+                java.time.Duration.ofSeconds(30), "", 30, 100, false)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AuditProperties(true, true, 9, java.time.Duration.ofSeconds(5), java.time.Duration.ofMinutes(2),
-                java.time.Duration.ofSeconds(30), "", 30, 100)).isInstanceOf(IllegalArgumentException.class);
+                java.time.Duration.ofSeconds(30), "", 30, 100, false)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AuditProperties(true, true, 2, java.time.Duration.ZERO, java.time.Duration.ofMinutes(2),
-                java.time.Duration.ofSeconds(30), "", 30, 100)).isInstanceOf(IllegalArgumentException.class);
+                java.time.Duration.ofSeconds(30), "", 30, 100, false)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AuditProperties(true, true, 2, java.time.Duration.ofSeconds(5), java.time.Duration.ofMinutes(2),
-                java.time.Duration.ofSeconds(30), "not a cron", 30, 100)).isInstanceOf(IllegalArgumentException.class)
+                java.time.Duration.ofSeconds(30), "not a cron", 30, 100, false)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("schedule-cron");
         AuditProperties ok = new AuditProperties(true, true, 2, java.time.Duration.ofSeconds(5), java.time.Duration.ofMinutes(2),
-                java.time.Duration.ofSeconds(30), "0 0 3 * * *", 30, 100);
+                java.time.Duration.ofSeconds(30), "0 0 3 * * *", 30, 100, false);
         assertThat(ok.scheduled()).isTrue();
         assertThat(new AuditProperties(false, true, 2, java.time.Duration.ofSeconds(5), java.time.Duration.ofMinutes(2),
-                java.time.Duration.ofSeconds(30), "", 30, 100).scheduled()).isFalse();
+                java.time.Duration.ofSeconds(30), "", 30, 100, false).scheduled()).isFalse();
         assertThatThrownBy(() -> new AlertProperties(true, 0, 40, 40)).isInstanceOf(IllegalArgumentException.class);
     }
 }

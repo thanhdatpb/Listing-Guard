@@ -49,7 +49,19 @@ public class ListingComparison {
         this.targets = targets;
     }
 
-    public Optional<Comparison> of(UUID clientId, Listing listing, Template template, SellerAccount account) {
+    /**
+     * A clone's original and the columns of the clone paired with the columns of the original, by the one pairing of ADR-062 §4: the same keys when both
+     * listings use one template or the fixed Etsy fields, otherwise {@link ListingCloner#pairs}. Empty when the listing is no clone, or its original is
+     * deleted or its template is gone. Nothing else in the workspace pairs columns, so the audit and the page cannot disagree.
+     *
+     * @param original         the listing this one was cloned from
+     * @param originalTemplate the template of {@code original}
+     * @param pairs            {@code sourceKey} is a column of the original, {@code targetKey} the column of the clone it goes to
+     */
+    public record Alignment(Listing original, Template originalTemplate, List<ListingCloner.Pair> pairs) {
+    }
+
+    public Optional<Alignment> aligned(UUID clientId, Listing listing, Template template) {
         if (listing.clonedFrom() == null) {
             return Optional.empty();
         }
@@ -61,10 +73,19 @@ public class ListingComparison {
         if (originalTemplate == null) {
             return Optional.empty();
         }
-        Set<String> untouched = new HashSet<>();
         List<ListingCloner.Pair> pairs = originalTemplate.id().equals(template.id()) || template.kind() == TemplateKind.ETSY_FIELDS
                 ? identity(original, template) : cloner.pairs(originalTemplate, template);
-        for (ListingCloner.Pair pair : pairs) {
+        return Optional.of(new Alignment(original, originalTemplate, pairs));
+    }
+
+    public Optional<Comparison> of(UUID clientId, Listing listing, Template template, SellerAccount account) {
+        Alignment alignment = aligned(clientId, listing, template).orElse(null);
+        if (alignment == null) {
+            return Optional.empty();
+        }
+        Listing original = alignment.original();
+        Set<String> untouched = new HashSet<>();
+        for (ListingCloner.Pair pair : alignment.pairs()) {
             String value = listing.data().get(pair.targetKey());
             Kind kind = pair.target() == null ? null : targets.find(account.marketplace(), pair.target()).map(StandardTargets.Target::kind).orElse(null);
             if (value == null || value.isBlank() || kind == Kind.SKU || kind == Kind.OWNER) {

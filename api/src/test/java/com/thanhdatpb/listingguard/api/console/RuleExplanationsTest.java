@@ -38,6 +38,10 @@ class RuleExplanationsTest {
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
 
+    /** The ruleset versions and the pack that a deployment can switch on without being the default (deploy/env.pilot.example, ADR-039). */
+    private static final List<String> OPT_IN = List.of("classpath:rulesets/etsy-2026-12b.yaml", "classpath:rulesets/amazon-2026-12d.yaml",
+            "classpath:workspace/clone-leftover-2026-12.yaml");
+
     private static JsonNode yaml(String classpathLocation) throws IOException {
         try (InputStream in = new ClassPathResource(classpathLocation.replaceFirst("^classpath:", "")).getInputStream()) {
             return YAML.readTree(in);
@@ -60,6 +64,8 @@ class RuleExplanationsTest {
         JsonNode guard = yaml("application.yml").path("listing-guard");
         List<String> locations = new ArrayList<>();
         guard.path("rulesets").path("locations").forEach(location -> locations.add(location.asText()));
+        // The versions a deployment opts into (ADR-039): not the default of application.yml, but their rules are explained all the same.
+        locations.addAll(OPT_IN);
         // Check checked-in defaults regardless of the environment that runs Maven.
         var defaults = new PropertySourcesPropertyResolver(new MutablePropertySources());
         for (String pack : new String[] {"trademark", "variation", "personalization"}) {
@@ -85,9 +91,9 @@ class RuleExplanationsTest {
 
     @Test
     void theScanFindsTheRulesOfEveryPack() throws IOException {
-        assertThat(registeredRulesets()).hasSize(5).allSatisfy(location -> assertThat(location).startsWith("classpath:rulesets/"));
+        assertThat(registeredRulesets()).hasSize(8).allSatisfy(location -> assertThat(location).startsWith("classpath:"));
         assertThat(enabledRuleIds()).contains("title_length", "required_fields", "duplicate_sku", "whitespace_issue",
-                "catalog_exact", "customization_text_input_count", "personalization_question_count", "etsy_variation_limits");
+                "catalog_exact", "customization_text_input_count", "personalization_question_count", "etsy_variation_limits", "mojibake", "size_unit_conflict", "clone_leftover_from_source");
     }
 
     @Test

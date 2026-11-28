@@ -1,0 +1,182 @@
+# Pack `clone-leftover` (ADR-039): what a clone still says of its original. The workspace's background audit reads it when
+# listing-guard.workspace.audit.clone-leftover is on, for a listing that has `cloned_from` and whose original still exists (ADR-062 §5). It is
+# not part of any marketplace ruleset: /api/v1/checks never reads it and the rule engine never runs it. Its version and content hash are part of
+# the analysis version of a clone, so a change here (a new version) audits the clones again, once.
+#
+# A published version is immutable (ADR-002, a test pins its hash): change a word list or a number in a new file with a new version.
+#
+# The facts (size, quantity, recipient, product_noun) are read by the same extractors as the content rules of etsy-2026-12b and amazon-2026-12d,
+# with the same word lists as those versions had when this pack was written. They are copies on purpose: the pack and the rulesets change
+# independently and a seller's finding names the pack version that made it.
+#
+# The one rule, clone_leftover_from_source, says: a variation attribute column of the clone (a column the template gave a field of kind ATTRIBUTE,
+# such as Size or Color) or its product type has a new value, a text of the clone still states the original's value, and does not state the new one.
+# Internal quality rule, not marketplace policy: the source is unverified and the severity is WARNING.
+pack_id: clone-leftover
+marketplace: ANY
+version: clone-leftover-2026-12
+checked_at: 2026-11-28
+
+rules:
+  clone_leftover_from_source:
+    severity: WARNING
+    # The texts of the clone that are read for a value of the original; a list field is read entry by entry.
+    fields: [title, brand, bullet_points, tags, item_highlights, description, search_terms]
+    source:
+      status: unverified
+      note: 'Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn: so bản nhân bản với bản gốc còn tồn tại trong kho; không có trang chính thức nào nêu nó. Chưa xác minh với file template Amazon thật.'
+
+  size:
+    # A value in a sentence that lists options ("available in 11oz or 15oz") says nothing about which one this listing is.
+    ambiguity_markers: [available, choose, select, option, options, variation, variations, pick, also, comes in, come in, sizes, offered, optional]
+    ambiguity_before: 40
+    ambiguity_after: 20
+    # A size is a number with one of these units; the family of a size is its unit, so 11 oz is compared with other ounces, never with inches.
+    units:
+      oz: [oz, ounce, ounces, fl oz, fl. oz]
+      ml: [ml, milliliter, milliliters, millilitre, millilitres]
+      l: [liter, liters, litre, litres]
+      gal: [gal, gallon, gallons]
+      in: [inch, inches, in., '"', "\u201D"]
+      cm: [cm, centimeter, centimeters, centimetre, centimetres]
+      mm: [mm, millimeter, millimeters]
+      ft: [ft, ft., foot, feet]
+      lb: [lb, lbs, pound, pounds]
+      kg: [kg, kilogram, kilograms]
+      g: [gram, grams]
+    # Units that can carry a second dimension (12 x 16 inch); "2 x 11oz" is a count and a size.
+    dimension_units: [in, cm, mm, ft]
+    # A number near one of these words measures a part or a weight of the product, not its size.
+    ignore_words: [weigh, weighs, weighing, weight, thick, thickness, deep, depth, handle, diameter, height, tall, base, rim, opening, strap, cord, chain, length, wide, width]
+    ignore_before: 25
+    ignore_after: 12
+    severity: WARNING
+    # A word list read by clone_leftover_from_source, not a rule: it never produces a finding, so it is switched off.
+    enabled: false
+    source:
+      status: unverified
+      note: 'Danh sách đơn vị lấy từ etsy-2026-12b; dùng để đọc kích cỡ trong cột thuộc tính của bản nhân bản và trong chữ của nó (ADR-039).'
+
+  quantity:
+    # A value in a sentence that lists options ("available in 11oz or 15oz") says nothing about which one this listing is.
+    ambiguity_markers: [available, choose, select, option, options, variation, variations, pick, also, comes in, come in, sizes, offered, optional]
+    ambiguity_before: 40
+    ambiguity_after: 20
+    # Each expression has the number (or a number word) as its first group. A number tied to no count word is not read.
+    patterns:
+      - '(?<![\p{L}\p{N}])(?:pack|set|bundle|lot|box|case|pair|kit)s?\s+of\s+(\d{1,4}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|dozen)(?![\p{L}\p{N}])(?!\s?(?:oz|ml|cm|mm|inch|inches|ft|lbs?|kg|gal|fl)(?![\p{L}]))'
+      - '(?<![\p{L}\p{N}.,/-])(\d{1,4})[\s-]?(?:pack|pk|pcs?|pieces?|count|ct|pairs?)(?![\p{L}\p{N}])'
+      - '(?<![\p{L}\p{N}])(?:qty|quantity)\s*[:=x]?\s*(\d{1,4})(?![\p{L}\p{N}])'
+    number_words: {one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10", eleven: "11", twelve: "12", dozen: "12"}
+    severity: WARNING
+    # A word list read by clone_leftover_from_source, not a rule: it never produces a finding, so it is switched off.
+    enabled: false
+    source:
+      status: unverified
+      note: 'Biểu thức số lượng lấy từ etsy-2026-12b (ADR-039).'
+
+  recipient:
+    # A value in a sentence that lists options ("available in 11oz or 15oz") says nothing about which one this listing is.
+    ambiguity_markers: [available, choose, select, option, options, variation, variations, pick, also, comes in, come in, sizes, offered, optional]
+    ambiguity_before: 40
+    ambiguity_after: 20
+    # Axes: on one axis the recipients exclude each other. A text that names two values of an axis agrees with a text that names either.
+    axes:
+      parent:
+        mom: [mom, mommy, mama, mother, mum, mummy]
+        dad: [dad, daddy, father]
+      grandparent:
+        grandma: [grandma, grandmother, granny, nana, nonna, gigi]
+        grandpa: [grandpa, grandfather, pawpaw]
+      spouse:
+        wife: [wife, wifey]
+        husband: [husband, hubby]
+      partner:
+        girlfriend: [girlfriend]
+        boyfriend: [boyfriend]
+      sibling:
+        sister: [sister]
+        brother: [brother]
+      child:
+        daughter: [daughter]
+        son: [son]
+      kid:
+        girl: [girl, girls]
+        boy: [boy, boys]
+      gender:
+        her: [for her, for women, for woman, for ladies, women's, womens, ladies]
+        him: [for him, for men, for man, men's, mens]
+    severity: WARNING
+    # A word list read by clone_leftover_from_source, not a rule: it never produces a finding, so it is switched off.
+    enabled: false
+    source:
+      status: unverified
+      note: 'Danh sách người nhận lấy từ etsy-2026-12b (ADR-039).'
+
+  product_noun:
+    # A noun group and every way a seller writes it, and the groups a product type or an Etsy category may be called (both marketplaces' tables).
+    groups:
+      mug: [mug, mugs, coffee cup]
+      tumbler: [tumbler, tumblers, water bottle]
+      shirt: [shirt, shirts, tee, tees, t-shirt, t-shirts, t shirt, tshirt, tank top]
+      sweatshirt: [sweatshirt, hoodie, crewneck, pullover, sweater]
+      wall_art: [poster, posters, canvas, wall art, art print, framed print]
+      sticker: [sticker, stickers, decal, decals]
+      pillow: [pillow, pillowcase, pillow cover, throw pillow, cushion cover]
+      blanket: [blanket, throw blanket]
+      ornament: [ornament, ornaments]
+      phone_case: [phone case, phone cases, iphone case, samsung case]
+      bag: [tote bag, tote, backpack, handbag]
+      hat: [hat, beanie, baseball cap]
+      jewelry: [necklace, bracelet, earrings, pendant]
+      candle: [candle, candles]
+      keychain: [keychain, key chain, keyring, key ring]
+    product_types:
+      MUG: [mug]
+      COFFEE_MUG: [mug]
+      DRINKING_CUP: [mug, tumbler]
+      TUMBLER: [tumbler]
+      SHIRT: [shirt, sweatshirt]
+      T_SHIRT: [shirt, sweatshirt]
+      SWEATSHIRT: [sweatshirt, shirt]
+      HAT: [hat]
+      BAG: [bag]
+      TOTE_BAG: [bag]
+      WALL_ART: [wall_art]
+      POSTER: [wall_art]
+      STICKER: [sticker]
+      PILLOW: [pillow]
+      BLANKET: [blanket]
+      ORNAMENT: [ornament]
+      PHONE_CASE: [phone_case]
+      NECKLACE: [jewelry]
+      BRACELET: [jewelry]
+      EARRINGS: [jewelry]
+      CANDLE: [candle]
+      KEYCHAIN: [keychain]
+      MUGS: [mug]
+      TUMBLERS: [tumbler]
+      T_SHIRTS: [shirt, sweatshirt]
+      SHIRTS: [shirt, sweatshirt]
+      SWEATSHIRTS: [sweatshirt, shirt]
+      HOODIES: [sweatshirt]
+      HATS: [hat]
+      TOTE_BAGS: [bag]
+      POSTERS: [wall_art]
+      PRINTS: [wall_art]
+      CANVAS_PRINTS: [wall_art]
+      STICKERS: [sticker]
+      THROW_PILLOWS: [pillow]
+      BLANKETS: [blanket]
+      ORNAMENTS: [ornament]
+      PHONE_CASES: [phone_case]
+      NECKLACES: [jewelry]
+      BRACELETS: [jewelry]
+      CANDLES: [candle]
+      KEYCHAINS: [keychain]
+    severity: WARNING
+    # A word list read by clone_leftover_from_source, not a rule: it never produces a finding, so it is switched off.
+    enabled: false
+    source:
+      status: unverified
+      note: 'Bảng nhóm danh từ và loại sản phẩm lấy từ etsy-2026-12b và amazon-2026-12d (ADR-039); chưa đối chiếu với danh sách loại của sàn.'
