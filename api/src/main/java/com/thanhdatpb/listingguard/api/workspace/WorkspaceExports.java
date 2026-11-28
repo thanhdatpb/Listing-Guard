@@ -457,6 +457,10 @@ public class WorkspaceExports {
      * whole number (ADR-063 §2). A column without a standard field is written as text, even when its value looks like a number.
      */
     boolean[] numericColumns(Template template) {
+        return numericColumns(template, targets);
+    }
+
+    static boolean[] numericColumns(Template template, StandardTargets targets) {
         boolean[] numeric = new boolean[template.columns().size()];
         for (int i = 0; i < numeric.length; i++) {
             String target = template.mapping().targets().get(template.columns().get(i).key());

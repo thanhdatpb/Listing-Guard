@@ -50,6 +50,7 @@ public class WorkspaceDataCommands {
     public static final String USAGE = """
               workspace export --client=<id|name> [--out=<dir>] [--include-deleted]   (ADR-059: TSV per template version with the full JSON, template files, manifest)
               workspace purge --client=<id|name> [--confirm=<code>]   (ADR-059: deletes every workspace row of the client; run once to see the counts and the code)
+              workspace roundtrip --file=<template> [--sheet=<name>] [--field-row=<n>] [--clone-to=<template 2>]   (ADR-063: export the file again into a temporary folder and report every difference; touches no database)
             """;
 
     /** The workspace tables in delete order (children first). */
@@ -80,6 +81,16 @@ public class WorkspaceDataCommands {
         List<String> args = arguments.getNonOptionArgs();
         if (args.size() < 2) {
             throw new IllegalArgumentException("Usage:\n" + USAGE);
+        }
+        if ("roundtrip".equals(args.get(1))) {
+            // reads a file and writes into a temporary folder; no client, no database
+            try {
+                WorkspaceRoundtrip.run(option(arguments, "file"), option(arguments, "sheet"), option(arguments, "field-row"),
+                        option(arguments, "clone-to"), out);
+            } catch (java.io.IOException e) {
+                throw new IllegalStateException("The round trip cannot be written: " + e.getMessage(), e);
+            }
+            return;
         }
         Client client = client(option(arguments, "client"));
         switch (args.get(1)) {
