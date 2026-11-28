@@ -267,10 +267,10 @@ public class WorkspaceDataCommands {
     private long writeExportLog(UUID clientId, Map<UUID, String> emails, Path directory) throws IOException {
         StringBuilder tsv = new StringBuilder();
         appendRow(tsv, List.of("id", "exported_at", "account", "template_kind", "template_version", "format", "encoding", "listings", "blocked",
-                "opened_by_reason", "unchecked_for_trademark", "value_warnings", "replaced_cells", "exported_by"));
+                "opened_by_reason", "unchecked_for_trademark", "value_warnings", "replaced_cells", "exported_by", "unchecked_for_catalog"));
         long[] count = {0};
         jdbc.query("SELECT e.id, e.exported_at, a.name AS account, e.template_kind, e.template_version, e.format, e.encoding, e.listing_count, "
-                + "e.blocked_count, e.opened_count, e.untrademarked_count, e.warning_count, e.replaced_cells, e.exported_by "
+                + "e.blocked_count, e.opened_count, e.untrademarked_count, e.warning_count, e.replaced_cells, e.exported_by, e.uncatalogued_count "
                 + "FROM workspace_export_log e JOIN workspace_account a ON a.id = e.account_id AND a.client_id = e.client_id "
                 + "WHERE e.client_id = ? ORDER BY e.id", rs -> {
             UUID by = rs.getObject("exported_by", UUID.class);
@@ -278,7 +278,7 @@ public class WorkspaceDataCommands {
                     rs.getString("account"), rs.getString("template_kind"), String.valueOf(rs.getObject("template_version")), rs.getString("format"),
                     rs.getString("encoding") == null ? "" : rs.getString("encoding"), rs.getString("listing_count"), rs.getString("blocked_count"),
                     rs.getString("opened_count"), rs.getString("untrademarked_count"), rs.getString("warning_count"), rs.getString("replaced_cells"),
-                    by == null ? "" : emails.getOrDefault(by, by.toString())));
+                    by == null ? "" : emails.getOrDefault(by, by.toString()), rs.getString("uncatalogued_count")));
             count[0]++;
         }, clientId);
         if (count[0] > 0) {
@@ -303,7 +303,7 @@ public class WorkspaceDataCommands {
                                 StringBuilder tsv) {
         long[] count = {0};
         jdbc.query("SELECT l.id, l.sku, l.parent_sku, l.role, l.data::text AS data, l.fields::text AS fields, l.owner_account_id, l.status, "
-                + "l.source, l.cloned_from, l.version, l.created_at, l.updated_at, l.deleted_at, l.exported_at, a.state AS audit_state, a.trademark_reason AS audit_reason, "
+                + "l.source, l.cloned_from, l.version, l.created_at, l.updated_at, l.deleted_at, l.exported_at, l.exported_hash, a.state AS audit_state, a.trademark_reason AS audit_reason, "
                 + "a.audited_at AS audit_at, a.catalog_version AS audit_catalog, a.watchlist_version AS audit_watchlist, "
                 + "(SELECT COALESCE(json_agg(json_build_object('rule', f.rule_id, 'level', f.level, 'source', f.source, 'field', f.field, "
                 + "'start', f.span_start, 'end', f.span_end, 'mark', f.mark, 'serial', f.serial, 'new', f.is_new) ORDER BY f.position)::text, '[]') "
@@ -332,6 +332,10 @@ public class WorkspaceDataCommands {
             // that never exported is what it was
             if (rs.getObject("exported_at") != null) {
                 json.put("exported_at", String.valueOf(rs.getObject("exported_at", java.time.OffsetDateTime.class)));
+                if (rs.getString("exported_hash") != null) {
+                    // the content hash at that export (ADR-064 §4); a listing whose content hash differs needs to be exported again
+                    json.put("exported_hash", rs.getString("exported_hash"));
+                }
             }
             json.set("data", data);
             json.set("fields", parse(rs.getString("fields")));

@@ -3,6 +3,7 @@ package com.thanhdatpb.listingguard.api.console.workspace;
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRoles;
 import com.thanhdatpb.listingguard.api.console.ConsoleDates;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
+import com.thanhdatpb.listingguard.api.console.ConsoleMode;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceAccess;
 import com.thanhdatpb.listingguard.api.workspace.WorkspaceAccess.Actor;
@@ -72,7 +73,7 @@ public class ConsoleWorkspaceExportController {
     }
 
     public record LogRow(String when, String format, String version, String kind, int listings, int blocked, int opened, int untrademarked, int warnings,
-                         int replaced, String by) {
+                         int replaced, String by, int uncatalogued) {
     }
 
     public record Choice(String code, String label, boolean disabled) {
@@ -85,11 +86,13 @@ public class ConsoleWorkspaceExportController {
     private final WorkspaceExportLog exportLog;
     private final ConsoleAccountRoles roles;
     private final ConsoleMessages messages;
+    private final ConsoleMode consoleMode;
 
     public ConsoleWorkspaceExportController(WorkspaceAccess access, WorkspaceAccounts accounts, WorkspaceListings listings, WorkspaceExports exports,
                                             WorkspaceExportLog exportLog, ConsoleAccountRoles roles,
-                                            ConsoleMessages messages) {
+                                            ConsoleMessages messages, ConsoleMode consoleMode) {
         this.access = access;
+        this.consoleMode = consoleMode;
         this.accounts = accounts;
         this.listings = listings;
         this.exports = exports;
@@ -161,7 +164,8 @@ public class ConsoleWorkspaceExportController {
         for (WorkspaceExportLog.Entry e : exportLog.recent(actor.clientId(), account.id(), 10)) {
             rows.add(new LogRow(ConsoleDates.dateTime(messages, e.exportedAt()), messages.get("workspace.export.format." + e.format().name().toLowerCase(Locale.ROOT)),
                     e.templateVersion() == null ? "" : "v" + e.templateVersion(), labels.kind(e.templateKind()), e.listings(), e.blocked(), e.opened(),
-                    e.untrademarked(), e.warnings(), e.replacedCells(), e.exportedBy() == null ? "" : emails.getOrDefault(e.exportedBy(), "")));
+                    e.untrademarked(), e.warnings(), e.replacedCells(), e.exportedBy() == null ? "" : emails.getOrDefault(e.exportedBy(), ""),
+                    e.uncatalogued()));
         }
         return rows;
     }
@@ -217,6 +221,9 @@ public class ConsoleWorkspaceExportController {
         UUID templateId = uuid(params.getFirst("templateId"));
         boolean withHeader = params.containsKey("withHeader");
         boolean checkValues = params.containsKey("checkValues");
+        // the cells that start with = + - @ get a single quote in the text for a spreadsheet: on by default in the workspace console (ADR-064 §5),
+        // and a form that shows the option says so with escapeShown, so that an unticked box is told from a form that never had it
+        boolean escape = params.containsKey("escapeShown") ? params.containsKey("escape") : consoleMode.workspace();
         boolean doExport = "export".equals(params.getFirst("step"));
         Integer confirm = null;
         try {
@@ -225,7 +232,7 @@ public class ConsoleWorkspaceExportController {
             // an unreadable count never matches: the export stops and the confirmation is shown again
         }
         WorkspaceExports.Request request = new WorkspaceExports.Request(accountId, kind, medium, encoding, templateId, ids, checkValues, withHeader,
-                doExport ? (confirm == null ? -1 : confirm) : null);
+                doExport ? (confirm == null ? -1 : confirm) : null, escape);
         String error = null;
         if (doExport) {
             try {
@@ -260,6 +267,8 @@ public class ConsoleWorkspaceExportController {
             model.addAttribute("exported", result.exported());
             model.addAttribute("held", result.held());
             model.addAttribute("untrademarked", result.untrademarked());
+            model.addAttribute("escaped", request.escapeFormulas());
+            model.addAttribute("uncatalogued", result.uncatalogued());
             model.addAttribute("opened", result.opened());
             model.addAttribute("kindLabel", labels.kind(request.kind() == Kind.BULK ? TemplateKind.AMAZON_BULK
                     : TemplateKind.AMAZON_CUSTOM));

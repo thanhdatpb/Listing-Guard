@@ -124,12 +124,37 @@ class ListingStatusGateTest {
 
     @Test
     void aCauseThatCanPassOrBeMendedHoldsTheListingBack() {
-        for (TrademarkReason reason : List.of(TrademarkReason.UNAVAILABLE, TrademarkReason.INCOMPLETE, TrademarkReason.WATCHLIST_ONLY)) {
+        for (TrademarkReason reason : List.of(TrademarkReason.UNAVAILABLE, TrademarkReason.INCOMPLETE)) {
             Verdict v = verdict(on(Audit.THIS_TEXT, 0, false, reason));
             assertThat(v.blocks()).as(reason.name()).containsExactly(Block.INCOMPLETE);
             assertThat(v.mayGo()).as(reason.name()).isFalse();
             assertThat(v.trademarkChecked()).as(reason.name()).isFalse();
         }
+    }
+
+    @Test
+    void aClientWithAWatchlistAndNoCatalogIsNotHeldBackAndTheListingIsSaidToBeUncheckedForTheCatalog() {
+        Verdict v = verdict(on(Audit.THIS_TEXT, 0, false, TrademarkReason.WATCHLIST_ONLY));
+        assertThat(v.blocks()).isEmpty();
+        assertThat(v.mayGo()).isTrue();
+        assertThat(v.trademarkChecked()).isFalse();
+        assertThat(v.catalogUnchecked()).isTrue();
+        assertThat(v.trademarkReason()).isEqualTo(TrademarkReason.WATCHLIST_ONLY);
+        // no other reason is "not checked against the catalog"
+        for (TrademarkReason reason : TrademarkReason.values()) {
+            if (reason != TrademarkReason.WATCHLIST_ONLY) {
+                assertThat(verdict(on(Audit.THIS_TEXT, 0, reason == TrademarkReason.RAN, reason)).catalogUnchecked()).as(reason.name()).isFalse();
+            }
+        }
+        // a hit of the watchlist is still an error and a HIGH risk
+        Verdict hit = verdict(new Setup(true, true, Audit.THIS_TEXT, 1, true, false, TrademarkReason.WATCHLIST_ONLY, null));
+        assertThat(hit.blocks()).containsExactlyInAnyOrder(Block.ERROR, Block.HIGH);
+        assertThat(hit.catalogUnchecked()).isTrue();
+        // no result of this text, or no audit at all: unchecked, and nothing is said of the catalog
+        Verdict older = verdict(on(Audit.OLDER_TEXT, 0, false, TrademarkReason.WATCHLIST_ONLY));
+        assertThat(older.blocks()).containsExactly(Block.UNCHECKED);
+        assertThat(older.catalogUnchecked()).isFalse();
+        assertThat(verdict(new Setup(false, true, Audit.NONE, 0, false, false, null, null)).catalogUnchecked()).isFalse();
     }
 
     @Test
@@ -150,6 +175,59 @@ class ListingStatusGateTest {
         assertThat(TrademarkReason.RAN.holdsBack()).isFalse();
         assertThat(EnumSet.allOf(TrademarkReason.class).stream().filter(TrademarkReason::notSetUp)).containsExactlyInAnyOrder(
                 TrademarkReason.NOT_CONFIGURED, TrademarkReason.NO_PLAN);
+        assertThat(EnumSet.allOf(TrademarkReason.class).stream().filter(TrademarkReason::holdsBack)).containsExactlyInAnyOrder(
+                TrademarkReason.UNAVAILABLE, TrademarkReason.INCOMPLETE);
+        assertThat(EnumSet.allOf(TrademarkReason.class).stream().filter(TrademarkReason::catalogUnchecked)).containsExactly(TrademarkReason.WATCHLIST_ONLY);
+    }
+
+    /**
+     * Every combination of the audit on or off, {@code block-on-error}, the state of the result, the number of errors, a HIGH hit, the reason and a
+     * reason of an ADMIN, against the table of ADR-063 §1 as ADR-064 §3 changes it, written out here without the code of the service.
+     */
+    @Test
+    void everyCombinationHasTheBlocksOfTheTable() {
+        int cases = 0;
+        for (boolean auditOn : new boolean[] {true, false}) {
+            for (boolean block : new boolean[] {true, false}) {
+                for (Audit audit : Audit.values()) {
+                    for (int errors : new int[] {0, 2}) {
+                        for (boolean high : new boolean[] {false, true}) {
+                            for (TrademarkReason reason : TrademarkReason.values()) {
+                                for (Boolean valid : new Boolean[] {null, true, false}) {
+                                    if (audit != Audit.NONE && !auditOn) {
+                                        continue;
+                                    }
+                                    Setup setup = new Setup(auditOn, block, audit, errors, high && errors > 0, reason == TrademarkReason.RAN, reason, valid);
+                                    Verdict v = verdict(setup);
+                                    Set<Block> expected = EnumSet.noneOf(Block.class);
+                                    if (block) {
+                                        if (audit != Audit.THIS_TEXT) {
+                                            expected.add(Block.UNCHECKED);
+                                        } else {
+                                            if (errors > 0) {
+                                                expected.add(Block.ERROR);
+                                                if (high) {
+                                                    expected.add(Block.HIGH);
+                                                }
+                                            }
+                                            if (reason == TrademarkReason.UNAVAILABLE || reason == TrademarkReason.INCOMPLETE) {
+                                                expected.add(Block.INCOMPLETE);
+                                            }
+                                        }
+                                    }
+                                    assertThat(v.blocks()).as(setup.toString()).isEqualTo(expected);
+                                    assertThat(v.mayGo()).as(setup.toString()).isEqualTo(expected.isEmpty() || Boolean.TRUE.equals(valid));
+                                    assertThat(v.catalogUnchecked()).as(setup.toString())
+                                            .isEqualTo(audit == Audit.THIS_TEXT && reason == TrademarkReason.WATCHLIST_ONLY);
+                                    cases++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assertThat(cases).isGreaterThan(300);
     }
 
     // ------------------------------------------------------------------ errors and the state of the result

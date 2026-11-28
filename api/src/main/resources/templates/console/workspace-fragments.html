@@ -136,6 +136,7 @@
 
 <!-- The release parts of a listing page (ADR-063). Model: listing, canRelease, isReady, isExported, isEtsy, exportedAt, etsyPanel, postable, postBlocks. -->
 <th:block th:fragment="release">
+    <div class="lg-banner lg-banner--warning lg-section" id="reexport-note" th:if="${needsReexport == true}"><p><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-warn"/></svg> <span th:text="#{workspace.reexport.note}"></span></p></div>
     <div class="lg-actions lg-section" id="release-actions" th:if="${canRelease and (isExported or listing.status().name() == 'LIVE' or (isEtsy and isReady))}">
         <p class="lg-text-muted" th:if="${exportedAt != null}" th:text="#{workspace.detail.exported(${exportedAt})}"></p>
         <form method="post" th:if="${isExported}" th:action="@{/console/workspace/listings/{id}/live(id=${listing.id()})}"><button type="submit" class="lg-btn" id="release-live" th:text="#{workspace.detail.live}"></button></form>

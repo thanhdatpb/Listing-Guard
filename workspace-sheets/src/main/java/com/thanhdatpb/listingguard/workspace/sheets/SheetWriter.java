@@ -228,11 +228,21 @@ public final class SheetWriter {
      * replaced. {@code headerRows} may be empty.
      */
     public static String clipboard(List<List<String>> headerRows, List<List<SheetCell>> rows) {
+        return clipboard(headerRows, rows, false);
+    }
+
+    /**
+     * The same, and with {@code escapeFormulas} a text cell (and a header cell) that starts with {@code =}, {@code +}, {@code -} or {@code @}
+     * gets a single quote in front of it, which Google Sheets and Excel read as "this is text" and do not show (ADR-064 §5): a pasted
+     * {@code =HYPERLINK(...)} stays a word. A numeric cell is never changed: a number cannot start with any of them except a minus sign, and a
+     * negative number is still a number. Nothing is escaped in a workbook or a {@code .txt} file; only the text for a spreadsheet.
+     */
+    public static String clipboard(List<List<String>> headerRows, List<List<SheetCell>> rows, boolean escapeFormulas) {
         StringBuilder text = new StringBuilder();
         for (List<String> header : headerRows) {
             boolean first = true;
             for (String cell : header) {
-                text.append(first ? "" : "\t").append(quoted(cell == null ? "" : cell));
+                text.append(first ? "" : "\t").append(quoted(cell == null ? "" : escapeFormulas ? escaped(cell) : cell));
                 first = false;
             }
             text.append('\n');
@@ -240,12 +250,18 @@ public final class SheetWriter {
         for (List<SheetCell> row : rows) {
             boolean first = true;
             for (SheetCell cell : row) {
-                text.append(first ? "" : "\t").append(cell == null || cell.isBlank() ? "" : quoted(cell.text()));
+                text.append(first ? "" : "\t").append(cell == null || cell.isBlank() ? ""
+                        : quoted(escapeFormulas && !cell.isNumber() ? escaped(cell.text()) : cell.text()));
                 first = false;
             }
             text.append('\n');
         }
         return text.toString();
+    }
+
+    /** The text with a single quote in front when it starts with a character that a spreadsheet may read as the start of a formula. */
+    public static String escaped(String cell) {
+        return !cell.isEmpty() && "=+-@".indexOf(cell.charAt(0)) >= 0 ? "'" + cell : cell;
     }
 
     private static String quoted(String cell) {

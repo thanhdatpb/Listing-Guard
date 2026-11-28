@@ -23,8 +23,10 @@
         <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.going}"></span><span class="lg-kv__value lg-num" th:text="${exported}"></span></li>
         <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.held}"></span><span class="lg-kv__value lg-num" th:text="${held}"></span></li>
         <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.untrademarked}"></span><span class="lg-kv__value lg-num" th:text="${untrademarked}"></span></li>
+        <li class="lg-kv__item" id="paste-uncatalogued"><span class="lg-kv__label" th:text="#{workspace.export.n.uncatalogued}"></span><span class="lg-kv__value lg-num" th:text="${uncatalogued}"></span></li>
     </ul>
     <p class="lg-text-muted" th:if="${markedExported}" th:text="#{workspace.export.paste.marked}"></p>
+    <p class="lg-text-muted" id="paste-escaped" th:if="${escaped == true}" th:text="#{workspace.export.paste.escaped}"></p>
     <section class="lg-card lg-section" aria-labelledby="paste-heading">
         <h2 id="paste-heading" class="lg-card__title" th:text="#{workspace.export.paste.text}"></h2>
         <textarea class="lg-textarea" id="paste-text" readonly rows="14" th:text="${text}"></textarea>

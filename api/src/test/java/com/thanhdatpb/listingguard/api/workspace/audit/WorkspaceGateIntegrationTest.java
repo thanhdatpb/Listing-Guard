@@ -114,34 +114,46 @@ class WorkspaceGateIntegrationTest extends AuditIntegrationBase {
     }
 
     @Test
-    void aWatchlistWithoutACatalogOnlyLooksAtTheWatchlistAndHoldsTheListingBackUntilAnAdministratorOpensIt() {
+    void aWatchlistWithoutACatalogOnlyLooksAtTheWatchlistAndDoesNotHoldTheListingBackButSaysSo() {
         Team team = team();
         SellerAccount shop = etsyShop(team, "Shop C");
         watch(team, "Brimwick Otters");
         Listing l = editor.create(member(team), shop.id(), form("C-1", "Plain ceramic mug"));
 
         assertThat(reasonOf(l)).isEqualTo("WATCHLIST_ONLY");
-        assertThat(verdict(team, l).blocks()).containsExactly(Block.INCOMPLETE);
+        var verdict = verdict(team, l);
+        assertThat(verdict.blocks()).isEmpty();
+        assertThat(verdict.trademarkChecked()).isFalse();
+        assertThat(verdict.catalogUnchecked()).isTrue();
         assertThat(statusService.markReady(member(team), List.of(l.id()), false, null)).singleElement()
-                .satisfies(o -> assertThat(o.result()).isEqualTo(Result.BLOCKED));
-        assertThat(reload(team, l).status()).isEqualTo(ListingStatus.DRAFT);
-
-        assertThat(statusService.markReady(admin(team), List.of(l.id()), true, "Only the watchlist is wanted for this client")).singleElement()
-                .satisfies(o -> assertThat(o.result()).isEqualTo(Result.MOVED_OPENED));
+                .satisfies(o -> assertThat(o.result()).isEqualTo(Result.MOVED));
         assertThat(reload(team, l).status()).isEqualTo(ListingStatus.READY_TO_EXPORT);
-        var row = overrides.latest(team.client().getId(), List.of(l.id())).get(l.id());
-        assertThat(row.blockReasons()).isEqualTo("INCOMPLETE");
-        assertThat(row.auditState()).isEqualTo("INCOMPLETE");
-        assertThat(verdict(team, reload(team, l)).mayGo()).isTrue();
+        // nobody opened anything: there was nothing to open
+        assertThat(overrides.latest(team.client().getId(), List.of(l.id()))).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM workspace_status_override WHERE listing_id = ?", Long.class, l.id())).isZero();
 
-        // the reason was given for this text: a changed text is a draft again and is held back again
+        // a changed text is a draft again, audited again with the same cause, and goes again without a reason
         Listing ready = reload(team, l);
         Map<String, String> edited = new LinkedHashMap<>(ready.data());
         edited.put("title", "Plain ceramic mug, edited");
         editor.save(member(team), ready.id(), ready.version(), edited);
         assertThat(reload(team, l).status()).isEqualTo(ListingStatus.DRAFT);
-        assertThat(verdict(team, reload(team, l)).opened()).isNull();
-        assertThat(verdict(team, reload(team, l)).blocks()).containsExactly(Block.INCOMPLETE);
+        assertThat(reasonOf(reload(team, l))).isEqualTo("WATCHLIST_ONLY");
+        assertThat(verdict(team, reload(team, l)).blocks()).isEmpty();
+    }
+
+    @Test
+    void aHitOfTheWatchlistWithoutACatalogStillHoldsTheListingBack() {
+        Team team = team();
+        SellerAccount shop = etsyShop(team, "Shop C2");
+        watch(team, "Brimwick Otters");
+        Listing l = editor.create(member(team), shop.id(), form("C-2", "Brimwick Otters ceramic mug"));
+
+        assertThat(reasonOf(l)).isEqualTo("WATCHLIST_ONLY");
+        assertThat(verdict(team, l).blocks()).contains(Block.ERROR, Block.HIGH);
+        assertThat(statusService.markReady(member(team), List.of(l.id()), false, null)).singleElement()
+                .satisfies(o -> assertThat(o.result()).isEqualTo(Result.BLOCKED));
+        assertThat(reload(team, l).status()).isEqualTo(ListingStatus.DRAFT);
     }
 
     // ------------------------------------------------------------------ a cause that passes

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard - Listing Guard</title>
+    
+    <link rel="icon" href="/brand/favicon.ico?v=BUILD" sizes="48x48">
+    <link rel="icon" type="image/svg+xml" href="/brand/logo/symbol.svg?v=BUILD" sizes="any">
+    <link rel="apple-touch-icon" href="/brand/icons/icon-180.png?v=BUILD">
+    <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+    <script src="/brand/theme.js?v=BUILD"></script>
+    <script defer src="/brand/console-interactions.js?v=BUILD"></script>
+    <link rel="stylesheet" href="/brand/tokens.css?v=BUILD">
+    <link rel="stylesheet" href="/brand/app.css?v=BUILD">
+
+</head>
+<body>
+<!-- The console home page (ADR-034, ADR-041): the week of the signed-in account's client in four figures, what needs attention, what the
+     checks run on, a chart drawn as SVG on the server (no script, no chart library, the same numbers in a table under it) and the
+     rules that found the most. Every value goes through th:text and every sentence is a message (ADR-028). -->
+
+<header class="app-side">
+    <a class="app-skip" href="#main">Skip to content</a>
+    <svg class="lg-sr-only" aria-hidden="true" focusable="false">
+        <symbol id="lg-i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></symbol>
+        <symbol id="lg-i-check" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+        <symbol id="lg-i-bulk" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/></symbol>
+        <symbol id="lg-i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
+        <symbol id="lg-i-reaudit" viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-14 5"/><path d="M4 12a8 8 0 0 1 14-5"/><path d="M18 3v4h-4M6 21v-4h4"/></symbol>
+        <symbol id="lg-i-watchlist" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="lg-i-stats" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+        <symbol id="lg-i-report" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
+        <symbol id="lg-i-keys" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></symbol>
+        <symbol id="lg-i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+        <symbol id="lg-i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+        <symbol id="lg-i-download" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/></symbol>
+        <symbol id="lg-i-edit" viewBox="0 0 24 24"><path d="M5 19l4-.9 10-10-3.1-3.1-10 10L5 19Zm9-12l3 3M4 21h16"/></symbol>
+        <symbol id="lg-i-phrase" viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8m-8 3h5"/></symbol>
+        <symbol id="lg-i-experiments" viewBox="0 0 24 24"><path d="M9 3h6m-5 0v7l-5 8a2 2 0 002 3h10a2 2 0 002-3l-5-8V3M8 15h8"/></symbol>
+        <symbol id="lg-i-review" viewBox="0 0 24 24"><path d="M5 5h14v14H5V5Zm3 6 3 3 5-5"/></symbol>
+        <symbol id="lg-i-impact" viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h16m-3-8 3 3-3 3"/></symbol>
+        <symbol id="lg-i-pod" viewBox="0 0 24 24"><path d="M12 3l8 4v10l-8 4-8-4V7l8-4Zm0 8v10M4 7l8 4 8-4"/></symbol>
+    </svg>
+    <a class="app-side__brand" href="/console">
+        <span class="lg-lockup">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="/brand/logo/lockup-horizontal-reverse.svg?v=BUILD">
+        <img src="/brand/logo/lockup-horizontal.svg?v=BUILD" alt="Listing Guard" class="app-side__logo">
+    </picture>
+    <img class="lg-lockup__light app-side__logo" src="/brand/logo/lockup-horizontal.svg?v=BUILD" alt="Listing Guard">
+    <img class="lg-lockup__dark app-side__logo" src="/brand/logo/lockup-horizontal-reverse.svg?v=BUILD" alt="Listing Guard">
+</span>
+    </a>
+    <div class="app-theme" data-console-theme-controls hidden>
+    <label class="lg-sr-only" for="console-theme">Console appearance</label>
+    <select class="lg-select" id="console-theme" data-console-theme-switch>
+        <option value="system">Follow system</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+    </select>
+</div>
+    <p id="console-working" hidden>Working…</p>
+    <p id="console-request-error" hidden>The request could not finish. Check your connection and try again.</p>
+    <input type="checkbox" id="app-menu" class="app-side__toggle">
+    <label class="app-side__menu" for="app-menu">
+        <svg class="lg-icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#lg-i-menu"/></svg>
+        <span class="lg-sr-only">Menu</span>
+    </label>
+    <div class="app-side__panel">
+        <nav class="app-nav" aria-label="Console">
+            <a class="app-nav__link" href="/console" aria-current="page">Dashboard<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-home"/></svg></a>
+            <p class="app-nav__label">Check</p>
+            <a class="app-nav__link" href="/console/check">Check listing<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
+            <a class="app-nav__link" href="/console/bulk">Bulk check<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg></a>
+            
+            <a class="app-nav__link" href="/console/check/edit">Compare a listing edit<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-edit"/></svg></a>
+            <p class="app-nav__label">Monitor</p>
+            <a class="app-nav__link" href="/console/history">History<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-history"/></svg></a>
+            <a class="app-nav__link" href="/console/reaudit">Re-audit<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-reaudit"/></svg></a>
+            
+                <p class="app-nav__label">Manage</p>
+                <a class="app-nav__link" href="/console/watchlist">Watchlist<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-watchlist"/></svg></a>
+                <a class="app-nav__link" href="/console/stats">Statistics<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-stats"/></svg></a>
+                
+                <a class="app-nav__link" href="/console/api-keys">API keys<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-keys"/></svg></a>
+                
+                <a class="app-nav__link" href="/console/report">Report<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-report"/></svg></a>
+            
+            
+                <p class="app-nav__label app-nav__label--icon"><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-experiments"/></svg><span>Experimental</span></p>
+                
+                <a class="app-nav__link" href="/console/policy-changes">Policy changes<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-impact"/></svg></a>
+                <a class="app-nav__link" href="/console/pod-readiness">POD readiness<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-pod"/></svg></a>
+            
+        </nav>
+        <div class="app-side__foot">
+            <div class="app-account">
+                <span class="app-account__avatar" aria-hidden="true">G</span>
+                <span class="app-account__who">
+                    <span class="app-account__client">goldenTOKEN12</span>
+                    <span title="golden-admin-TOKEN12@example.test">golden-admin-TOKEN12@example.test</span>
+                </span>
+            </div>
+            <div class="app-side__actions">
+                <div class="lang" role="group" aria-label="Language">
+    
+        <a href="/console?lang=en" lang="en" hreflang="en"
+           aria-current="true">English</a><span> | </span>
+    
+        <a href="/console?lang=vi" lang="vi" hreflang="vi">Tiếng Việt</a>
+    
+</div>
+                <form method="post" action="/logout"><input type="hidden" name="_csrf" value="TOKEN"/>
+                    <button type="submit" class="lg-btn lg-btn--link">Sign out</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</header>
+<main class="lg-page" id="home">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <p class="lg-page__crumb">Week from Nov 23, 2026 to Nov 28, 2026 (UTC).</p>
+            <h1>Dashboard</h1>
+            <p class="lg-page__sub">What Listing Guard held back before your listings reached the marketplace.</p>
+        </div>
+        <div class="lg-actions">
+            <!-- One brand button on a screen: with no data yet it is the empty state's button, so this one is plain. -->
+            <a class="lg-btn" href="/console/check">
+                <svg class="lg-icon lg-btn__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg>
+                Check listing
+            </a>
+            
+        </div>
+    </div>
+
+    
+
+    <!-- The catalog changed since a scope was last re-audited (ADR-035): said as a warning, with the way to the page. -->
+    
+
+    <!-- No result and no verdict in eight weeks: how to start, not a page of zeros. -->
+    <section class="lg-empty lg-section" id="home-empty" aria-labelledby="empty-heading">
+        <h2 id="empty-heading" class="lg-empty__title">No data yet</h2>
+        <p class="lg-empty__text">This page shows what Listing Guard did for you each week. It fills in as soon as you check listings and mark the findings.</p>
+        <ol class="lg-empty__steps">
+            <li><span>Check a listing or a whole Sheet:</span>
+                <a href="/console/check">Check listing</a> &middot; <a href="/console/bulk">Bulk check</a></li>
+            <li>Next to each finding, mark it Correct, False positive or Not useful. It takes one click and is what tells a lucky rule from a good one.</li>
+            <li>Come back here: the week, a chart of eight weeks and the rules that found the most will appear on this page.</li>
+        </ol>
+        <a class="lg-btn lg-btn--primary" href="/console/bulk">Bulk check</a>
+    </section>
+
+    
+
+    <!-- The plan and the month's usage, with or without data; where plans are off there is nothing to show and no card. -->
+    
+</main>
+</body>
+</html>

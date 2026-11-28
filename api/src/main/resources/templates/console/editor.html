@@ -24,7 +24,7 @@
         </div>
         <div class="lg-actions">
             <a class="lg-btn" th:if="${consoleNavigation != null and consoleNavigation.pod}" th:href="@{/console/pod-readiness}" th:text="#{pod.title}"></a>
-            <a class="lg-btn" th:href="@{/console/check/edit}" th:text="#{edit.mode.button}"></a>
+            <a class="lg-btn" th:if="${sheetToolsHidden != true}" th:href="@{/console/check/edit}" th:text="#{edit.mode.button}"></a>
         </div>
     </div>
 

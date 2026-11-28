@@ -95,8 +95,8 @@
         </form>
         <p th:text="#{impact.reaudit.note}"></p>
         <div class="lg-actions">
-            <a class="lg-btn" th:href="@{/console/reaudit(marketplace=${report.marketplace})}" th:text="#{impact.reaudit}"></a>
-            <a class="lg-btn" th:href="@{/console/check/edit(marketplace=${report.marketplace})}" th:text="#{impact.compare}"></a>
+            <a class="lg-btn" th:if="${sheetToolsHidden != true}" th:href="@{/console/reaudit(marketplace=${report.marketplace})}" th:text="#{impact.reaudit}"></a>
+            <a class="lg-btn" th:if="${sheetToolsHidden != true}" th:href="@{/console/check/edit(marketplace=${report.marketplace})}" th:text="#{impact.compare}"></a>
             <a class="lg-btn" th:href="@{/console/policy-changes/{id}/report.csv(id=${report.id})}" th:text="#{impact.csv}"></a>
         </div>
     </section>

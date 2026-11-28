@@ -44,11 +44,11 @@
             <li th:text="#{pilot.flow}"></li>
             <li th:if="${consoleNavigation.manage}" th:text="#{pilot.manage}"></li>
         </ul>
-        <a id="pilot-start" class="lg-btn lg-btn--primary" th:href="@{/console/bulk}" th:text="#{pilot.start}"></a>
+        <a th:if="${sheetToolsHidden != true}" id="pilot-start" class="lg-btn lg-btn--primary" th:href="@{/console/bulk}" th:text="#{pilot.start}"></a><a th:if="${workspaceMode == true}" id="home-workspace" class="lg-btn lg-btn--primary" th:href="@{/console/workspace}" th:text="#{nav.ws.listings}"></a>
     </section>
 
     <!-- The catalog changed since a scope was last re-audited (ADR-035): said as a warning, with the way to the page. -->
-    <th:block th:if="${reauditNotice != null}">
+    <th:block th:if="${reauditNotice != null and sheetToolsHidden != true}">
         <div th:replace="~{console/reaudit-fragments :: due(${reauditNotice}, @{/console/reaudit})}"></div>
     </th:block><th:block th:if="${auditHome != null}"><th:block th:replace="~{console/workspace-fragments :: homeCard}"></th:block></th:block>
 
@@ -58,11 +58,11 @@
         <p class="lg-empty__text" th:text="#{home.empty.intro}"></p>
         <ol class="lg-empty__steps">
             <li><span th:text="#{home.empty.step1}"></span>
-                <a th:href="@{/console/check}" th:text="#{nav.check}"></a> &middot; <a th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a></li>
+                <a th:href="@{/console/check}" th:text="#{nav.check}"></a><th:block th:if="${sheetToolsHidden != true}"> &middot; <a th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a></th:block></li>
             <li th:text="#{home.empty.step2}"></li>
             <li th:text="#{home.empty.step3}"></li>
         </ol>
-        <a class="lg-btn lg-btn--primary" th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a>
+        <a class="lg-btn lg-btn--primary" th:if="${sheetToolsHidden != true}" th:href="@{/console/bulk}" th:text="#{nav.bulk}"></a><a class="lg-btn lg-btn--primary" th:if="${workspaceMode == true}" th:href="@{/console/workspace}" th:text="#{nav.ws.listings}"></a>
     </section>
 
     <th:block th:if="${overview and !home.empty}">
@@ -104,7 +104,7 @@
             <section class="lg-card" id="home-attention" aria-labelledby="attention-heading">
                 <div class="lg-card__head">
                     <h2 id="attention-heading" class="lg-card__title" th:text="#{home.attention.heading}"></h2>
-                    <a class="lg-small" th:href="@{/console/history}" th:text="#{home.attention.all}"></a>
+                    <a class="lg-small" th:if="${sheetToolsHidden != true}" th:href="@{/console/history}" th:text="#{home.attention.all}"></a>
                 </div>
                 <p class="lg-text-muted" th:if="${home.attention.isEmpty()}" th:text="#{home.attention.none}"></p>
                 <ul class="lg-feed" th:unless="${home.attention.isEmpty()}">
@@ -154,7 +154,7 @@
                                  th:with="pattern=#{format.daymonth}" th:text="#{home.data.reaudit.value(${#temporals.format(home.data.lastReauditAt, pattern)}, ${#strings.toString(home.data.lastReauditNew)})}"></div>
                             <div class="lg-kv__value" th:if="${home.data.lastReauditAt == null}" th:text="#{home.data.reaudit.never}"></div>
                         </div>
-                        <a class="lg-small" th:href="@{/console/reaudit}" th:text="#{home.data.open}"></a>
+                        <a class="lg-small" th:if="${sheetToolsHidden != true}" th:href="@{/console/reaudit}" th:text="#{home.data.open}"></a>
                     </li>
                     <li class="lg-kv__item" id="data-rulesets">
                         <div class="lg-kv__main">

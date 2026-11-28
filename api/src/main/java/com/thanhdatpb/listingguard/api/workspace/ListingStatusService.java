@@ -35,7 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
  * trademark risk, while it was not checked (no result, or a result of older text), or while its trademark part did not run for a cause that
  * can pass or be mended (a catalog being loaded, a rule that failed). A trademark part that did not run because the client has no trademark
  * set-up (no catalog served and no watchlist, or a plan without the pack) does not hold the listing back, and the listing is said to be
- * unchecked for trademark wherever it is shown. With the background audit off no listing has a result, so every listing is unchecked and
+ * unchecked for trademark wherever it is shown. A client with a watchlist and no catalog is not held back either (ADR-064 §3): its listings are
+ * said to be unchecked for the catalog; a HIGH hit of the watchlist is still an error. With the background audit off no listing has a result, so every listing is unchecked and
  * held back; {@code block-on-error=false} switches the gate off. An ADMIN can open the block with a reason; the reason is stored with who,
  * when, the content hash and the audit's state, and counts only while the listing's content is that one.
  */
@@ -78,6 +79,14 @@ public class ListingStatusService {
         /** True when the listing may go now: nothing blocks it, or a reason of an ADMIN is valid for this very content. */
         public boolean mayGo() {
             return blocks.isEmpty() || opened != null;
+        }
+
+        /**
+         * True when the audit of this very content looked at the client's watchlist only, because no catalog is served (ADR-064 §3). The gate does not
+         * hold such a listing back for that, and the status page, the export screen and the export log say it was not checked against the catalog.
+         */
+        public boolean catalogUnchecked() {
+            return trademarkReason != null && trademarkReason.catalogUnchecked();
         }
     }
 

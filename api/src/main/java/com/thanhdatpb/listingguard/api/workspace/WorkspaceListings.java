@@ -416,13 +416,31 @@ public class WorkspaceListings {
      */
     public boolean release(UUID clientId, UUID listingId, ListingStatus to, long expectedVersion, UUID changedBy) {
         Timestamp now = Timestamp.from(clock.instant());
-        int changed = jdbc.update("UPDATE workspace_listing SET status = ?, exported_at = ?, version = version + 1, updated_at = ? WHERE id = ? "
+        int changed = jdbc.update("UPDATE workspace_listing SET status = ?, exported_at = ?, exported_hash = content_hash, version = version + 1, "
+                + "updated_at = ? WHERE id = ? "
                 + "AND client_id = ? AND version = ? AND status = 'READY_TO_EXPORT' AND deleted_at IS NULL", to.name(), now, now, listingId,
                 clientId, expectedVersion);
         if (changed == 1) {
             snapshot(clientId, listingId, ChangeKind.EXPORT, changedBy);
         }
         return changed == 1;
+    }
+
+    /**
+     * The listings among these that need to be exported again (ADR-064 §4): exported or live, with a content that is not the content they had
+     * when they were last exported or posted. A listing in any other status is never in the set: a draft or a ready listing has no export to
+     * repeat, and a listing whose export is not known (no {@code exported_hash}) is not guessed.
+     */
+    public java.util.Set<UUID> needsReexport(UUID clientId, Collection<UUID> ids) {
+        java.util.Set<UUID> found = new java.util.HashSet<>();
+        List<UUID> all = new ArrayList<>(ids);
+        for (int from = 0; from < all.size(); from += 1000) {
+            jdbc.query("SELECT id FROM workspace_listing WHERE client_id = ? AND id = ANY (?) AND deleted_at IS NULL "
+                    + "AND status IN ('EXPORTED', 'LIVE') AND exported_hash IS NOT NULL AND exported_hash <> content_hash",
+                    (org.springframework.jdbc.core.RowCallbackHandler) rs -> found.add(rs.getObject("id", UUID.class)), clientId,
+                    all.subList(from, Math.min(all.size(), from + 1000)).toArray(UUID[]::new));
+        }
+        return found;
     }
 
     /** When each of these listings was last exported or posted; a listing that never was is absent. */

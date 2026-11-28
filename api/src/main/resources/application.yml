@@ -21,6 +21,8 @@ listing-guard:
     # until an ADMIN opens the block with a reason. A client with no trademark set-up is not held back and its listings are said to be unchecked for trademark.
     # With the background audit off every listing is unchecked and held back. false: nothing blocks.
     block-on-error: ${LISTING_GUARD_WORKSPACE_BLOCK_ON_ERROR:true}
+    # ADR-064: who may import data: ADMIN or ADMIN,MEMBER (an ADMIN always may). Empty: ADMIN in the console mode "workspace", ADMIN,MEMBER in "classic" (as ADR-059).
+    import-roles: ${LISTING_GUARD_WORKSPACE_IMPORT_ROLES:}
     # ADR-063: the export of a seller account's listings as a copy of its template (.xlsm/.xlsx), a tab-delimited .txt or text to paste.
     export:
       # The most listings of one export; a larger selection is refused, not cut.
@@ -95,6 +97,11 @@ listing-guard:
     role-home-enabled: ${LISTING_GUARD_CONSOLE_ROLE_HOME_ENABLED:false}
     catalog-gate-passed-version: ${LISTING_GUARD_CONSOLE_CATALOG_GATE_PASSED_VERSION:}
     pilot: ${LISTING_GUARD_CONSOLE_PILOT:false}
+    # ADR-064: classic (the menu, the home and the paths of every earlier version, unchanged) or workspace (the Console starts from the listing workspace and hides the
+    # Sheet tools). workspace takes effect only while listing-guard.workspace.enabled is true. Read at start-up.
+    mode: ${LISTING_GUARD_CONSOLE_MODE:classic}
+    # ADR-064: true keeps the Sheet tools (bulk check, edit before/after, re-audit by file, history of checks) in the workspace mode. The classic mode never hides them.
+    sheet-tools: ${LISTING_GUARD_CONSOLE_SHEET_TOOLS:false}
     policy-changes-enabled: ${LISTING_GUARD_CONSOLE_POLICY_CHANGES_ENABLED:true}
     pod-enabled: ${LISTING_GUARD_CONSOLE_POD_ENABLED:true}
     enabled: ${LISTING_GUARD_CONSOLE_ENABLED:false}

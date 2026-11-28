@@ -48,7 +48,21 @@ class WorkspaceLayoutTest {
     @Test
     void theLayoutHoldsNoWorkspaceMarkupOutsideItsFlaggedBlocks() throws IOException {
         String layout = Files.readString(Path.of("src/main/resources/templates/console/layout.html"), StandardCharsets.UTF_8);
-        String rest = withoutWorkspaceBlocks(layout);
+        // the workspace console mode (ADR-064) has its own flag, {@code workspaceMode}, which is false whenever the workspace is off: its menu is one element
+        // glued to the end of the classic menu, and its one icon is one block glued to the sprite
+        String modeNav = "<nav class=\"app-nav app-nav--workspace\" th:if=\"${workspaceMode == true}\"";
+        int navStart = layout.indexOf(modeNav);
+        assertThat(navStart).as("the workspace console menu").isGreaterThan(0);
+        assertThat(layout.substring(0, navStart)).endsWith("</nav>");
+        int navEnd = layout.indexOf("</nav>", layout.indexOf("<!--/* The slot of the notifications page")) + "</nav>".length();
+        String modeIcon = "<th:block th:if=\"${workspaceMode == true}\">";
+        int iconStart = layout.indexOf(modeIcon);
+        assertThat(iconStart).isGreaterThan(0);
+        assertThat(layout.substring(0, iconStart)).endsWith("</th:block>");
+        int iconEnd = layout.indexOf("</th:block>", iconStart) + "</th:block>".length();
+        String withoutMode = layout.substring(0, navStart) + layout.substring(navEnd);
+        withoutMode = withoutMode.replace(layout.substring(iconStart, iconEnd), "");
+        String rest = withoutWorkspaceBlocks(withoutMode);
 
         assertThat(layout).contains(OPEN).contains("lg-i-workspace").contains("#{workspace.nav.listings}");
         // (the demo workspace of ADR-057 is another feature and uses the word too)

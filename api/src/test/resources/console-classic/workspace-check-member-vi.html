@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kiểm tra listing - Listing Guard</title>
+    
+    <link rel="icon" href="/brand/favicon.ico?v=BUILD" sizes="48x48">
+    <link rel="icon" type="image/svg+xml" href="/brand/logo/symbol.svg?v=BUILD" sizes="any">
+    <link rel="apple-touch-icon" href="/brand/icons/icon-180.png?v=BUILD">
+    <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+    <script src="/brand/theme.js?v=BUILD"></script>
+    <script defer src="/brand/console-interactions.js?v=BUILD"></script>
+    <link rel="stylesheet" href="/brand/tokens.css?v=BUILD">
+    <link rel="stylesheet" href="/brand/app.css?v=BUILD">
+
+    <link rel="stylesheet" href="/console/editor.css">
+    <script src="/console/editor.js" defer></script>
+    
+    <meta name="htmx-config"
+          content='{"includeIndicatorStyles":false,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[4]..","swap":true,"error":false},{"code":"...","swap":false,"error":true}]}'>
+    <script src="/console/vendor/htmx.min.js" defer></script>
+
+    
+</head>
+<body>
+<!-- The Check listing page (ADR-014 part B3, ADR-041): the form on the left; on the right the listing as it was checked with the words the
+     findings point at marked, the readiness and the trademark risk side by side with the disclaimer, then one card for each finding. -->
+
+<header class="app-side">
+    <a class="app-skip" href="#main">Bỏ qua tới nội dung</a>
+    <svg class="lg-sr-only" aria-hidden="true" focusable="false">
+        <symbol id="lg-i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></symbol>
+        <symbol id="lg-i-check" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+        <symbol id="lg-i-bulk" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/></symbol>
+        <symbol id="lg-i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
+        <symbol id="lg-i-reaudit" viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-14 5"/><path d="M4 12a8 8 0 0 1 14-5"/><path d="M18 3v4h-4M6 21v-4h4"/></symbol>
+        <symbol id="lg-i-watchlist" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="lg-i-stats" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+        <symbol id="lg-i-report" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
+        <symbol id="lg-i-keys" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></symbol>
+        <symbol id="lg-i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+        <symbol id="lg-i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+        <symbol id="lg-i-download" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/></symbol>
+        <symbol id="lg-i-edit" viewBox="0 0 24 24"><path d="M5 19l4-.9 10-10-3.1-3.1-10 10L5 19Zm9-12l3 3M4 21h16"/></symbol>
+        <symbol id="lg-i-phrase" viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8m-8 3h5"/></symbol>
+        <symbol id="lg-i-experiments" viewBox="0 0 24 24"><path d="M9 3h6m-5 0v7l-5 8a2 2 0 002 3h10a2 2 0 002-3l-5-8V3M8 15h8"/></symbol>
+        <symbol id="lg-i-review" viewBox="0 0 24 24"><path d="M5 5h14v14H5V5Zm3 6 3 3 5-5"/></symbol>
+        <symbol id="lg-i-impact" viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h16m-3-8 3 3-3 3"/></symbol>
+        <symbol id="lg-i-pod" viewBox="0 0 24 24"><path d="M12 3l8 4v10l-8 4-8-4V7l8-4Zm0 8v10M4 7l8 4 8-4"/></symbol>
+        <symbol id="lg-i-workspace" viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/></symbol>
+        <symbol id="lg-i-accounts" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></symbol>
+        <symbol id="lg-i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></symbol>
+        <symbol id="lg-i-s-draft" viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/></symbol>
+        <symbol id="lg-i-s-ready_to_export" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8 12l3 3 5-6"/></symbol>
+        <symbol id="lg-i-s-exported" viewBox="0 0 24 24"><path d="M5 12v7h14v-7"/><path d="M12 16V4M8 8l4-4 4 4"/></symbol>
+        <symbol id="lg-i-s-live" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="lg-i-warn" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v1"/></symbol>
+        <symbol id="lg-i-guess" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17v.5"/></symbol>
+        <symbol id="lg-i-unchecked" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/></symbol>
+        <symbol id="lg-i-ok" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+        <symbol id="lg-i-audit" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+        <symbol id="lg-i-risk-severe" viewBox="0 0 24 24"><path d="M12 3l9 9-9 9-9-9z"/><path d="M12 8v5M12 16v1"/></symbol>
+        <symbol id="lg-i-risk-new" viewBox="0 0 24 24"><path d="M12 3l9 9-9 9-9-9z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+        
+    </svg>
+    <a class="app-side__brand" href="/console">
+        <span class="lg-lockup">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="/brand/logo/lockup-horizontal-reverse.svg?v=BUILD">
+        <img src="/brand/logo/lockup-horizontal.svg?v=BUILD" alt="Listing Guard" class="app-side__logo">
+    </picture>
+    <img class="lg-lockup__light app-side__logo" src="/brand/logo/lockup-horizontal.svg?v=BUILD" alt="Listing Guard">
+    <img class="lg-lockup__dark app-side__logo" src="/brand/logo/lockup-horizontal-reverse.svg?v=BUILD" alt="Listing Guard">
+</span>
+    </a>
+    <div class="app-theme" data-console-theme-controls hidden>
+    <label class="lg-sr-only" for="console-theme">Giao diện Console</label>
+    <select class="lg-select" id="console-theme" data-console-theme-switch>
+        <option value="system">Theo hệ thống</option>
+        <option value="light">Sáng</option>
+        <option value="dark">Tối</option>
+    </select>
+</div>
+    <p id="console-working" hidden>Đang xử lý…</p>
+    <p id="console-request-error" hidden>Yêu cầu chưa hoàn tất. Kiểm tra kết nối rồi thử lại.</p>
+    <input type="checkbox" id="app-menu" class="app-side__toggle">
+    <label class="app-side__menu" for="app-menu">
+        <svg class="lg-icon" width="22" height="22" aria-hidden="true" focusable="false"><use href="#lg-i-menu"/></svg>
+        <span class="lg-sr-only">Menu</span>
+    </label>
+    <div class="app-side__panel">
+        <nav class="app-nav" aria-label="Bảng điều khiển">
+            <a class="app-nav__link" href="/console">Trang chủ<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-home"/></svg></a>
+            <p class="app-nav__label">Kiểm tra</p>
+            <a class="app-nav__link" href="/console/check" aria-current="page">Kiểm tra listing<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
+            <a class="app-nav__link" href="/console/bulk">Kiểm tra hàng loạt<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg></a>
+            <a class="app-nav__link" href="/console/phrase-screening">Kiểm keyword<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-phrase"/></svg></a>
+            <a class="app-nav__link" href="/console/check/edit">So sánh lần sửa listing<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-edit"/></svg></a>
+                <p class="app-nav__label">Kho listing</p>
+                <a class="app-nav__link" href="/console/workspace">Danh sách listing<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-workspace"/></svg></a>
+                <a class="app-nav__link" href="/console/workspace/accounts">Tài khoản và template<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-accounts"/></svg></a>
+                <a class="app-nav__link" href="/console/workspace/import">Nhập dữ liệu<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-upload"/></svg></a><a class="app-nav__link" href="/console/workspace/audit">Rà nền<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-audit"/></svg></a>
+            
+            <p class="app-nav__label">Theo dõi</p>
+            <a class="app-nav__link" href="/console/history">Lịch sử<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-history"/></svg></a>
+            <a class="app-nav__link" href="/console/reaudit">Rà định kỳ<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-reaudit"/></svg></a>
+            
+            
+                <p class="app-nav__label app-nav__label--icon"><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-experiments"/></svg><span>Thử nghiệm</span></p>
+                
+                <a class="app-nav__link" href="/console/policy-changes">Thay đổi chính sách<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-impact"/></svg></a>
+                <a class="app-nav__link" href="/console/pod-readiness">Mức sẵn sàng POD<svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-pod"/></svg></a>
+            
+        </nav>
+        <div class="app-side__foot">
+            <div class="app-account">
+                <span class="app-account__avatar" aria-hidden="true">G</span>
+                <span class="app-account__who">
+                    <span class="app-account__client">goldenTOKEN12</span>
+                    <span title="golden-member-TOKEN12@example.test">golden-member-TOKEN12@example.test</span>
+                </span>
+            </div>
+            <div class="app-side__actions">
+                <div class="lang" role="group" aria-label="Ngôn ngữ">
+    
+        <a href="/console/check?lang=en" lang="en" hreflang="en">English</a><span> | </span>
+    
+        <a href="/console/check?lang=vi" lang="vi" hreflang="vi"
+           aria-current="true">Tiếng Việt</a>
+    
+</div>
+                <form method="post" action="/logout"><input type="hidden" name="_csrf" value="TOKEN"/>
+                    <button type="submit" class="lg-btn lg-btn--link">Đăng xuất</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</header>
+<main class="lg-page" id="editor">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <h1 id="editor-heading">Kiểm tra listing</h1>
+            <p class="lg-page__sub">Listing Guard kiểm tra và gợi ý. Công cụ không bao giờ sửa hay đăng listing của bạn, và không lưu những gì bạn nhập.</p>
+        </div>
+        <div class="lg-actions">
+            <a class="lg-btn" href="/console/pod-readiness">Mức sẵn sàng POD</a>
+            <a class="lg-btn" href="/console/check/edit">Chế độ sửa</a>
+        </div>
+    </div>
+
+    <div class="lg-split lg-split--even">
+    <section class="lg-card editor" aria-labelledby="editor-heading">
+        <h2 class="lg-section-title">1. Sàn và danh mục</h2>
+        <nav class="lg-seg" aria-label="Sàn">
+            <a class="lg-seg__item" href="/console/check?marketplace=ETSY" aria-current="page">Etsy</a><a class="lg-seg__item" href="/console/check?marketplace=AMAZON">Amazon</a>
+        </nav>
+        <p class="lg-field__hint lg-editor__note">Chọn sàn khác sẽ bắt đầu một biểu mẫu trống.</p>
+
+        <!-- The sentences of the live counters (editor.js) are written here: the script holds no text (ADR-028). They are patterns
+             with {0}, {1}; the script fills in the numbers. -->
+        <form id="editor-form" data-console-submit method="post" action="/console/check" novalidate data-i18n-chars="{0} / {1} ký tự" data-i18n-chars-nolimit="{0} ký tự" data-i18n-bytes="{0} / {1} byte" data-i18n-bytes-nolimit="{0} byte" data-i18n-entries="{0} / {1} mục" data-i18n-entries-nolimit="{0} mục" data-i18n-longest="dài nhất {0} / {1} ký tự" data-i18n-over="{0} - vượt giới hạn"><input type="hidden" name="_csrf" value="TOKEN"/>
+            <input type="hidden" id="marketplace" name="marketplace" value="ETSY">
+            
+            
+            
+
+            <div class="lg-field">
+                <label class="lg-field__label" for="category">Danh mục</label>
+                <input type="text" class="lg-input" autocomplete="off" id="category" name="category" value="">
+            </div>
+
+            <h2 class="lg-section-title">2. Thông tin listing</h2>
+            <p class="lg-field__hint">Nhập tiêu đề, mô tả, giá, số lượng, người làm và thời điểm làm.</p>
+
+
+            <div class="lg-field">
+                <label class="lg-field__label" for="title">Tiêu đề</label>
+                <input type="text" class="lg-input" autocomplete="off" aria-describedby="title-counter" id="title" name="title" value="">
+                <p class="lg-field__hint counter" id="title-counter" data-counter-for="title" data-mode="chars"
+                   data-limit="140">Giới hạn: 140 ký tự</p>
+            </div>
+
+            
+
+            <div class="lg-field">
+                <label class="lg-field__label" for="description">Mô tả</label>
+                <textarea class="lg-textarea" rows="8" id="description" name="description"></textarea>
+            </div>
+
+            <div class="lg-field">
+                <label class="lg-field__label" for="whoMade">Ai làm ra sản phẩm (who made it)</label>
+                <input type="text" class="lg-input" autocomplete="off" aria-describedby="whoMade-hint" id="whoMade" name="whoMade" value="">
+                <p class="lg-field__hint" id="whoMade-hint">
+                    <span>Nhập tự do: mã Etsy dùng cho trường này, ví dụ</span> <code>i_did</code><span>. Listing Guard không giữ danh sách các mã.</span>
+                </p>
+            </div>
+
+            <div class="lg-field">
+                <label class="lg-field__label" for="whenMade">Làm ra khi nào (when made)</label>
+                <input type="text" class="lg-input" autocomplete="off" aria-describedby="whenMade-hint" id="whenMade" name="whenMade" value="">
+                <p class="lg-field__hint" id="whenMade-hint">
+                    <span>Nhập tự do: mã Etsy dùng cho trường này, ví dụ</span> <code>made_to_order</code><span>. Listing Guard không giữ danh sách các mã.</span>
+                </p>
+            </div>
+            <div class="lg-field">
+                <label class="lg-field__label" for="price">Giá</label>
+                <input type="text" class="lg-input" inputmode="decimal" autocomplete="off"
+                       aria-describedby="price-hint"
+                       aria-invalid="false" id="price" name="price" value="">
+                <p class="lg-field__hint" id="price-hint">Một số có dấu chấm thập phân, ví dụ 19.99.</p>
+                
+            </div>
+
+            <div class="lg-field">
+                <label class="lg-field__label" for="quantity">Số lượng</label>
+                <input type="text" class="lg-input" inputmode="numeric" autocomplete="off"
+                       aria-describedby="quantity-hint"
+                       aria-invalid="false" id="quantity" name="quantity" value="">
+                <p class="lg-field__hint" id="quantity-hint">Một số nguyên, ví dụ 5.</p>
+                
+            </div>
+
+            <details id="other-fields" class="lg-disclosure lg-editor__other">
+                <summary>Các trường khác của listing</summary>
+                <p class="lg-field__hint">Thêm các trường này nếu listing của bạn có thông tin tương ứng.</p>
+
+                <div class="lg-field">
+                    <label class="lg-field__label" for="tags"><span>Tag</span> <span class="lg-text-muted">(mỗi dòng một mục)</span></label>
+                    <textarea class="lg-textarea" aria-describedby="tags-counter" rows="6" id="tags" name="tags"></textarea>
+                    <p class="lg-field__hint counter" id="tags-counter" data-counter-for="tags" data-mode="list"
+                       data-limit-count="13" data-limit-each="20">Tối đa 13 tag, mỗi mục tối đa 20 ký tự</p>
+                </div>
+
+                
+
+                
+
+            </details>
+
+            <h2 class="lg-section-title">3. Xem lại và kiểm tra</h2>
+            <ul class="lg-editor__packs" id="check-packs">
+                <li><strong>Quy tắc listing</strong>
+                    <span>Mức xác minh tùy quy tắc. Xem nguồn trên từng phát hiện.</span>
+                    
+                </li>
+                <li><strong>Rủi ro nhãn hiệu</strong>
+                    <span>Quy tắc chưa xác minh. Kết quả chỉ để tham khảo.</span>
+                    <span id="trademark-pack-availability">Danh mục nhãn hiệu và danh sách theo dõi hiện tại chưa cho phép kiểm tra.</span>
+                </li>
+            </ul>
+            <div class="lg-actions lg-editor__actions">
+                <button type="submit" class="lg-btn lg-btn--primary" id="check-button">Kiểm tra</button>
+                <p class="lg-field__hint lg-editor__cost" id="cost">
+                    
+                    
+                        <span>Bản triển khai này không áp dụng giới hạn theo gói, nên không tính gì cả.</span>
+                    
+                </p>
+            </div>
+        </form>
+    </section>
+
+    <aside class="lg-stack lg-editor__results" id="results" aria-live="polite" aria-label="Kết quả">
+        
+        
+
+        <section class="lg-card preview" id="preview" aria-labelledby="preview-heading">
+            <h2 id="preview-heading" class="lg-card__title"><span>Xem trước</span> <span class="badge">Mô phỏng</span></h2>
+            <p class="lg-text-muted lg-small">Hình dung sơ bộ về văn bản đang có trong biểu mẫu sau lần kiểm tra hoặc gợi ý gần nhất. Đây không phải trang thật và không sao chép thiết kế của sàn nào, nên trang thật cắt tiêu đề khác đi và thay đổi theo thời gian.</p>
+            <div class="sim-grid">
+                <div>
+                    <h3 class="lg-section-title lg-section-title--small">Trong kết quả tìm kiếm</h3>
+                    <figure class="sim-card tile">
+                        <div class="sim-photo" aria-hidden="true"></div>
+                        <figcaption>
+                            <p class="sim-title placeholder">Tiêu đề của bạn hiện ở đây</p>
+                            
+                            <p class="sim-price">Chưa nhập giá</p>
+                        </figcaption>
+                    </figure>
+                    <p class="lg-small lg-text-muted">Tiêu đề bị file CSS cắt sau hai dòng. Trang thật cắt khác đi.</p>
+                </div>
+                <div>
+                    <h3 class="lg-section-title lg-section-title--small">Trong trang sản phẩm</h3>
+                    <div class="sim-page">
+                        <article>
+                            <h4 class="sim-page-title placeholder"><span>Tiêu đề của bạn hiện ở đây</span><span></span></h4>
+                            
+                            <p class="sim-price">Chưa nhập giá</p>
+                            
+                            
+                        </article>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+    </aside>
+    </div>
+</main>
+</body>
+</html>

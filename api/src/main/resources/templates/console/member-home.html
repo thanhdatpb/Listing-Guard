@@ -13,14 +13,14 @@
 <main class="lg-page lg-role-home" id="main">
     <div class="lg-page__head"><div><h1 th:text="#{work.home}"></h1><p class="lg-page__sub" th:text="#{work.intro}"></p></div></div>
     <p class="lg-banner lg-banner--success lg-toast lg-section" role="status" th:if="${guideSaved == true}" th:text="#{console.guide.saved}"></p>
-    <div class="lg-actions lg-section" id="work-actions">
-        <a class="lg-btn lg-btn--primary" id="pilot-start" th:href="@{/console/bulk}">
+    <div class="lg-actions lg-section" id="work-actions"><th:block th:if="${workspaceMode == true}"><a class="lg-btn lg-btn--primary" id="home-workspace" th:href="@{/console/workspace}"><svg class="lg-icon" width="20" height="20" aria-hidden="true"><use href="#lg-i-workspace"/></svg><span th:text="#{nav.ws.listings}"></span></a><a class="lg-btn" id="home-new" th:href="@{/console/workspace/new}"><svg class="lg-icon" width="20" height="20" aria-hidden="true"><use href="#lg-i-plus"/></svg><span th:text="#{nav.ws.new}"></span></a></th:block>
+        <a th:if="${sheetToolsHidden != true}" th:class="${workspaceMode == true} ? 'lg-btn' : 'lg-btn lg-btn--primary'" id="pilot-start" th:href="@{/console/bulk}">
             <svg class="lg-icon" width="20" height="20" aria-hidden="true"><use href="#lg-i-bulk"/></svg><span th:text="#{nav.bulk}"></span>
         </a>
         <a class="lg-btn" id="home-phrase-screening" th:if="${phraseScreeningEnabled == true}" th:href="@{/console/phrase-screening}">
             <svg class="lg-icon" width="20" height="20" aria-hidden="true"><use href="#lg-i-check"/></svg><span th:text="#{phrase.heading}"></span>
         </a>
-        <a class="lg-btn" th:href="@{/console/check/edit}">
+        <a class="lg-btn" th:if="${sheetToolsHidden != true}" th:href="@{/console/check/edit}">
             <svg class="lg-icon" width="20" height="20" aria-hidden="true"><use href="#lg-i-report"/></svg><span th:text="#{work.edit}"></span>
         </a>
     </div>
@@ -30,8 +30,8 @@
         <p th:if="${work.needsFix.isEmpty()}" th:text="#{work.fix.empty}"></p>
         <ul class="lg-feed" th:unless="${work.needsFix.isEmpty()}">
             <li class="lg-feed__item" th:each="item : ${work.needsFix}">
-                <a th:href="@{/console/history/{pack}/{id}(pack=${item.pack},id=${item.checkId})}"
-                   th:text="${item.sku != null} ? ${item.sku} : ${item.marketplace}"></a>
+                <a th:if="${sheetToolsHidden != true}" th:href="@{/console/history/{pack}/{id}(pack=${item.pack},id=${item.checkId})}"
+                   th:text="${item.sku != null} ? ${item.sku} : ${item.marketplace}"></a><span th:if="${sheetToolsHidden == true}" th:text="${item.sku != null} ? ${item.sku} : ${item.marketplace}"></span>
                 <span class="lg-small"><span aria-hidden="true" class="lg-manager-marker"></span>
                     <span th:text="#{work.errors(${item.blocked})}"></span>
                     <span th:text="${item.scope == 'CONTENT'} ? #{bulk.scope.content} : #{bulk.scope.full}"></span></span>
@@ -40,22 +40,22 @@
     </section>
     <section class="lg-card lg-section" id="work-recent">
         <h2 th:text="#{work.recent}"></h2>
-        <p th:if="${work.recent.isEmpty()}" th:text="#{work.recent.empty}"></p>
+        <p th:if="${work.recent.isEmpty()}" th:text="${workspaceMode == true} ? #{work.ws.recent.empty} : #{work.recent.empty}"></p>
         <ul class="lg-feed" th:unless="${work.recent.isEmpty()}">
             <li class="lg-feed__item" th:each="item : ${work.recent}">
-                <a th:if="${item.checkId != null}" th:href="@{/console/history/{pack}/{id}(pack=${item.pack},id=${item.checkId})}"
-                   th:text="${item.sku != null} ? ${item.sku} : ${item.marketplace}"></a>
+                <a th:if="${item.checkId != null and sheetToolsHidden != true}" th:href="@{/console/history/{pack}/{id}(pack=${item.pack},id=${item.checkId})}"
+                   th:text="${item.sku != null} ? ${item.sku} : ${item.marketplace}"></a><span th:if="${item.checkId != null and sheetToolsHidden == true}" th:text="${item.sku != null} ? ${item.sku} : ${item.marketplace}"></span>
                 <a th:if="${item.pack == 'phrase-screening'}" th:href="@{/console/phrase-screening}"
                    th:text="#{work.phrases(${item.rows},${item.blocked})}"></a>
-                <a th:if="${item.pack == 'reaudit'}" th:href="@{/console/reaudit}"
-                   th:text="#{work.audit(${item.rows},${item.blocked})}"></a>
+                <a th:if="${item.pack == 'reaudit' and sheetToolsHidden != true}" th:href="@{/console/reaudit}"
+                   th:text="#{work.audit(${item.rows},${item.blocked})}"></a><span th:if="${item.pack == 'reaudit' and sheetToolsHidden == true}" th:text="#{work.audit(${item.rows},${item.blocked})}"></span>
                 <time class="lg-small" th:datetime="${item.at}" th:text="${#temporals.format(item.at,'yyyy-MM-dd HH:mm','UTC')}"></time>
             </li>
         </ul>
     </section>
     <section class="lg-card lg-section" id="work-guide" th:unless="${work.guideHidden}">
         <h2 th:text="#{work.guide}"></h2>
-        <ol><li th:text="#{work.step.one}"></li><li th:text="#{work.step.two}"></li><li th:text="#{work.step.three}"></li></ol>
+        <ol><li th:text="${workspaceMode == true} ? #{work.ws.step.one} : #{work.step.one}"></li><li th:text="${workspaceMode == true} ? #{work.ws.step.two} : #{work.step.two}"></li><li th:text="${workspaceMode == true} ? #{work.ws.step.three} : #{work.step.three}"></li></ol>
         <form data-console-submit method="post" th:action="@{/console/home/hide-guide}">
             <button type="submit" class="lg-btn" th:text="#{work.guide.hide}"></button>
         </form>

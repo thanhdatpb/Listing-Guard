@@ -82,11 +82,17 @@ public class WorkspaceExports {
      * @param confirmCount null at the preview; the number of listings the confirmation showed, at the export
      */
     public record Request(UUID accountId, Kind kind, Medium medium, TextEncoding encoding, UUID templateId, List<UUID> listingIds,
-                          boolean checkValues, boolean withHeader, Integer confirmCount) {
+                          boolean checkValues, boolean withHeader, Integer confirmCount, boolean escapeFormulas) {
 
         public Request {
             listingIds = List.copyOf(new LinkedHashSet<>(listingIds));
             kind = kind == null ? Kind.BULK : kind;
+        }
+
+        /** A request that does not escape the cells of the text for a spreadsheet: the export as it was before ADR-064. */
+        public Request(UUID accountId, Kind kind, Medium medium, TextEncoding encoding, UUID templateId, List<UUID> listingIds,
+                       boolean checkValues, boolean withHeader, Integer confirmCount) {
+            this(accountId, kind, medium, encoding, templateId, listingIds, checkValues, withHeader, confirmCount, false);
         }
     }
 
@@ -126,7 +132,7 @@ public class WorkspaceExports {
     public record Preview(SellerAccount account, Kind kind, Medium medium, boolean mediumFellBack, String excelProblem, TextEncoding encoding,
                           boolean withHeader, boolean checkValues, List<Group> groups, List<Held> held, int selected, int exportable, int opened,
                           int untrademarked, int missingCustom, int otherVersion, int outside, List<String> problems, boolean gateActive,
-                          boolean auditActive) {
+                          boolean auditActive, int uncatalogued, boolean escapeFormulas) {
 
         public boolean canExport() {
             return problems.isEmpty() && exportable > 0;
@@ -155,7 +161,7 @@ public class WorkspaceExports {
      * a text file whose tab or line break was replaced by a space.
      */
     public record Result(List<ExportFile> files, String clipboard, int exported, int held, int untrademarked, int opened, int warnings,
-                         int replacedCells, int conflicts, String downloadName, String contentType, byte[] bytes) {
+                         int replacedCells, int conflicts, String downloadName, String contentType, byte[] bytes, int uncatalogued) {
     }
 
     private final WorkspaceAccess access;
@@ -335,6 +341,7 @@ public class WorkspaceExports {
         int exportable = 0;
         int opened = 0;
         int untrademarked = 0;
+        int uncatalogued = 0;
         // the oldest template version first, so the files and the groups of an export come in the same order every time
         List<Map.Entry<UUID, List<Listing>>> entries = new ArrayList<>(byTemplate.entrySet());
         entries.removeIf(e -> plan.templates.get(e.getKey()) == null);
@@ -345,6 +352,7 @@ public class WorkspaceExports {
             plan.going.put(entry.getKey(), ordered);
             int groupOpened = (int) ordered.stream().filter(l -> verdicts.get(l.id()).opened() != null && !verdicts.get(l.id()).blocks().isEmpty()).count();
             int groupUntrademarked = (int) ordered.stream().filter(l -> !verdicts.get(l.id()).trademarkChecked()).count();
+            uncatalogued += (int) ordered.stream().filter(l -> verdicts.get(l.id()).catalogUnchecked()).count();
             Validation validation = request.checkValues() ? validate(clientId, template, ordered, plan) : Validation.of("OFF");
             plan.validations.put(entry.getKey(), validation);
             int replacedCells = 0;
@@ -366,7 +374,7 @@ public class WorkspaceExports {
         held.sort(Comparator.comparing(Held::sku));
         plan.preview = new Preview(account, request.kind(), medium, fellBack, excelProblem, encoding, request.withHeader(), request.checkValues(),
                 groups, held, wanted.size(), exportable, opened, untrademarked, missingCustom, otherVersion, outside, problems,
-                status.gateActive(), status.auditActive());
+                status.gateActive(), status.auditActive(), uncatalogued, request.escapeFormulas());
         return plan;
     }
 
@@ -502,6 +510,7 @@ public class WorkspaceExports {
         int conflicts = 0;
         int replaced = 0;
         int untrademarked = 0;
+        int uncatalogued = 0;
         int opened = 0;
         int warnings = 0;
         for (Map.Entry<UUID, List<Listing>> entry : plan.going.entrySet()) {
@@ -552,7 +561,7 @@ public class WorkspaceExports {
                     }
                     case CLIPBOARD -> {
                         format = OutputFormat.CLIPBOARD;
-                        clipboard.append(SheetWriter.clipboard(preview.withHeader() ? template.headerRows() : List.of(), rows));
+                        clipboard.append(SheetWriter.clipboard(preview.withHeader() ? template.headerRows() : List.of(), rows, preview.escapeFormulas()));
                     }
                     default -> throw new IllegalStateException();
                 }
@@ -562,13 +571,15 @@ public class WorkspaceExports {
             replaced += groupReplaced;
             Verdict[] groupVerdicts = going.stream().map(l -> plan.verdicts.get(l.id())).toArray(Verdict[]::new);
             int groupUntrademarked = (int) java.util.Arrays.stream(groupVerdicts).filter(v -> !v.trademarkChecked()).count();
+            int groupUncatalogued = (int) java.util.Arrays.stream(groupVerdicts).filter(Verdict::catalogUnchecked).count();
             int groupOpened = (int) java.util.Arrays.stream(groupVerdicts).filter(v -> v.opened() != null && !v.blocks().isEmpty()).count();
             int groupWarnings = plan.validations.getOrDefault(entry.getKey(), Validation.of("OFF")).cells();
             exportLog.add(clientId, new WorkspaceExportLog.Entry(0, preview.account().id(), template.id(), template.version(), template.kind(),
                     format, encodingCode, going.size(), plan.heldByTemplate.getOrDefault(entry.getKey(), 0), groupOpened, groupUntrademarked,
-                    groupWarnings, groupReplaced, actor.accountId(), now));
+                    groupWarnings, groupReplaced, actor.accountId(), now, groupUncatalogued));
             exported += going.size();
             untrademarked += groupUntrademarked;
+            uncatalogued += groupUncatalogued;
             opened += groupOpened;
             warnings += groupWarnings;
         }
@@ -587,7 +598,7 @@ public class WorkspaceExports {
         log.info("Workspace export by account {} of client {}: {} listings in {} files, {} held back", actor.accountId(), clientId, exported,
                 files.size(), preview.held().size());
         return new Result(List.copyOf(files), preview.medium() == Medium.CLIPBOARD ? clipboard.toString() : null, exported,
-                preview.held().size(), untrademarked, opened, warnings, replaced, conflicts, downloadName, contentType, bytes);
+                preview.held().size(), untrademarked, opened, warnings, replaced, conflicts, downloadName, contentType, bytes, uncatalogued);
     }
 
     private static byte[] zip(List<ExportFile> files) {
@@ -664,7 +675,7 @@ public class WorkspaceExports {
         boolean opened = verdict.opened() != null && !verdict.blocks().isEmpty();
         exportLog.add(actor.clientId(), new WorkspaceExportLog.Entry(0, l.accountId(), template == null ? null : template.id(),
                 template == null ? null : template.version(), TemplateKind.ETSY_FIELDS, OutputFormat.ETSY_POSTED, null, 1, 0, opened ? 1 : 0,
-                verdict.trademarkChecked() ? 0 : 1, 0, 0, actor.accountId(), clock.instant()));
+                verdict.trademarkChecked() ? 0 : 1, 0, 0, actor.accountId(), clock.instant(), verdict.catalogUnchecked() ? 1 : 0));
         log.info("Workspace listing {} of client {} posted by account {}", id, actor.clientId(), actor.accountId());
         return new PostOutcome(opened ? PostResult.POSTED_OPENED : PostResult.POSTED, verdict.blocks());
     }

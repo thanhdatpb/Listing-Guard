@@ -190,6 +190,7 @@ public class ConsoleWorkspaceController {
             statuses.add(new String[] {status.name(), labels.status(status)});
         }
         model.addAttribute("rows", rows);
+        model.addAttribute("reexport", listings.needsReexport(actor.clientId(), page.items().stream().map(ListingSummary::id).toList()));
         model.addAttribute("page", page);
         model.addAttribute("sellerAccounts", sellerAccounts);
         model.addAttribute("owners", emails);

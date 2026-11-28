@@ -170,7 +170,7 @@ class WorkspaceExportIntegrationTest {
     private WorkspaceExports.Result export(Actor actor, WorkspaceExports.Request request) {
         int count = exports.preview(actor, request).exportable();
         return exports.export(actor, new WorkspaceExports.Request(request.accountId(), request.kind(), request.medium(), request.encoding(),
-                request.templateId(), request.listingIds(), request.checkValues(), request.withHeader(), count));
+                request.templateId(), request.listingIds(), request.checkValues(), request.withHeader(), count, request.escapeFormulas()));
     }
 
     private static Map<String, List<String>> bySku(SheetGrid grid, int firstDataRow) {
@@ -355,6 +355,41 @@ class WorkspaceExportIntegrationTest {
     }
 
     // ------------------------------------------------------------------ the clipboard
+
+    @Test
+    void theCellsOfTheClipboardThatStartLikeAFormulaGetAQuoteOnlyWhenAskedAndNothingElseChanges() throws IOException {
+        Team team = team();
+        SellerAccount account = readyAccount(team, "Shop Escape", ExportFormat.XLSM, ExportFixtures.flatFileXlsm("F-"));
+        List<UUID> ids = allIds(team, account);
+        Listing first = listing(team, account, "F-S2");
+        // the stored text of a cell (the row of the listing was written by an import of a sheet a seller typed)
+        jdbc.update("UPDATE workspace_listing SET data = jsonb_set(data, '{item_name}', '\"=HYPERLINK(1)\"') WHERE id = ?", first.id());
+
+        WorkspaceExports.Request plainRequest = new WorkspaceExports.Request(account.id(), Kind.BULK, Medium.CLIPBOARD, null, null, List.of(first.id()), false,
+                false, null);
+        // the nine-argument request is the export as it was: no quote
+        WorkspaceExports.Preview before = exports.preview(team.admin(), plainRequest);
+        assertThat(before.escapeFormulas()).isFalse();
+        WorkspaceExports.Result asBefore = export(team.admin(), plainRequest);
+        assertThat(asBefore.clipboard()).contains("\t=HYPERLINK(1)\t").doesNotContain("'=HYPERLINK");
+
+        jdbc.update("UPDATE workspace_listing SET status = 'READY_TO_EXPORT' WHERE id = ?", first.id());
+        WorkspaceExports.Request escapedRequest = new WorkspaceExports.Request(account.id(), Kind.BULK, Medium.CLIPBOARD, null, null, List.of(first.id()),
+                false, false, null, true);
+        assertThat(exports.preview(team.admin(), escapedRequest).escapeFormulas()).isTrue();
+        WorkspaceExports.Result escaped = export(team.admin(), escapedRequest);
+        assertThat(escaped.clipboard()).contains("\t'=HYPERLINK(1)\t");
+        // only that cell changed: the rest of the row is the row of the request without the option
+        assertThat(escaped.clipboard().replace("'=HYPERLINK(1)", "=HYPERLINK(1)")).isEqualTo(asBefore.clipboard());
+        assertThat(listing(team, account, "F-S2").status()).isEqualTo(ListingStatus.EXPORTED);
+
+        // a file is never changed by the option: the same cell in a text file has no quote
+        jdbc.update("UPDATE workspace_listing SET status = 'READY_TO_EXPORT' WHERE id = ?", first.id());
+        WorkspaceExports.Result text = export(team.admin(), new WorkspaceExports.Request(account.id(), Kind.BULK, Medium.TXT, null, null,
+                List.of(first.id()), false, false, null, true));
+        assertThat(new String(text.bytes(), java.nio.charset.StandardCharsets.UTF_8)).contains("\t=HYPERLINK(1)\t").doesNotContain("'=HYPERLINK");
+        assertThat(ids).isNotEmpty();
+    }
 
     @Test
     void theClipboardTextIsTheDataRowsInTheTemplatesOrderWithOrWithoutTheHeaderRows() throws IOException {

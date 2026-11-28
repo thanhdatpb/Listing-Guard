@@ -69,6 +69,7 @@ public class WorkspaceReleaseViews {
         boolean canRelease = access.canEdit(actor, listing.ownerAccountId());
         model.addAttribute("exportedAt", exported == null ? null : ConsoleDates.dateTime(messages, exported));
         model.addAttribute("canRelease", canRelease);
+        model.addAttribute("needsReexport", !listings.needsReexport(actor.clientId(), List.of(listing.id())).isEmpty());
         model.addAttribute("isDraft", listing.status() == ListingStatus.DRAFT);
         model.addAttribute("isReady", listing.status() == ListingStatus.READY_TO_EXPORT);
         model.addAttribute("isExported", listing.status() == ListingStatus.EXPORTED);
