@@ -2,6 +2,8 @@ package com.thanhdatpb.listingguard.api.console.workspace;
 
 import com.thanhdatpb.listingguard.api.console.ConsoleAccountRoles;
 import com.thanhdatpb.listingguard.api.console.ConsoleMessages;
+import com.thanhdatpb.listingguard.api.console.ConsoleMode;
+import com.thanhdatpb.listingguard.api.console.ConsoleRole;
 import com.thanhdatpb.listingguard.api.console.ConsoleUser;
 import com.thanhdatpb.listingguard.api.workspace.ImportModels.MappingColumn;
 import com.thanhdatpb.listingguard.api.workspace.ImportModels.MappingView;
@@ -104,11 +106,12 @@ public class ConsoleWorkspaceImportController {
     private final ConsoleMessages messages;
     private final WorkspaceProperties properties;
     private final StandardTargets targets;
+    private final ConsoleMode consoleMode;
 
     public ConsoleWorkspaceImportController(WorkspaceAccess access, WorkspaceAccounts accounts, WorkspaceTemplates templates,
                                             ImportStages stages, ListingImportService imports, TemplateService templateService,
                                             ConsoleAccountRoles roles, ConsoleMessages messages, WorkspaceProperties properties,
-                                            StandardTargets targets) {
+                                            StandardTargets targets, ConsoleMode consoleMode) {
         this.access = access;
         this.accounts = accounts;
         this.templates = templates;
@@ -119,10 +122,16 @@ public class ConsoleWorkspaceImportController {
         this.messages = messages;
         this.properties = properties;
         this.targets = targets;
+        this.consoleMode = consoleMode;
     }
 
+    /** The signed-in account in the capacity it acts in; every step of an import is refused to a role that {@code import-roles} does not list (ADR-064 §2). */
     private Actor actor(ConsoleUser user) {
-        return access.actor(user).orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
+        Actor actor = access.actor(user).orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
+        if (!consoleMode.mayImport(actor.admin() ? ConsoleRole.ADMIN : ConsoleRole.MEMBER)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        return actor;
     }
 
     private Actor actorFor(ConsoleUser user, String mode) {

@@ -95,7 +95,8 @@
         <symbol id="lg-i-audit" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
         <symbol id="lg-i-risk-severe" viewBox="0 0 24 24"><path d="M12 3l9 9-9 9-9-9z"/><path d="M12 8v5M12 16v1"/></symbol>
         <symbol id="lg-i-risk-new" viewBox="0 0 24 24"><path d="M12 3l9 9-9 9-9-9z"/><circle cx="12" cy="12" r="2.5"/></symbol></th:block>
-        </th:block>
+        </th:block><th:block th:if="${workspaceMode == true}">
+        <symbol id="lg-i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol></th:block>
     </svg>
     <a class="app-side__brand" th:href="@{/console}">
         <picture th:replace="~{console/layout :: logo('app-side__logo')}"></picture>
@@ -109,7 +110,7 @@
         <span class="lg-sr-only" th:text="#{nav.menu}"></span>
     </label>
     <div class="app-side__panel">
-        <nav class="app-nav" th:aria-label="#{nav.aria}">
+        <nav class="app-nav" th:if="${workspaceMode != true}" th:aria-label="#{nav.aria}">
             <a class="app-nav__link" th:href="@{/console}" th:aria-current="${active == 'dashboard'} ? 'page'"><th:block th:text="#{nav.dashboard}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-home"/></svg></a>
             <p class="app-nav__label" th:text="#{nav.group.work}"></p>
             <a class="app-nav__link" th:href="@{/console/check}" th:aria-current="${active == 'check'} ? 'page'"><th:block th:text="#{nav.check}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
@@ -135,6 +136,47 @@
                    th:aria-current="${active == 'pilot-report'} ? 'page'"><th:block th:text="#{pilot.report}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-report"/></svg></a>
                 <a th:unless="${consoleNavigation != null and consoleNavigation.pilot}" class="app-nav__link" th:href="@{/console/report}" th:aria-current="${active == 'report'} ? 'page'"><th:block th:text="#{nav.report}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-report"/></svg></a>
             </th:block>
+            <th:block th:if="${consoleNavigation != null and (consoleNavigation.pod or consoleNavigation.policyChanges or consoleNavigation.review)}">
+                <p class="app-nav__label app-nav__label--icon"><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-experiments"/></svg><span th:text="#{nav.group.experimental}"></span></p>
+                <a class="app-nav__link" th:if="${consoleNavigation.review}" th:href="@{/console/review-queue}" th:aria-current="${active == 'review'} ? 'page'"><th:block th:text="#{review.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-review"/></svg></a>
+                <a class="app-nav__link" th:if="${consoleNavigation.policyChanges}" th:href="@{/console/policy-changes}" th:aria-current="${active == 'impact'} ? 'page'"><th:block th:text="#{impact.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-impact"/></svg></a>
+                <a class="app-nav__link" th:if="${consoleNavigation.pod}" th:href="@{/console/pod-readiness}" th:aria-current="${active == 'pod'} ? 'page'"><th:block th:text="#{pod.title}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-pod"/></svg></a>
+            </th:block>
+        </nav><nav class="app-nav app-nav--workspace" th:if="${workspaceMode == true}" th:aria-label="#{nav.aria}">
+                <a class="app-nav__link" th:href="@{/console}" th:aria-current="${active == 'dashboard'} ? 'page'"><th:block th:text="#{nav.dashboard}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-home"/></svg></a>
+                <p class="app-nav__label" th:text="#{nav.group.workspace}"></p>
+                <a class="app-nav__link" th:href="@{/console/workspace}" th:aria-current="${active == 'workspace' and workspaceNav.section() == 'listings'} ? 'page'"><th:block th:text="#{nav.ws.listings}"></th:block><span class="lg-chip lg-chip--flag app-nav__count" th:if="${workspaceNav.newRisk() != null and workspaceNav.newRisk() > 0}" th:text="#{nav.ws.newrisk(${workspaceNav.newRisk()})}"></span><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-workspace"/></svg></a>
+                <a class="app-nav__link" th:href="@{/console/workspace/new}" th:aria-current="${active == 'workspace' and workspaceNav.section() == 'new'} ? 'page'"><th:block th:text="#{nav.ws.new}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-plus"/></svg></a>
+                <a class="app-nav__link" th:href="@{/console/workspace/export}" th:aria-current="${active == 'workspace' and workspaceNav.section() == 'export'} ? 'page'"><th:block th:text="#{nav.ws.export}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-download"/></svg></a>
+                <p class="app-nav__label" th:text="#{nav.group.tools}"></p>
+                <a th:if="${phraseScreeningEnabled == true}" class="app-nav__link" th:href="@{/console/phrase-screening}" th:aria-current="${active == 'phrases'} ? 'page'"><th:block th:text="#{phrase.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-phrase"/></svg></a>
+                <a class="app-nav__link" th:href="@{/console/check}" th:aria-current="${active == 'check'} ? 'page'"><th:block th:text="#{nav.ws.quick}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
+                <th:block th:if="${sheetToolsHidden != true}">
+                    <a class="app-nav__link" th:href="@{/console/bulk}" th:aria-current="${active == 'bulk'} ? 'page'"><th:block th:text="#{nav.bulk}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-bulk"/></svg></a>
+                    <a class="app-nav__link" th:href="@{/console/check/edit}" th:aria-current="${active == 'edit'} ? 'page'"><th:block th:text="#{edit.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-edit"/></svg></a>
+                </th:block>
+                <p class="app-nav__label" th:text="#{nav.group.monitor}"></p>
+                <!--/* The slot of the notifications page (UX-4): its entry goes here, before the audit. */-->
+                <a th:if="${workspaceAuditEnabled == true}" class="app-nav__link" th:href="@{/console/workspace/audit}" th:aria-current="${active == 'workspace-audit'} ? 'page'"><th:block th:text="#{workspace.nav.audit}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-audit"/></svg></a>
+                <th:block th:if="${sheetToolsHidden != true}">
+                    <a class="app-nav__link" th:href="@{/console/history}" th:aria-current="${active == 'history'} ? 'page'"><th:block th:text="#{nav.history}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-history"/></svg></a>
+                    <a class="app-nav__link" th:href="@{/console/reaudit}" th:aria-current="${active == 'reaudit'} ? 'page'"><th:block th:text="#{nav.reaudit}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-reaudit"/></svg></a>
+                </th:block>
+                <th:block th:if="${consoleNavigation == null or consoleNavigation.manage or workspaceNav.mayImport()}">
+                    <p class="app-nav__label" th:text="#{nav.group.manage}"></p>
+                    <th:block th:if="${consoleNavigation == null or consoleNavigation.manage}">
+                        <a class="app-nav__link" th:href="@{/console/workspace/accounts}" th:aria-current="${active == 'workspace-accounts'} ? 'page'"><th:block th:text="#{nav.ws.accounts}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-accounts"/></svg></a>
+                    </th:block>
+                    <a th:if="${workspaceNav.mayImport()}" class="app-nav__link" th:href="@{/console/workspace/import}" th:aria-current="${active == 'workspace-import'} ? 'page'"><th:block th:text="#{workspace.nav.import}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-upload"/></svg></a>
+                    <th:block th:if="${consoleNavigation == null or consoleNavigation.manage}">
+                        <a class="app-nav__link" th:href="@{/console/watchlist}" th:aria-current="${active == 'watchlist'} ? 'page'"><th:block th:text="#{nav.watchlist}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-watchlist"/></svg></a>
+                        <a class="app-nav__link" th:href="@{/console/stats}" th:aria-current="${active == 'stats'} ? 'page'"><th:block th:text="#{nav.stats}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-stats"/></svg></a>
+                        <a th:if="${consoleNavigation != null and consoleNavigation.pilot}" class="app-nav__link" th:href="@{/console/stats/pilot}" th:aria-current="${active == 'pilot-report'} ? 'page'"><th:block th:text="#{pilot.report}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-report"/></svg></a>
+                        <a th:unless="${consoleNavigation != null and consoleNavigation.pilot}" class="app-nav__link" th:href="@{/console/report}" th:aria-current="${active == 'report'} ? 'page'"><th:block th:text="#{nav.report}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-report"/></svg></a>
+                        <a th:if="${consoleNavigation != null and consoleNavigation.readiness}" class="app-nav__link" th:href="@{/console/readiness}" th:aria-current="${active == 'readiness'} ? 'page'"><th:block th:text="#{nav.readiness}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-check"/></svg></a>
+                        <a class="app-nav__link" th:href="@{/console/api-keys}" th:aria-current="${active == 'keys'} ? 'page'"><th:block th:text="#{nav.keys}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-keys"/></svg></a>
+                    </th:block>
+                </th:block>
             <th:block th:if="${consoleNavigation != null and (consoleNavigation.pod or consoleNavigation.policyChanges or consoleNavigation.review)}">
                 <p class="app-nav__label app-nav__label--icon"><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-experiments"/></svg><span th:text="#{nav.group.experimental}"></span></p>
                 <a class="app-nav__link" th:if="${consoleNavigation.review}" th:href="@{/console/review-queue}" th:aria-current="${active == 'review'} ? 'page'"><th:block th:text="#{review.heading}"></th:block><svg class="lg-icon app-nav__icon" aria-hidden="true" focusable="false"><use href="#lg-i-review"/></svg></a>

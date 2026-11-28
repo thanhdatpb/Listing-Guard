@@ -37,7 +37,7 @@ Cổng vẫn là **một**: `ListingStatusService.verdicts`/`verdictsOf`. "Chuy�
   | `NO_PLAN` | gói của client không có pack `trademark-risk` | **không chặn**; ghi "chưa kiểm trademark" |
   | `UNAVAILABLE` | catalog đang nạp (`not evaluated`) hoặc bị từ chối (`REFUSED`), hoặc check không trả lời được | chặn (`INCOMPLETE`) |
   | `INCOMPLETE` | check chạy với catalog nhưng một rule lỗi | chặn |
-  | `WATCHLIST_ONLY` | có watchlist, không có catalog: chỉ watchlist được xem | chặn (xem câu hỏi mở) |
+  | `WATCHLIST_ONLY` | có watchlist, không có catalog: chỉ watchlist được xem | ~~chặn~~ **không chặn từ [ADR-064](ADR-064-workspace-first-console-mode.md) §3**; ghi "chưa kiểm catalog" (HIGH của watchlist vẫn chặn) |
   | `NULL` | kết quả lưu trước V60 | chặn cho đến khi rà lại |
 
   `AuditContexts` ghi thêm `catalogAvailability` (`READY`, `NOT_CONFIGURED`, `UNAVAILABLE`) từ `TrademarkCatalogRuntime.Status`: `REFUSED` và `DISABLED` với chi tiết `not evaluated`
@@ -181,3 +181,12 @@ Mọi bean mới là `@ConditionalOnProperty(listing-guard.workspace.enabled=tru
 - **Chưa chạy được ở đây**: bộ test Testcontainers (không có Docker; các test mới chạy trên PostgreSQL 16 cục bộ không có pgvector, xem mô tả PR), script Playwright và ảnh chụp nếu trình duyệt không chạy.
 - Câu hỏi mở: (1) client chỉ có **watchlist, không catalog** (`WATCHLIST_ONLY`) hiện **bị chặn**; có nên coi là "đã cấu hình một phần" và cho đi kèm ghi "chưa kiểm catalog"? (2) sửa nội dung listing **Đã xuất/Đang bán** có nên tự đưa về Nháp như listing Sẵn sàng?
   (3) xuất Custom có nên đi cùng file bulk trong một lần (hiện: hai lần, Custom trước)? (4) MEMBER xuất listing của người khác (hiện: không, cần quyền sửa). (5) nhiều tài khoản trong một lần xuất (hiện: từ chối). (6) Google Sheet hiểu ô dán bắt đầu bằng `=` là công thức: có cần thêm tuỳ chọn thoát?
+
+## Bổ sung (ADR-064)
+
+[ADR-064](ADR-064-workspace-first-console-mode.md) trả lời ba câu hỏi mở ở trên:
+
+- **(1) `WATCHLIST_ONLY`**: client chỉ có watchlist, chưa có catalog, **không còn bị chặn** ("chưa rà đủ"); `TrademarkReason.WATCHLIST_ONLY.holdsBack()` là `false`. Một HIT mức HIGH của watchlist vẫn chặn như mọi HIGH. Trang
+  trạng thái, màn hình xác nhận xuất, trang dán và nhật ký xuất (V61 `uncatalogued_count`) ghi **"chưa kiểm catalog"**. Các tổ hợp khác của bảng §1 giữ nguyên.
+- **(2) Sửa listing Đã xuất/Đang bán** không đổi trạng thái (như đã làm ở §10); listing được đánh dấu **"Cần xuất lại"** khi nội dung khác nội dung lúc xuất (V61 `exported_hash`). Xuất lại vẫn qua cổng.
+- **(6) Ô bắt đầu bằng `=`** khi dán vào Sheet: có tuỳ chọn thoát bằng một dấu nháy đơn ở đầu ô, chỉ cho text để dán (§5 ở trên không đổi), mặc định bật ở console `workspace`.

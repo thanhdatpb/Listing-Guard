@@ -102,7 +102,7 @@
                 <td class="lg-ellip" th:title="${row.title}" th:text="${row.title}"></td>
                 <td><span th:text="${row.account}"></span><br><span class="lg-text-muted lg-small" th:text="${row.marketplace}"></span></td>
                 <td th:text="${row.role}"></td>
-                <td><span th:replace="~{console/workspace-fragments :: status(${row.status}, ${row.statusLabel})}"></span></td>
+                <td><span th:replace="~{console/workspace-fragments :: status(${row.status}, ${row.statusLabel})}"></span><th:block th:if="${reexport != null and reexport.contains(row.id)}"><br><span class="lg-chip lg-chip--audit lg-chip--audit-warning" th:id="${'reexport-' + row.id}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-warn"/></svg><span th:text="#{workspace.reexport.chip}"></span></span></th:block></td>
                 <td class="lg-ellip" th:title="${row.owner}"><span th:if="${row.owner != null}" th:text="${row.owner}"></span><span class="lg-text-muted" th:if="${row.owner == null}" th:text="#{workspace.owner.none}"></span></td>
                 <td><th:block th:if="${auditOn != true}"><span th:replace="~{console/workspace-fragments :: unchecked}"></span></th:block><th:block th:if="${auditOn == true}"><span th:replace="~{console/workspace-fragments :: auditState(${row.auditState}, ${row.auditLabel})}"></span></th:block></td>
                 <td class="lg-nowrap lg-text-muted" th:text="${row.updated}"></td>

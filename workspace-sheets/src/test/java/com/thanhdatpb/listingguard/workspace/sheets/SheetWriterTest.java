@@ -221,4 +221,28 @@ class SheetWriterTest {
         assertThat(text).isEqualTo("item_sku\titem_name\nP-1\t\"two\nlines\tand \"\"quotes\"\"\"\nP-2\t5\n");
         assertThat(SheetWriter.clipboard(List.of(), List.of())).isEmpty();
     }
+
+    @Test
+    void theClipboardCanPutAQuoteInFrontOfATextThatStartsLikeAFormula() {
+        List<List<String>> header = List.of(List.of("=header", "plain"));
+        List<List<SheetCell>> rows = List.of(
+                List.of(SheetCell.text("=HYPERLINK(\"http://x\")"), SheetCell.text("+84 90 000"), SheetCell.text("-dash"), SheetCell.text("@mention")),
+                List.of(SheetCell.text("a=b"), SheetCell.text(" =leading space"), SheetCell.blank(), SheetCell.text("'=already")),
+                List.of(SheetCell.number(new BigDecimal("-5")), SheetCell.number(new BigDecimal("19.5")), SheetCell.text("-5"), SheetCell.text("=1\n2")));
+
+        // off: the text of the earlier versions, byte for byte
+        assertThat(SheetWriter.clipboard(header, rows, false)).isEqualTo(SheetWriter.clipboard(header, rows));
+        assertThat(SheetWriter.clipboard(header, rows)).startsWith("=header\tplain\n\"=HYPERLINK(\"\"http://x\"\")\"\t+84 90 000\t-dash\t@mention\n");
+
+        String escaped = SheetWriter.clipboard(header, rows, true);
+        assertThat(escaped).isEqualTo(String.join("\n",
+                "'=header\tplain",
+                "\"'=HYPERLINK(\"\"http://x\"\")\"\t'+84 90 000\t'-dash\t'@mention",
+                "a=b\t =leading space\t\t'=already",
+                // a number stays a number (a minus sign is not a formula); a TEXT that looks like one is text and is escaped; a quoted cell is escaped inside its quotes
+                "-5\t19.5\t'-5\t\"'=1\n2\"", ""));
+        assertThat(SheetWriter.escaped("")).isEmpty();
+        assertThat(SheetWriter.escaped("=")).isEqualTo("'=");
+        assertThat(SheetWriter.escaped("plain")).isEqualTo("plain");
+    }
 }

@@ -22,7 +22,7 @@
             <p class="lg-page__sub" th:text="${listing.title()}"></p>
         </div>
         <div class="lg-actions">
-            <span th:replace="~{console/workspace-fragments :: status(${listing.status().name().toLowerCase()}, ${statusLabel})}"></span>
+            <span th:replace="~{console/workspace-fragments :: status(${listing.status().name().toLowerCase()}, ${statusLabel})}"></span><span class="lg-chip lg-chip--audit lg-chip--audit-warning" id="needs-reexport" th:if="${needsReexport == true}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-warn"/></svg><span th:text="#{workspace.reexport.chip}"></span></span>
             <th:block th:if="${auditOn != true}"><span th:replace="~{console/workspace-fragments :: unchecked}"></span></th:block><th:block th:if="${auditOn == true}"><span th:replace="~{console/workspace-fragments :: auditState(${audit == null ? 'none' : audit.state.code}, ${audit == null ? #messages.msg('workspace.check.none') : audit.state.label})}"></span></th:block>
         </div>
     </div>

@@ -5,6 +5,10 @@
 Mở địa chỉ pilot do lead gửi. Đăng nhập **Cloudflare Access** bằng email đã được mời. Trang chủ hiển thị nhãn **Pilot** và các
 chức năng đang hoạt động. Tiếng Việt là mặc định. Bạn có thể chọn **English** trong menu.
 
+> **Menu của bạn bắt đầu bằng "Kho listing"?** Console đang ở chế độ **workspace**: bạn làm listing ngay trong kho và các màn hình Sheet (Kiểm tra hàng loạt, Sửa listing, Lịch sử, Rà định kỳ) được ẩn. Đi theo
+> [hướng dẫn kho listing](workspace.md#14-chế-độ-console-workspace-adr-064): **Listing → Tạo mới** hoặc mở một listing để sửa, xem **Rủi ro mới**, chuyển **Sẵn sàng xuất**, rồi **Xuất file**. **Kiểm nhanh** (nhóm Công cụ)
+> là trang **Kiểm tra listing** dưới tên mới. Mục 2 dưới đây dành cho console ở chế độ classic.
+
 ## 2. Kiểm, sửa và trả kết quả về Sheet
 
 1. Trong Sheet, sao chép vùng dữ liệu có hàng tiêu đề. Dùng đúng các cột bạn đang viết: `SKU`, `Title`, `Description`, `Tags`. Bạn **không cần**

@@ -326,7 +326,7 @@
                     <span class="lg-kv__value" th:text="${report.reaudit.scopesToReaudit == null} ? '&mdash;' : ${report.reaudit.scopesToReaudit}"></span></li>
             </ul>
             <p class="lg-card__foot" th:if="${report.reaudit.scopesToReaudit != null and report.reaudit.scopesToReaudit > 0}">
-                <a class="lg-btn lg-btn--small" th:href="@{/console/reaudit}" th:text="#{report.reaudit.link}"></a>
+                <a class="lg-btn lg-btn--small" th:if="${sheetToolsHidden != true}" th:href="@{/console/reaudit}" th:text="#{report.reaudit.link}"></a>
             </p>
         </section>
 

@@ -20,10 +20,14 @@ import org.springframework.stereotype.Repository;
 @ConditionalOnProperty(prefix = "listing-guard.workspace", name = "enabled", havingValue = "true")
 public class WorkspaceExportLog {
 
-    /** What a row records. {@code templateId} may be null for a template that was replaced. */
+    /**
+     * What a row records. {@code templateId} may be null for a template that was replaced. {@code untrademarked} counts every listing that was
+     * not checked for trademark in full; {@code uncatalogued} is those of them that were checked against the client's watchlist only because
+     * no catalog was served (V61, ADR-064 §3).
+     */
     public record Entry(long id, UUID accountId, UUID templateId, Integer templateVersion, TemplateKind templateKind, OutputFormat format,
                         String encoding, int listings, int blocked, int opened, int untrademarked, int warnings, int replacedCells,
-                        UUID exportedBy, Instant exportedAt) {
+                        UUID exportedBy, Instant exportedAt, int uncatalogued) {
     }
 
     private final JdbcTemplate jdbc;
@@ -36,21 +40,22 @@ public class WorkspaceExportLog {
 
     public void add(UUID clientId, Entry entry) {
         jdbc.update("INSERT INTO workspace_export_log (client_id, account_id, template_id, template_version, template_kind, format, encoding, "
-                + "listing_count, blocked_count, opened_count, untrademarked_count, warning_count, replaced_cells, exported_by, exported_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", clientId, entry.accountId(), entry.templateId(), entry.templateVersion(),
+                + "listing_count, blocked_count, opened_count, untrademarked_count, warning_count, replaced_cells, exported_by, exported_at, "
+                + "uncatalogued_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", clientId, entry.accountId(), entry.templateId(), entry.templateVersion(),
                 entry.templateKind().name(), entry.format().name(), entry.encoding(), entry.listings(), entry.blocked(), entry.opened(),
-                entry.untrademarked(), entry.warnings(), entry.replacedCells(), entry.exportedBy(), Timestamp.from(clock.instant()));
+                entry.untrademarked(), entry.warnings(), entry.replacedCells(), entry.exportedBy(), Timestamp.from(clock.instant()),
+                entry.uncatalogued());
     }
 
     /** The newest rows of an account, newest first. */
     public List<Entry> recent(UUID clientId, UUID accountId, int limit) {
         return jdbc.query("SELECT id, account_id, template_id, template_version, template_kind, format, encoding, listing_count, blocked_count, "
-                + "opened_count, untrademarked_count, warning_count, replaced_cells, exported_by, exported_at FROM workspace_export_log "
+                + "opened_count, untrademarked_count, warning_count, replaced_cells, exported_by, exported_at, uncatalogued_count FROM workspace_export_log "
                 + "WHERE client_id = ? AND account_id = ? ORDER BY id DESC LIMIT ?", (rs, n) -> new Entry(rs.getLong("id"),
                 rs.getObject("account_id", UUID.class), rs.getObject("template_id", UUID.class), (Integer) rs.getObject("template_version"),
                 TemplateKind.valueOf(rs.getString("template_kind")), OutputFormat.valueOf(rs.getString("format")), rs.getString("encoding"),
                 rs.getInt("listing_count"), rs.getInt("blocked_count"), rs.getInt("opened_count"), rs.getInt("untrademarked_count"),
                 rs.getInt("warning_count"), rs.getInt("replaced_cells"), rs.getObject("exported_by", UUID.class),
-                rs.getObject("exported_at", OffsetDateTime.class).toInstant()), clientId, accountId, limit);
+                rs.getObject("exported_at", OffsetDateTime.class).toInstant(), rs.getInt("uncatalogued_count")), clientId, accountId, limit);
     }
 }

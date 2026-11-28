@@ -64,6 +64,7 @@
                 <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.going}"></span><span class="lg-kv__value lg-num" id="export-count" th:text="${preview.exportable()}"></span></li>
                 <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.held}"></span><span class="lg-kv__value lg-num" th:text="${held.size()}"></span></li>
                 <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.untrademarked}"></span><span class="lg-kv__value lg-num" th:text="${preview.untrademarked()}"></span></li>
+                <li class="lg-kv__item" id="export-uncatalogued"><span class="lg-kv__label" th:text="#{workspace.export.n.uncatalogued}"></span><span class="lg-kv__value lg-num" th:text="${preview.uncatalogued()}"></span></li>
                 <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.opened}"></span><span class="lg-kv__value lg-num" th:text="${preview.opened()}"></span></li>
                 <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.orphans}"></span><span class="lg-kv__value lg-num" th:text="${preview.orphanChildren()}"></span></li>
                 <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.version}"></span><span class="lg-kv__value lg-num" th:text="${preview.otherVersion()}"></span></li>
@@ -156,6 +157,8 @@
             </div>
             <label class="lg-check"><input type="checkbox" name="withHeader" value="1" th:checked="${preview.withHeader()}"> <span th:text="#{workspace.export.withheader}"></span></label>
             <label class="lg-check"><input type="checkbox" name="checkValues" value="1" th:checked="${preview.checkValues()}"> <span th:text="#{workspace.export.checkvalues}"></span></label>
+            <th:block th:if="${workspaceMode == true}"><input type="hidden" name="escapeShown" value="1"><label class="lg-check" id="export-escape"><input type="checkbox" name="escape" value="1" th:checked="${preview.escapeFormulas()}"> <span th:text="#{workspace.export.escape}"></span></label>
+            <p class="lg-field__hint" th:text="#{workspace.export.escape.hint}"></p></th:block>
             <div class="lg-actions">
                 <button type="submit" class="lg-btn" id="export-refresh" name="step" value="preview" th:text="#{workspace.export.refresh}"></button>
                 <button type="submit" class="lg-btn lg-btn--primary" id="export-go" name="step" value="export" th:disabled="${!preview.canExport()}" th:text="#{workspace.export.go(${preview.exportable()})}"></button>
@@ -169,8 +172,8 @@
         <p class="lg-text-muted" th:text="#{workspace.export.log.hint}"></p>
         <div class="lg-table-wrap"><table class="lg-table lg-table--dense" id="export-log-table">
             <caption class="lg-sr-only" th:text="#{workspace.export.log}"></caption>
-            <thead><tr><th scope="col" th:text="#{workspace.history.when}"></th><th scope="col" th:text="#{workspace.export.col.format}"></th><th scope="col" th:text="#{workspace.detail.template}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.going}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.held}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.untrademarked}"></th><th scope="col" th:text="#{workspace.history.by}"></th></tr></thead>
-            <tbody><tr th:each="r : ${log}"><td class="lg-nowrap" th:text="${r.when()}"></td><td th:text="${r.format()}"></td><td th:text="${r.version() + ' ' + r.kind()}"></td><td class="lg-num" th:text="${r.listings()}"></td><td class="lg-num" th:text="${r.blocked()}"></td><td class="lg-num" th:text="${r.untrademarked()}"></td><td th:text="${r.by()}"></td></tr></tbody>
+            <thead><tr><th scope="col" th:text="#{workspace.history.when}"></th><th scope="col" th:text="#{workspace.export.col.format}"></th><th scope="col" th:text="#{workspace.detail.template}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.going}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.held}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.untrademarked}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.uncatalogued}"></th><th scope="col" th:text="#{workspace.history.by}"></th></tr></thead>
+            <tbody><tr th:each="r : ${log}"><td class="lg-nowrap" th:text="${r.when()}"></td><td th:text="${r.format()}"></td><td th:text="${r.version() + ' ' + r.kind()}"></td><td class="lg-num" th:text="${r.listings()}"></td><td class="lg-num" th:text="${r.blocked()}"></td><td class="lg-num" th:text="${r.untrademarked()}"></td><td class="lg-num" th:text="${r.uncatalogued()}"></td><td th:text="${r.by()}"></td></tr></tbody>
         </table></div>
     </section>
 </main>

@@ -142,6 +142,8 @@ body:has(> .app-side) { padding-left: var(--side-width); }
 .app-nav__link:hover { background: var(--hover); color: var(--ink); }
 .app-nav__link[aria-current="page"] { background: var(--brand-subtle); color: var(--brand-text); font-weight: 600; }
 .app-nav__icon { order: -1; width: 18px; height: 18px; }
+.app-nav__count { margin-left: auto; white-space: nowrap; }
+.app-nav__link .app-nav__count { min-height: 22px; padding: 0 8px; font-size: 12px; line-height: 18px; }
 
 .app-side__foot {
   margin-top: auto;

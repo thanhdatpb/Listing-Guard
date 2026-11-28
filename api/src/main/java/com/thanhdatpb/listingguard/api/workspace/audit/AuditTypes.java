@@ -58,7 +58,8 @@ public final class AuditTypes {
      * Why the trademark part of an audit did or did not run (ADR-063, V60 {@code trademark_reason}). The gate reads it: a part that did not run
      * because the client has no trademark set-up ({@link #NOT_CONFIGURED}, {@link #NO_PLAN}) does not hold a listing back, but the listing is
      * said to be unchecked for trademark; a part that did not run for a cause that passes or that can be mended ({@link #UNAVAILABLE},
-     * {@link #INCOMPLETE}, {@link #WATCHLIST_ONLY}) does.
+     * {@link #INCOMPLETE}) does. A client that has a watchlist and no catalog ({@link #WATCHLIST_ONLY}) is not held back either (ADR-064 §3: it
+     * chose to run on the watchlist alone), and its listings are said to be unchecked for the catalog wherever they are shown.
      */
     public enum TrademarkReason {
         /** the trademark part ran in full */
@@ -71,8 +72,8 @@ public final class AuditTypes {
         UNAVAILABLE(false, true),
         /** the check ran and a rule of it failed */
         INCOMPLETE(false, true),
-        /** the client has a watchlist and no catalog is served: only the watchlist was looked at */
-        WATCHLIST_ONLY(false, true);
+        /** the client has a watchlist and no catalog is served: only the watchlist was looked at; a HIGH hit of the watchlist still holds the listing back */
+        WATCHLIST_ONLY(false, false);
 
         private final boolean notSetUp;
         private final boolean holdsBack;
@@ -85,6 +86,11 @@ public final class AuditTypes {
         /** True when the client has no trademark set-up at all: the gate lets the listing go and says it was not checked for trademark. */
         public boolean notSetUp() {
             return notSetUp;
+        }
+
+        /** True when only the watchlist was looked at because no catalog is served: the listing goes, and it is said to be unchecked for the catalog (ADR-064 §3). */
+        public boolean catalogUnchecked() {
+            return this == WATCHLIST_ONLY;
         }
 
         /** True when the missing trademark part holds the listing back at the gate. */

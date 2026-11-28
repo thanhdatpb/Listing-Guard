@@ -82,7 +82,8 @@ public class ConsoleWorkspaceEditorController {
     }
 
     public record StatusRow(UUID id, String sku, String title, String status, List<String> blocks, String state, String openedReason,
-                            String openedBy, String result, boolean mayGo, boolean trademarkUnchecked, String trademarkWhy) {
+                            String openedBy, String result, boolean mayGo, boolean trademarkUnchecked, String trademarkWhy,
+                            boolean catalogUnchecked) {
     }
 
     private final WorkspaceAccess access;
@@ -194,7 +195,9 @@ public class ConsoleWorkspaceEditorController {
         Map<String, String> typed = posted(params);
         try {
             ListingEditor.Saved saved = editor.save(actor, id, version(params), typed);
-            redirect.addFlashAttribute("notice", saved.changed() ? messages.get(saved.readyReverted() ? "workspace.edit.saved.draft" : "workspace.edit.saved")
+            boolean released = saved.listing().status() == com.thanhdatpb.listingguard.api.workspace.WorkspaceTypes.ListingStatus.EXPORTED || saved.listing().status() == com.thanhdatpb.listingguard.api.workspace.WorkspaceTypes.ListingStatus.LIVE;
+            redirect.addFlashAttribute("notice", saved.changed() ? messages.get(saved.readyReverted() ? "workspace.edit.saved.draft"
+                    : released ? "workspace.edit.saved.reexport" : "workspace.edit.saved")
                     : messages.get("workspace.edit.unchanged"));
             return "redirect:/console/workspace/listings/" + id + "/edit";
         } catch (ListingEditor.VersionConflict conflict) {
@@ -689,7 +692,7 @@ public class ConsoleWorkspaceEditorController {
             ListingStatusService.Verdict v = verdicts.get(id);
             rows.add(new StatusRow(id, l.sku(), l.title(), labels.status(l.status()), v.blocks().stream().map(labels::block).toList(), v.state(),
                     v.opened() == null ? null : v.opened().reason(), v.opened() == null || v.opened().openedBy() == null ? null : emails.get(v.opened().openedBy()),
-                    results.get(id), v.mayGo(), !v.trademarkChecked(), trademarkWhy(v)));
+                    results.get(id), v.mayGo(), !v.trademarkChecked(), trademarkWhy(v), v.catalogUnchecked()));
         }
         model.addAttribute("rows", rows);
         model.addAttribute("ids", ids);
@@ -699,6 +702,7 @@ public class ConsoleWorkspaceEditorController {
         model.addAttribute("auditOff", !statusService.auditActive());
         model.addAttribute("anyBlocked", rows.stream().anyMatch(r -> !r.mayGo()));
         model.addAttribute("anyUnchecked", rows.stream().anyMatch(StatusRow::trademarkUnchecked));
+        model.addAttribute("anyCatalogUnchecked", rows.stream().anyMatch(StatusRow::catalogUnchecked));
         model.addAttribute("error", error);
         model.addAttribute("reasonMax", WorkspaceOverrides.REASON_MAX);
         return "console/workspace-status";

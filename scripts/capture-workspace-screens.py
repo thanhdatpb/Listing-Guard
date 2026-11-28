@@ -4,7 +4,12 @@ Started by WorkspaceBrowserIntegrationTest, which seeds the dataset (WorkspaceDe
 
     python3 scripts/capture-workspace-screens.py <manifest.json>
 
-Environment: LG_WORKSPACE_URL and LG_WORKSPACE_TEST_ASSERTION (set by the test, a local server only), LG_WORKSPACE_SCREENSHOTS (a folder: keep the PNG files),
+With "menu": true in the manifest (ConsoleMenuBrowserBase, ADR-064) it takes only the menu of the Console in its mode ("mode": "classic" or "workspace") for an ADMIN and a
+MEMBER, in both themes, and checks which entries and which paths the mode shows: console-menu-<mode>-<role>-<theme>.png (English; the Vietnamese menu is held by
+ConsoleWorkspaceModeTest).
+
+Environment: LG_WORKSPACE_URL and LG_WORKSPACE_TEST_ASSERTION (set by the test, a local server only; LG_WORKSPACE_MEMBER_ASSERTION is the MEMBER's for the menu run),
+LG_WORKSPACE_SCREENSHOTS (a folder: keep the PNG files),
 LG_CHROMIUM_PATH (an installed Chromium, when Playwright's own was not downloaded). Nothing here saves anything in the workspace: a re-import stops at its
 preview, a clone at its preview, a status change before the button. Screenshots are 1280 px wide, English, once in the light and once in the dark theme.
 """
@@ -253,6 +258,54 @@ def etsy_copy_screen(page, manifest, folder, theme):
     save_screen(page, folder, "workspace-etsy-copy", theme)
 
 
+SHEET_PATHS = ("/console/bulk", "/console/check/edit", "/console/reaudit", "/console/history")
+
+
+def signing(origin, assertion):
+    """A route handler that sends the sign-in assertion of one person to the local server only (a closure: Playwright reads the handler's arguments)."""
+    def handler(route):
+        if route.request.url.startswith(origin + "/"):
+            route.continue_(headers={**route.request.headers, "Cf-Access-Jwt-Assertion": assertion})
+        else:
+            route.abort()
+    return handler
+
+
+def menu_screens(page, manifest, role, folder, theme):
+    """console-menu-<mode>-<role>: the home page with its menu, in the mode of the server.
+
+    classic: the Sheet tools (bulk check, edit, re-audit, history) are in the menu and their paths answer. workspace: they are not in the menu and their
+    paths are 404, the quick check stays and the workspace entries come first. Nothing is saved."""
+    mode = manifest["mode"]
+    for lang in ("en",):
+        response = page.goto("/console?lang=en", wait_until="domcontentloaded")
+        if response is None or not response.ok:
+            raise RuntimeError(f"Console home failed for {role}")
+        expect(page.locator("html")).to_have_attribute("lang", lang)
+        set_theme(page, theme)
+        nav = page.locator(".app-nav")
+        expect(nav).to_be_visible()
+        sheet_links = page.locator(", ".join(f"a.app-nav__link[href='{path}']" for path in SHEET_PATHS))
+        if mode == "workspace":
+            expect(sheet_links).to_have_count(0)
+            expect(page.locator("a.app-nav__link[href='/console/workspace/new']")).to_have_count(1)
+            expect(page.locator("a.app-nav__link[href='/console/workspace/export']")).to_have_count(1)
+            expect(page.locator("a.app-nav__link[href='/console/check']")).to_have_count(1)
+            expect(page.locator("a.app-nav__link[href='/console/workspace/accounts']")).to_have_count(1 if role == "admin" else 0)
+            expect(page.locator("a.app-nav__link[href='/console/workspace/import']")).to_have_count(1 if role == "admin" else 0)
+            first = nav.locator("a.app-nav__link").nth(1)
+            expect(first).to_have_attribute("href", "/console/workspace")
+        else:
+            expect(sheet_links).to_have_count(len(SHEET_PATHS))
+            expect(page.locator("a.app-nav__link[href='/console/workspace/new']")).to_have_count(0)
+        save_screen(page, folder, f"console-menu-{mode}-{role}", theme)
+    # the paths: reachable in the classic console, not found in the workspace one
+    for path in SHEET_PATHS:
+        status = page.goto(path, wait_until="domcontentloaded").status
+        if (status == 404) != (mode == "workspace"):
+            raise RuntimeError(f"{path} answered {status} in the {mode} console")
+
+
 def inspect(page, manifest, folder, theme):
     import_screens(page, manifest, folder, theme)
     list_screen(page, folder, theme)
@@ -287,15 +340,25 @@ def main():
             }) if route.request.url.startswith(origin + "/") else route.abort())
             page = context.new_page()
             staged = Path(temp) if dest else None
-            for theme in ("light", "dark"):
-                inspect(page, manifest, staged, theme)
+            if manifest.get("menu"):
+                for role, assertion in (("admin", os.environ["LG_WORKSPACE_TEST_ASSERTION"]), ("member", os.environ["LG_WORKSPACE_MEMBER_ASSERTION"])):
+                    with browser.new_context(base_url=origin, viewport=VIEWPORT, device_scale_factor=1, locale="en-US", service_workers="block") as signed:
+                        signed.route("**/*", signing(origin, assertion))
+                        for theme in ("light", "dark"):
+                            menu_screens(signed.new_page(), manifest, role, staged, theme)
+            else:
+                for theme in ("light", "dark"):
+                    inspect(page, manifest, staged, theme)
             if staged:
                 output = Path(dest)
                 output.mkdir(parents=True, exist_ok=True)
                 for file in sorted(staged.glob("*.png")):
                     (output / file.name).write_bytes(file.read_bytes())
         browser.close()
-    print("Passed: import, list, detail, editor, clone, compare, history, status, conflict, audit, export and Etsy copy pages in both themes.")
+    if manifest.get("menu"):
+        print(f"Passed: the {manifest['mode']} console menu for an administrator and a member in both themes.")
+    else:
+        print("Passed: import, list, detail, editor, clone, compare, history, status, conflict, audit, export and Etsy copy pages in both themes.")
 
 
 if __name__ == "__main__":
