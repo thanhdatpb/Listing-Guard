@@ -156,3 +156,29 @@ workspace audit. See the [rulesets](../rulesets.md#content-hygiene-and-clone-lef
   against the marketplaces' lists. Not measured: the false-positive rate on real listings (the test and eval sets were written with the rules), the time to audit a large batch of clones again, the
   marking in a real browser. Not run here: the Docker-only tests (they run in CI).
 
+
+## Workspace-first console mode (ADR-064)
+
+ADR-064, V61. The Console gets a mode: `listing-guard.console.mode = classic | workspace` (`LISTING_GUARD_CONSOLE_MODE`). **`classic` is the default and is unchanged byte for byte**
+(golden HTML taken from `main` before the change, see below). `workspace` takes effect only while `listing-guard.workspace.enabled=true`; with the workspace off the Console stays classic and the
+start-up log warns once. An unknown value stops the start. See the [workspace guide](../workspace.md#14-chế-độ-console-workspace-adr-064).
+
+- **Menu (workspace mode):** Home · Workspace (Listings with the reader's "New risks: n", Create new, Export file) · Tools (keyword screening, Quick check = the single-listing check) · Monitor (background audit; the
+  slot of the notifications page is left for UX-4) · Manage for ADMIN (accounts and templates, import, watchlist, statistics, report, readiness, API keys) · Experiments as before.
+- **Sheet tools hidden** (bulk check, edit before/after, re-audit by file, history of checks): no menu entry, no page links to them, and their paths answer **404** for every method (a servlet filter before the
+  security chain, so a GET of a POST-only path is a 404, not a 405). `LISTING_GUARD_CONSOLE_SHEET_TOOLS=true` brings them back. `/api/v1/*`, the SDK, MCP, the jobs and the single check are unchanged.
+- **Import:** `LISTING_GUARD_WORKSPACE_IMPORT_ROLES` (`ADMIN`, or `ADMIN,MEMBER`): ADMIN only by default in the workspace mode, both roles in classic (as W1). A role that is not listed gets 403 on every import step.
+- **Member home (pilot):** the Sheet buttons are replaced by shortcuts to the workspace and Create new; the guide text is about the workspace; lists built from the check history show text without links.
+- **Gate (changes ADR-063 §1, also in classic when the workspace is on):** a client with a **watchlist and no catalog** (`WATCHLIST_ONLY`) is **no longer held back**. The listing is said to be "not checked against
+  the catalog" on the status page, the export confirmation, the paste page and the export log (`workspace_export_log.uncatalogued_count`, a count only). A HIGH hit of the watchlist still holds a listing back.
+- **"Needs to be exported again" (V61 `workspace_listing.exported_hash`, also in classic when the workspace is on):** an export or a post records the listing's content hash. Editing an exported or live listing still does
+  not change its status; a listing whose content differs from the last export shows a warning chip (word and icon) on its page and in the list, and loses it when the exported text is back. Draft and ready listings are unchanged.
+  Exporting again goes back through the gate. Listings exported before V61 are recorded as "as they are now": only later edits show.
+- **Text for a Sheet:** option "Escape cells that start with = + - @" (a single quote in front), on by default in the workspace mode and **not offered in classic**; `.xlsm`/`.xlsx`/`.txt` are never changed.
+- `deploy/env.pilot.example` sets `LISTING_GUARD_CONSOLE_MODE=workspace`, the workspace and the audit on and the multipart limits; the note says what to do for sellers who do not use the workspace. The two compose files
+  pass `LISTING_GUARD_CONSOLE_MODE`, `LISTING_GUARD_CONSOLE_SHEET_TOOLS` and `LISTING_GUARD_WORKSPACE_IMPORT_ROLES` through (**without this the settings never reach the container**).
+- Console screenshots script: `scripts/capture-workspace-screens.py` has a "menu" run (`ConsoleMenu{Classic,Workspace}BrowserIntegrationTest`) that takes the menu of each mode for an ADMIN and a MEMBER in both themes
+  (`docs/images/console/console-menu-*`).
+- Contract (ADR-022): no `/api/v1` change, so no additive or breaking line; OpenAPI, SDK and MCP are untouched (`./mvnw -B -pl contract-tools verify` is run in the pull request).
+- Not verified: the order and the words of the menu have not been tried by sellers. The Vietnamese menu is held by a test, not photographed. Not measured: the cost of the "New risks" count in the menu on a very large workspace.
+  Not run here: the Docker-only tests (see the pull request).

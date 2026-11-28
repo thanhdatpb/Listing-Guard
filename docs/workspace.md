@@ -36,6 +36,9 @@ Tắt mặc định. Khi tắt: không có menu "Kho listing", mọi đường d
 | `LISTING_GUARD_WORKSPACE_IMPORT_MAX_BYTES` | `20MB` | File hoặc vùng dán lớn nhất của một lần nhập. |
 | `LISTING_GUARD_WORKSPACE_IMPORT_MAX_ROWS` | `10000` | Số dòng dữ liệu tối đa. Vượt trần thì từ chối cả file, không cắt. |
 | `LISTING_GUARD_WORKSPACE_HISTORY_KEEP` | `20` | Số phiên bản giữ cho mỗi listing. |
+| `LISTING_GUARD_CONSOLE_MODE` | `classic` | `classic`: menu và trang chủ như mọi phiên bản trước. `workspace`: console bắt đầu từ kho (mục [14](#14-chế-độ-console-workspace-adr-064)); chỉ có hiệu lực khi kho bật. Đọc lúc khởi động. |
+| `LISTING_GUARD_CONSOLE_SHEET_TOOLS` | `false` ở `workspace` | `true`: giữ các công cụ Sheet (Kiểm tra hàng loạt, Sửa listing, Rà định kỳ, Lịch sử) ở chế độ `workspace`. Không đọc ở `classic`. |
+| `LISTING_GUARD_WORKSPACE_IMPORT_ROLES` | `ADMIN` ở `workspace`; `ADMIN,MEMBER` ở `classic` | Vai được nhập dữ liệu vào kho. ADMIN luôn được. |
 | `LISTING_GUARD_MULTIPART_MAX_FILE_SIZE` / `LISTING_GUARD_MULTIPART_MAX_REQUEST_SIZE` | `10MB` / `60MB` (theo ảnh) | Trần upload của Spring. **Phải ≥ trần nhập/template**: mặc định 20 MB cần đặt `25MB`; ứng dụng không khởi động nếu thấp hơn và báo đúng tên biến. |
 
 ## 3. Quyền
@@ -346,7 +349,7 @@ Chọn listing ở danh sách (hoặc nút ở trang sửa) → **Chuyển Sẵn
 | --- | --- |
 | Còn Lỗi / rủi ro HIGH | Kết quả rà của đúng nội dung hiện tại có ERROR của quy tắc hoặc HIGH của trademark. Luôn chặn. |
 | Chưa kiểm | Chưa có kết quả rà, kết quả là của nội dung cũ, hoặc **rà nền đang tắt** (khi đó mọi listing là "Chưa kiểm"). Luôn chặn. |
-| Phần trademark chưa chạy (tạm thời) | Catalog đang nạp hoặc bị từ chối, check không trả lời, một rule lỗi, chỉ có watchlist mà chưa có catalog, hoặc kết quả cũ chưa ghi nguyên nhân (được rà lại một lần). Chặn. |
+| Phần trademark chưa chạy (tạm thời) | Catalog đang nạp hoặc bị từ chối, check không trả lời, một rule lỗi, chỉ có watchlist mà chưa có catalog (từ ADR-064 §3 trường hợp này **không** chặn nữa, xem [14.5](#145-cổng-với-client-chỉ-có-watchlist)), hoặc kết quả cũ chưa ghi nguyên nhân (được rà lại một lần). Chặn. |
 | Client chưa cấu hình trademark | Không có catalog READY và không có mục watchlist lúc rà, hoặc gói không có pack trademark. **Không chặn**; trang trạng thái, màn hình xác nhận xuất và nhật ký xuất ghi **"chưa kiểm trademark"**. |
 
 `LISTING_GUARD_WORKSPACE_BLOCK_ON_ERROR=false` tắt hẳn cổng (kể cả khi rà nền tắt). Cảnh báo (WARNING/MEDIUM) không chặn. **ADMIN mở chặn** bằng cách tick và nhập **lý do bắt buộc**; hệ thống lưu người mở, thời điểm, `content_hash` và trạng thái rà lúc mở. **Lý do hết hiệu lực ngay khi nội dung listing đổi** (listing về Nháp và bị chặn lại), và có hiệu lực lại nếu khôi phục đúng nội dung đó.
@@ -461,3 +464,74 @@ Chỉ chạy trong rà nền của kho, cho listing có `cloned_from` mà bản 
   Kết quả ghi `pack = clone-leftover`, `rule_id = clone_leftover_from_source`, mức WARNING.
 - **Chưa xác minh với file template Amazon thật** (mọi fixture là tổng hợp; cột thuộc tính được tìm bằng đoán tên cột trong `standard-targets.yaml`). Chưa đo tỉ lệ báo nhầm trên listing thật.
 
+## 14. Chế độ console `workspace` (ADR-064)
+
+Seller làm listing ngay trong kho thì không cần các màn hình xoay quanh Google Sheet. Chế độ này **ẩn** chúng; mã nguồn và API không đổi, và `classic` (mặc định) giữ mọi thứ từng byte.
+
+### 14.1 Bật
+
+```bash
+LISTING_GUARD_CONSOLE_MODE=workspace
+LISTING_GUARD_WORKSPACE_ENABLED=true      # bắt buộc: không có kho thì console giữ classic và log một cảnh báo lúc khởi động
+LISTING_GUARD_CONSOLE_SHEET_TOOLS=false   # mặc định ở workspace; true để giữ lại bốn công cụ Sheet
+LISTING_GUARD_WORKSPACE_IMPORT_ROLES=ADMIN  # mặc định ở workspace; ADMIN,MEMBER để cho thành viên nhập
+```
+
+Khởi động lại sau khi đổi. `deploy/env.pilot.example` đã đặt `LISTING_GUARD_CONSOLE_MODE=workspace`; ai không dùng kho bỏ dòng đó (hoặc đặt `classic`).
+
+### 14.2 Menu (ảnh chụp: `docs/images/console/console-menu-*`)
+
+| Nhóm | Mục |
+| --- | --- |
+| (đầu) | Trang chủ |
+| Kho listing | Listing (kèm "Rủi ro mới: n" của bạn khi rà nền bật) · Tạo mới · Xuất file |
+| Công cụ | Kiểm keyword (nếu bật) · Kiểm nhanh (trang kiểm một listing) |
+| Theo dõi | Rà nền (nếu bật); chỗ cho Thông báo (UX-4) |
+| Quản lý | Tài khoản & template · Nhập dữ liệu · Watchlist · Thống kê · Báo cáo · Sẵn sàng · Khoá API |
+| Thử nghiệm | như hiện tại |
+
+Nhóm **Quản lý** theo quy tắc cũ: ADMIN khi pilot bật (khi pilot tắt các trang này mở cho mọi người). MEMBER chỉ thấy **Nhập dữ liệu** khi `IMPORT_ROLES` có `MEMBER`.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/console-menu-workspace-admin-dark.png">
+  <img src="images/console/console-menu-workspace-admin-light.png" alt="Trang chủ quản lý ở chế độ workspace: menu bắt đầu bằng Kho listing với số Rủi ro mới, rồi Công cụ, Theo dõi và Quản lý; không có Kiểm tra hàng loạt, Sửa listing, Lịch sử hay Rà định kỳ.">
+</picture>
+
+Cùng trang ở chế độ `classic` (để so sánh):
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/console/console-menu-classic-admin-dark.png">
+  <img src="images/console/console-menu-classic-admin-light.png" alt="Trang chủ quản lý ở chế độ classic: nhóm Kiểm tra có Kiểm tra listing, Kiểm tra hàng loạt và Sửa listing; Kho listing ở giữa; Theo dõi có Lịch sử và Rà định kỳ.">
+</picture>
+
+### 14.3 Công cụ Sheet bị ẩn
+
+Kiểm tra hàng loạt (`/console/bulk`), Sửa listing / so sánh dán trước-sau (`/console/check/edit`), Rà định kỳ bằng tải file (`/console/reaudit`) và Lịch sử kiểm của console (`/console/history`) **không có trong menu và các đường dẫn đó trả 404**
+(cả `GET` và `POST`, cả khi chưa đăng nhập). `LISTING_GUARD_CONSOLE_SHEET_TOOLS=true` đưa chúng về. **Bookmark** cũ tới Lịch sử sẽ 404: đó là chủ ý.
+
+Không đổi: `/api/v1/*` (kể cả `batch-check`), SDK, MCP, job, Kiểm nhanh (`/console/check`), Kiểm keyword. Trang chủ thành viên có lối tắt Kho listing và Tạo mới thay cho hai nút Sheet; danh sách "Cần sửa" và "Gần đây" của trang chủ in
+chữ không có liên kết (UX-4 sẽ thay bằng hàng đợi việc).
+
+### 14.4 Nhập dữ liệu
+
+Mặc định chỉ ADMIN nhập (mọi bước của `/console/workspace/import/**` trả 403 cho MEMBER). Đặt `LISTING_GUARD_WORKSPACE_IMPORT_ROLES=ADMIN,MEMBER` để cho thành viên nhập vào template đã có (như ở `classic`); tạo template vẫn chỉ của ADMIN.
+
+### 14.5 Cổng với client chỉ có watchlist
+
+Client có watchlist mà chưa có catalog trademark `READY` **không còn bị chặn** vì "chưa rà đủ". Listing được ghi **"Chưa kiểm catalog"** ở trang trạng thái, màn hình xuất, trang dán và nhật ký xuất. Nếu watchlist trúng mức HIGH thì listing vẫn bị chặn như mọi HIGH.
+Áp dụng cả ở `classic` khi kho bật (ADR-064 §3).
+
+### 14.6 "Cần xuất lại"
+
+Sửa listing **Đã xuất** hoặc **Đang bán** không đổi trạng thái. Từ nay hệ thống nhớ băm nội dung lúc xuất (V61 `exported_hash`) và listing có nội dung khác lần xuất gần nhất hiện chip **Cần xuất lại** (cảnh báo, chữ và icon) ở trang listing và cột trạng thái
+của danh sách; sửa lại đúng nội dung đã xuất thì dấu mất. Để xuất lại: **Đưa về Nháp** → rà → **Sẵn sàng xuất** → Xuất (vẫn qua cổng). Listing xuất trước V61 chỉ hiện dấu với các lần sửa **sau** V61.
+
+### 14.7 Thoát ô bắt đầu bằng `= + - @` khi dán vào Sheet
+
+Ở màn hình xuất dạng **Copy để dán vào Sheet** của console `workspace`, hộp **Thoát ô bắt đầu bằng = + - @** bật sẵn: ô chữ bắt đầu bằng một trong bốn ký tự có thêm dấu nháy đơn ở đầu để Sheet giữ là chữ, không hiểu là công thức (ô số không đổi).
+File `.xlsm`/`.xlsx`/`.txt` không đổi. `classic` không có hộp này và giữ text như cũ.
+
+### 14.8 Chưa làm, chưa đo
+
+- Chưa thử với seller thật; thứ tự menu theo yêu cầu của HappyC. Trang Thông báo và hàng đợi việc là UX-4.
+- Ảnh menu chụp từ dữ liệu tổng hợp ở chế độ pilot, tiếng Anh (`ConsoleMenu*BrowserIntegrationTest`); menu tiếng Việt do `ConsoleWorkspaceModeTest` kiểm.

@@ -31,6 +31,12 @@ các cờ AI tắt.
 
 ![Trang Sẵn sàng khi mọi mục đã đạt](images/pilot-readiness.png)
 
+**5b. Bật chế độ workspace (khi seller làm listing trong kho, không qua Sheet).** [`deploy/env.pilot.example`](../deploy/env.pilot.example) đã có `LISTING_GUARD_CONSOLE_MODE=workspace`; chế độ này chỉ có hiệu lực khi
+`LISTING_GUARD_WORKSPACE_ENABLED=true` (và đặt `LISTING_GUARD_MULTIPART_MAX_FILE_SIZE=25MB`, `LISTING_GUARD_MULTIPART_MAX_REQUEST_SIZE=60MB`, xem [workspace.md mục 2](workspace.md#2-bật-tính-năng)); nếu kho tắt, console giữ `classic` và log một cảnh báo lúc
+khởi động. Tạo lại `api`. Kiểm tra: đăng nhập bằng ADMIN thấy menu bắt đầu bằng **Kho listing** (Listing, Tạo mới, Xuất file), **Công cụ → Kiểm nhanh**, và **không** có *Kiểm tra hàng loạt*, *Sửa listing*, *Lịch sử*, *Rà định kỳ*
+(mở `/console/bulk` trả 404); đăng nhập bằng MEMBER không thấy **Nhập dữ liệu** và **Quản lý**. Muốn giữ lại bốn công cụ Sheet: `LISTING_GUARD_CONSOLE_SHEET_TOOLS=true`; muốn cho thành viên nhập dữ liệu:
+`LISTING_GUARD_WORKSPACE_IMPORT_ROLES=ADMIN,MEMBER`. Chi tiết: [workspace.md mục 14](workspace.md#14-chế-độ-console-workspace-adr-064). Không dùng kho thì để `classic`.
+
 **6. Gửi hướng dẫn cho seller.** Gửi [hướng dẫn một trang](pilot-seller-guide.md) và địa chỉ pilot. Nhắc seller ba điều: bảng chỉ cần cột `SKU`, `Title`, `Description`, `Tags` (kiểm nội dung);
 **Đạt (nội dung)** chưa phải sẵn sàng đăng; liên kết **Giải thích kết quả** ở trang kết quả nói rõ ý nghĩa và lời miễn trừ.
 
