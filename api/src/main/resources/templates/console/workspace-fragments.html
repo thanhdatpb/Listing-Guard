@@ -133,5 +133,39 @@
 <th:block th:fragment="carry(fields)">
     <input type="hidden" th:each="field : ${fields}" th:name="${field.key}" th:value="${field.value}">
 </th:block>
+
+<!-- The release parts of a listing page (ADR-063). Model: listing, canRelease, isReady, isExported, isEtsy, exportedAt, etsyPanel, postable, postBlocks. -->
+<th:block th:fragment="release">
+    <div class="lg-actions lg-section" id="release-actions" th:if="${canRelease and (isExported or listing.status().name() == 'LIVE' or (isEtsy and isReady))}">
+        <p class="lg-text-muted" th:if="${exportedAt != null}" th:text="#{workspace.detail.exported(${exportedAt})}"></p>
+        <form method="post" th:if="${isExported}" th:action="@{/console/workspace/listings/{id}/live(id=${listing.id()})}"><button type="submit" class="lg-btn" id="release-live" th:text="#{workspace.detail.live}"></button></form>
+        <form method="post" th:if="${isEtsy and isReady}" th:action="@{/console/workspace/listings/{id}/posted(id=${listing.id()})}"><button type="submit" class="lg-btn lg-btn--primary" id="release-posted" th:disabled="${postable != true}" th:text="#{workspace.etsy.posted}"></button></form>
+        <form method="post" th:if="${listing.status().name() != 'DRAFT' and listing.status().name() != 'READY_TO_EXPORT'}" th:action="@{/console/workspace/listings/{id}/draft(id=${listing.id()})}"><button type="submit" class="lg-btn" id="release-draft" th:text="#{workspace.edit.draft}"></button></form>
+    </div>
+    <div class="lg-banner lg-banner--warning lg-section" id="release-blocked" th:if="${isEtsy and isReady and postable == false}"><p th:text="#{workspace.etsy.posted.blocked}"></p><ul class="lg-plain"><li th:each="b : ${postBlocks}" th:text="${b}"></li></ul></div>
+    <div class="lg-banner lg-banner--info lg-section" id="release-unchecked" th:if="${isEtsy and isReady and postable == true and postUnchecked == true}"><p th:text="#{workspace.etsy.posted.unchecked}"></p></div>
+</th:block>
+
+<!-- The Etsy panel "copy each item", in the order of etsy-fields.yaml. Model: etsyPanel, etsyLimitsKnown. -->
+<section class="lg-card lg-section" id="etsy-copy" aria-labelledby="etsy-copy-heading" th:fragment="etsyCopy" th:if="${etsyPanel != null}">
+    <h2 id="etsy-copy-heading" class="lg-card__title" th:text="#{workspace.copy.heading}"></h2>
+    <p class="lg-text-muted" th:text="#{workspace.copy.intro}"></p>
+    <div class="lg-table-wrap">
+        <table class="lg-table lg-table--dense" id="etsy-copy-table">
+            <caption class="lg-sr-only" th:text="#{workspace.copy.heading}"></caption>
+            <thead><tr><th scope="col" th:text="#{workspace.detail.field}"></th><th scope="col" th:text="#{workspace.detail.value}"></th><th scope="col" th:text="#{workspace.copy.count}"></th><th scope="col"><span class="lg-sr-only" th:text="#{workspace.copy.button}"></span></th></tr></thead>
+            <tbody>
+            <tr th:each="item : ${etsyPanel}" th:attr="data-field=${item.key()}">
+                <th scope="row" class="lg-wrap" th:text="${item.label()}"></th>
+                <td class="lg-wrap"><textarea class="lg-textarea" readonly th:id="${'copy-' + item.key()}" th:rows="${item.multiline() ? 4 : 1}" th:if="${!item.empty()}" th:aria-label="${item.label()}" th:text="${item.value()}"></textarea><span class="lg-text-muted" th:if="${item.empty()}" th:text="#{workspace.copy.empty}"></span></td>
+                <td class="lg-wrap"><span th:if="${item.count() != null}" th:text="${item.count()}"></span> <span class="lg-chip lg-chip--audit lg-chip--audit-warning" th:if="${item.over()}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-warn"/></svg><span th:text="#{workspace.copy.over}"></span></span></td>
+                <td><button type="button" class="lg-btn lg-btn--small" th:if="${!item.empty()}" th:attr="data-copy-from=${'copy-' + item.key()},data-copied=#{workspace.copy.done},data-failed=#{workspace.copy.failed},aria-label=#{workspace.copy.button.of(${item.label()})}" th:text="#{workspace.copy.button}"></button></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="lg-small" id="copy-status" role="status" aria-live="polite"></p>
+    <p class="lg-text-muted lg-small" th:unless="${etsyLimitsKnown}" th:text="#{workspace.copy.nolimits}"></p>
+</section>
 </body>
 </html>

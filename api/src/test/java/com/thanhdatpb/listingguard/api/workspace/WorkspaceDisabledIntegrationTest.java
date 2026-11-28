@@ -92,14 +92,16 @@ class WorkspaceDisabledIntegrationTest {
         for (String path : new String[] {"/console/workspace", "/console/workspace/accounts", "/console/workspace/import",
                 "/console/workspace/import/sheet", "/console/workspace/import/mapping", "/console/workspace/listings/" + id,
                 "/console/workspace/templates/" + id + "/file", "/console/workspace/new", "/console/workspace/new?account=" + id,
-                "/console/workspace/listings/" + id + "/edit", "/console/workspace/listings/" + id + "/history"}) {
+                "/console/workspace/listings/" + id + "/edit", "/console/workspace/listings/" + id + "/history", "/console/workspace/export",
+                "/console/workspace/export?account=" + id}) {
             mvc.perform(get(path).with(signedIn(user))).andExpect(status().isNotFound());
         }
         for (String path : new String[] {"/console/workspace/accounts", "/console/workspace/import/preview", "/console/workspace/import/commit",
                 "/console/workspace/import/save-template", "/console/workspace/import/cancel", "/console/workspace/listings/" + id + "/owner",
                 "/console/workspace/listings/" + id + "/delete", "/console/workspace/new", "/console/workspace/listings/" + id + "/edit",
                 "/console/workspace/clone", "/console/workspace/clone/preview", "/console/workspace/clone/commit", "/console/workspace/status",
-                "/console/workspace/listings/" + id + "/restore", "/console/workspace/listings/" + id + "/draft"}) {
+                "/console/workspace/listings/" + id + "/restore", "/console/workspace/listings/" + id + "/draft", "/console/workspace/export",
+                "/console/workspace/listings/" + id + "/posted", "/console/workspace/listings/" + id + "/live"}) {
             mvc.perform(post(path).with(signedIn(user)).with(csrf()).param("name", "x")).andExpect(status().isNotFound());
         }
         mvc.perform(multipart("/console/workspace/import/upload").file(new MockMultipartFile("file", "f.xlsx", "application/octet-stream", new byte[] {1}))

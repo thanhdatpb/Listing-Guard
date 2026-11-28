@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.export.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+    <script th:src="@{/console/copy.js}" defer></script>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace')}"></header>
+<!-- The export of a seller account's listings (ADR-063): the choice of the account and the filter, then the confirmation. The confirmation writes
+     nothing; the last button makes the file or the text. Every value goes through th:text. No text is written here (ADR-028). -->
+<main class="lg-page" id="workspace-export">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <a class="lg-page__crumb" th:href="@{/console/workspace}" th:text="#{workspace.detail.back}"></a>
+            <h1 th:text="#{workspace.export.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{workspace.export.sub}"></p>
+        </div>
+    </div>
+    <th:block th:replace="~{console/workspace-fragments :: notices}"></th:block>
+    <div class="lg-banner lg-banner--warning lg-section" id="export-error" role="alert" th:if="${error != null}"><p th:text="${error}"></p></div>
+
+    <form class="lg-form lg-section" id="export-filter" method="post" th:action="@{/console/workspace/export}">
+        <div class="lg-field">
+            <label class="lg-field__label" for="export-account" th:text="#{workspace.export.account}"></label>
+            <select class="lg-select" id="export-account" name="account">
+                <option th:each="a : ${accountOptions}" th:value="${a.id()}" th:selected="${selected != null and a.id() == selected.id()}" th:text="${a.name() + ' (' + a.format() + ')'}"></option>
+            </select>
+        </div>
+        <div class="lg-field">
+            <label class="lg-field__label" for="export-status" th:text="#{workspace.col.status}"></label>
+            <select class="lg-select" id="export-status" name="status">
+                <option th:each="s : ${statuses}" th:value="${s.code()}" th:selected="${s.code() == filterStatus}" th:text="${s.label()}"></option>
+            </select>
+        </div>
+        <div class="lg-field">
+            <label class="lg-field__label" for="export-owner" th:text="#{workspace.col.owner}"></label>
+            <select class="lg-select" id="export-owner" name="owner">
+                <option value="" th:text="#{workspace.filter.owner.any}"></option>
+                <option value="none" th:selected="${filterOwner == 'none'}" th:text="#{workspace.owner.none}"></option>
+                <option th:each="o : ${owners}" th:value="${o.key}" th:selected="${o.key.toString() == filterOwner}" th:text="${o.value}"></option>
+            </select>
+        </div>
+        <div class="lg-field">
+            <label class="lg-field__label" for="export-q" th:text="#{workspace.filter.query}"></label>
+            <input class="lg-input" id="export-q" name="q" type="search" th:value="${filterQuery}">
+            <p class="lg-field__hint" th:text="#{workspace.export.filter.hint(${maxListings})}"></p>
+        </div>
+        <div class="lg-actions"><button type="submit" class="lg-btn lg-btn--primary" id="export-preview-open" th:text="#{workspace.export.preview}"></button></div>
+    </form>
+
+    <th:block th:if="${preview != null}">
+        <div class="lg-banner lg-banner--info lg-section" id="export-audit-off" th:unless="${auditOn}"><p th:text="#{workspace.status.audit.off}"></p></div>
+        <div class="lg-banner lg-banner--info lg-section" id="export-gate-off" th:unless="${gateOn}"><p th:text="#{workspace.status.gate.off}"></p></div>
+        <div class="lg-banner lg-banner--warning lg-section" id="export-problems" role="alert" th:unless="${problems.isEmpty()}"><ul class="lg-plain"><li th:each="p : ${problems}" th:text="${p}"></li></ul></div>
+
+        <section class="lg-card lg-section" aria-labelledby="export-summary-heading">
+            <h2 id="export-summary-heading" class="lg-card__title" th:text="#{workspace.export.summary}"></h2>
+            <ul class="lg-kv" id="export-summary">
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.going}"></span><span class="lg-kv__value lg-num" id="export-count" th:text="${preview.exportable()}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.held}"></span><span class="lg-kv__value lg-num" th:text="${held.size()}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.untrademarked}"></span><span class="lg-kv__value lg-num" th:text="${preview.untrademarked()}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.opened}"></span><span class="lg-kv__value lg-num" th:text="${preview.opened()}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.orphans}"></span><span class="lg-kv__value lg-num" th:text="${preview.orphanChildren()}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.version}"></span><span class="lg-kv__value lg-num" th:text="${preview.otherVersion()}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.outside}"></span><span class="lg-kv__value lg-num" th:text="${preview.outside()}"></span></li>
+                <li class="lg-kv__item" th:if="${kind == 'CUSTOM'}"><span class="lg-kv__label" th:text="#{workspace.export.n.nocustom}"></span><span class="lg-kv__value lg-num" th:text="${preview.missingCustom()}"></span></li>
+                <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.warnings}"></span><span class="lg-kv__value lg-num" th:text="${preview.warnings()}"></span></li>
+                <li class="lg-kv__item" th:if="${medium == 'TXT'}"><span class="lg-kv__label" th:text="#{workspace.export.n.replaced}"></span><span class="lg-kv__value lg-num" th:text="${preview.replacedCells()}"></span></li>
+            </ul>
+        </section>
+
+        <div class="lg-table-wrap lg-section" th:unless="${groups.isEmpty()}">
+            <table class="lg-table lg-table--dense" id="export-groups">
+                <caption class="lg-sr-only" th:text="#{workspace.export.groups}"></caption>
+                <thead><tr>
+                    <th scope="col" th:text="#{workspace.detail.template}"></th>
+                    <th scope="col" th:text="#{workspace.export.col.source}"></th>
+                    <th scope="col" class="lg-num" th:text="#{workspace.export.n.going}"></th>
+                    <th scope="col" class="lg-num" th:text="#{workspace.export.n.held}"></th>
+                    <th scope="col" class="lg-num" th:text="#{workspace.export.n.untrademarked}"></th>
+                    <th scope="col" th:text="#{workspace.export.col.values}"></th>
+                </tr></thead>
+                <tbody><tr th:each="g : ${groups}">
+                    <td><span th:text="${g.version()}"></span> <span class="lg-text-muted" th:text="${g.kind()}"></span></td>
+                    <td th:text="${g.source()}"></td>
+                    <td class="lg-num" th:text="${g.listings()}"></td>
+                    <td class="lg-num" th:text="${g.held()}"></td>
+                    <td class="lg-num" th:text="${g.untrademarked()}"></td>
+                    <td><span th:text="${g.values()}"></span> <span class="lg-text-muted lg-small" th:if="${g.valueRules() > 0 or g.valueUnresolved() > 0 or g.valueExtension() > 0}" th:text="#{workspace.export.values.rules(${g.valueRules()}, ${g.valueUnresolved()}, ${g.valueExtension()})}"></span></td>
+                </tr></tbody>
+            </table>
+        </div>
+
+        <section class="lg-card lg-section" id="export-warnings" th:unless="${warnings.isEmpty()}" aria-labelledby="export-warnings-heading">
+            <h2 id="export-warnings-heading" class="lg-card__title" th:text="#{workspace.export.warnings}"></h2>
+            <p class="lg-text-muted" th:text="#{workspace.export.warnings.hint}"></p>
+            <div class="lg-table-wrap"><table class="lg-table lg-table--dense" id="export-warnings-table">
+                <caption class="lg-sr-only" th:text="#{workspace.export.warnings}"></caption>
+                <thead><tr><th scope="col" th:text="#{workspace.export.col.version}"></th><th scope="col" th:text="#{workspace.detail.field}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.going}"></th><th scope="col" th:text="#{workspace.export.col.examples}"></th></tr></thead>
+                <tbody><tr th:each="w : ${warnings}"><td th:text="${w.version()}"></td><th scope="row"><code class="lg-code" th:text="${w.header()}"></code></th><td class="lg-num" th:text="${w.listings()}"></td><td class="lg-wrap" th:text="${w.examples()}"></td></tr></tbody>
+            </table></div>
+        </section>
+
+        <section class="lg-card lg-section" id="export-held" th:unless="${held.isEmpty()}" aria-labelledby="export-held-heading">
+            <h2 id="export-held-heading" class="lg-card__title" th:text="#{workspace.export.held}"></h2>
+            <div class="lg-table-wrap"><table class="lg-table lg-table--dense" id="export-held-table">
+                <caption class="lg-sr-only" th:text="#{workspace.export.held}"></caption>
+                <thead><tr><th scope="col" th:text="#{workspace.col.sku}"></th><th scope="col" th:text="#{workspace.col.title}"></th><th scope="col" th:text="#{workspace.col.status}"></th><th scope="col" th:text="#{workspace.export.col.why}"></th></tr></thead>
+                <tbody><tr th:each="h : ${held}">
+                    <td class="lg-sku"><code class="lg-code" th:text="${h.sku()}"></code></td>
+                    <td class="lg-ellip" th:text="${h.title()}"></td>
+                    <td th:text="${h.status()}"></td>
+                    <td><span th:text="${h.why()}"></span> <span class="lg-chip lg-chip--audit lg-chip--audit-error" th:each="b : ${h.blocks()}"><svg class="lg-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#lg-i-risk-severe"/></svg><span th:text="${b}"></span></span></td>
+                </tr></tbody>
+            </table></div>
+        </section>
+
+        <form class="lg-form lg-section" id="export-form" method="post" th:action="@{/console/workspace/export}">
+            <input type="hidden" name="account" th:value="${selected.id()}">
+            <input type="hidden" name="status" th:value="${filterStatus}">
+            <input type="hidden" name="owner" th:value="${filterOwner}">
+            <input type="hidden" name="q" th:value="${filterQuery}">
+            <input type="hidden" name="listing" th:each="id : ${ids}" th:value="${id}">
+            <input type="hidden" name="confirm" th:value="${preview.exportable()}">
+            <fieldset class="lg-fieldset">
+                <legend th:text="#{workspace.export.kind}"></legend>
+                <label class="lg-check"><input type="radio" name="kind" value="BULK" th:checked="${kind == 'BULK'}"> <span th:text="#{workspace.kind.amazon_bulk}"></span></label>
+                <label class="lg-check"><input type="radio" name="kind" value="CUSTOM" th:checked="${kind == 'CUSTOM'}"> <span th:text="#{workspace.kind.amazon_custom}"></span></label>
+                <p class="lg-field__hint" th:text="#{workspace.export.kind.hint}"></p>
+            </fieldset>
+            <fieldset class="lg-fieldset">
+                <legend th:text="#{workspace.export.medium}"></legend>
+                <label class="lg-check" th:each="m : ${media}"><input type="radio" name="medium" th:value="${m.code()}" th:checked="${m.code() == medium}" th:disabled="${m.disabled()}"> <span th:text="${m.label()}"></span></label>
+                <p class="lg-field__hint" th:if="${preview.excelProblem() != null}" id="export-excel-reason" th:text="#{workspace.export.excel.nofile}"></p>
+                <p class="lg-field__hint" th:if="${preview.mediumFellBack()}" th:text="#{workspace.export.fellback(${formatLabel})}"></p>
+            </fieldset>
+            <div class="lg-field" th:if="${versions.size() > 1}">
+                <label class="lg-field__label" for="export-template" th:text="#{workspace.export.version}"></label>
+                <select class="lg-select" id="export-template" name="templateId">
+                    <option value="" th:text="#{workspace.export.version.all}"></option>
+                    <option th:each="v : ${versions}" th:value="${v.key}" th:selected="${v.key.toString() == selectedTemplate}" th:text="${v.value}"></option>
+                </select>
+                <p class="lg-field__hint" th:text="#{workspace.export.version.hint}"></p>
+            </div>
+            <div class="lg-field">
+                <label class="lg-field__label" for="export-encoding" th:text="#{workspace.export.encoding}"></label>
+                <select class="lg-select" id="export-encoding" name="encoding">
+                    <option th:each="e : ${encodings}" th:value="${e.code()}" th:selected="${e.code() == encoding}" th:text="${e.label()}"></option>
+                </select>
+                <p class="lg-field__hint" th:text="#{workspace.export.encoding.hint}"></p>
+            </div>
+            <label class="lg-check"><input type="checkbox" name="withHeader" value="1" th:checked="${preview.withHeader()}"> <span th:text="#{workspace.export.withheader}"></span></label>
+            <label class="lg-check"><input type="checkbox" name="checkValues" value="1" th:checked="${preview.checkValues()}"> <span th:text="#{workspace.export.checkvalues}"></span></label>
+            <div class="lg-actions">
+                <button type="submit" class="lg-btn" id="export-refresh" name="step" value="preview" th:text="#{workspace.export.refresh}"></button>
+                <button type="submit" class="lg-btn lg-btn--primary" id="export-go" name="step" value="export" th:disabled="${!preview.canExport()}" th:text="#{workspace.export.go(${preview.exportable()})}"></button>
+            </div>
+            <p class="lg-text-muted lg-small" th:text="#{workspace.export.go.hint}"></p>
+        </form>
+    </th:block>
+
+    <section class="lg-card lg-section" id="export-log" th:if="${log != null and !log.isEmpty()}" aria-labelledby="export-log-heading">
+        <h2 id="export-log-heading" class="lg-card__title" th:text="#{workspace.export.log}"></h2>
+        <p class="lg-text-muted" th:text="#{workspace.export.log.hint}"></p>
+        <div class="lg-table-wrap"><table class="lg-table lg-table--dense" id="export-log-table">
+            <caption class="lg-sr-only" th:text="#{workspace.export.log}"></caption>
+            <thead><tr><th scope="col" th:text="#{workspace.history.when}"></th><th scope="col" th:text="#{workspace.export.col.format}"></th><th scope="col" th:text="#{workspace.detail.template}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.going}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.held}"></th><th scope="col" class="lg-num" th:text="#{workspace.export.n.untrademarked}"></th><th scope="col" th:text="#{workspace.history.by}"></th></tr></thead>
+            <tbody><tr th:each="r : ${log}"><td class="lg-nowrap" th:text="${r.when()}"></td><td th:text="${r.format()}"></td><td th:text="${r.version() + ' ' + r.kind()}"></td><td class="lg-num" th:text="${r.listings()}"></td><td class="lg-num" th:text="${r.blocked()}"></td><td class="lg-num" th:text="${r.untrademarked()}"></td><td th:text="${r.by()}"></td></tr></tbody>
+        </table></div>
+    </section>
+</main>
+</body>
+</html>

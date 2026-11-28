@@ -6,6 +6,7 @@
     <title th:text="${creating} ? #{workspace.new.title} : #{workspace.edit.title}"></title>
     <th:block th:replace="~{console/layout :: head}"></th:block>
     <script th:src="@{/console/editor.js}" defer></script>
+    <script th:src="@{/console/copy.js}" defer></script>
 </head>
 <body>
 <!-- The editor and the new-listing form of the workspace (ADR-062). The columns are those of the template, grouped by the standard field they were given
@@ -166,6 +167,10 @@
                 </li>
             </ul>
         </section>
+    </th:block>
+    <th:block th:unless="${creating}">
+        <th:block th:replace="~{console/workspace-fragments :: release}"></th:block>
+        <th:block th:replace="~{console/workspace-fragments :: etsyCopy}"></th:block>
     </th:block>
 </main>
 </body>

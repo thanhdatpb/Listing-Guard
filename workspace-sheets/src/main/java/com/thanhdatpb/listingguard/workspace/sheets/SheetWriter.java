@@ -29,7 +29,7 @@ public final class SheetWriter {
     /** The most characters one Excel cell holds. */
     public static final int MAX_CELL_CHARS = 32_767;
 
-    private static final Pattern BREAKS = Pattern.compile("\r\n|[\r\n\u0085  ]|\t");
+    private static final Pattern BREAKS = Pattern.compile("\r\n|[\r\n\u0085\u2028\u2029]|\t");
     private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
     private static final byte[] UTF16LE_BOM = {(byte) 0xFF, (byte) 0xFE};
     private static final String LINE_END = "\r\n";
@@ -187,9 +187,33 @@ public final class SheetWriter {
         text.append(LINE_END);
     }
 
+    private static boolean needsReplacing(String cell) {
+        return cell.indexOf('\t') >= 0 || cell.indexOf('\n') >= 0 || cell.indexOf('\r') >= 0 || cell.indexOf('\u0085') >= 0
+                || cell.indexOf('\u2028') >= 0 || cell.indexOf('\u2029') >= 0;
+    }
+
+    /** How many cells of {@link #delimited} with these rows would have a tab or a line break replaced: what a confirmation page tells before the file is made. */
+    public static int replacedCells(List<List<String>> headerRows, List<List<SheetCell>> rows) {
+        int count = 0;
+        for (List<String> header : headerRows) {
+            for (String cell : header) {
+                if (cell != null && needsReplacing(cell)) {
+                    count++;
+                }
+            }
+        }
+        for (List<SheetCell> row : rows) {
+            for (SheetCell cell : row) {
+                if (cell != null && !cell.isBlank() && needsReplacing(cell.text())) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     private static String plain(String cell, int[] replaced) {
-        if (cell.indexOf('\t') < 0 && cell.indexOf('\n') < 0 && cell.indexOf('\r') < 0 && cell.indexOf('\u0085') < 0
-                && cell.indexOf(' ') < 0 && cell.indexOf(' ') < 0) {
+        if (!needsReplacing(cell)) {
             return cell;
         }
         replaced[0]++;

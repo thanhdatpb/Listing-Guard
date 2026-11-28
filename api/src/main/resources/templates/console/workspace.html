@@ -20,6 +20,7 @@
             <p class="lg-page__sub" th:text="#{workspace.intro}"></p>
         </div>
         <div class="lg-actions">
+            <a class="lg-btn" id="workspace-export-open" th:href="@{/console/workspace/export}" th:text="#{workspace.export.open}"></a>
             <a class="lg-btn" id="workspace-new-open" th:href="@{/console/workspace/new}" th:text="#{workspace.new.open}"></a>
             <a class="lg-btn lg-btn--primary" id="workspace-import-open" th:href="@{/console/workspace/import}" th:text="#{workspace.import.open}"></a>
         </div>
@@ -71,6 +72,7 @@
     <form id="workspace-select-form" method="post" th:action="@{/console/workspace/clone}" th:unless="${rows.isEmpty()}">
     <div class="lg-actions lg-section" id="workspace-bulk" role="group" th:aria-label="#{workspace.bulk.aria}">
         <button type="submit" class="lg-btn lg-btn--small" id="bulk-clone" th:text="#{workspace.bulk.clone}"></button>
+        <button type="submit" class="lg-btn lg-btn--small" id="bulk-export" th:formaction="@{/console/workspace/export}" th:text="#{workspace.bulk.export}"></button>
         <button type="submit" class="lg-btn lg-btn--small" id="bulk-ready" th:formaction="@{/console/workspace/status}" th:text="#{workspace.bulk.ready}"></button>
         <span class="lg-small lg-text-muted" th:text="#{workspace.bulk.hint}"></span>
     </div>

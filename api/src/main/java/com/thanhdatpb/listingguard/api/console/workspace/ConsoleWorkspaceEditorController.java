@@ -82,7 +82,7 @@ public class ConsoleWorkspaceEditorController {
     }
 
     public record StatusRow(UUID id, String sku, String title, String status, List<String> blocks, String state, String openedReason,
-                            String openedBy, String result, boolean mayGo) {
+                            String openedBy, String result, boolean mayGo, boolean trademarkUnchecked, String trademarkWhy) {
     }
 
     private final WorkspaceAccess access;
@@ -100,6 +100,12 @@ public class ConsoleWorkspaceEditorController {
     private final RulesetLimitsService rulesetLimits;
     private final ObjectProvider<WorkspaceAuditViews> auditViews;
     private final WorkspaceProperties properties;
+    private WorkspaceReleaseViews releaseViews;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRelease(WorkspaceReleaseViews views) {
+        this.releaseViews = views;
+    }
 
     public ConsoleWorkspaceEditorController(WorkspaceAccess access, WorkspaceAccounts accounts, WorkspaceTemplates templates,
                                             WorkspaceListings listings, ListingEditor editor, ListingCloner cloner, ListingHistory history,
@@ -250,6 +256,7 @@ public class ConsoleWorkspaceEditorController {
         model.addAttribute("passthrough", passthrough);
         model.addAttribute("canEdit", canEdit);
         model.addAttribute("admin", actor.admin());
+        releaseViews.fill(model, actor, listing, account);
         model.addAttribute("error", error != null ? error : model.getAttribute("error"));
         model.addAttribute("conflict", conflict);
         model.addAttribute("compared", compared);
@@ -682,17 +689,27 @@ public class ConsoleWorkspaceEditorController {
             ListingStatusService.Verdict v = verdicts.get(id);
             rows.add(new StatusRow(id, l.sku(), l.title(), labels.status(l.status()), v.blocks().stream().map(labels::block).toList(), v.state(),
                     v.opened() == null ? null : v.opened().reason(), v.opened() == null || v.opened().openedBy() == null ? null : emails.get(v.opened().openedBy()),
-                    results.get(id), v.mayGo()));
+                    results.get(id), v.mayGo(), !v.trademarkChecked(), trademarkWhy(v)));
         }
         model.addAttribute("rows", rows);
         model.addAttribute("ids", ids);
         model.addAttribute("applied", apply);
         model.addAttribute("admin", actor.admin());
         model.addAttribute("gate", statusService.gateActive());
+        model.addAttribute("auditOff", !statusService.auditActive());
         model.addAttribute("anyBlocked", rows.stream().anyMatch(r -> !r.mayGo()));
+        model.addAttribute("anyUnchecked", rows.stream().anyMatch(StatusRow::trademarkUnchecked));
         model.addAttribute("error", error);
         model.addAttribute("reasonMax", WorkspaceOverrides.REASON_MAX);
         return "console/workspace-status";
+    }
+
+    /** Why the trademark part was not checked, as a word of the language of the page: what the audit stored, or that no audit result is of this text. */
+    private String trademarkWhy(ListingStatusService.Verdict v) {
+        if (v.trademarkChecked()) {
+            return null;
+        }
+        return messages.get("workspace.trademark.reason." + (v.trademarkReason() == null ? "none" : v.trademarkReason().name().toLowerCase(java.util.Locale.ROOT)));
     }
 
     @PostMapping("/listings/{id}/draft")

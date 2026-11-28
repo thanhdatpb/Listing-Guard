@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{workspace.export.paste.title}"></title>
+    <th:block th:replace="~{console/layout :: head}"></th:block>
+    <script th:src="@{/console/copy.js}" defer></script>
+</head>
+<body>
+<div th:replace="~{console/layout :: demoBanner}"></div>
+<header th:replace="~{console/layout :: nav('workspace')}"></header>
+<main class="lg-page" id="workspace-export-paste">
+    <span id="main" tabindex="-1"></span>
+    <div class="lg-page__head">
+        <div>
+            <a class="lg-page__crumb" th:href="@{/console/workspace/export(account=${account.id()})}" th:text="#{workspace.export.back}"></a>
+            <h1 th:text="#{workspace.export.paste.heading}"></h1>
+            <p class="lg-page__sub" th:text="#{workspace.export.paste.sub(${account.name()}, ${kindLabel})}"></p>
+        </div>
+    </div>
+    <ul class="lg-kv lg-section" id="paste-summary">
+        <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.going}"></span><span class="lg-kv__value lg-num" th:text="${exported}"></span></li>
+        <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.held}"></span><span class="lg-kv__value lg-num" th:text="${held}"></span></li>
+        <li class="lg-kv__item"><span class="lg-kv__label" th:text="#{workspace.export.n.untrademarked}"></span><span class="lg-kv__value lg-num" th:text="${untrademarked}"></span></li>
+    </ul>
+    <p class="lg-text-muted" th:if="${markedExported}" th:text="#{workspace.export.paste.marked}"></p>
+    <section class="lg-card lg-section" aria-labelledby="paste-heading">
+        <h2 id="paste-heading" class="lg-card__title" th:text="#{workspace.export.paste.text}"></h2>
+        <textarea class="lg-textarea" id="paste-text" readonly rows="14" th:text="${text}"></textarea>
+        <div class="lg-actions">
+            <button type="button" class="lg-btn lg-btn--primary" id="paste-copy" data-copy-from="paste-text" th:attr="data-copied=#{workspace.copy.done},data-failed=#{workspace.copy.failed}" th:text="#{workspace.export.paste.copy}"></button>
+            <span class="lg-small" id="copy-status" role="status" aria-live="polite"></span>
+        </div>
+        <p class="lg-text-muted lg-small" th:text="#{workspace.export.paste.hint}"></p>
+    </section>
+</main>
+</body>
+</html>

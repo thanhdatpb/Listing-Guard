@@ -125,7 +125,7 @@ không phải lỗi. **Xuất Custom không đổi trạng thái listing** (tr�
 ### 8. Etsy: "Copy từng mục"
 
 Panel trên **trang listing** và **trang soạn** của listing Etsy: mỗi mục một nút Sao chép, **thứ tự theo `etsy-fields.yaml`** (ghi vào danh sách từ `EtsyFields`, không viết cứng). Tags nối bằng **dấu phẩy** (`, `),
-kèm **số tag và số ký tự theo ruleset** (cùng nguồn giới hạn với trình soạn: `RulesetLimitsService`; không có ruleset thì chỉ hiện độ dài). Giá trị lấy từ `data` qua `ListingContent.uses` (cùng thứ tự tag, ADR-062 §1), không có
+kèm **số tag và số ký tự theo ruleset** (cùng nguồn giới hạn với trình soạn: `RulesetLimitsService`; không có ruleset thì chỉ hiện độ dài). Giá trị lấy từ `data` của listing; riêng **tags** và **materials** lấy từ `fields` (đã dựng từ `data` bằng `ListingContent`, cùng thứ tự tag, ADR-062 §1), nên không có
 logic dựng thứ hai. Nút **"Đã đăng"** chuyển listing "Sẵn sàng xuất" sang **Đang bán (LIVE)** qua **cùng cổng như xuất** (`verdictsOf`); chỉ người sửa được listing; ghi `exported_at`, một mục lịch sử `EXPORT` và một dòng
 nhật ký (`format = ETSY_POSTED`). Listing đang bị cổng chặn thì nút bị khoá kèm lý do; ADMIN mở chặn ở trang trạng thái như thường.
 
@@ -134,7 +134,7 @@ nhật ký (`format = ETSY_POSTED`). Listing đang bị cổng chặn thì nút 
 - Một listing **xuất được** khi: thuộc tài khoản đã chọn của client; **người xuất sửa được listing** (`WorkspaceAccess.canEdit`: MEMBER chỉ xuất listing mình phụ trách với `member-edit-scope=own`, vì xuất đổi trạng thái);
   **ở trạng thái "Sẵn sàng xuất"**; và `Verdict.mayGo()` (không bị chặn, hoặc lý do mở của ADMIN còn hiệu lực cho đúng nội dung). Listing còn lại **không xuất** và được liệt kê kèm lý do (không đủ quyền / chưa sẵn sàng / bị cổng chặn kèm mã).
 - **Màn hình xác nhận** (một bước, không ghi gì): số listing xuất, **số bị chặn kèm lý do** (bảng), **số chưa kiểm trademark**, số đi qua nhờ lý do mở, số child không có parent trong lô, số "version khác", số không tìm thấy hay thuộc tài khoản khác,
-  cảnh báo giá trị hợp lệ, số ô sẽ bị thay (`.txt`; hiện sau khi xuất, vì cần dựng file), mỗi template version một dòng, và một ghi chú nếu cổng đang tắt (`block-on-error=false`) hoặc **"Rà nền đang tắt"**.
+  cảnh báo giá trị hợp lệ, số ô sẽ bị thay (`.txt`; đếm từ các ô sẽ ghi, không cần dựng file), mỗi template version một dòng, và một ghi chú nếu cổng đang tắt (`block-on-error=false`) hoặc **"Rà nền đang tắt"**.
   Nút xuất là nút cuối cùng và **tính lại toàn bộ dưới khoá tài khoản**; nếu số listing sẽ xuất khác số đã xác nhận thì dừng (`export.changed`) và hiện lại màn hình xác nhận.
 
 ### 10. Sau khi xuất: trạng thái, lịch sử, nhật ký

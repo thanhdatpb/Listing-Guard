@@ -119,7 +119,8 @@ public class WorkspaceExports {
     }
 
     /** One template version of the export: the listings that go, the ones held, and what is known of them. */
-    public record Group(Template template, int listings, int held, int untrademarked, int opened, int orphanChildren, Validation validation) {
+    public record Group(Template template, int listings, int held, int untrademarked, int opened, int orphanChildren, int replacedCells,
+                        Validation validation) {
     }
 
     public record Preview(SellerAccount account, Kind kind, Medium medium, boolean mediumFellBack, String excelProblem, TextEncoding encoding,
@@ -133,6 +134,15 @@ public class WorkspaceExports {
 
         public int warnings() {
             return groups.stream().mapToInt(g -> g.validation().cells()).sum();
+        }
+
+        /** The cells of a text file whose tab or line break would be replaced by a space; 0 for any other medium. */
+        public int replacedCells() {
+            return groups.stream().mapToInt(Group::replacedCells).sum();
+        }
+
+        public int orphanChildren() {
+            return groups.stream().mapToInt(Group::orphanChildren).sum();
         }
     }
 
@@ -337,8 +347,18 @@ public class WorkspaceExports {
             int groupUntrademarked = (int) ordered.stream().filter(l -> !verdicts.get(l.id()).trademarkChecked()).count();
             Validation validation = request.checkValues() ? validate(clientId, template, ordered, plan) : Validation.of("OFF");
             plan.validations.put(entry.getKey(), validation);
+            int replacedCells = 0;
+            if (medium == Medium.TXT) {
+                // what the text file would change, said before it is made
+                boolean[] numeric = numericColumns(template);
+                List<List<SheetCell>> rows = new ArrayList<>();
+                for (Listing l : ordered) {
+                    rows.add(cells(template, plan.customData.containsKey(l.id()) ? plan.customData.get(l.id()) : l.data(), numeric));
+                }
+                replacedCells = SheetWriter.replacedCells(template.headerRows(), rows);
+            }
             groups.add(new Group(template, ordered.size(), plan.heldByTemplate.getOrDefault(entry.getKey(), 0), groupUntrademarked, groupOpened,
-                    orphans(ordered), validation));
+                    orphans(ordered), replacedCells, validation));
             exportable += ordered.size();
             opened += groupOpened;
             untrademarked += groupUntrademarked;
