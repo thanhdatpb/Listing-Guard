@@ -231,6 +231,28 @@ def status_screen(page, manifest, folder, theme):
     save_screen(page, folder, "workspace-status", theme)
 
 
+def export_screen(page, manifest, folder, theme):
+    """workspace-export: the confirmation of an export of selected listings, with the ones that cannot go listed with their reason. Nothing is exported."""
+    open_page(page, WORKSPACE, "workspace-page")
+    for sku in ("MUG-004", "MUG-001-B", "TOTE-S"):
+        pick(page, sku)
+    page.locator("#bulk-export").click()
+    checked_page(page, "workspace-export")
+    expect(page.locator("#export-summary")).to_be_visible()
+    expect(page.locator("#export-held-table")).to_contain_text("MUG-004")
+    save_screen(page, folder, "workspace-export", theme)
+
+
+def etsy_copy_screen(page, manifest, folder, theme):
+    """workspace-etsy-copy: the panel "copy each item" of an Etsy listing. Nothing is copied or posted."""
+    open_page(page, WORKSPACE, "workspace-page")
+    page.locator("#workspace-table tbody tr").filter(has_text="ETSY-TOTE-1").first.locator("a").first.click()
+    checked_page(page, "workspace-detail")
+    expect(page.locator("#etsy-copy-table")).to_be_visible()
+    page.locator("#etsy-copy").scroll_into_view_if_needed()
+    save_screen(page, folder, "workspace-etsy-copy", theme)
+
+
 def inspect(page, manifest, folder, theme):
     import_screens(page, manifest, folder, theme)
     list_screen(page, folder, theme)
@@ -242,6 +264,8 @@ def inspect(page, manifest, folder, theme):
     status_screen(page, manifest, folder, theme)
     conflict_screen(page, manifest, folder, theme)
     audit_screen(page, folder, theme)
+    export_screen(page, manifest, folder, theme)
+    etsy_copy_screen(page, manifest, folder, theme)
 
 
 def main():
@@ -271,7 +295,7 @@ def main():
                 for file in sorted(staged.glob("*.png")):
                     (output / file.name).write_bytes(file.read_bytes())
         browser.close()
-    print("Passed: import, list, detail, editor, clone, compare, history, status, conflict and audit pages in both themes.")
+    print("Passed: import, list, detail, editor, clone, compare, history, status, conflict, audit, export and Etsy copy pages in both themes.")
 
 
 if __name__ == "__main__":

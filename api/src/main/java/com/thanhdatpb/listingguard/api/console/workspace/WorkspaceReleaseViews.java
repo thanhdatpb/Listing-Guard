@@ -123,9 +123,6 @@ public class WorkspaceReleaseViews {
                 } else {
                     count = messages.get("workspace.copy.count.chars", characters);
                 }
-                if (over) {
-                    count = count + " " + messages.get("workspace.copy.over");
-                }
             }
             items.add(new CopyItem(key, labels.target(key), value, empty, value.indexOf('\n') >= 0 || "description".equals(key), count, over));
         }

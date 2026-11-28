@@ -127,3 +127,9 @@ No API, schema, ruleset or contract change (no migration, no ADR).
 - `scripts/check-doc-links.py`: the Linux form of `docs/check-doc-links.ps1`.
 - Not changed: the tests that need Docker, and no real Amazon template was read (**not verified against a real file**).
 
+## Xuất theo template của tài khoản (W4)
+
+ADR-063, V60, sau `listing-guard.workspace.enabled`. Xuất listing Amazon ra bản sao template gốc (`.xlsm`/`.xlsx`, giữ macro, data validation, sheet phụ), file `.txt` tab-delimited hoặc text để dán vào Google Sheet; xuất Amazon Custom; panel "Copy từng mục" và nút "Đã đăng" cho Etsy; trạng thái Đã xuất/Đang bán, mục lịch sử `EXPORT` và nhật ký xuất chỉ có số đếm; lệnh admin `workspace roundtrip`. Xem [hướng dẫn](../workspace.md#12-xuất-theo-template-của-tài-khoản-adr-063).
+
+**Thay đổi hành vi so với W3 (cổng "Sẵn sàng xuất", ADR-063 §1):** client chưa cấu hình trademark không còn bị chặn bởi "Chưa rà đủ" (listing được ghi "chưa kiểm trademark"); khi rà nền tắt, mọi listing là "Chưa kiểm" và bị chặn (ADMIN mở được kèm lý do; `block-on-error=false` tắt hẳn cổng). Kết quả rà lưu trước V60 được rà lại một lần để có nguyên nhân. Biến mới: `LISTING_GUARD_WORKSPACE_EXPORT_MAX_LISTINGS`, `LISTING_GUARD_WORKSPACE_EXPORT_TEXT_ENCODING`. Không đổi `/api/v1`, OpenAPI, SDK, MCP, ruleset, `analysisVersion`; không dependency mới.
+
