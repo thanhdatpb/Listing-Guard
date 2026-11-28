@@ -1,0 +1,17 @@
+# Synthetic sample case (ADR-032): self-written, not taken from a real listing; the DEMO marks are invented.
+id: amazon-08-mojibake-bullet
+marketplace: AMAZON
+note: 'A bullet point copied from a file read in the wrong character set.'
+listing:
+  title: "Northfield Pottery Stoneware Coffee Mug, Blue Glaze, 12 oz"
+  brand: Northfield Pottery
+  bullet_points: ["Stoneware mug thrown on the wheel", "Holds about 350 ml", "CafÃ© style glaze"]
+  description: "A stoneware mug finished with a blue glaze."
+  search_terms: "ceramic mug stoneware cup"
+  product_type: DRINKING_CUP
+  price: 28.00
+  quantity: 4
+expected:
+  - rule: mojibake
+    field: bullet_points[2]
+trademark_risk: LOW

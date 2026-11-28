@@ -322,7 +322,7 @@ Từ danh sách (chọn nhiều), trang sửa hoặc trang chi tiết: **một l
 
 ### 11.4 So với bản gốc
 
-Listing nhân bản mà bản gốc còn tồn tại: cột còn **giống hệt bản gốc** được đánh dấu **Chưa sửa** (hay gặp: quên sửa tiêu đề, sót thông tin bản cũ). Tiêu đề giống hệt bản gốc hoặc listing khác cùng tài khoản hiện **cảnh báo trùng**: đây là kiểm tra nội bộ của kho, **không phải chính sách của sàn**. Tính khi hiển thị, không đổi kết quả rà. Rule bắt thông tin sót (size, số lượng) là việc của W5.
+Listing nhân bản mà bản gốc còn tồn tại: cột còn **giống hệt bản gốc** được đánh dấu **Chưa sửa** (hay gặp: quên sửa tiêu đề, sót thông tin bản cũ). Tiêu đề giống hệt bản gốc hoặc listing khác cùng tài khoản hiện **cảnh báo trùng**: đây là kiểm tra nội bộ của kho, **không phải chính sách của sàn**. Tính khi hiển thị, không đổi kết quả rà. Rule bắt thông tin sót (size, số lượng, người nhận, loại sản phẩm) là việc của W5, xem [mục 13](#13-rule-bắt-thông-tin-sót-của-bản-nhân-bản-adr-039).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/console/workspace-compare-dark.png">
@@ -428,3 +428,36 @@ Lệnh đọc file, đoán cột như lúc nhập, xuất lại `.xlsm`/`.xlsx` 
 - Chưa xác minh với template Amazon thật: kiểu ô số, ô có xuống dòng, dòng header của `.txt`, vị trí data validation (`dataValidation` hay `extLst`).
 - Xuất Excel dựng workbook trong bộ nhớ (khác phần đọc dùng SAX); chưa đo bộ nhớ với 2000 listing × template thật.
 - Hai ảnh trên chụp bằng cùng kịch bản của [mục 10](#10-chụp-lại-ảnh) (`export_screen`, `etsy_copy_screen`), trên dữ liệu tổng hợp, tiếng Anh.
+
+## 13. Rule bắt thông tin sót của bản nhân bản (ADR-039)
+
+Seller nhân bản listing cũ rồi sửa; lỗi hay gặp là **sót thông tin của bản cũ** (size 11oz ở tiêu đề, 15oz ở mô tả) và lỗi sao chép dán. Có hai phần, cả hai là **quy tắc chất lượng nội bộ, không phải chính sách của sàn**
+(nguồn `unverified`, mức mặc định **WARNING**, không bao giờ chặn "Sẵn sàng xuất").
+
+### 13.1 Trong cùng một listing: version ruleset mới
+
+Mười rule (`mojibake`, `placeholder_leftover`, `whitespace`, `unbalanced_brackets`, `repeated_word`, `all_caps_ratio`, `size_unit_conflict`, `quantity_conflict`, `recipient_conflict`, `product_noun_conflict`)
+nằm trong `etsy-2026-12b` và `amazon-2026-12d` ([bảng và những gì cố ý bỏ qua](rulesets.md#content-hygiene-and-clone-leftover-rules-adr-039)). Chúng là version **opt-in**: đặt
+`LISTING_GUARD_ETSY_RULESET=classpath:rulesets/etsy-2026-12b.yaml` và `LISTING_GUARD_AMAZON_RULESET=classpath:rulesets/amazon-2026-12d.yaml` (như `deploy/env.pilot.example`). Rà nền, trình soạn và
+`/api/v1/checks` đều dùng ruleset đang chạy, nên khi bật, rà nền báo các rule này và **tô đỏ** đúng chỗ (rule khớp chữ có vị trí). Đổi version ruleset làm rà nền rà lại mọi listing một lần (ADR-061).
+
+Bốn rule `*_conflict` so **tiêu đề với từng chỗ khác** (mô tả, gạch đầu dòng, tag) và đặt finding ở chỗ khác, ghi cả hai giá trị và hai trường; chỉ một chỗ có thông tin thì bỏ qua.
+Chỉ `whitespace` có gợi ý sửa (tiêu đề và tag: bản đã bỏ khoảng trắng thừa); Listing Guard không bao giờ tự áp dụng.
+
+### 13.2 So với bản gốc: `clone_leftover_from_source`
+
+Chỉ chạy trong rà nền của kho, cho listing có `cloned_from` mà bản gốc còn tồn tại (chưa xoá mềm). Không nằm trong rule-engine, nên `/api/v1/checks`, SDK và MCP không đổi.
+
+- **Khi nào có finding.** Bản nhân bản đổi một **cột thuộc tính biến thể** (cột được gán trường chuẩn `attribute`, như Size) sang kích cỡ, số lượng hoặc người nhận khác bản gốc, hoặc đổi **loại sản phẩm / danh mục** sang một nhóm sản phẩm khác;
+  trong khi một chữ của bản nhân bản (tiêu đề, bullet, tag, mô tả, search terms...) **còn ghi giá trị của bản gốc và không ghi giá trị mới**. Ví dụ: cột Size của bản nhân bản là `15oz` (bản gốc `11oz`) nhưng tiêu đề còn `11oz`.
+  Giá trị không đọc được là một sự kiện (màu, `M`) thì bỏ qua; câu liệt kê lựa chọn ("available in 11oz or 15oz") cũng bỏ qua.
+- **Bằng chứng** (trong chữ của finding): tên cột, giá trị mới, giá trị bản gốc, trường còn sót, và "chữ này còn giống hệt bản gốc" khi cột nguồn của trường đó chưa sửa. **Vị trí** là chỗ giá trị cũ trong chữ đã lưu, nên Console tô đỏ đúng chỗ.
+- **Khác template**: các cột được ghép bằng đúng phép ghép của [mục 11.3](#113-nhân-bản) và [11.4](#114-so-với-bản-gốc) (`ListingComparison.aligned`), không có phép ghép thứ hai.
+- **Etsy** chỉ có cột loại sản phẩm (`category`): template Etsy cố định không có cột thuộc tính biến thể. Size, số lượng, người nhận chỉ so được ở Amazon.
+- **Bật/tắt.** `LISTING_GUARD_WORKSPACE_AUDIT_CLONE_LEFTOVER=true` (`listing-guard.workspace.audit.clone-leftover`), mặc định `false`, cần rà nền bật. **Tắt**: hành vi, kết quả đã lưu và khoá phân tích giữ nguyên từng byte, không listing nào bị rà lại.
+  **Bật**: mỗi bản nhân bản được rà lại **đúng một lần** (khoá phân tích của nó gồm pack `clone-leftover-2026-12` và nội dung của bản gốc); listing không phải bản nhân bản không bị rà lại. Sau đó bản nhân bản được rà lại khi nội dung của nó, pack hoặc bản gốc đổi;
+  sửa bản gốc chỉ rà lại chính bản gốc ngay, còn bản nhân bản theo sau ở lượt rà kế tiếp (theo lịch, nút "Rà lại tài khoản" hoặc khi ngữ cảnh đổi).
+- **Pack** `clone-leftover-2026-12` (`api/src/main/resources/workspace/clone-leftover-2026-12.yaml`): danh sách đơn vị, biểu thức số lượng, trục người nhận, bảng danh từ và danh sách trường được quét. Bất biến như ruleset: đổi là file mới với version mới.
+  Kết quả ghi `pack = clone-leftover`, `rule_id = clone_leftover_from_source`, mức WARNING.
+- **Chưa xác minh với file template Amazon thật** (mọi fixture là tổng hợp; cột thuộc tính được tìm bằng đoán tên cột trong `standard-targets.yaml`). Chưa đo tỉ lệ báo nhầm trên listing thật.
+

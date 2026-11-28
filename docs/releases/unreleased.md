@@ -133,3 +133,26 @@ ADR-063, V60, sau `listing-guard.workspace.enabled`. Xuất listing Amazon ra b�
 
 **Thay đổi hành vi so với W3 (cổng "Sẵn sàng xuất", ADR-063 §1):** client chưa cấu hình trademark không còn bị chặn bởi "Chưa rà đủ" (listing được ghi "chưa kiểm trademark"); khi rà nền tắt, mọi listing là "Chưa kiểm" và bị chặn (ADMIN mở được kèm lý do; `block-on-error=false` tắt hẳn cổng). Kết quả rà lưu trước V60 được rà lại một lần để có nguyên nhân. Biến mới: `LISTING_GUARD_WORKSPACE_EXPORT_MAX_LISTINGS`, `LISTING_GUARD_WORKSPACE_EXPORT_TEXT_ENCODING`. Không đổi `/api/v1`, OpenAPI, SDK, MCP, ruleset, `analysisVersion`; không dependency mới.
 
+## Content hygiene and clone-leftover rules (W5)
+
+ADR-039. No migration (V60 stays the last) and no `/api/v1` change. Ten internal quality rules in two new ruleset versions, and a comparison of a clone with its original in the
+workspace audit. See the [rulesets](../rulesets.md#content-hygiene-and-clone-leftover-rules-adr-039) and the [workspace guide](../workspace.md#13-rule-bắt-thông-tin-sót-của-bản-nhân-bản-adr-039).
+
+- **New ruleset versions `etsy-2026-12b` and `amazon-2026-12d`** (opt-in: the default of `application.yml` stays `etsy-2026-12` and `amazon-2026-12c`; `LISTING_GUARD_ETSY_RULESET` and
+  `LISTING_GUARD_AMAZON_RULESET` select them, and `deploy/env.pilot.example` does). Every earlier rule is copied as it was (a test compares each one); the old versions stay and their
+  hashes are pinned. `Rule.optional()` lets a ruleset leave a rule out, so the old versions run on the same Java and give results equal to an engine that never had the new rules.
+- **Ten rules**, all `unverified` ("quy tắc chất lượng nội bộ, không phải chính sách của sàn") and WARNING: `mojibake`, `placeholder_leftover`, `whitespace`, `unbalanced_brackets`,
+  `repeated_word`, `all_caps_ratio`, and four that find a fact told two ways in one listing: `size_unit_conflict`, `quantity_conflict`, `recipient_conflict`, `product_noun_conflict`.
+  Every word list, expression and number is in the YAML. A text-matching rule sets `matchStart`/`matchEnd` so the workspace marks it. Only `whitespace` proposes a fix (title and tags).
+- **`clone_leftover_from_source`** (pack `clone-leftover`, `workspace/clone-leftover-2026-12.yaml`, WARNING): in the workspace audit, a clone whose variation attribute (size, quantity,
+  recipient) or product type is new while a text still states the original's value. Columns are paired by `ListingComparison.aligned`, the pairing of ADR-062 §4. It is not in the rule
+  engine, so `/api/v1/checks`, the SDK and MCP are unchanged. **`listing-guard.workspace.audit.clone-leftover` / `LISTING_GUARD_WORKSPACE_AUDIT_CLONE_LEFTOVER`, off by default.** Off:
+  every analysis version and every stored result is what it was. On: each clone is audited once more (its analysis version holds the pack and what of the original decides the result);
+  a listing that is no clone is not.
+- Explanations in both languages for the eleven rules (`rules_vi.properties`, `rules.properties`); the eval set has 16 new cases (43) and a baseline written by a real run (the eval job
+  and the CI gate score the two new versions, `application-eval-listing.yml`).
+- Contract (ADR-022): no `/api/v1` change. `./mvnw -B -pl contract-tools verify`: 0 breaking; the additive lines are the ones already listed above (phrase screening and v0.11.0), none is new.
+- Not verified: no real Amazon template (all fixtures synthetic; the attribute column is found by the guesses of `standard-targets.yaml`); the product-type tables of both marketplaces are not checked
+  against the marketplaces' lists. Not measured: the false-positive rate on real listings (the test and eval sets were written with the rules), the time to audit a large batch of clones again, the
+  marking in a real browser. Not run here: the Docker-only tests (they run in CI).
+

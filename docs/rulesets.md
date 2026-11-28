@@ -88,9 +88,35 @@ so **every source is `unverified`**, no finding is an `ERROR`, and **the two shi
 | `too_long` (more characters than the profile allows for the field, by label or the default) | WARNING | unverified |
 | `whitespace_issue` (space at the start or end, several in a row; nothing is removed) | INFO | unverified |
 
+## Content hygiene and clone-leftover rules (ADR-039)
+
+`etsy-2026-12b.yaml` and `amazon-2026-12d.yaml` add ten rules to everything their predecessor has (each earlier rule is copied as it was). They are **internal quality rules, not
+marketplace policy**: every source is `unverified` with the note "Quy tắc chất lượng nội bộ của Listing Guard (ADR-039), không phải chính sách của sàn", every severity is **WARNING**, and none can
+hold back "ready to export". The versions are opt-in (`LISTING_GUARD_ETSY_RULESET`, `LISTING_GUARD_AMAZON_RULESET`; `deploy/env.pilot.example` sets them); `etsy-2026-12` and `amazon-2026-12c` stay
+the default and give the results they always gave, because a rule marked `optional` is not run by a ruleset that does not configure it. `fields` of each rule says which texts it reads; the word
+lists, expressions and numbers are all in the file.
+
+| Rule | Reports | Left alone on purpose |
+|---|---|---|
+| `mojibake` | broken character encoding (`CafÃ©`, `donâ€™t`, the replacement character) | `Café`, `Piñata`, `NÃO`, Vietnamese |
+| `placeholder_leftover` | `[NAME]`, `{name}`, `{{first_name}}`, `XXXXX`, `TBD`, `lorem ipsum`, `insert text here` | `XXXL`, `Name Necklace`, `{Set of 2}`, `XOXO` |
+| `whitespace` | two spaces in a row, tab, no-break space, zero-width characters, a space before a comma. **The only rule with a fix** (title and tags: the cleaned text) | trimmed ends, line breaks and indentation of a description |
+| `unbalanced_brackets` | a `(` `[` `{` never closed, or a closing one never opened | `:)`, `:-)`, `1)` at the start of a line |
+| `repeated_word` | the same word twice in a row (`Mug mug`) | `Mom Mom`, `no no`, `bye bye`, a comma or hyphen between |
+| `all_caps_ratio` | a text written (almost) entirely in capitals | `BMW Racing Mug`, `NASA Space Mug`, acronyms, fewer than three counted words |
+| `size_unit_conflict` | the title and another text state two different sizes in one unit (`11oz`, `15 oz`) | another unit, `weighs 8 oz`, `handle 4 inches`, "available in 11oz or 15oz", only one text with a size |
+| `quantity_conflict` | two different quantities (`Pack of 2`, `4 pieces`) | `2 pack of 11oz mugs` reads 2, `two` = `2`, option sentences, only one text with a quantity |
+| `recipient_conflict` | two recipients that exclude each other on an axis (Mom/Dad, him/her, girl/boy, wife/husband...) | `Mom and Dad` in one text, `also great for`, a pronoun alone, only one text with a recipient |
+| `product_noun_conflict` | the title names a product (`Mug`) that the declared product type (`SHIRT`; for Etsy the last part of the category) does not fit | a type the table does not list, a title with no known noun or with the type's noun among others |
+
+The four `*_conflict` rules compare the title with each other text and put the finding on the other text, at the conflicting value, with both values and both fields in the message; a fact stated in only
+one text is not compared. A text-matching rule sets `matchStart`/`matchEnd` (ADR-061): the check API does not return them, the workspace audit marks them. `clone_leftover_from_source` (a clone that still
+says what its original said) is **not** a rule of these files: it needs the workspace, so it lives in the pack `clone-leftover` and the audit only (see the [workspace guide](workspace.md#13-rule-bắt-thông-tin-sót-của-bản-nhân-bản-adr-039)).
+
 To change a threshold or a severity, create a new ruleset file with a new `version`: the API refuses to
 start if a registered version has different content (see [ADR-002](adr/ADR-002-ruleset-versioning.md)).
 `etsy-2026-10.yaml`, `etsy-2026-11.yaml`, `amazon-2026-11.yaml` and `amazon-2026-12.yaml` are kept unchanged as history (a test pins their hashes) and are no longer loaded.
+`etsy-2026-12.yaml` and `amazon-2026-12c.yaml` are still the default; `etsy-2026-12b.yaml` and `amazon-2026-12d.yaml` are opt-in (above).
 Which rulesets are loaded is set by `listing-guard.rulesets.locations` in `application.yml`.
 
 The numeric limits of the loaded rulesets are served, read only, by `GET /api/v1/rulesets/{marketplace}/limits` (and
